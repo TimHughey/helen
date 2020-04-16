@@ -7,17 +7,17 @@ defmodule Janitor do
 
   use Config.Helper
   import Process, only: [send_after: 3]
-  import Janice.TimeSupport, only: [duration_ms: 1]
+  import TimeSupport, only: [duration_ms: 1]
 
   alias Fact.RunMetric
 
   defmacro __using__(_opts) do
     quote do
       use Config.Helper
-      import Janice.TimeSupport, only: [utc_now: 0]
+      import TimeSupport, only: [utc_now: 0]
 
       def janitor_opts do
-        from_config = Application.get_env(:mcp, __MODULE__)
+        from_config = Application.get_env(:helen, __MODULE__)
 
         mods =
           :sys.get_state(unquote(__MODULE__))
@@ -49,7 +49,7 @@ defmodule Janitor do
 
       def orphan_list(opts \\ []) when is_list(opts) do
         import Ecto.Query, only: [from: 2]
-        import Janice.TimeSupport, only: [utc_shift_past: 1]
+        import TimeSupport, only: [utc_shift_past: 1]
 
         # sent before passed as an option will override the app env config
         # if not passed in then grab it from the config
@@ -164,7 +164,7 @@ defmodule Janitor do
       ## Private
       #
       def older_than(opts \\ [older_than: [months: 3]]) when is_list(opts) do
-        import Janice.TimeSupport, only: [utc_shift_past: 1]
+        import TimeSupport, only: [utc_shift_past: 1]
 
         # :older_than passed as an option will override the app env config
         # if not passed in then grab it from the config
@@ -217,7 +217,7 @@ defmodule Janitor do
   def start_link(s) do
     defs = []
 
-    opts = Application.get_env(:mcp, __MODULE__, defs)
+    opts = Application.get_env(:helen, __MODULE__, defs)
 
     # setup the overall state with the necessary keys so we can pattern
     # match in handle_* functions
@@ -630,7 +630,7 @@ defmodule Janitor do
   defp increment_count({_rc, _res}, s, _orphans), do: s
 
   defp make_mod_maps do
-    {:ok, all_mods} = :application.get_key(:mcp, :modules)
+    {:ok, all_mods} = :application.get_key(:helen, :modules)
 
     for m <- all_mods,
         function_exported?(m, :want_janitorial_services, 0),
@@ -683,7 +683,7 @@ defmodule Janitor do
       _x -> false
     end
 
-    for {k, v} <- Application.get_all_env(:mcp),
+    for {k, v} <- Application.get_all_env(:helen),
         is_list(v),
         has_config?.(v),
         do: k

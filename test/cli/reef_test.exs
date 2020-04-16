@@ -61,7 +61,7 @@ defmodule ReefTest do
   end
 
   defp base(:msg) do
-    import Janice.TimeSupport, only: [unix_now: 1, utc_now: 0]
+    import TimeSupport, only: [unix_now: 1, utc_now: 0]
 
     %{
       host: random_mcr(),

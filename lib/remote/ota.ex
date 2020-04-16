@@ -3,7 +3,7 @@ defmodule OTA do
 
   require Logger
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   alias Mqtt.Client
 
@@ -19,7 +19,7 @@ defmodule OTA do
       ]
     ]
 
-    config = Application.get_env(:mcp, OTA, def)
+    config = Application.get_env(:helen, OTA, def)
     host = Kernel.get_in(config, [:url, :host])
     uri = Kernel.get_in(config, [:url, :uri])
     fw_file = Kernel.get_in(config, [:url, :fw_file])

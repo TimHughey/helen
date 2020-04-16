@@ -1,4 +1,4 @@
-defmodule Janice.TimeSupport do
+defmodule TimeSupport do
   @moduledoc false
   require Logger
   use Timex

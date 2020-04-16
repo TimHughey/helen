@@ -4,7 +4,7 @@ defmodule SwitchDeviceTest do
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog
 
-  alias Janice.TimeSupport
+  alias TimeSupport
   alias Switch.Device
 
   setup do

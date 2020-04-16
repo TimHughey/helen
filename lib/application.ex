@@ -1,4 +1,4 @@
-defmodule Mcp.Application do
+defmodule Helen.Application do
   @moduledoc false
 
   use Application
@@ -6,7 +6,7 @@ defmodule Mcp.Application do
   import Application, only: [get_env: 2, get_env: 3, put_env: 3]
   import Keyword, only: [has_key?: 2]
 
-  @log_opts get_env(:mcp, Mcp.Application, []) |> Keyword.get(:log, [])
+  @log_opts get_env(:helen, Helen.Application, []) |> Keyword.get(:log, [])
 
   def start(_type, args) do
     log = Keyword.get(@log_opts, :init, true)
@@ -16,11 +16,11 @@ defmodule Mcp.Application do
 
     build_env = Keyword.get(args, :build_env, "dev")
 
-    put_env(:mcp, :build_env, build_env)
+    put_env(:helen, :build_env, build_env)
 
     children =
-      for i <- get_env(:mcp, :sup_tree) do
-        if is_tuple(i), do: i, else: get_env(:mcp, i)
+      for i <- get_env(:helen, :sup_tree) do
+        if is_tuple(i), do: i, else: get_env(:helen, i)
       end
       |> List.flatten()
 
@@ -31,13 +31,13 @@ defmodule Mcp.Application do
     # for other strategies and supported options
     opts = [
       strategy: :rest_for_one,
-      name: Mcp.Supervisor,
+      name: Helen.Supervisor,
       max_restarts: 100,
       max_seconds: 5
     ]
 
     # only start the Supervisor if the database password is set
-    if get_env(:mcp, Repo, []) |> has_key?(:password) do
+    if get_env(:helen, Repo, []) |> has_key?(:password) do
       Logger.info([
         "build_env[",
         build_env,

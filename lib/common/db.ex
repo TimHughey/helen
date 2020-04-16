@@ -1,14 +1,14 @@
-defmodule Janice.Common.DB do
+defmodule Common.DB do
   @moduledoc false
   use Timex
 
   defmacro __using__([]) do
     quote do
-      import Janice.Common.DB, only: [deprecated_name: 1, name_regex: 0]
+      import Common.DB, only: [deprecated_name: 1, name_regex: 0]
 
-      # @behaviour Janice.Common.DB
+      # @behaviour Common.DB
 
-      def find(x), do: Janice.Common.DB.find(__MODULE__, x)
+      def find(x), do: Common.DB.find(__MODULE__, x)
     end
   end
 

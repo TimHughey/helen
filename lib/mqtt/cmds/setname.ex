@@ -3,7 +3,7 @@ defmodule Mqtt.SetName do
 
   require Logger
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   def new_cmd(host, name)
       when is_binary(host) and is_binary(name),

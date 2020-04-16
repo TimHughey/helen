@@ -343,7 +343,7 @@ defmodule Thermostat.Server do
   def start_link(%{id: id} = args) do
     Logger.debug(["start_link() args: ", inspect(args, pretty: true)])
 
-    opts = Application.get_env(:mcp, Thermostat.Server, [])
+    opts = Application.get_env(:helen, Thermostat.Server, [])
     {_, name_atom} = server_name(id)
     t = Thermostat.get_by(id: id)
 

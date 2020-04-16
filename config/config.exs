@@ -8,14 +8,14 @@ config :logger,
   backends: [:console],
   level: :info,
   compile_time_purge_matching: [
-    [application: :mcp, level_lower_than: :info],
+    [application: :helen, level_lower_than: :info],
     [application: :swarm, level_lower_than: :error]
   ]
 
 config :scribe, style: Scribe.Style.GithubMarkdown
 
 # General application configuration
-config :mcp,
+config :helen,
   ecto_repos: [Repo],
   build_env: "#{Mix.env()}",
   namespace: Web,
@@ -57,13 +57,13 @@ config :mcp,
     {Thermostat.Supervisor, [start_workers: true]}
   ],
   misc_workers: [
-    {Janice.Scheduler, []}
+    {Helen.Scheduler, []}
   ],
   agnus: [
     {Agnus.Supervisor, []}
   ]
 
-config :mcp, Agnus.DayInfo,
+config :helen, Agnus.DayInfo,
   log: [init: false, init_args: false],
   tz: "America/New_York",
   api: [
@@ -72,22 +72,22 @@ config :mcp, Agnus.DayInfo,
     lng: -74.011
   ]
 
-config :mcp, Agnus.Supervisor, log: [init: false, init_args: false]
+config :helen, Agnus.Supervisor, log: [init: false, init_args: false]
 
-config :mcp, Mcp.Application, log: [init: false]
+config :helen, Helen.Application, log: [init: false]
 
-config :mcp, Janice.Scheduler,
+config :helen, Helen.Scheduler,
   global: true,
   run_strategy: Quantum.RunStrategy.Local,
   timezone: "America/New_York"
 
-config :mcp, Janitor,
+config :helen, Janitor,
   log: [init: true, init_args: false],
   metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
 
-config :mcp, Janitor.Supervisor, log: [init: true, init_args: false]
+config :helen, Janitor.Supervisor, log: [init: true, init_args: false]
 
-config :mcp, MessageSave,
+config :helen, MessageSave,
   log: [init: false],
   save: false,
   save_opts: [],
@@ -95,7 +95,7 @@ config :mcp, MessageSave,
   forward_opts: [in: [feed: {"dev/mcr/f/report", 0}]],
   purge: [all_at_startup: true, older_than: [minutes: 20], log: false]
 
-config :mcp, Mqtt.Inbound,
+config :helen, Mqtt.Inbound,
   additional_message_flags: [
     log_invalid_readings: true,
     log_roundtrip_times: true
@@ -110,17 +110,17 @@ config :mcp, Mqtt.Inbound,
   remote_msgs: {Remote, :external_update},
   pwm_msgs: {PulseWidth, :external_update}
 
-config :mcp, OTA,
+config :helen, OTA,
   url: [
     host: "www.wisslanding.com",
-    uri: "janice/mcr_esp/firmware",
+    uri: "helen/mcr_esp/firmware",
     fw_file: "latest-mcr_esp.bin"
   ]
 
-config :mcp, Repo,
+config :helen, Repo,
   migration_timestamps: [type: :utc_datetime_usec],
   adapter: Ecto.Adapters.Postgres
 
-config :mcp, Switch.Device, log: [cmd_ack: false]
+config :helen, Switch.Device, log: [cmd_ack: false]
 
 import_config "#{Mix.env()}.exs"

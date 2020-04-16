@@ -21,7 +21,7 @@ defmodule Mqtt.Client do
   #    }
   #  end
 
-  @cmd_feed get_env(:mcp, :feeds, []) |> Keyword.get(:cmd, {nil, nil})
+  @cmd_feed get_env(:helen, :feeds, []) |> Keyword.get(:cmd, {nil, nil})
 
   def start_link(s) when is_map(s) do
     GenServer.start_link(__MODULE__, s, name: __MODULE__)
@@ -63,7 +63,7 @@ defmodule Mqtt.Client do
     ## HACK: clean up opts
     #
     log =
-      get_env(:mcp, Mqtt.Client, [])
+      get_env(:helen, Mqtt.Client, [])
       |> Keyword.get(:log, [])
       |> Keyword.get(:init, false)
 
@@ -131,7 +131,7 @@ defmodule Mqtt.Client do
   end
 
   def report_subscribe do
-    feed = get_env(:mcp, :feeds, []) |> Keyword.get(:rpt, nil)
+    feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt, nil)
     subscribe(feed)
   end
 
@@ -240,7 +240,7 @@ defmodule Mqtt.Client do
     Logger.debug(["mqtt endpoint connected"])
 
     # subscribe to the report feed
-    feed = get_env(:mcp, :feeds, []) |> Keyword.get(:rpt, nil)
+    feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt, nil)
     res = Connection.subscribe(s.client_id, [feed])
 
     s = Map.put(s, :rpt_feed_subscribed, res)
@@ -368,7 +368,7 @@ defmodule Mqtt.Client do
 
   defp config(key)
        when is_atom(key) do
-    get_env(:mcp, Mqtt.Client) |> Keyword.get(key)
+    get_env(:helen, Mqtt.Client) |> Keyword.get(key)
   end
 
   defp log_unhandled(type, message) do
@@ -433,7 +433,7 @@ defmodule Mqtt.Client do
   end
 
   defp timesync_opts do
-    get_env(:mcp, Mqtt.Client, [])
+    get_env(:helen, Mqtt.Client, [])
     |> Keyword.get(:timesync, [])
     |> Enum.into(%{})
   end

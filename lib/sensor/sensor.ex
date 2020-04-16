@@ -11,8 +11,8 @@ defmodule Sensor do
   import Ecto.Query, only: [from: 2]
   import Repo, only: [insert!: 1, update: 1, update!: 1, one: 1]
 
-  import Janice.Common.DB, only: [name_regex: 0]
-  alias Janice.TimeSupport
+  import Common.DB, only: [name_regex: 0]
+  alias TimeSupport
 
   # alias Fact.Celsius
   alias Fact.Fahrenheit

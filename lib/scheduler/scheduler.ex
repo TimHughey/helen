@@ -1,4 +1,4 @@
-defmodule Janice.Scheduler do
+defmodule Helen.Scheduler do
   use Quantum.Scheduler,
-    otp_app: :mcp
+    otp_app: :helen
 end

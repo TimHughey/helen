@@ -9,7 +9,7 @@ defmodule JanitorTest do
   # alias Dutycycle.Server
   # alias Dutycycle.State
   # alias Dutycycle.Supervisor
-  # alias Janice.TimeSupport
+  # alias TimeSupport
 
   setup do
     :ok

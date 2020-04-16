@@ -10,7 +10,7 @@ base=$(git rev-parse --show-toplevel)
 
 source $base/extra/common/vars.sh
 
-chdir $mcp_base
+chdir $helen_base
 
 if [[ -v SKIP_PULL ]]; then
   print -P "\n$fg_bold[yellow]* skipping git pull, as requested%f\n"

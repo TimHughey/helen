@@ -7,7 +7,7 @@ config :logger,
   # level: :warn
   level: :info
 
-config :mcp,
+config :helen,
   feeds: [
     cmd: {"prod/mcr/f/command", 1},
     rpt: {"prod/mcr/f/report", 0}
@@ -20,10 +20,10 @@ config :mcp,
 # import_config "modules/msg_save_enable.exs"
 # import_config "modules/msg_save_forward.exs"
 
-config :mcp, Mqtt.Client,
+config :helen, Mqtt.Client,
   log_dropped_msgs: true,
   tort_opts: [
-    client_id: "janice-prod",
+    client_id: "helen-prod",
     user_name: "** set in prod.secret.exs",
     password: "** set in prod.secret.exs",
     server:
@@ -34,7 +34,7 @@ config :mcp, Mqtt.Client,
   # the MQTT spec requires both sending and receiving to prevent disconnects
   timesync: [frequency: {:mins, 2}, loops: 0, forever: true, log: false]
 
-config :mcp, Mqtt.Inbound,
+config :helen, Mqtt.Inbound,
   additional_message_flags: [
     log_invalid_readings: true,
     log_roundtrip_times: true
@@ -45,8 +45,8 @@ config :mcp, Mqtt.Inbound,
     repeat: {:hrs, 60}
   ]
 
-config :mcp, Fact.Influx,
-  database: "jan_prod",
+config :helen, Fact.Influx,
+  database: "helen_prod",
   host: "** set in prod.secret.exs",
   auth: [
     method: :basic,
@@ -59,7 +59,7 @@ config :mcp, Fact.Influx,
   scheme: "http",
   writer: Instream.Writer.Line
 
-config :mcp, PulseWidthCmd,
+config :helen, PulseWidthCmd,
   orphan: [
     at_startup: true,
     sent_before: [seconds: 1],
@@ -73,14 +73,14 @@ config :mcp, PulseWidthCmd,
     log: true
   ]
 
-config :mcp, Repo,
-  database: "jan_prod",
-  username: "jan_prod",
+config :helen, Repo,
+  database: "helen_prod",
+  username: "helen_prod",
   password: "** set in prod.secret.exs",
   hostname: "** set in prod.secret.exs",
   pool_size: 20
 
-config :mcp, Switch.Command,
+config :helen, Switch.Command,
   # NOTE:  older_than lists are passed to Timex to create a
   #        shifted DateTime in UTC
   orphan: [
@@ -96,21 +96,21 @@ config :mcp, Switch.Command,
     log: true
   ]
 
-run_strategy = {Quantum.RunStrategy.All, [:"mcp-prod@jophiel.wisslanding.com"]}
+run_strategy = {Quantum.RunStrategy.All, [:"prod@helen.live.wisslanding.com"]}
 
-config :mcp, Janice.Scheduler,
+config :helen, Helen.Scheduler,
   jobs: [
     # Every minute
     {:touch,
      [
        schedule: {:cron, "* * * * *"},
-       task: {Janice.Jobs, :touch_file, ["/tmp/janice-prod.touch"]},
+       task: {Jobs, :touch_file, ["/tmp/helen-prod.touch"]},
        run_strategy: run_strategy
      ]},
     {:purge_readings,
      [
        schedule: {:cron, "22,56 * * * *"},
-       task: {Janice.Jobs, :purge_readings, [[days: -30]]},
+       task: {Jobs, :purge_readings, [[days: -30]]},
        run_strategy: run_strategy
      ]},
     {:seedlings_day,
@@ -135,12 +135,5 @@ config :mcp, Janice.Scheduler,
     # Runs every midnight:
     # {"@daily",         {Backup, :backup, []}}
   ]
-
-config :mcp, Mcp.SoakTest,
-  # don't start
-  startup_delay: {:ms, 0},
-  periodic_log_first: {:mins, 30},
-  periodic_log: {:hrs, 1},
-  flash_led: {:secs, 3}
 
 import_config "prod.secret.exs"

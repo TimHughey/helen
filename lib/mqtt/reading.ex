@@ -5,7 +5,7 @@ defmodule Mqtt.Reading do
 
   alias Fact.EngineMetric
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   alias Jason
 

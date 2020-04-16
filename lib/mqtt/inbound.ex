@@ -5,7 +5,7 @@ defmodule Mqtt.Inbound do
   use GenServer
   import Application, only: [get_env: 2]
   import Process, only: [send_after: 3]
-  import Janice.TimeSupport, only: [ms: 1]
+  import TimeSupport, only: [ms: 1]
 
   alias Fact.EngineMetric
   alias Fact.FreeRamStat
@@ -139,7 +139,7 @@ defmodule Mqtt.Inbound do
 
   defp config(key, default \\ [])
        when is_atom(key) do
-    get_env(:mcp, Mqtt.Inbound) |> Keyword.get(key, default)
+    get_env(:helen, Mqtt.Inbound) |> Keyword.get(key, default)
   end
 
   defp incoming_msg(msg, s, opts) do

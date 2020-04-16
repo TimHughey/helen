@@ -496,7 +496,7 @@ defmodule Dutycycle.Server do
   def start_link(%{id: id} = args) do
     Logger.debug(["start_link() args: ", inspect(args, pretty: true)])
 
-    opts = Application.get_env(:mcp, Dutycycle.Server, [])
+    opts = Application.get_env(:helen, Dutycycle.Server, [])
     {dc, server_name} = server_name(id)
 
     GenServer.start_link(

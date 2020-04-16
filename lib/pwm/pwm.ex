@@ -36,7 +36,7 @@ defmodule PulseWidth do
   end
 
   def add(%{device: device, host: _host, mtime: mtime} = r) do
-    import Janice.TimeSupport, only: [from_unix: 1]
+    import TimeSupport, only: [from_unix: 1]
 
     keys = [:device, :host, :duty, :duty_max, :duty_min]
 
@@ -171,7 +171,7 @@ defmodule PulseWidth do
           msg_recv_dt: msg_recv_at
         } = r
       ) do
-    import Janice.TimeSupport, only: [from_unix: 1]
+    import TimeSupport, only: [from_unix: 1]
 
     set =
       Enum.into(Map.take(r, external_changes()), []) ++
@@ -250,7 +250,7 @@ defmodule PulseWidth do
         unique_constraint: 3
       ]
 
-    import Janice.Common.DB, only: [name_regex: 0]
+    import Common.DB, only: [name_regex: 0]
 
     pwm
     |> cast(params, possible_changes())
@@ -270,7 +270,7 @@ defmodule PulseWidth do
   end
 
   defp duty_read(opts) do
-    import Janice.TimeSupport, only: [ttl_expired?: 2]
+    import TimeSupport, only: [ttl_expired?: 2]
 
     pwm = %PulseWidth{duty: duty, ttl_ms: ttl_ms} = Keyword.get(opts, :pwm)
 
@@ -295,7 +295,7 @@ defmodule PulseWidth do
   defp last_seen_at(%PulseWidth{last_seen_at: x}), do: x
 
   defp record_cmd(%PulseWidth{} = pwm, opts) when is_list(opts) do
-    import Janice.TimeSupport, only: [utc_now: 0]
+    import TimeSupport, only: [utc_now: 0]
     import Mqtt.Client, only: [publish_cmd: 1]
     import Mqtt.SetPulseWidth, only: [create_cmd: 3]
 

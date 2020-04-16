@@ -6,15 +6,15 @@ defmodule Fact.LedFlashes do
   alias Fact.LedFlashes
   import(Fact.Influx, only: [write: 2])
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   series do
-    database(Application.get_env(:mcp, Fact.Influx) |> Keyword.get(:database))
+    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     measurement("led_flashes")
 
     tag(:name)
-    tag(:application, default: "janice")
-    tag(:env, default: Application.get_env(:mcp, :build_env, "dev"))
+    tag(:application, default: "helen")
+    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
 
     field(:val)
   end

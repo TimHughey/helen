@@ -3,7 +3,7 @@ defmodule Mqtt.SetSwitch do
 
   require Logger
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   alias Switch.{Device, Command}
 
@@ -16,7 +16,7 @@ defmodule Mqtt.SetSwitch do
         opts
       )
       when is_list(opts) do
-    import Janice.TimeSupport, only: [unix_now: 1]
+    import TimeSupport, only: [unix_now: 1]
 
     %{
       cmd: @setswitch_cmd,

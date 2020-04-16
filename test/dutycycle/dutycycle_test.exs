@@ -10,7 +10,7 @@ defmodule DutycycleTest do
   alias Dutycycle.Server
   alias Dutycycle.State
   alias Dutycycle.Supervisor
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   @tag alias_prefix: "dutycycle_sw"
 

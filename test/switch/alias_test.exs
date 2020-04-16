@@ -7,7 +7,7 @@ defmodule SwitchAliasTest do
 
   use JanTest
 
-  alias Janice.TimeSupport
+  alias TimeSupport
   alias Switch.Alias
   alias Switch.Device
 

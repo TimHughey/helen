@@ -10,7 +10,7 @@ base=$(git rev-parse --show-toplevel)
 
 source $base/extra/common/vars.sh
 
-cd $janice_extra/mcp
+cd $helen_extra/mcp
 
 ./prod-build.sh && ./prod-install.sh && ./tail-log.sh
 

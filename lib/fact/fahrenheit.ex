@@ -5,16 +5,16 @@ defmodule Fact.Fahrenheit do
   alias Fact.Fahrenheit
   import(Fact.Influx, only: [write: 2])
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   series do
-    database(Application.get_env(:mcp, Fact.Influx) |> Keyword.get(:database))
+    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     measurement("fahrenheit")
 
     tag(:remote_host)
     tag(:device)
     tag(:name)
-    tag(:env, default: Application.get_env(:mcp, :build_env, "dev"))
+    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
 
     field(:val)
   end

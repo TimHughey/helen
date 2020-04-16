@@ -4,7 +4,7 @@ defmodule Fact.Sensor do
   # alias Fact.Celsius
   # import(Fact.Influx, only: [write: 2])
   #
-  # alias Janice.TimeSupport
+  # alias TimeSupport
 
   #   %{
   #   points: [

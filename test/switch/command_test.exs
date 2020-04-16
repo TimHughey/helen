@@ -8,7 +8,7 @@ defmodule SwitchCommandTest do
 
   # import ExUnit.CaptureLog
 
-  alias Janice.TimeSupport
+  alias TimeSupport
   alias Switch.{Command, Device}
 
   setup do

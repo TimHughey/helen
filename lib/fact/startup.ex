@@ -6,15 +6,15 @@ defmodule Fact.StartupAnnouncement do
   alias Fact.StartupAnnouncement
   import(Fact.Influx, only: [write: 2])
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   series do
-    database(Application.get_env(:mcp, Fact.Influx) |> Keyword.get(:database))
+    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     measurement("run_metric")
 
-    tag(:application, default: "janice")
+    tag(:application, default: "helen")
     tag(:metric, default: "startup_announcement")
-    tag(:env, default: Application.get_env(:mcp, :build_env, "dev"))
+    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
     tag(:host)
     tag(:vsn, default: "unknown-vsn")
     tag(:hw, default: "unknown-hw")

@@ -35,7 +35,7 @@ defmodule Dutycycle do
 
   import Ecto.Query, only: [from: 2]
 
-  import Janice.Common.DB, only: [name_regex: 0]
+  import Common.DB, only: [name_regex: 0]
 
   alias Dutycycle.Profile
   alias Dutycycle.Server

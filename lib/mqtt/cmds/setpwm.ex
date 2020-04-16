@@ -9,7 +9,7 @@ defmodule Mqtt.SetPulseWidth do
         opts
       )
       when is_list(opts) do
-    import Janice.TimeSupport, only: [unix_now: 1]
+    import TimeSupport, only: [unix_now: 1]
 
     %{
       cmd: "pwm",

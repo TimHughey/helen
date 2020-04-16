@@ -1,4 +1,4 @@
-defmodule Mcp.IExHelpers do
+defmodule Helen.IExHelpers do
   @moduledoc false
 
   require Logger
@@ -13,7 +13,7 @@ defmodule Mcp.IExHelpers do
 
   def observer do
     :observer.start()
-    Node.connect(:"prod-mcp@jophiel.wisslanding.com")
+    Node.connect(:"prod@helen.live.wisslanding.com")
   end
 end
 

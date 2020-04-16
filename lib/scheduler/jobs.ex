@@ -1,11 +1,11 @@
-defmodule Janice.Jobs do
+defmodule Jobs do
   @moduledoc false
   require Logger
 
   def purge_readings(opts) when is_list(opts), do: Sensor.purge_readings(opts)
 
   def touch_file do
-    System.cmd("touch", ["/tmp/janice-every-minute"])
+    System.cmd("touch", ["/tmp/helen-every-minute"])
   end
 
   def touch_file(filename) when is_binary(filename) do

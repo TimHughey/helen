@@ -1,8 +1,8 @@
 #!/usr/bin/env zsh
 
-jan_base=/usr/local/janice
-jan_bin=${jan_base}/bin
-mcp=${jan_bin}/mcp
+helen_base=/usr/local/helen
+helen_bin=${helen_base}/bin
+mcp=${helen_bin}/mcp
 
 print -n "waiting for mcp to start... "
 
@@ -12,8 +12,8 @@ done
 
 print "done."
 
-mcp_pid=$($mcp pid)
+helen_pid=$($mcp pid)
 
-print "tailing janice log file. (use CTRL+C to stop)"
+print "tailing helen log file. (use CTRL+C to stop)"
 
-exec tail --lines=100 --pid=${mcp_pid} -f $jan_base/tmp/log/erlang.*(om[1])
+exec tail --lines=100 --pid=${helen_pid} -f $helen_base/tmp/log/erlang.*(om[1])

@@ -7,13 +7,13 @@ config :logger,
   # level: :warn
   level: :info
 
-config :mcp,
+config :helen,
   feeds: [
     cmd: {"dev/mcr/f/command", 1},
     rpt: {"dev/mcr/f/report", 0}
   ]
 
-config :mcp,
+config :helen,
   # overrides from config.exs
   protocol_supervisors: [
     {Fact.Supervisor, [log: [init: false]]}
@@ -31,27 +31,20 @@ config :mcp,
 # import_config "modules/msg_save_enable.exs"
 # import_config "modules/msg_save_forward.exs"
 
-config :mcp, Fact.Influx,
-  database: "jan_dev",
+config :helen, Fact.Influx,
+  database: "helen_dev",
   host: "jophiel.wisslanding.com",
-  auth: [method: :basic, username: "jan_test", password: "jan_test"],
+  auth: [method: :basic, username: "helen_test", password: "helen_test"],
   http_opts: [insecure: true],
   pool: [max_overflow: 10, size: 5, timeout: 150_000, max_connections: 10],
   port: 8086,
   scheme: "http",
   writer: Instream.Writer.Line
 
-config :mcp, Mcp.SoakTest,
-  # don't start
-  startup_delay: {:ms, 0},
-  periodic_log_first: {:mins, 30},
-  periodic_log: {:hrs, 1},
-  flash_led: {:secs, 3}
-
-config :mcp, Mqtt.Client,
+config :helen, Mqtt.Client,
   log_dropped_msgs: true,
   tort_opts: [
-    client_id: "janice-#{Mix.env()}",
+    client_id: "helen-#{Mix.env()}",
     user_name: "mqtt",
     password: "mqtt",
     server:
@@ -61,12 +54,12 @@ config :mcp, Mqtt.Client,
   timesync: [frequency: {:mins, 1}, loops: 5, forever: true, log: false],
   log: [init: false]
 
-config :mcp, Mqtt.Inbound,
+config :helen, Mqtt.Inbound,
   additional_message_flags: [
     switch_redesign: true
   ]
 
-config :mcp, PulseWidthCmd,
+config :helen, PulseWidthCmd,
   orphan: [
     at_startup: true,
     sent_before: [seconds: 10],
@@ -79,15 +72,15 @@ config :mcp, PulseWidthCmd,
     log: false
   ]
 
-config :mcp, Repo,
-  database: "jan_dev",
-  username: "jan_dev",
-  password: "jan_dev",
+config :helen, Repo,
+  database: "helen_dev",
+  username: "helen_dev",
+  password: "helen_dev",
   port: 15432,
   hostname: "dev.db.wisslanding.com",
   pool_size: 10
 
-config :mcp, Switch.Command,
+config :helen, Switch.Command,
   # NOTE:  older_than lists are passed to Timex to create a
   #        shifted DateTime in UTC
   orphan: [
@@ -102,19 +95,19 @@ config :mcp, Switch.Command,
     log: true
   ]
 
-config :mcp, Janice.Scheduler,
+config :helen, Helen.Scheduler,
   jobs: [
     # Every minute
     {:touch,
      [
        schedule: {:cron, "* * * * *"},
-       task: {Janice.Jobs, :touch_file, ["/tmp/janice-dev.touch"]},
+       task: {Jobs, :touch_file, ["/tmp/helen-dev.touch"]},
        run_strategy: Quantum.RunStrategy.Local
      ]},
     {:purge_readings,
      [
        schedule: {:cron, "22,56 * * * *"},
-       task: {Janice.Jobs, :purge_readings, [[days: -30]]},
+       task: {Jobs, :purge_readings, [[days: -30]]},
        run_strategy: Quantum.RunStrategy.Local
      ]}
   ]

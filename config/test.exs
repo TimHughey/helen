@@ -2,13 +2,13 @@
 # and its dependencies with the aid of the Mix.Config module.
 use Mix.Config
 
-config :mcp,
+config :helen,
   feeds: [
     cmd: {"test/mcr/f/command", 1},
     rpt: {"prod/mcr/f/report", 0}
   ]
 
-config :mcp,
+config :helen,
   # overrides from config.exs
   worker_supervisors: [
     # DynamicSupervisors
@@ -23,11 +23,11 @@ config :mcp,
 # import_config "modules/msg_save_enable.exs"
 import_config "modules/msg_save_forward.exs"
 
-config :mcp, Mqtt.Client,
+config :helen, Mqtt.Client,
   log_dropped_msg: true,
   runtime_metrics: true,
   tort_opts: [
-    client_id: "janice-test",
+    client_id: "helen-test",
     user_name: "mqtt",
     password: "mqtt",
     server:
@@ -36,23 +36,23 @@ config :mcp, Mqtt.Client,
   ],
   timesync: [frequency: {:secs, 5}, loops: 5, forever: false, log: false]
 
-config :mcp, Mqtt.Inbound,
+config :helen, Mqtt.Inbound,
   log: [
     engine_metrics: false
   ],
   periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
-config :mcp, Fact.Influx,
-  database: "jan_test",
+config :helen, Fact.Influx,
+  database: "helen_test",
   host: "jophiel.wisslanding.com",
-  auth: [method: :basic, username: "jan_test", password: "jan_test"],
+  auth: [method: :basic, username: "helen_test", password: "helen_test"],
   http_opts: [insecure: true],
   pool: [max_overflow: 10, size: 10, timeout: 60_000, max_connections: 30],
   port: 8086,
   scheme: "http",
   writer: Instream.Writer.Line
 
-config :mcp, PulseWidthCmd,
+config :helen, PulseWidthCmd,
   orphan: [
     at_startup: true,
     sent_before: [seconds: 1],
@@ -65,15 +65,15 @@ config :mcp, PulseWidthCmd,
     log: true
   ]
 
-config :mcp, Repo,
-  username: "jan_test",
-  password: "jan_test",
-  database: "jan_test",
+config :helen, Repo,
+  username: "helen_test",
+  password: "helen_test",
+  database: "helen_test",
   port: 15432,
   hostname: "test.db.wisslanding.com",
   pool_size: 10
 
-config :mcp, Switch.Command,
+config :helen, Switch.Command,
   # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [
     at_startup: true,
@@ -87,13 +87,13 @@ config :mcp, Switch.Command,
     log: true
   ]
 
-config :mcp, Janice.Scheduler,
+config :helen, Helen.Scheduler,
   jobs: [
     # Every minute
     {:touch,
      [
        schedule: {:extended, "* * * * *"},
-       task: {Janice.Jobs, :touch_file, ["/tmp/janice-test.touch"]},
+       task: {Jobs, :touch_file, ["/tmp/helen-test.touch"]},
        run_strategy: Quantum.RunStrategy.Local
      ]}
 
@@ -106,10 +106,3 @@ config :mcp, Janice.Scheduler,
     # Runs every midnight:
     # {"@daily",         {Backup, :backup, []}}
   ]
-
-config :mcp, Mcp.SoakTest,
-  # don't start
-  startup_delay: {:ms, 0},
-  periodic_log_first: {:mins, 30},
-  periodic_log: {:mins, 15},
-  flash_led: {:secs, 1}

@@ -14,9 +14,9 @@ defmodule Switch.Alias do
       unique_constraint: 3
     ]
 
-  import Janice.Common.DB, only: [name_regex: 0]
+  import Common.DB, only: [name_regex: 0]
 
-  # alias Janice.TimeSupport
+  # alias TimeSupport
   alias Switch.{Alias, Command, Device}
 
   @timestamps_opts [type: :utc_datetime_usec]

@@ -8,8 +8,8 @@ defmodule Dutycycle.Profile do
   import Ecto.Query, only: [from: 2]
   import Repo, only: [get_by: 2, one: 1, update: 1]
 
-  import Janice.Common.DB, only: [name_regex: 0]
-  import Janice.TimeSupport, only: [ms: 1]
+  import Common.DB, only: [name_regex: 0]
+  import TimeSupport, only: [ms: 1]
 
   alias Dutycycle.Profile
 

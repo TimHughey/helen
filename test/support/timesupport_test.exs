@@ -7,8 +7,8 @@ defmodule TimeSupportTest do
 
   use Timex
 
-  import Janice.TimeSupport, only: [ms: 1, utc_now: 0, utc_shift: 1]
-  alias Janice.TimeSupport
+  import TimeSupport, only: [ms: 1, utc_now: 0, utc_shift: 1]
+  alias TimeSupport
 
   setup do
     :ok

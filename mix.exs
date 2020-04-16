@@ -1,7 +1,7 @@
-defmodule Mcp.Mixfile do
+defmodule Helen.Mixfile do
   @license """
-       Master Control Program
-       Copyright (C) 2017  Tim Hughey (thughey)
+       Helen
+       Copyright (C) 2020  Tim Hughey (thughey)
 
        This program is free software: you can redistribute it and/or modify
        it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ defmodule Mcp.Mixfile do
 
   def project do
     [
-      app: :mcp,
-      version: "0.1.74",
+      app: :helen,
+      version: "0.0.3",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -45,7 +45,7 @@ defmodule Mcp.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      mod: {Mcp.Application, args()},
+      mod: {Helen.Application, args()},
       extra_applications: [
         :logger,
         :runtime_tools,
@@ -57,9 +57,9 @@ defmodule Mcp.Mixfile do
 
   def deploy_paths,
     do: [
-      dev: "/tmp/janice/dev",
-      test: "/tmp/janice/test",
-      prod: "/usr/local/janice"
+      dev: "/tmp/helen/dev",
+      test: "/tmp/helen/test",
+      prod: "/usr/local/helen"
     ]
 
   def stage_paths,
@@ -122,7 +122,7 @@ defmodule Mcp.Mixfile do
         "ecto.migrate",
         "ecto.dump --dump-path priv/repo/structure-#{Mix.env()}.sql"
       ],
-      "mcp.deps.update": [
+      "helen.deps.update": [
         "local.hex --if-missing --force",
         "deps.get",
         "deps.clean --unused"
@@ -159,7 +159,7 @@ defmodule Mcp.Mixfile do
     ]
   end
 
-  defp escript_config, do: [main_module: Mcp]
+  defp escript_config, do: [main_module: Helenp]
 
   defp git_describe do
     {result, _rc} = System.cmd("git", ["describe"])
@@ -170,7 +170,7 @@ defmodule Mcp.Mixfile do
     [
       tool: Coverex.Task,
       ignore_modules: [
-        Mcp.IExHelpers,
+        Helen.IExHelpers,
         Fact.Celsius.Fields,
         Fact.Celsius.Tags,
         Fact.EngineMetric.Fields,
@@ -202,13 +202,13 @@ defmodule Mcp.Mixfile do
         Path.join([
           home,
           "devel",
-          "janice",
-          "mcp",
+          "helen",
+          "helen",
           "_build",
           Atom.to_string(Mix.env())
         ]),
       tarball: "#{release.name}-#{release.version}.tar.gz",
-      sym_link: "mcp.tar.gz"
+      sym_link: "helen.tar.gz"
     }
   end
 
@@ -236,7 +236,7 @@ defmodule Mcp.Mixfile do
 
   defp releases do
     [
-      mcp: [
+      helen: [
         include_erts: true,
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],

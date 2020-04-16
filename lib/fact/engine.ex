@@ -8,7 +8,7 @@ defmodule Fact.EngineMetric do
   import(Map, only: [has_key?: 2])
   alias Fact.EngineMetric
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   @metric_type "mcr_stat"
   @metric_name "engine_phase"
@@ -25,12 +25,12 @@ defmodule Fact.EngineMetric do
   @metric_fields [:convert_us, :discover_us, :report_us, :switch_cmd_us]
 
   series do
-    database(Application.get_env(:mcp, Fact.Influx) |> Keyword.get(:database))
+    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     # 'type' maps to the measurement
     measurement(@metric_type)
 
-    tag(:application, default: "janice")
-    tag(:env, default: Application.get_env(:mcp, :build_env, "dev"))
+    tag(:application, default: "helen")
+    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
     tag(:host)
     tag(:name)
     tag(:metric, default: @metric_name)
@@ -71,7 +71,7 @@ defmodule Fact.EngineMetric do
   end
 
   def record(%{record: true} = r) do
-    db = Application.get_env(:mcp, Fact.Influx) |> Keyword.get(:database)
+    db = Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database)
     make_point(r) |> write(database: db, async: true, precision: :second)
   end
 

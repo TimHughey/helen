@@ -1,4 +1,4 @@
-defmodule Mcp.ReadingTest do
+defmodule ReadingTest do
   @moduledoc false
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog

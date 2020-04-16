@@ -6,7 +6,7 @@ defmodule Fact.Remote do
 
   import Fact.Influx, only: [write: 2]
 
-  @env Application.get_env(:mcp, :build_env, "unknown")
+  @env Application.get_env(:helen, :build_env, "unknown")
 
   #   %{
   #   points: [

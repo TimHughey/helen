@@ -15,8 +15,8 @@ defmodule Switch.Device do
     ]
 
   import Ecto.Query, only: [from: 2]
-  import Janice.Common.DB, only: [name_regex: 0]
-  import Janice.TimeSupport, only: [from_unix: 1, ttl_check: 4, utc_now: 0]
+  import Common.DB, only: [name_regex: 0]
+  import TimeSupport, only: [from_unix: 1, ttl_check: 4, utc_now: 0]
   import Mqtt.Client, only: [publish_cmd: 1]
 
   alias Switch.{Alias, Device, Command}

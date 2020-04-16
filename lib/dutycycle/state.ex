@@ -10,7 +10,7 @@ defmodule Dutycycle.State do
 
   alias Dutycycle.Profile
   alias Dutycycle.State
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   schema "dutycycle_state" do
     field(:state, :binary, default: "stopped")

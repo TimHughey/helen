@@ -5,7 +5,7 @@ defmodule RemoteTest do
   import ExUnit.CaptureLog
   use Timex
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   def host(num), do: "mcr.remote" <> String.pad_leading(Integer.to_string(num), 3, "0")
   def name(num), do: "remote" <> String.pad_leading(Integer.to_string(num), 3, "0")

@@ -1,7 +1,7 @@
 defmodule JanTest do
   @moduledoc false
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   import Ecto.Query, only: [from: 2]
 

@@ -1,11 +1,11 @@
-defmodule Mcp do
+defmodule Helen do
   @moduledoc """
-  Documentation for Mcp.
+  Hello, this is Helen.
   """
 
   def license do
     """
-      Master Control Program (mcp)  Copyright (C) 2017  Tim Hughey
+      Helen  Copyright (C) 2020  Tim Hughey
         This program comes with ABSOLUTELY NO WARRANTY.
         This is free software, and you are welcome to redistribute it
         under certain conditions.

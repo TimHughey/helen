@@ -17,7 +17,7 @@ defmodule MessageSave do
   import Ecto.Query, only: [from: 2]
   import Repo, only: [one!: 1]
 
-  import Janice.TimeSupport,
+  import TimeSupport,
     only: [duration: 1, humanize_duration: 1, utc_shift: 1]
 
   alias Mqtt.Reading
@@ -111,7 +111,7 @@ defmodule MessageSave do
 
     args =
       Map.merge(args, %{
-        opts: get_env(:mcp, MessageSave, defs),
+        opts: get_env(:helen, MessageSave, defs),
         inflight: %{},
         counts: [deleted: 0, saved: 0, forwarded: 0]
       })
@@ -377,7 +377,7 @@ defmodule MessageSave do
       | inflight:
           Map.merge(inflight, %{
             msgpack: IO.iodata_to_binary(payload),
-            src_host: "<mcp>"
+            src_host: "<helen>"
           })
     }
     |> insert_msg()

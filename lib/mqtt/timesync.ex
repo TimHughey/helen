@@ -6,7 +6,7 @@ defmodule Mqtt.Timesync do
   require Logger
   use Task
 
-  import Janice.TimeSupport, only: [ms: 1, unix_now: 1]
+  import TimeSupport, only: [ms: 1, unix_now: 1]
 
   alias Mqtt.Client
 
@@ -43,16 +43,6 @@ defmodule Mqtt.Timesync do
   def send do
     run(%{single: true})
   end
-
-  @doc ~S"""
-  Create a timesync command with all map values required set to appropriate values
-
-   ##Examples:
-    iex> c = Mcp.Cmd.timesync
-    ...> %Mcp.Cmd{cmd: "time.sync", mtime: cmd_time, version: 1} = c
-    ...> cmd_time > 0
-    true
-  """
 
   def new_cmd do
     %{}

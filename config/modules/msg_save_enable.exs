@@ -1,6 +1,6 @@
 use Mix.Config
 
-config :mcp, MessageSave,
+config :helen, MessageSave,
   log: [init: false],
   save: true,
   save_opts: [],

@@ -7,7 +7,7 @@ defmodule SensorSoil do
   import Ecto.Query, only: [from: 2]
   import Repo, only: [delete_all: 2]
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   schema "sensor_soil" do
     field(:moisture, :integer)

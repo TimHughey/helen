@@ -1,7 +1,7 @@
 defmodule Fact.Influx do
   @moduledoc false
 
-  use Instream.Connection, otp_app: :mcp
+  use Instream.Connection, otp_app: :helen
 
   def shards(db) do
     Fact.Influx.execute("show shards")

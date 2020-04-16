@@ -2,6 +2,7 @@ defmodule JobsTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+
   # import ExUnit.CaptureLog
 
   @moduletag :jobs
@@ -15,13 +16,13 @@ defmodule JobsTest do
   end
 
   test "sensor reading purge" do
-    res = Janice.Jobs.purge_readings(days: -1)
+    res = Jobs.purge_readings(days: -1)
 
     assert is_list(res)
   end
 
   test "sensor reading purge handles bad opts" do
-    res = Janice.Jobs.purge_readings(days: 10)
+    res = Jobs.purge_readings(days: 10)
 
     assert res === :bad_opts
   end

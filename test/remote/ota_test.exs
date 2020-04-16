@@ -4,7 +4,7 @@ defmodule OTATest do
   use ExUnit.Case, async: true
   # import ExUnit.CaptureLog
 
-  alias Janice.TimeSupport
+  alias TimeSupport
 
   def preferred_vsn, do: "b4edefc"
   def host(num), do: "mcr.ota" <> Integer.to_string(num)

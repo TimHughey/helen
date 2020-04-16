@@ -18,6 +18,6 @@ defmodule Repo do
   #    along with this program.  If not, see <http://www.gnu.org/licenses/>
 
   use Ecto.Repo,
-    otp_app: :mcp,
+    otp_app: :helen,
     adapter: Ecto.Adapters.Postgres
 end

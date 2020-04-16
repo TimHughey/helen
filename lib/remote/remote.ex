@@ -15,8 +15,8 @@ defmodule Remote do
   alias Fact.RunMetric
   alias Fact.StartupAnnouncement
 
-  import Janice.Common.DB, only: [name_regex: 0]
-  alias Janice.TimeSupport
+  import Common.DB, only: [name_regex: 0]
+  alias TimeSupport
 
   alias Mqtt.Client
   alias Mqtt.SetName
