@@ -203,7 +203,6 @@ defmodule Helen.Mixfile do
           home,
           "devel",
           "helen",
-          "helen",
           "_build",
           Atom.to_string(Mix.env())
         ]),
