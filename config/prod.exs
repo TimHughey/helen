@@ -46,7 +46,7 @@ config :helen, Mqtt.Inbound,
   ]
 
 config :helen, Fact.Influx,
-  database: "jan_prod",
+  database: "helen_prod",
   host: "** set in prod.secret.exs",
   auth: [
     method: :basic,
