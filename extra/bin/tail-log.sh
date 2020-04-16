@@ -2,17 +2,17 @@
 
 helen_base=/usr/local/helen
 helen_bin=${helen_base}/bin
-mcp=${helen_bin}/mcp
+helen=${helen_bin}/helen
 
-print -n "waiting for mcp to start... "
+print -n "waiting for helen to start... "
 
-until $mcp pid 1>/dev/null 2>/dev/null; do
+until $helen pid 1>/dev/null 2>/dev/null; do
   sleep 1
 done
 
 print "done."
 
-helen_pid=$($mcp pid)
+helen_pid=$($helen pid)
 
 print "tailing helen log file. (use CTRL+C to stop)"
 

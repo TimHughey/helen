@@ -6,17 +6,17 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
-base=$(git rev-parse --show-toplevel)
+src_base=$(git rev-parse --show-toplevel)
 
-source $base/extra/common/vars.sh
+source $src_base/extra/common/vars.sh
 
-chdir $helen_base
+chdir $helen_src_base
 
 if [[ -v SKIP_PULL ]]; then
   print -P "\n$fg_bold[yellow]* skipping git pull, as requested%f\n"
-  env MIX_ENV=prod mix release mcp --overwrite
+  env MIX_ENV=prod mix release helen --overwrite
 else
-  git pull && env MIX_ENV=prod mix release mcp --overwrite
+  git pull && env MIX_ENV=prod mix release helen --overwrite
 fi
 
 chdir $save_cwd
