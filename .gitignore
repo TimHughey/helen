@@ -46,3 +46,5 @@ assets/node_modules
 /log/
 /var/log/
 ttb_last_config
+
+.DS_Store
