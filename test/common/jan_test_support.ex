@@ -1,4 +1,4 @@
-defmodule JanTest do
+defmodule HelenTest do
   @moduledoc false
 
   alias TimeSupport

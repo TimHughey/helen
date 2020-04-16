@@ -5,7 +5,7 @@ defmodule SwitchAliasTest do
 
   # import ExUnit.CaptureLog
 
-  use JanTest
+  use HelenTest
 
   alias TimeSupport
   alias Switch.Alias

@@ -6,7 +6,7 @@ defmodule PulseWidthTest do
   # import ExUnit.CaptureLog
 
   alias TimeSupport
-  import JanTest, only: [base_ext: 2, num_str: 1]
+  import HelenTest, only: [base_ext: 2, num_str: 1]
 
   setup do
     :ok

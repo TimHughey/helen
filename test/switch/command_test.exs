@@ -4,7 +4,7 @@ defmodule SwitchCommandTest do
   use Timex
   use ExUnit.Case, async: true
 
-  use JanTest
+  use HelenTest
 
   # import ExUnit.CaptureLog
 

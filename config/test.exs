@@ -31,7 +31,7 @@ config :helen, Mqtt.Client,
     user_name: "mqtt",
     password: "mqtt",
     server:
-      {Tortoise.Transport.Tcp, host: "jophiel.wisslanding.com", port: 1883},
+      {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
     keep_alive: 15
   ],
   timesync: [frequency: {:secs, 5}, loops: 5, forever: false, log: false]
@@ -44,7 +44,7 @@ config :helen, Mqtt.Inbound,
 
 config :helen, Fact.Influx,
   database: "helen_test",
-  host: "jophiel.wisslanding.com",
+  host: "influx.test.wisslanding.com",
   auth: [method: :basic, username: "helen_test", password: "helen_test"],
   http_opts: [insecure: true],
   pool: [max_overflow: 10, size: 10, timeout: 60_000, max_connections: 30],
@@ -70,7 +70,7 @@ config :helen, Repo,
   password: "helen_test",
   database: "helen_test",
   port: 15432,
-  hostname: "test.db.wisslanding.com",
+  hostname: "db.test.wisslanding.com",
   pool_size: 10
 
 config :helen, Switch.Command,

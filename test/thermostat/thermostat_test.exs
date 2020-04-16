@@ -4,9 +4,9 @@ defmodule ThermostatTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
-  use JanTest
+  use HelenTest
 
-  import JanTest, only: [create_temp_sensor: 4]
+  import HelenTest, only: [create_temp_sensor: 4]
 
   alias Thermostat.Profile
   alias Thermostat.Server

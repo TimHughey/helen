@@ -148,7 +148,7 @@ defmodule Helen.Mixfile do
   end
 
   defp description do
-    "Master Control Program for Wiss Landing"
+    "Helen"
   end
 
   defp package do

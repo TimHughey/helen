@@ -3,7 +3,7 @@ defmodule ReefTest do
 
   use ExUnit.Case, async: false
 
-  use JanTest
+  use HelenTest
 
   setup do
     :ok

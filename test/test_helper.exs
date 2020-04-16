@@ -11,7 +11,7 @@
   Sensor,
   Remote
 ]
-|> JanTest.delete_all()
+|> HelenTest.delete_all()
 
 #
 # ExUnit.configure(
