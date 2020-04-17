@@ -15,7 +15,7 @@ defmodule Mqtt.Reading do
   @switch_t "switch"
   @relhum_t "relhum"
   @remote_run_t "remote_runtime"
-  @mcr_stat_t "stats"
+  @stat_t "stats"
   @simple_text_t "text"
   @pwm_t "pwm"
 
@@ -52,7 +52,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host": "mcr.macaddr", "device": "ds/29.00000ffff",
+    ...>   ~s({"host": "ruth.macaddr", "device": "ds/29.00000ffff",
     ...>       "mtime": 1506867918, "type": "temp", "tc": 20.0, "tf": 80.0})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.metadata?()
     true
@@ -92,7 +92,7 @@ defmodule Mqtt.Reading do
   @doc ~S"""
   Does the Reading have the base metadata?
 
-  NOTE: 1. As of 2017-10-01 we only support readings from mcr hosts with
+  NOTE: 1. As of 2017-10-01 we only support readings from hosts with
            enforcement by checking the prefix of the host id
         2. We also check the mtime to confirm it is greater than epoch + 1 year.
            This is a safety check for situations where a host is reporting
@@ -100,14 +100,16 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host":"mcr.macaddr", "device":"ds/28.00000ffff",
+    ...>   ~s({"host":"ruth.macaddr", "device":"ds/28.00000ffff",
     ...>       "mtime": 1506867918, "type": "temp", "tc": 20.0, "tf": 80.0})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.metadata?()
     true
 
   """
 
-  def metadata(%{mtime: mtime, type: type, host: <<"mcr.", _rest::binary>>} = r)
+  def metadata(
+        %{mtime: mtime, type: type, host: <<"ruth.", _rest::binary>>} = r
+      )
       when is_integer(mtime) and
              is_binary(type),
       do: Map.merge(r, %{metadata: :ok, processed: false})
@@ -130,7 +132,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host":"mcr.macaddr", "device":"ds/28.0000",
+    ...>   ~s({"host":"ruth.macaddr", "device":"ds/28.0000",
     ...>       "mtime": 1506867918, "type": "temp", "tc": 20.0, "tf": 80.0})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.mtime_good?()
     true
@@ -154,7 +156,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host": "mcr.macaddr",
+    ...>   ~s({"host": "ruth.macaddr",
     ...>       "mtime": 2106, "type": "pwm", "duty": 2048, "duty_min": 1,
     ...>       "duty_max": 4095})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.pwm?()
@@ -171,7 +173,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host": "mcr.macaddr",
+    ...>   ~s({"host": "ruth.macaddr",
     ...>       "mtime": 2106, "type": "text", "text": "simple message"})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.simple_text?()
     true
@@ -187,13 +189,13 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host": "mcr.macaddr",
+    ...>   ~s({"host": "ruth.macaddr",
     ...>       "mtime": 2106, "type": "startup"})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.startup?()
     true
 
     iex> json =
-    ...>   ~s({"host":"mcr.macaddr", "device":"ds/28.0000",
+    ...>   ~s({"host":"ruth.macaddr", "device":"ds/28.0000",
     ...>       "mtime": 1506867918, "type": "temp", "tc": 20.0, "tf": 80.0})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.startup?()
     false
@@ -207,7 +209,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host": "mcr.macaddr", "device": "ds/28.0000",
+    ...>   ~s({"host": "ruth.macaddr", "device": "ds/28.0000",
     ...>       "mtime": 1506867918, "type": "temp", "tc": 20.0, "tf": 80.0})
     ...> Jason.decode!(json, keys: :atoms) |> Mqtt.Reading.temperature?()
     true
@@ -239,7 +241,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
    iex> json =
-   ...>   ~s({"host": "mcr.macaddr",
+   ...>   ~s({"host": "ruth.macaddr",
    ...>       "device": "ds/29.0000", "mtime": 1506867918,
    ...>       "type": "relhum",
    ...>       "rh": 56.0})
@@ -272,7 +274,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({"host": "mcr.macaddr",
+    ...>   ~s({"host": "ruth.macaddr",
     ...>       "device": "ds/29.0000", "mtime": 1506867918,
     ...>        "type": "switch",
     ...>        "states": [{"pio": 0, "state": true},
@@ -293,7 +295,7 @@ defmodule Mqtt.Reading do
 
   def free_ram_stat?(%{} = r) do
     freeram = Map.get(r, :freeram)
-    metadata?(r) and r.type == @mcr_stat_t and is_integer(freeram)
+    metadata?(r) and r.type == @stat_t and is_integer(freeram)
   end
 
   def engine_metric?(%{} = r) do
@@ -305,7 +307,7 @@ defmodule Mqtt.Reading do
 
    ##Examples:
     iex> json =
-    ...>   ~s({ "host": "mcr.macaddr",
+    ...>   ~s({ "host": "ruth.macaddr",
     ...>       "device": "ds/29.0000", "mtime": 1506867918,
     ...>        "type": "switch",
     ...>        "states": [{"pio": 0, "state": true},

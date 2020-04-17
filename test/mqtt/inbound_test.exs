@@ -9,7 +9,7 @@ defmodule MqttInboundMessageTest do
   def preferred_vsn, do: "b4edefc"
 
   def num(n), do: String.pad_leading(Integer.to_string(n), 3, "0")
-  def host(n), do: "mcr.inbound" <> num(n)
+  def host(n), do: "ruth.inbound" <> num(n)
   def name(n), do: "inbound" <> num(n)
 
   def device(n), do: "ds/inbound" <> num(n)

@@ -10,7 +10,7 @@ defmodule Fact.EngineMetric do
 
   alias TimeSupport
 
-  @metric_type "mcr_stat"
+  @metric_type "stat"
   @metric_name "engine_phase"
   @metric_tags [
     :vsn,

@@ -14,12 +14,12 @@ defmodule Fact.FreeRamStat do
 
   series do
     database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
-    measurement("mcr_stat")
+    measurement("stat")
 
     tag(:remote_host)
     tag(:remote_name)
     tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
-    tag(:mcr_stat, default: "freeram")
+    tag(:stat, default: "freeram")
 
     field(:val)
   end
@@ -28,7 +28,7 @@ defmodule Fact.FreeRamStat do
   Record a completely defined FreeRamStat metric
 
     ##Examples:
-     iex> %{host: "mcr.xxxx", name: "mcr-name", mtime: 1557515656, val: 262000}
+     iex> %{host: "ruth.xxxx", name: "ruth-name", mtime: 1557515656, val: 262000}
      ...> |> Fact.FreeRamStat.record()
      :ok
   """
@@ -42,7 +42,7 @@ defmodule Fact.FreeRamStat do
     tags = %{
       remote_host: host,
       remote_name: name,
-      mcr_stat: "freeram"
+      stat: "freeram"
     }
 
     write(
@@ -59,10 +59,10 @@ defmodule Fact.FreeRamStat do
   def record(%{record: false}), do: {:not_recorded}
 
   @doc ~S"""
-  Record a FreeRamStat metric that is missing the mcr name
+  Record a FreeRamStat metric that is missing the host name
 
     ##Examples:
-     iex> %{host: "mcr.xxxx", mtime: 1557515656, val: 262000}
+     iex> %{host: "ruth.xxxx", mtime: 1557515656, val: 262000}
      ...> |> Fact.FreeRamStat.record()
      :ok
   """
@@ -77,7 +77,7 @@ defmodule Fact.FreeRamStat do
   Record a FreeRamStat metric that is missing the mtime
 
     ##Examples:
-     iex> %{host: "mcr.xxxx", name: "mcr-name", val: 262000}
+     iex> %{host: "ruth.xxxx", name: "ruth-name", val: 262000}
      ...> |> Fact.FreeRamStat.record()
      :ok
   """
@@ -89,7 +89,7 @@ defmodule Fact.FreeRamStat do
   Properly handle a request to record an invalid FreeRamStat metric
 
     ##Examples:
-     iex> %{bad_host: "mcr.xxxx", name: "mcr-name", val: 262000}
+     iex> %{bad_host: "ruth.xxxx", name: "ruth-name", val: 262000}
      ...> |> Fact.FreeRamStat.record()
      :fail
   """

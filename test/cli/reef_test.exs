@@ -64,7 +64,7 @@ defmodule ReefTest do
     import TimeSupport, only: [unix_now: 1, utc_now: 0]
 
     %{
-      host: random_mcr(),
+      host: random_host(),
       name: "reef:display",
       hw: "esp32",
       vsn: "b4edefc",

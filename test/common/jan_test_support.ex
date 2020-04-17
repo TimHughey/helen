@@ -7,7 +7,7 @@ defmodule HelenTest do
 
   defmacro __using__(_opts) do
     quote do
-      # switch command ack (from mcr remote) include the key cmdack
+      # switch command ack (from ruth remote) include the key cmdack
       def ack_msg(%{
             device: device,
             host: host,
@@ -50,7 +50,7 @@ defmodule HelenTest do
         add_alias = Map.get(context, :add_alias, false)
         alias_pio = Map.get(context, :alias_pio, 1)
 
-        host = Map.get(context, :host, random_mcr())
+        host = Map.get(context, :host, random_host())
 
         rem_name =
           Map.get(
@@ -146,14 +146,14 @@ defmodule HelenTest do
         {:not_added, %Switch.Alias{}}
       end
 
-      # command msgs to remotes (mcr) do NOT include key cmdack
+      # command msgs to remotes (ruth) do NOT include key cmdack
       # rather they include:
       #   1. cmd:   "set.switch"
       #   2. ack:   boolean (true = respond with cmdack: true)
       #   3. refid: the UUID of this command
       #
       # NOTE: although not required as of 2020-03-22, the this test does
-      #       include host: <mcr id> and name: <mcr name> for future enhancements
+      #       include host: <ruth id> and name: <ruth name> for future enhancements
       def cmd_msg(%{
             device: switch,
             host: host,
@@ -239,13 +239,13 @@ defmodule HelenTest do
       end
 
       defp random_mac() do
-        # mcr.30 ae a4 f2 c2 10
+        # ruth.30 ae a4 f2 c2 10
         bytes = for b <- 1..6, do: :rand.uniform(249) + 5
 
         for b <- bytes, do: Integer.to_string(b, 16) |> String.downcase()
       end
 
-      defp random_mcr(), do: ["mcr.", random_mac()] |> IO.iodata_to_binary()
+      defp random_host(), do: ["ruth.", random_mac()] |> IO.iodata_to_binary()
 
       defp remote_msg(opts) when is_list(opts) do
         rem_name = Keyword.get(opts, :rem_name, "remote_base")
@@ -255,7 +255,7 @@ defmodule HelenTest do
         %{
           processed: false,
           type: "switch",
-          host: random_mcr(),
+          host: random_host(),
           name: rem_name,
           hw: "esp32",
           device: device,
@@ -282,7 +282,7 @@ defmodule HelenTest do
           ) do
         alias Switch.Device
 
-        # simulate the ack from the mcr device:
+        # simulate the ack from the ruth device:
         #  1. grab required keys from the reading in the context
         #  2. add remaining required keys
         #  3. create the ack_msg
@@ -304,7 +304,7 @@ defmodule HelenTest do
       end
 
       def simulate_msg(msg) do
-        %{payload: msg, topic: "test/mcr/f/report", direction: :in}
+        %{payload: msg, topic: "test/ruth/f/report", direction: :in}
         |> Mqtt.Inbound.process(async: false)
       end
     end
@@ -328,7 +328,7 @@ defmodule HelenTest do
     }
 
   def device(name, n), do: "ds/#{name}#{num_str(n)}"
-  def host(name, n), do: "mcr.#{name}#{num_str(n)}"
+  def host(name, n), do: "ruth.#{name}#{num_str(n)}"
 
   def mt_host(n), do: host("mixtank", n)
   def mt_name(n), do: name("mixtank", n)
@@ -377,7 +377,7 @@ defmodule HelenTest do
   def relhum_name(n), do: name("relhum", n + 50)
 
   defp send(msg) do
-    %{payload: msg, topic: "test/mcr/f/report", direction: :in}
+    %{payload: msg, topic: "test/ruth/f/report", direction: :in}
     |> Mqtt.Inbound.process(async: false)
   end
 

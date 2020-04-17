@@ -4,8 +4,8 @@ use Mix.Config
 
 config :helen,
   feeds: [
-    cmd: {"test/mcr/f/command", 1},
-    rpt: {"prod/mcr/f/report", 0}
+    cmd: {"test/ruth/f/command", 1},
+    rpt: {"prod/+/f/report", 0}
   ]
 
 config :helen,

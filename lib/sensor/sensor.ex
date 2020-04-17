@@ -595,7 +595,7 @@ defmodule Sensor do
   end
 
   # handle unknown Sensors by simply passing through
-  # useful when bringing new sensors online via mcr
+  # useful when bringing new sensors online
   defp update_reading({%Sensor{} = s, %{} = r}) do
     {s, r}
   end

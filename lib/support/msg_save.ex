@@ -103,7 +103,7 @@ defmodule MessageSave do
   def start_link(args) do
     defs = [
       forward: false,
-      forward_opts: [in: [feed: {"dev/mcr/f/report", 0}]],
+      forward_opts: [in: [feed: {"dev/+/f/report", 0}]],
       save: false,
       save_opts: [],
       purge: [all_at_startup: false, older_than: [hours: 12]]

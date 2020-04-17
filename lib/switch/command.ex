@@ -104,7 +104,7 @@ defmodule Switch.Command do
   def ack_immediate_if_needed({:pending, res} = rc, opts)
       when is_list(res) and is_list(opts) do
     #
-    # if ack: false (mcr expected to ack) then immediately ack
+    # if ack: false (host expected to ack) then immediately ack
     #
     unless Keyword.get(opts, :ack, true) do
       cmd = Keyword.get(res, :refid) |> find_refid()

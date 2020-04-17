@@ -2,12 +2,13 @@ defmodule OTATest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+
   # import ExUnit.CaptureLog
 
   alias TimeSupport
 
   def preferred_vsn, do: "b4edefc"
-  def host(num), do: "mcr.ota" <> Integer.to_string(num)
+  def host(num), do: "ruth.ota" <> Integer.to_string(num)
   def name(num), do: "ota" <> Integer.to_string(num)
 
   def ext(num),

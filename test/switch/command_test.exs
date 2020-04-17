@@ -17,8 +17,8 @@ defmodule SwitchCommandTest do
 
   # context @tag inputs:
   #  sd_num:  integer used to create a unique Switch Device (default: 0)
-  #  host:    remote mcr host id, (default: mcr.switch_device0x<num>)
-  #  name:    remote mcr host name, (default: rem_swdev0x<num>)
+  #  host:    remote host id, (default: ruth.switch_device0x<num>)
+  #  name:    remote host name, (default: rem_swdev0x<num>)
   #  device:  switch device name, (default: ds/swdev0x<num>)
   #  insert:  boolean, if true call Device.upsert/1
 
@@ -30,7 +30,7 @@ defmodule SwitchCommandTest do
       Map.get(
         context,
         :host,
-        ["mcr.switch_device", num_str] |> IO.iodata_to_binary()
+        ["ruth.switch_device", num_str] |> IO.iodata_to_binary()
       )
 
     name =
@@ -103,7 +103,7 @@ defmodule SwitchCommandTest do
     # grab available required keys from the reading (in the context)
     # add required keys and submit to Switch.Device for processing
 
-    # simulate the ack from the mcr device:
+    # simulate the ack from the ruth device:
     #  1. grab required keys from the reading in the context
     #  2. add remaining required keys
     #  3. create the ack_msg

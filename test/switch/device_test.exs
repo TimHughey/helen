@@ -19,7 +19,7 @@ defmodule SwitchDeviceTest do
       Map.get(
         context,
         :host,
-        ["mcr.switch_device", num_str] |> IO.iodata_to_binary()
+        ["ruth.switch_device", num_str] |> IO.iodata_to_binary()
       )
 
     name =

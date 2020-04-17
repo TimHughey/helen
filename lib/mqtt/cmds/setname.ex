@@ -11,6 +11,6 @@ defmodule Mqtt.SetName do
         cmd: "set.name",
         mtime: TimeSupport.unix_now(:second),
         host: host,
-        name: String.replace_prefix(name, "mcr.", "")
+        name: String.replace_prefix(name, "ruth.", "")
       }
 end

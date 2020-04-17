@@ -8,12 +8,6 @@ config :logger,
   level: :info
 
 config :helen,
-  feeds: [
-    cmd: {"dev/mcr/f/command", 1},
-    rpt: {"dev/mcr/f/report", 0}
-  ]
-
-config :helen,
   # overrides from config.exs
   protocol_supervisors: [
     {Fact.Supervisor, [log: [init: false]]}

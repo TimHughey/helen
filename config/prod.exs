@@ -9,8 +9,8 @@ config :logger,
 
 config :helen,
   feeds: [
-    cmd: {"prod/mcr/f/command", 1},
-    rpt: {"prod/mcr/f/report", 0}
+    cmd: {"prod/ruth/f/command", 1},
+    rpt: {"prod/+/f/report", 0}
   ]
 
 #

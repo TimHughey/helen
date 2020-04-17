@@ -7,8 +7,11 @@ defmodule RemoteTest do
 
   alias TimeSupport
 
-  def host(num), do: "mcr.remote" <> String.pad_leading(Integer.to_string(num), 3, "0")
-  def name(num), do: "remote" <> String.pad_leading(Integer.to_string(num), 3, "0")
+  def host(num),
+    do: "ruth.remote" <> String.pad_leading(Integer.to_string(num), 3, "0")
+
+  def name(num),
+    do: "remote" <> String.pad_leading(Integer.to_string(num), 3, "0")
 
   def ext(num),
     do: %{
@@ -38,7 +41,7 @@ defmodule RemoteTest do
       type: "boot",
       hw: "esp32",
       vsn: "12345678",
-      proj: "mcr",
+      proj: "ruth",
       idf: "idf-3.3",
       sha: "0123456789abcdef",
       bdate: "04-16-2019",
@@ -93,7 +96,10 @@ defmodule RemoteTest do
   end
 
   test "process external update of type 'remote_runtime'" do
-    res = ext(17) |> Map.put_new(:type, "remote_runtime") |> Remote.external_update()
+    res =
+      ext(17)
+      |> Map.put_new(:type, "remote_runtime")
+      |> Remote.external_update()
 
     assert res === :ok
   end
@@ -107,7 +113,10 @@ defmodule RemoteTest do
   end
 
   test "external update logs remote startup message" do
-    fun = fn -> Map.put(ext(4), :log, true) |> boot() |> Remote.external_update() end
+    fun = fn ->
+      Map.put(ext(4), :log, true) |> boot() |> Remote.external_update()
+    end
+
     msg = capture_log(fun)
 
     assert msg =~ name(4)
@@ -176,8 +185,11 @@ defmodule RemoteTest do
     ext(3) |> Remote.external_update()
     result = Remote.get_by(host: host(3), only: [:last_seen_at, :last_start_at])
 
-    seen = if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
-    start = if is_map(result), do: Map.get(result, :last_start_at, nil), else: result
+    seen =
+      if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
+
+    start =
+      if is_map(result), do: Map.get(result, :last_start_at, nil), else: result
 
     refute is_nil(seen) and is_nil(start)
   end
@@ -186,7 +198,8 @@ defmodule RemoteTest do
     ext(3) |> Remote.external_update()
     result = Remote.get_by(host: host(3), only: :last_seen_at)
 
-    last = if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
+    last =
+      if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
 
     refute is_nil(last)
   end

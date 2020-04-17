@@ -169,6 +169,10 @@ defmodule Mqtt.Client do
       when is_binary(feed) and is_list(pub_opts) do
     {elapsed_us, pub_rc} =
       :timer.tc(fn ->
+        #
+        ## NOTE:  special case to support legacy remote devices
+        Tortoise.publish(client_id, "prod/mcr/f/command", payload, pub_opts)
+
         Tortoise.publish(client_id, feed, payload, pub_opts)
       end)
 

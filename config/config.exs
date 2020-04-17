@@ -22,8 +22,8 @@ config :helen,
   generators: [context_app: false],
   # default settings for dev and test, must override in prod
   feeds: [
-    cmd: {"dev/mcr/f/command", 1},
-    rpt: {"dev/mcr/f/report", 0}
+    cmd: {"dev/ruth/f/command", 1},
+    rpt: {"dev/+/f/report", 0}
   ],
   # Supervision Tree and Initial Opts (listed in startup order)
   sup_tree: [

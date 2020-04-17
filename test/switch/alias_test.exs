@@ -59,7 +59,7 @@ defmodule SwitchAliasTest do
 
   @tag alias_num: 3
   @tag add_alias: true
-  test "can get and set the position of an Alias without mcr remote ack",
+  test "can get and set the position of an Alias without remote ack",
        %{alias_name: name, sa: {_rc, _sa}} = _r do
     {rc1, initial_pos} = Alias.position(name)
     assert rc1 == :ok
@@ -121,7 +121,7 @@ defmodule SwitchAliasTest do
       Map.get(
         context,
         :host,
-        ["mcr.switch_alias", num_str] |> IO.iodata_to_binary()
+        ["ruth.switch_alias", num_str] |> IO.iodata_to_binary()
       )
 
     rem_name =

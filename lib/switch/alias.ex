@@ -90,7 +90,7 @@ defmodule Switch.Alias do
          {:lazy, true, false} <-
            {:lazy, lazy, position == curr_position} do
       # the requested position does not match the current posiion so
-      # call Device.record_cmd/2 to publish the cmd to the mcr remote
+      # call Device.record_cmd/2 to publish the cmd to the host
       Device.record_cmd(sd, sa, cmd_map: cmd_map)
     else
       {:position, {:opt, false}} ->

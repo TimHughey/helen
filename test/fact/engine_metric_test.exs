@@ -7,7 +7,7 @@ defmodule FactEngineMetricTest do
   alias TimeSupport
 
   def preferred_vsn, do: "b4edefc"
-  def host(num), do: "mcr.010203040" <> Integer.to_string(num)
+  def host(num), do: "ruth.010203040" <> Integer.to_string(num)
   def name(num), do: "test_name" <> Integer.to_string(num)
 
   def ext(num, engine),
@@ -15,7 +15,7 @@ defmodule FactEngineMetricTest do
       vsn: preferred_vsn(),
       host: host(num),
       name: name(0),
-      type: "mcr_stat",
+      type: "stat",
       metric: "engine_phase",
       engine: engine,
       discover_us: 0,

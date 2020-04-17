@@ -33,7 +33,7 @@ defmodule ReadingTest do
 
   test "can unpack a MessagePack formatted message" do
     r1 = %{
-      host: "mcr.macaddr",
+      host: "ruth.macaddr",
       device: "ds/28.0000",
       mtime: 1_506_867_918,
       type: "temp",
