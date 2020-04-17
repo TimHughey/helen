@@ -113,8 +113,8 @@ config :helen, Mqtt.Inbound,
 config :helen, OTA,
   url: [
     host: "www.wisslanding.com",
-    uri: "helen/mcr_esp/firmware",
-    fw_file: "latest-mcr_esp.bin"
+    uri: "helen/firmware",
+    fw_file: "latest.bin"
   ]
 
 config :helen, Repo,
