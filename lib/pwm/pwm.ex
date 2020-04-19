@@ -259,11 +259,11 @@ defmodule PulseWidth do
     |> validate_number(:duty, greater_than_or_equal_to: 0, less_than: 4096)
     |> validate_number(:duty_min,
       greater_than_or_equal_to: 0,
-      less_than: 4096
+      less_than: 8191
     )
     |> validate_number(:duty_max,
       greater_than_or_equal_to: 0,
-      less_than: 4096
+      less_than: 8191
     )
     |> unique_constraint(:name, name: :pwm_name_index)
     |> unique_constraint(:device, name: :pwm_device_index)
