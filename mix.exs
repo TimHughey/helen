@@ -19,18 +19,26 @@ defmodule Helen.Mixfile do
       compilers: [:gettext] ++ Mix.compilers(),
       aliases: aliases(),
       package: package(),
-      description: description(),
+      description: "Helen",
       escript: escript_config(),
       test_coverage: test_coverage(),
       deploy_paths: deploy_paths(),
-      stage_paths: stage_paths()
+      stage_paths: stage_paths(),
+      homepage_url: "https://www.wisslanding.com",
+      source_url: "https://github.com/TimHughey/helen"
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      mod: {Helen.Application, args()},
+      mod:
+        {Helen.Application,
+         [
+           version: "#{project() |> Keyword.get(:version)}",
+           build_env: "#{Mix.env()}",
+           git_vsn: "#{git_describe()}"
+         ]},
       extra_applications: [
         :logger,
         :runtime_tools,
@@ -125,28 +133,15 @@ defmodule Helen.Mixfile do
   #   ]
   # end
 
-  defp args do
-    [
-      version: "#{project() |> Keyword.get(:version)}",
-      build_env: "#{Mix.env()}",
-      git_vsn: "#{git_describe()}"
-    ]
-  end
-
-  defp description do
-    "Helen"
-  end
-
   defp package do
     [
       name: "helen",
-      files:
-        ~w(config extra lib priv rel special test .credo.exs .formatter.exs mix.exs README* readme* LICENSE*
-                license* CHANGELOG* changelog*),
-      links: %{"GitHub" => "https://github.com/TimHugheyhelen"},
+      files: ~w(config extra lib priv rel special test
+            .credo.exs .formatter.exs mix.exs
+            COPYING* README* LICENSE* CHANGELOG*),
+      links: %{"GitHub" => "https://github.com/TimHughey/helen"},
       maintainers: ["Tim Hughey"],
-      licenses: ["LGPL-3.0-or-later"],
-      homepage_url: "https://www.wisslanding.com"
+      licenses: ["LGPL-3.0-or-later"]
     ]
   end
 

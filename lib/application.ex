@@ -1,5 +1,8 @@
 defmodule Helen.Application do
-  @moduledoc false
+  @moduledoc """
+  Helen Application Module
+  """
+  @moduledoc since: "0.0.3"
 
   use Application
   require Logger
@@ -8,7 +11,16 @@ defmodule Helen.Application do
 
   @log_opts get_env(:helen, Helen.Application, []) |> Keyword.get(:log, [])
 
-  def start(_type, args) do
+  @doc """
+    Starts Helen Supervisor
+
+
+  """
+  @doc since: "0.0.3"
+  @impl true
+  def start(start_type, args)
+
+  def start(:normal, args) do
     log = Keyword.get(@log_opts, :init, true)
 
     log &&
@@ -51,4 +63,7 @@ defmodule Helen.Application do
       {:error, :no_db_password}
     end
   end
+
+  @type start_type :: :normal
+  @type args :: term
 end
