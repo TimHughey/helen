@@ -1,24 +1,23 @@
 defmodule Helen.Mixfile do
-  @license """
-       Helen
-       Copyright (C) 2020  Tim Hughey (thughey)
-
-       This program is free software: you can redistribute it and/or modify
-       it under the terms of the GNU General Public License as published by
-       the Free Software Foundation, either version 3 of the License, or
-       (at your option) any later version.
-
-       This program is distributed in the hope that it will be useful,
-       but WITHOUT ANY WARRANTY; without even the implied warranty of
-       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-       GNU General Public License for more details.
-
-       You should have received a copy of the GNU General Public License
-       along with this program.  If not, see <http://www.gnu.org/licenses/>
-  """
   @moduledoc """
-    Mix file defining Master Control Program
+    Mix file defining Helen
   """
+
+  # Helen
+  # Copyright (C) 2020  Tim Hughey (thughey)
+  #
+  # This program is free software: you can redistribute it and/or modify
+  # it under the terms of the GNU General Public License as published by
+  # the Free Software Foundation, either version 3 of the License, or
+  # (at your option) any later version.
+  #
+  # This program is distributed in the hope that it will be useful,
+  # but WITHOUT ANY WARRANTY; without even the implied warranty of
+  # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  # GNU General Public License for more details.
+  #
+  # You should have received a copy of the GNU General Public License
+  # along with this program.  If not, see <http://www.gnu.org/licenses/>
 
   use Mix.Project
 
@@ -89,7 +88,8 @@ defmodule Helen.Mixfile do
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:coverex, "~> 1.0", only: :test},
       {:deep_merge, "~> 1.0"},
-      {:crontab, "~> 1.1"}
+      {:crontab, "~> 1.1"},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
       # {:phoenix, "~> 1.4.0"},
       # {:phoenix_pubsub, "~> 1.0"},
       # {:phoenix_ecto, "~> 4.0"},
@@ -153,9 +153,14 @@ defmodule Helen.Mixfile do
 
   defp package do
     [
-      files: ["lib", "priv", "LICENSE", "README*", "config", "test"],
+      name: "helen",
+      files:
+        ~w(config extra lib priv rel special test .credo.exs .formatter.exs mix.exs README* readme* LICENSE*
+                license* CHANGELOG* changelog*),
+      links: %{"GitHub" => "https://github.com/TimHugheyhelen"},
       maintainers: ["Tim Hughey"],
-      licenses: [@license]
+      licenses: ["Apache-2.0"],
+      homepage_url: "https://www.wisslanding.com"
     ]
   end
 

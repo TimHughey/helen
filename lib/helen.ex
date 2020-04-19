@@ -5,7 +5,8 @@ defmodule Helen do
 
   def license do
     """
-      Helen  Copyright (C) 2020  Tim Hughey
+                   Helen Copyright (C) 2020  Tim Hughey
+
         This program comes with ABSOLUTELY NO WARRANTY.
         This is free software, and you are welcome to redistribute it
         under certain conditions.
