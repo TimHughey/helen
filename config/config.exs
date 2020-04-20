@@ -36,7 +36,8 @@ config :helen,
     :support_workers,
     :worker_supervisors,
     :misc_workers,
-    :agnus
+    :agnus,
+    :helen
   ],
   core_supervisors: [
     # TODO: implement the Supervisors below to create a 'proper'
@@ -61,6 +62,9 @@ config :helen,
   ],
   agnus: [
     {Agnus.Supervisor, []}
+  ],
+  helen: [
+    {Helen.Supervisor, []}
   ]
 
 config :helen, Agnus.DayInfo,

@@ -25,7 +25,25 @@ defmodule Helen.Mixfile do
       deploy_paths: deploy_paths(),
       stage_paths: stage_paths(),
       homepage_url: "https://www.wisslanding.com",
-      source_url: "https://github.com/TimHughey/helen"
+      source_url: "https://github.com/TimHughey/helen",
+      docs: [
+        main: "api-reference.html#modules",
+        extras: ["CHANGELOG.md"],
+        groups_for_modules: [
+          Devices: [PulseWidth, Remote, Sensor, Switch],
+          Servers: [Dutycycle, Thermostat]
+        ],
+        nest_modules_by_prefix: [
+          Dutycycle,
+          Fact,
+          Helen,
+          Mqtt,
+          PulseWidth,
+          Switch,
+          Thermostat,
+          Remote
+        ]
+      ]
     ]
   end
 
