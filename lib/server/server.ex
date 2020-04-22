@@ -103,6 +103,7 @@ defmodule Helen.Server do
     {:reply, res, s}
   end
 
+  @impl true
   def handle_call(
         %{module: :sensor, function: function, args: args},
         _from,
@@ -119,6 +120,7 @@ defmodule Helen.Server do
     {:reply, res, s}
   end
 
+  @impl true
   def handle_call(
         %{module: :switch, function: function, args: args},
         _from,
@@ -145,6 +147,18 @@ defmodule Helen.Server do
     res =
       try do
         apply(Thermostat.Server, function, args)
+      rescue
+        error -> error
+      end
+
+    {:reply, res, s}
+  end
+
+  @impl true
+  def handle_call({_a, _b, _c} = ast, _from, %{} = s) do
+    res =
+      try do
+        Code.eval_quoted(ast)
       rescue
         error -> error
       end
