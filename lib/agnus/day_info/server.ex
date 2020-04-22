@@ -190,12 +190,16 @@ defmodule Agnus.DayInfo do
 
   defp info_current?(%{} = s) do
     if_latest_valid(s) do
-      import Timex, only: [equal?: 3, now: 1]
+      import Timex, only: [day: 1, now: 1]
 
       %{opts: opts, day_info: %{last_fetch: last_fetch}} = s
       tz = Keyword.get(opts, :tz)
 
-      if is_nil(last_fetch), do: false, else: equal?(now(tz), last_fetch, :days)
+      if is_nil(last_fetch) do
+        false
+      else
+        Timex.day(last_fetch) == Timex.day(now(tz))
+      end
     end
   end
 

@@ -153,6 +153,6 @@ defmodule Helen.Server do
   end
 
   @impl true
-  def hanle_call(catchall, _from, %{} = s),
+  def handle_call(catchall, _from, %{} = s),
     do: {:reply, {:unhandled, catchall}, s}
 end
