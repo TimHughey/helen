@@ -48,122 +48,14 @@ defmodule Helen.Server do
   ## handle_call() callbacks
   #
 
-  @doc """
-    Handling of exposed API calls
-  """
-  @doc since: "0.0.4"
-  @impl true
-  def handle_call(
-        %{module: :dutycycle, function: function, args: args},
-        _from,
-        %{} = s
-      )
-      when is_atom(function) and is_list(args) do
-    res =
-      try do
-        apply(Dutycycle.Server, function, args)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
-  end
-
-  @impl true
-  def handle_call(
-        %{module: :pwm, function: function, args: args},
-        _from,
-        %{} = s
-      )
-      when is_atom(function) and is_list(args) do
-    res =
-      try do
-        apply(PulseWidth, function, args)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
-  end
-
-  @impl true
-  def handle_call(
-        %{module: :remote, function: function, args: args},
-        _from,
-        %{} = s
-      )
-      when is_atom(function) and is_list(args) do
-    res =
-      try do
-        apply(Remote, function, args)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
-  end
-
-  @impl true
-  def handle_call(
-        %{module: :sensor, function: function, args: args},
-        _from,
-        %{} = s
-      )
-      when is_atom(function) and is_list(args) do
-    res =
-      try do
-        apply(Sensor, function, args)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
-  end
-
-  @impl true
-  def handle_call(
-        %{module: :switch, function: function, args: args},
-        _from,
-        %{} = s
-      )
-      when is_atom(function) and is_list(args) do
-    res =
-      try do
-        apply(Switch, function, args)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
-  end
-
-  @impl true
-  def handle_call(
-        %{module: :thermostat, function: function, args: args},
-        _from,
-        %{} = s
-      )
-      when is_atom(function) and is_list(args) do
-    res =
-      try do
-        apply(Thermostat.Server, function, args)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
-  end
-
   @impl true
   def handle_call({_a, _b, _c} = ast, _from, %{} = s) do
-    res =
-      try do
-        Code.eval_quoted(ast)
-      rescue
-        error -> error
-      end
-
-    {:reply, res, s}
+    try do
+      {res, _bindings} = Code.eval_quoted(ast)
+      {:reply, res, s}
+    rescue
+      error -> {:reply, error, s}
+    end
   end
 
   @impl true

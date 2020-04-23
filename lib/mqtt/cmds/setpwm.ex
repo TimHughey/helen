@@ -11,14 +11,24 @@ defmodule Mqtt.SetPulseWidth do
       when is_list(opts) do
     import TimeSupport, only: [unix_now: 1]
 
-    %{
-      cmd: "pwm",
-      mtime: unix_now(:second),
-      device: device,
-      refid: refid,
-      ack: Keyword.get(opts, :ack, true),
-      duty: Keyword.get(opts, :duty, 0),
-      fade_ms: Keyword.get(opts, :fade_ms, 30)
-    }
+    fade_opts =
+      Keyword.take(opts, [
+        :direction,
+        :step_num,
+        :duty_cycle_num,
+        :duty_scale
+      ])
+
+    Map.merge(
+      %{
+        cmd: "pwm",
+        mtime: unix_now(:second),
+        device: device,
+        refid: refid,
+        ack: Keyword.get(opts, :ack, true),
+        duty: Keyword.get(opts, :duty, 0)
+      },
+      Enum.into(fade_opts, %{})
+    )
   end
 end

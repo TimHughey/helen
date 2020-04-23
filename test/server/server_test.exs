@@ -17,42 +17,21 @@ defmodule HelenServerTest do
     assert is_pid(pid)
   end
 
-  test "helen server handles sensor messages" do
-    res =
-      GenServer.call({:global, :helen_server}, %{
-        module: :sensor,
-        function: :temperature,
-        args: [[name: "unknown sensor", since_secs: 30]]
-      })
+  test "helen server handles a quoted block" do
+    block =
+      quote do
+        Sensor.temperature(name: "unknown sensor", since_secs: 30)
+      end
+
+    res = GenServer.call({:global, :helen_server}, block)
 
     assert is_nil(res)
   end
 
-  test "helen server handles switch messages" do
-    res =
-      GenServer.call({:global, :helen_server}, %{
-        module: :switch,
-        function: :position,
-        args: ["unknown switch"]
-      })
+  test "helen server gracefully poorly formed handle_call messages" do
+    res = GenServer.call({:global, :helen_server}, :foobar)
 
-    assert {:not_found, "unknown switch"} == res
-  end
-
-  test "helen server gracefully handles exceptions from apply/3" do
-    res =
-      GenServer.call({:global, :helen_server}, %{
-        module: :sensor,
-        function: :temperature,
-        args: [name: "unknown sensor", since_secs: 30]
-      })
-
-    assert res == %UndefinedFunctionError{
-             arity: 2,
-             function: :temperature,
-             module: Sensor
-           }
-
-    assert is_struct(res)
+    assert is_tuple(res)
+    assert {:unhandled, _msg} = res
   end
 end

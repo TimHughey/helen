@@ -295,7 +295,16 @@ defmodule PulseWidth do
 
     with {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
          {:cmd, %PulseWidthCmd{} = cmd} <- {:cmd, hd(pwm.cmds)},
-         cmd_opts <- Keyword.take(opts, [:duty, :fade_ms, :ack]),
+         cmd_opts <-
+           Keyword.take(opts, [
+             :duty,
+             :fade_ms,
+             :ack,
+             :direction,
+             :step_num,
+             :duty_cycle_num,
+             :duty_scale
+           ]),
          cmd <- create_cmd(pwm, cmd, cmd_opts),
          pub_rc <- publish_cmd(cmd) do
       [pwm: pwm, pub_rc: pub_rc] ++ opts
