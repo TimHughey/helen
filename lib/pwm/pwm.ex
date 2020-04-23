@@ -306,7 +306,6 @@ defmodule PulseWidth do
              :duty_scale
            ]),
          cmd <- create_cmd(pwm, cmd, cmd_opts),
-         :ok <- Logger.info(["cmd: ", inspect(cmd, pretty: true)]),
          pub_rc <- publish_cmd(cmd) do
       [pwm: pwm, pub_rc: pub_rc] ++ opts
     else
