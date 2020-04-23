@@ -42,6 +42,20 @@ defmodule PulseWidthTest do
     assert true
   end
 
+  test "can set the fade of a PulseWidth" do
+    device = device(2, 1)
+
+    PulseWidth.duty(device,
+      duty: :rand.uniform(4095),
+      direction: 0,
+      step_num: 100,
+      duty_cycle_num: 100,
+      duty_scale: 100
+    )
+
+    assert true
+  end
+
   test "the truth will set you free" do
     assert true
   end
