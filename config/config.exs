@@ -36,7 +36,6 @@ config :helen,
     :support_workers,
     :worker_supervisors,
     :misc_workers,
-    :agnus,
     :helen
   ],
   core_supervisors: [
@@ -60,23 +59,9 @@ config :helen,
   misc_workers: [
     {Helen.Scheduler, []}
   ],
-  agnus: [
-    {Agnus.Supervisor, []}
-  ],
   helen: [
     {Helen.Supervisor, []}
   ]
-
-config :helen, Agnus.DayInfo,
-  log: [init: false, init_args: false],
-  tz: "America/New_York",
-  api: [
-    url: "https://api.sunrise-sunset.org",
-    lat: 40.2108,
-    lng: -74.011
-  ]
-
-config :helen, Agnus.Supervisor, log: [init: false, init_args: false]
 
 config :helen, Helen.Application, log: [init: false]
 

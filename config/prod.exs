@@ -116,13 +116,13 @@ config :helen, Helen.Scheduler,
     {:seedlings_day,
      [
        schedule: {:cron, "* 06-20 * * *"},
-       task: {Seedlings, :lights, [:day]},
+       task: {Jobs.Seedlings, :lights, [:day]},
        run_strategy: run_strategy
      ]},
     {:seedlings_night,
      [
        schedule: {:cron, "* 00-05,21-23 * * *"},
-       task: {Seedlings, :lights, [:night]},
+       task: {Jobs.Seedlings, :lights, [:night]},
        run_strategy: run_strategy
      ]}
 

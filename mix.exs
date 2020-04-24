@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.4",
+      version: "0.0.5",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -61,7 +61,8 @@ defmodule Helen.Mixfile do
         :logger,
         :runtime_tools,
         :parse_trans,
-        :httpoison
+        :httpoison,
+        :agnus
       ]
     ]
   end
@@ -101,7 +102,8 @@ defmodule Helen.Mixfile do
       {:coverex, "~> 1.0", only: :test},
       {:deep_merge, "~> 1.0"},
       {:crontab, "~> 1.1"},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:agnus, git: "https://github.com/TimHughey/agnus.git", branch: "master"}
       # {:phoenix, "~> 1.4.0"},
       # {:phoenix_pubsub, "~> 1.0"},
       # {:phoenix_ecto, "~> 4.0"},

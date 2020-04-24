@@ -1,4 +1,4 @@
-defmodule Seedlings do
+defmodule Jobs.Seedlings do
   @moduledoc false
 
   use Switch
