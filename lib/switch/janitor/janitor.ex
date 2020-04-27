@@ -79,7 +79,7 @@ defmodule Janitor do
         trash = purge_list(opts)
 
         if dryrun do
-          log?(opts) &&
+          log?(:dryrun, true) &&
             Logger.info([
               "DRY RUN >> found ",
               inspect(Enum.count(trash)),

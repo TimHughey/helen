@@ -20,6 +20,12 @@ config :helen,
 # import_config "modules/msg_save_enable.exs"
 # import_config "modules/msg_save_forward.exs"
 
+config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
+
+config :helen, Janitor,
+  log: [init: false, init_args: false],
+  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
+
 config :helen, Mqtt.Client,
   log_dropped_msgs: true,
   tort_opts: [
@@ -44,6 +50,15 @@ config :helen, Mqtt.Inbound,
     first: {:mins, 5},
     repeat: {:hrs, 60}
   ]
+
+config :helen, OTA, [
+  {:url,
+   [
+     host: "www.wisslanding.com",
+     uri: "helen/firmware",
+     fw_file: "latest.bin"
+   ]}
+]
 
 config :helen, Fact.Influx,
   database: "helen_prod",
@@ -99,6 +114,8 @@ config :helen, Switch.Command,
 run_strategy = {Quantum.RunStrategy.All, [:"prod@helen.live.wisslanding.com"]}
 
 config :helen, Helen.Scheduler,
+  global: true,
+  timezone: "America/New_York",
   jobs: [
     # Every minute
     {:touch,

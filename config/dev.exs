@@ -35,6 +35,12 @@ config :helen, Fact.Influx,
   scheme: "http",
   writer: Instream.Writer.Line
 
+config :helen, Janitor.Supervisor, log: [init: true, init_args: false]
+
+config :helen, Janitor,
+  log: [init: true, init_args: true],
+  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
+
 config :helen, Mqtt.Client,
   log_dropped_msgs: true,
   tort_opts: [
@@ -52,6 +58,15 @@ config :helen, Mqtt.Inbound,
   additional_message_flags: [
     switch_redesign: true
   ]
+
+config :helen, OTA, [
+  {:url,
+   [
+     host: "www.wisslanding.com",
+     uri: "helen/firmware",
+     fw_file: "latest.bin"
+   ]}
+]
 
 config :helen, PulseWidthCmd,
   orphan: [
@@ -72,7 +87,9 @@ config :helen, Repo,
   password: "helen_dev",
   port: 15432,
   hostname: "dev.db.wisslanding.com",
-  pool_size: 10
+  pool_size: 10,
+  migration_timestamps: [type: :utc_datetime_usec],
+  adapter: Ecto.Adapters.Postgres
 
 config :helen, Switch.Command,
   # NOTE:  older_than lists are passed to Timex to create a

@@ -459,7 +459,7 @@ defmodule DutycycleTest do
   test "server can update Dutycycle device",
        context do
     name = name_str(context[:num])
-    rc = Server.change_device(name, "diff_device")
+    rc = Server.change_device(name, "dutycycle_sw0x4")
 
     assert :ok === rc
   end

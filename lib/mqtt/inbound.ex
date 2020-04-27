@@ -14,6 +14,17 @@ defmodule Mqtt.Inbound do
 
   alias Mqtt.Reading
 
+  @additional_msg_flags_default [
+    log_invalid_readings: true,
+    log_roundtrip_times: true
+  ]
+
+  @periodic_log_default [
+    enable: true,
+    first: {:secs, 1},
+    repeat: {:mins, 15}
+  ]
+
   def start_link(s) do
     GenServer.start_link(Mqtt.Inbound, s, name: Mqtt.Inbound)
   end
@@ -28,22 +39,20 @@ defmodule Mqtt.Inbound do
       when is_map(s) do
     Logger.debug(["init()"])
 
-    periodic_log_default = [
-      enable: true,
-      first: {:secs, 1},
-      repeat: {:mins, 15}
-    ]
-
     s =
-      Map.put_new(s, :log_reading, config(:log_reading))
+      Map.put_new(s, :log_reading, config(:log_reading, false))
       |> Map.put_new(:messages_dispatched, 0)
-      |> Map.put_new(:temperature_msgs, config(:temperature_msgs))
-      |> Map.put_new(:remote_msgs, config(:remote_msgs))
-      |> Map.put_new(:pwm_msgs, config(:pwm_msgs))
-      |> Map.put_new(:periodic_log, config(:periodic_log, periodic_log_default))
+      |> Map.put_new(:temperature_msgs, {Sensor, :external_update})
+      |> Map.put_new(:remote_msgs, {Remote, :external_update})
+      |> Map.put_new(:pwm_msgs, {PulseWidth, :external_update})
+      |> Map.put_new(
+        :periodic_log,
+        config(:periodic_log, @periodic_log_default)
+      )
       |> Map.put_new(
         :additional_message_flags,
-        config(:additional_message_flags) |> Enum.into(%{})
+        config(:additional_message_flags, @additional_msg_flags_default)
+        |> Enum.into(%{})
       )
 
     if Map.get(s, :autostart, false) do
@@ -137,8 +146,7 @@ defmodule Mqtt.Inbound do
     {:noreply, s}
   end
 
-  defp config(key, default \\ [])
-       when is_atom(key) do
+  defp config(key, default) when is_atom(key) do
     get_env(:helen, Mqtt.Inbound) |> Keyword.get(key, default)
   end
 

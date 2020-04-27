@@ -103,7 +103,7 @@ defmodule Helen.Mixfile do
       {:deep_merge, "~> 1.0"},
       {:crontab, "~> 1.1"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:agnus, git: "https://github.com/TimHughey/agnus.git", branch: "master"}
+      {:agnus, "~> 0.0.2"}
       # {:phoenix, "~> 1.4.0"},
       # {:phoenix_pubsub, "~> 1.0"},
       # {:phoenix_ecto, "~> 4.0"},
@@ -300,58 +300,6 @@ defmodule Helen.Mixfile do
       {:helen,
        [
          {Helen.Supervisor, []}
-       ]},
-      {OTA,
-       [
-         {:url,
-          [
-            host: "www.wisslanding.com",
-            uri: "helen/firmware",
-            fw_file: "latest.bin"
-          ]}
-       ]},
-      {Repo,
-       [
-         migration_timestamps: [type: :utc_datetime_usec],
-         adapter: Ecto.Adapters.Postgres
-       ]},
-      {Mqtt.Inbound,
-       [
-         additional_message_flags: [
-           log_invalid_readings: true,
-           log_roundtrip_times: true
-         ],
-         periodic_log: [
-           enable: false,
-           first: {:mins, 5},
-           repeat: {:hrs, 60}
-         ],
-         log_reading: false,
-         temperature_msgs: {Sensor, :external_update},
-         remote_msgs: {Remote, :external_update},
-         pwm_msgs: {PulseWidth, :external_update}
-       ]},
-      {MessageSave,
-       [
-         log: [init: false],
-         save: false,
-         save_opts: [],
-         forward: false,
-         forward_opts: [in: [feed: {"dev/mcr/f/report", 0}]],
-         purge: [all_at_startup: true, older_than: [minutes: 20], log: false]
-       ]},
-      {Switch.Device, [log: [cmd_ack: false]]},
-      {Janitor.Supervisor, [log: [init: true, init_args: false]]},
-      {Janitor,
-       [
-         log: [init: true, init_args: false],
-         metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
-       ]},
-      {Helen.Scheduler,
-       [
-         global: true,
-         run_strategy: Quantum.RunStrategy.Local,
-         timezone: "America/New_York"
        ]}
     ]
   end

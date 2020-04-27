@@ -23,6 +23,12 @@ config :helen,
 # import_config "modules/msg_save_enable.exs"
 import_config "modules/msg_save_forward.exs"
 
+config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
+
+config :helen, Janitor,
+  log: [dryrun: false, init: false, init_args: false],
+  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
+
 config :helen, Mqtt.Client,
   log_dropped_msg: true,
   runtime_metrics: true,
@@ -41,6 +47,13 @@ config :helen, Mqtt.Inbound,
     engine_metrics: false
   ],
   periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
+
+config :helen, OTA,
+  url: [
+    host: "www.wisslanding.com",
+    uri: "helen/firmware",
+    fw_file: "latest.bin"
+  ]
 
 config :helen, Fact.Influx,
   database: "helen_test",
@@ -71,9 +84,12 @@ config :helen, Repo,
   database: "helen_test",
   port: 15432,
   hostname: "db.test.wisslanding.com",
-  pool_size: 10
+  pool_size: 10,
+  migration_timestamps: [type: :utc_datetime_usec],
+  adapter: Ecto.Adapters.Postgres
 
 config :helen, Switch.Command,
+  log: [dryrun: false],
   # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [
     at_startup: true,
@@ -88,6 +104,9 @@ config :helen, Switch.Command,
   ]
 
 config :helen, Helen.Scheduler,
+  global: true,
+  run_strategy: Quantum.RunStrategy.Local,
+  timezone: "America/New_York",
   jobs: [
     # Every minute
     {:touch,

@@ -102,6 +102,7 @@ defmodule MessageSave do
 
   def start_link(args) do
     defs = [
+      log: [init: false],
       forward: false,
       forward_opts: [in: [feed: {"dev/+/f/report", 0}]],
       save: false,
