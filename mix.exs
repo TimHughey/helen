@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.5",
+      version: "0.0.6",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -54,7 +54,6 @@ defmodule Helen.Mixfile do
         {Helen.Application,
          [
            version: "#{project() |> Keyword.get(:version)}",
-           build_env: "#{Mix.env()}",
            git_vsn: "#{git_describe()}"
          ]},
       extra_applications: [
@@ -63,7 +62,8 @@ defmodule Helen.Mixfile do
         :parse_trans,
         :httpoison,
         :agnus
-      ]
+      ],
+      env: base_env()
     ]
   end
 
@@ -187,8 +187,6 @@ defmodule Helen.Mixfile do
         Fact.DevMetric.Tags,
         Fact.FreeRamStat.Fields,
         Fact.FreeRamStat.Tags,
-        Fact.LedFlashes.Fields,
-        Fact.LedFlashes.Tags,
         Fact.RelativeHumidity.Fields,
         Fact.RelativeHumidity.Tags,
         Fact.RunMetric.Fields,
@@ -248,6 +246,113 @@ defmodule Helen.Mixfile do
         cookie: "augury-kinship-swain-circus",
         steps: [&sym_link_to_tar_rm/1, :assemble, :tar, &sym_link_to_tar/1]
       ]
+    ]
+  end
+
+  defp base_env do
+    [
+      {:ecto_repos, [Repo]},
+      # default settings for dev and test, must override in prod
+      {:feeds,
+       [
+         cmd: {"dev/ruth/f/command", 1},
+         rpt: {"dev/+/f/report", 0}
+       ]},
+      # Supervision Tree and Initial Opts (listed in startup order)
+      {:sup_tree,
+       [
+         {Repo, []},
+         {Janitor.Supervisor, []},
+         :core_supervisors,
+         # TODO: once the Supervisors below are implemented remove the following
+         #       specific list of supervisors
+         :protocol_supervisors,
+         :support_workers,
+         :worker_supervisors,
+         :misc_workers,
+         :helen
+       ]},
+      {:core_supervisors,
+       [
+         # TODO: implement the Supervisors below to create a 'proper'
+         #       supervisom tree that does not restart servers uncessary
+         # {Protocols.Supervisor, []},
+         # {Support.Supervisor, []},
+         # {Workers.Supervisor, []},
+         # {Misc.Supervisors, []}
+       ]},
+      {:protocol_supervisors,
+       [
+         {Fact.Supervisor, [log: [init: false, init_args: false]]},
+         {Mqtt.Supervisor, []}
+       ]},
+      {:support_workers, []},
+      {:worker_supervisors,
+       [
+         # DynamicSupervisors
+         {Dutycycle.Supervisor, [start_workers: true]},
+         {Thermostat.Supervisor, [start_workers: true]}
+       ]},
+      {:misc_workers,
+       [
+         {Helen.Scheduler, []}
+       ]},
+      {:helen,
+       [
+         {Helen.Supervisor, []}
+       ]},
+      {OTA,
+       [
+         {:url,
+          [
+            host: "www.wisslanding.com",
+            uri: "helen/firmware",
+            fw_file: "latest.bin"
+          ]}
+       ]},
+      {Repo,
+       [
+         migration_timestamps: [type: :utc_datetime_usec],
+         adapter: Ecto.Adapters.Postgres
+       ]},
+      {Mqtt.Inbound,
+       [
+         additional_message_flags: [
+           log_invalid_readings: true,
+           log_roundtrip_times: true
+         ],
+         periodic_log: [
+           enable: false,
+           first: {:mins, 5},
+           repeat: {:hrs, 60}
+         ],
+         log_reading: false,
+         temperature_msgs: {Sensor, :external_update},
+         remote_msgs: {Remote, :external_update},
+         pwm_msgs: {PulseWidth, :external_update}
+       ]},
+      {MessageSave,
+       [
+         log: [init: false],
+         save: false,
+         save_opts: [],
+         forward: false,
+         forward_opts: [in: [feed: {"dev/mcr/f/report", 0}]],
+         purge: [all_at_startup: true, older_than: [minutes: 20], log: false]
+       ]},
+      {Switch.Device, [log: [cmd_ack: false]]},
+      {Janitor.Supervisor, [log: [init: true, init_args: false]]},
+      {Janitor,
+       [
+         log: [init: true, init_args: false],
+         metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
+       ]},
+      {Helen.Scheduler,
+       [
+         global: true,
+         run_strategy: Quantum.RunStrategy.Local,
+         timezone: "America/New_York"
+       ]}
     ]
   end
 end

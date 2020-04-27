@@ -8,17 +8,15 @@ defmodule Fact.FreeRamStat do
   alias Fact.FreeRamStat.Fields
   alias Fact.FreeRamStat.Tags
 
-  import(Fact.Influx, only: [write: 2])
+  import Fact.Influx, only: [write: 2]
 
   alias TimeSupport
 
   series do
-    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     measurement("stat")
 
     tag(:remote_host)
     tag(:remote_name)
-    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
     tag(:stat, default: "freeram")
 
     field(:val)

@@ -8,13 +8,11 @@ defmodule Fact.Fahrenheit do
   alias TimeSupport
 
   series do
-    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     measurement("fahrenheit")
 
     tag(:remote_host)
     tag(:device)
     tag(:name)
-    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
 
     field(:val)
   end

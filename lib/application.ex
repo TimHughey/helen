@@ -6,10 +6,6 @@ defmodule Helen.Application do
 
   use Application
   require Logger
-  import Application, only: [get_env: 2, get_env: 3, put_env: 3]
-  import Keyword, only: [has_key?: 2]
-
-  @log_opts get_env(:helen, Helen.Application, []) |> Keyword.get(:log, [])
 
   @doc """
     Starts Helen Supervisor
@@ -21,17 +17,20 @@ defmodule Helen.Application do
   def start(start_type, args)
 
   def start(:normal, args) do
-    log = Keyword.get(@log_opts, :init, true)
+    import Application, only: [get_env: 2, get_env: 3]
+    import Keyword, only: [has_key?: 2]
+
+    mod_opts = get_env(:helen, Helen.Application, default_opts())
+
+    log =
+      Keyword.get(mod_opts, :log, [])
+      |> Keyword.get(:init, true)
 
     log &&
       Logger.info(["start() ", inspect(args, pretty: true)])
 
-    build_env = Keyword.get(args, :build_env, "dev")
-
-    put_env(:helen, :build_env, build_env)
-
     children =
-      for i <- get_env(:helen, :sup_tree) do
+      for i <- get_env(:helen, :sup_tree, []) do
         if is_tuple(i), do: i, else: get_env(:helen, i)
       end
       |> List.flatten()
@@ -51,11 +50,9 @@ defmodule Helen.Application do
     # only start the Supervisor if the database password is set
     if get_env(:helen, Repo, []) |> has_key?(:password) do
       Logger.info([
-        "build_env[",
-        build_env,
-        "] version[",
+        "starting supervisor version[",
         Keyword.get(args, :version, "unknown"),
-        "] starting supervisor "
+        "]"
       ])
 
       Supervisor.start_link(children, opts)
@@ -63,6 +60,8 @@ defmodule Helen.Application do
       {:error, :no_db_password}
     end
   end
+
+  def default_opts, do: [log: [init: false]]
 
   @type start_type :: :normal
   @type args :: term

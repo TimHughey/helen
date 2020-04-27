@@ -25,12 +25,10 @@ defmodule Fact.EngineMetric do
   @metric_fields [:convert_us, :discover_us, :report_us, :switch_cmd_us]
 
   series do
-    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     # 'type' maps to the measurement
     measurement(@metric_type)
 
     tag(:application, default: "helen")
-    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
     tag(:host)
     tag(:name)
     tag(:metric, default: @metric_name)

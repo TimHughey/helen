@@ -4,8 +4,6 @@ defmodule Mqtt.Handler do
 
   alias Mqtt.Client
 
-  # @build_env Application.compile_env(:helen, :build_env)
-
   def init(args) do
     {:ok, args}
   end
@@ -37,18 +35,6 @@ defmodule Mqtt.Handler do
 
     {:ok, state}
   end
-
-  # def handle_message(topic, _payload, state) do
-  #   Logger.warn([
-  #     Module.split(__MODULE__),
-  #     " mqtt msg recv'd mismatch, build_env: ",
-  #     inspect(@build_env),
-  #     " topic: ",
-  #     inspect(Path.join(topic))
-  #   ])
-  #
-  #   {:ok, state}
-  # end
 
   def subscription(status, topic_filter, state) do
     log = Keyword.get(state, :log_subscriptions, false)

@@ -4,10 +4,6 @@ defmodule Fact.Remote do
   require Logger
   use Timex
 
-  import Fact.Influx, only: [write: 2]
-
-  @env Application.get_env(:helen, :build_env, "unknown")
-
   #   %{
   #   points: [
   #     %{
@@ -25,6 +21,7 @@ defmodule Fact.Remote do
   # |> MyApp.MyConnection.write()
 
   def record(%{metadata: :ok} = r) do
+    import Fact.Influx, only: [write: 2]
     point(r) |> write(precision: :nanosecond, async: true)
   end
 
@@ -41,7 +38,7 @@ defmodule Fact.Remote do
         :ap_rssi
       ])
 
-    tags = Map.take(r, [:name, :host]) |> Map.put(:env, @env)
+    tags = Map.take(r, [:name, :host])
 
     %{
       points: [

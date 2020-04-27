@@ -9,13 +9,11 @@ defmodule Fact.RunMetric do
   alias TimeSupport
 
   series do
-    database(Application.get_env(:helen, Fact.Influx) |> Keyword.get(:database))
     measurement("run_metric")
 
     tag(:module)
     tag(:application, default: "helen")
     tag(:metric)
-    tag(:env, default: Application.get_env(:helen, :build_env, "dev"))
     tag(:device)
 
     field(:val)
