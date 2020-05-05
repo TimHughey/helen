@@ -244,6 +244,7 @@ defmodule Helen.Mixfile do
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],
         cookie: "augury-kinship-swain-circus",
+        strip_beams: false,
         steps: [&sym_link_to_tar_rm/1, :assemble, :tar, &sym_link_to_tar/1]
       ]
     ]
@@ -251,7 +252,6 @@ defmodule Helen.Mixfile do
 
   defp base_env do
     [
-      {:ecto_repos, [Repo]},
       # default settings for dev and test, must override in prod
       {:feeds,
        [

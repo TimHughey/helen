@@ -2,6 +2,8 @@
 # and its dependencies with the aid of the Mix.Config module.
 use Mix.Config
 
+config :helen, ecto_repos: [Repo]
+
 # Configures Elixir's Logger
 config :logger,
   console: [metadata: [:module], format: "$time $metadata$message\n"],
