@@ -225,19 +225,19 @@ defmodule PulseWidth do
     end
   end
 
-  def off(device) when is_binary(device) do
-    with %PulseWidth{duty_min: min} <- Repo.get_by(__MODULE__, device: device) do
-      duty(device, duty: min)
+  def off(name) when is_binary(name) do
+    with %PulseWidth{duty_min: min} <- find(name) do
+      duty(name, duty: min)
     else
-      _catchall -> {:not_found, device}
+      _catchall -> {:not_found, name}
     end
   end
 
-  def on(device) when is_binary(device) do
-    with %PulseWidth{duty_max: max} <- Repo.get_by(__MODULE__, device: device) do
-      duty(device, duty: max)
+  def on(name) when is_binary(name) do
+    with %PulseWidth{duty_max: max} <- find(name) do
+      duty(name, duty: max)
     else
-      _catchall -> {:not_found, device}
+      _catchall -> {:not_found, name}
     end
   end
 
