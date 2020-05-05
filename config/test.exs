@@ -72,7 +72,7 @@ config :helen, PulseWidthCmd,
     log: true
   ],
   purge: [
-    at_startup: true,
+    at_startup: false,
     interval: [minutes: 2],
     older_than: [days: 30],
     log: true

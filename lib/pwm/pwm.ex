@@ -210,6 +210,37 @@ defmodule PulseWidth do
   def find_by_device(device) when is_binary(device),
     do: Repo.get_by(__MODULE__, device: device)
 
+  def like(string) when is_binary(string) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = ["%", string, "%"] |> IO.iodata_to_binary()
+
+    from(p in PulseWidth, where: like(p.name, ^like_string), select: p.name)
+    |> Repo.all()
+  end
+
+  def off(list) when is_list(list) do
+    for l <- list do
+      off(l)
+    end
+  end
+
+  def off(device) when is_binary(device) do
+    with %PulseWidth{duty_min: min} <- Repo.get_by(__MODULE__, device: device) do
+      duty(device, duty: min)
+    else
+      _catchall -> {:not_found, device}
+    end
+  end
+
+  def on(device) when is_binary(device) do
+    with %PulseWidth{duty_max: max} <- Repo.get_by(__MODULE__, device: device) do
+      duty(device, duty: max)
+    else
+      _catchall -> {:not_found, device}
+    end
+  end
+
   def reload({:ok, %PulseWidth{id: id}}), do: reload(id)
 
   def reload(%PulseWidth{id: id}), do: reload(id)
