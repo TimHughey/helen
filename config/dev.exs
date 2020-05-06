@@ -86,7 +86,7 @@ config :helen, Repo,
   username: "helen_dev",
   password: "helen_dev",
   port: 15432,
-  hostname: "dev.db.wisslanding.com",
+  hostname: "db.dev.wisslanding.com",
   pool_size: 10,
   migration_timestamps: [type: :utc_datetime_usec],
   adapter: Ecto.Adapters.Postgres

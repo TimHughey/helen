@@ -21,7 +21,7 @@ defmodule PulseWidthCmd do
     field(:ack_at, :utc_datetime_usec)
     belongs_to(:pwm, PulseWidth, foreign_key: :pwm_id)
 
-    timestamps(usec: true)
+    timestamps(type: :utc_datetime_usec)
   end
 
   def acked?(refid) do
