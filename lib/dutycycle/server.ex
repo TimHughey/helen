@@ -141,10 +141,15 @@ defmodule Dutycycle.Server do
         %{name: name, msg: %{msg: :dutycycle_state, opts: opts}}
         |> call_server()
 
-  def halt(name, opts \\ []) when is_binary(name),
-    do:
-      %{name: name, msg: %{msg: :halt, opts: opts}}
-      |> call_server()
+  def halt(name, opts \\ []) when is_binary(name) do
+    msg = %{name: name, msg: %{msg: :halt, opts: opts}}
+
+    with {rc, res} <- call_server(msg) do
+      {rc, Dutycycle.status(res)}
+    else
+      error -> error
+    end
+  end
 
   def log(name, opts \\ []) when is_binary(name),
     do: %{name: name, msg: %{msg: :log, opts: opts}} |> call_server()
@@ -166,14 +171,19 @@ defmodule Dutycycle.Server do
       %{name: name, msg: %{msg: :reload, opts: opts}}
       |> call_server()
 
-  def resume(name, opts \\ []) when is_binary(name) and is_list(opts),
-    # special case for resume -> request activation of the :active profile
-    do:
-      %{
-        name: name,
-        msg: %{msg: :activate_profile, profile: :active, opts: opts}
-      }
-      |> call_server()
+  # special case for resume -> request activation of the :active profile
+  def resume(name, opts \\ []) when is_binary(name) and is_list(opts) do
+    msg = %{
+      name: name,
+      msg: %{msg: :activate_profile, profile: :active, opts: opts}
+    }
+
+    with {rc, res} <- call_server(msg) do
+      {rc, Dutycycle.status(res)}
+    else
+      error -> error
+    end
+  end
 
   def restart(name) when is_binary(name),
     do: Dutycycle.Supervisor.restart_dutycycle(name)

@@ -470,18 +470,22 @@ defmodule DutycycleTest do
     {_dc, name} = name_from_db(context[:num])
     {rc1, res} = Server.activate_profile(name, "slow")
 
-    rc2 = Server.halt(name)
+    {rc2, res2} = Server.halt(name)
     %Dutycycle{state: %State{started_at: started_at}} = Dutycycle.find(name)
-    rc3 = Server.resume(name)
+    {rc3, res3} = Server.resume(name)
 
     assert :ok == rc1
     assert is_list(res)
     assert res[:name] == name
     assert res[:active_profile] == "slow"
-    assert {:ok, %Dutycycle{}} = rc2
+    assert rc2 == :ok
+    assert is_list(res2)
+    assert Keyword.has_key?(res2, :name)
     refute is_nil(started_at)
     # assert {:failed, {:ok, {:position, {:not_found, _}}}, %Dutycycle{}} = rc2
-    assert {:ok, _profile} = rc3
+    assert :ok == rc3
+    assert is_list(res3)
+    assert Keyword.has_key?(res3, :name)
   end
 
   @tag num: 8
