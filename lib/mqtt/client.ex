@@ -23,8 +23,6 @@ defmodule Mqtt.Client do
 
   @feed_prefix get_env(:helen, :feeds, []) |> Keyword.get(:prefix, "dev")
   @cmd_feed get_env(:helen, :feeds, []) |> Keyword.get(:cmd, {nil, nil})
-  @host_feed get_env(:helen, :feeds, [])
-             |> Keyword.get(:host, {"_PREFIX_/_HOST_/", 1})
 
   def start_link(s) when is_map(s) do
     GenServer.start_link(__MODULE__, s, name: __MODULE__)
@@ -119,17 +117,16 @@ defmodule Mqtt.Client do
   @doc since: "0.0.8"
   def publish_profile(%{host: host} = msg_map, opts \\ [])
       when is_map(msg_map) and is_list(opts) do
-    {feed_template, qos} = Keyword.get(opts, :feed, @host_feed)
+    default_feed = {[@feed_prefix, host] |> Enum.join("/"), 1}
+    {feed, qos} = Keyword.get(opts, :feed, default_feed)
     pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
-
-    # feed format: _PREFIX_/_HOST_/f/config
-    feed =
-      String.replace(feed_template, "_PREFIX_", @feed_prefix)
-      |> String.replace("_HOST_", host)
 
     with {:ok, payload} <- Msgpax.pack(msg_map),
          save_msg <- %{payload: payload, direction: :out},
          %{payload: payload} <- MessageSave.save(save_msg) do
+      ["publishing profile: host=", inspect(host), " feed=", inspect(feed)]
+      |> Logger.info()
+
       GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
     else
       e -> report_publish_error(e)
