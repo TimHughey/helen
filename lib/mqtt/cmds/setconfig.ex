@@ -1,11 +1,11 @@
-defmodule Mqtt.SetConfig do
+defmodule Mqtt.SetProfile do
   @moduledoc false
 
   require Logger
 
   alias TimeSupport
 
-  def send(%Remote{} = r), do: new_cmd(r) |> Mqtt.Client.publish_config()
+  def send(%Remote{} = r), do: new_cmd(r) |> Mqtt.Client.publish_profile()
 
   def new_cmd(%Remote{host: host, name: name, profile: profile}) do
     Map.merge(

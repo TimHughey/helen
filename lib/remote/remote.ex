@@ -57,9 +57,6 @@ defmodule Remote do
     timestamps(type: :utc_datetime_usec)
   end
 
-  # 15 minutes (as millesconds)
-  @delete_timeout_ms 15 * 60 * 1000
-
   def add(%Remote{} = r), do: add([r])
 
   def add(%{host: host, mtime: mtime} = r) do
@@ -292,24 +289,6 @@ defmodule Remote do
   def find_by_host(host) when is_binary(host),
     do: Repo.get_by(__MODULE__, host: host)
 
-  # def get_by(opts) when is_list(opts) do
-  #   filter = Keyword.take(opts, [:id, :host, :name])
-  #
-  #   select =
-  #     Keyword.take(opts, [:only]) |> Keyword.get_values(:only) |> List.flatten()
-  #
-  #   if Enum.empty?(filter) do
-  #     Logger.warn(["get_by bad args: ", inspect(opts, pretty: true)])
-  #     []
-  #   else
-  #     rem = from(remote in Remote, where: ^filter) |> one()
-  #
-  #     if is_nil(rem) or Enum.empty?(select),
-  #       do: rem,
-  #       else: Map.take(rem, select)
-  #   end
-  # end
-
   # header to define default parameter for multiple functions
   def mark_as_seen(host, time, threshold_secs \\ 3)
 
@@ -418,15 +397,16 @@ defmodule Remote do
   # PRIVATE FUNCTIONS
   #
 
-  # handle boot and startup (depcreated) messages
+  # handle boot and deprecated startup messages
+  # NOTE: this function should be renamed in favor of profiles
   defp send_remote_config([%Remote{} = rem], %{type: "boot"} = eu) do
     # all devices are sent their name
     SetName.new_cmd(rem.host, rem.name)
     |> Client.publish_cmd()
 
     # NOTE HACK
-    # also send the configuration
-    Mqtt.SetConfig.send(rem)
+    # also send the profile
+    Mqtt.SetProfile.send(rem)
 
     log = Map.get(eu, :log, true)
 

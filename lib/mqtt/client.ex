@@ -23,8 +23,8 @@ defmodule Mqtt.Client do
 
   @feed_prefix get_env(:helen, :feeds, []) |> Keyword.get(:prefix, "dev")
   @cmd_feed get_env(:helen, :feeds, []) |> Keyword.get(:cmd, {nil, nil})
-  @config_feed get_env(:helen, :feeds, [])
-               |> Keyword.get(:config, {"_PREFIX_/_HOST_/f/config", 1})
+  @host_feed get_env(:helen, :feeds, [])
+             |> Keyword.get(:host, {"_PREFIX_/_HOST_/", 1})
 
   def start_link(s) when is_map(s) do
     GenServer.start_link(__MODULE__, s, name: __MODULE__)
@@ -106,20 +106,20 @@ defmodule Mqtt.Client do
   end
 
   @doc """
-    Publishes the passed map to the specific configuration feed for a host
+    Publishes the passed map to the host specific MQTT feed
 
       ## Inputs
         1. msg_map
         2. optional opts:  [feed: {template_string, qos}, pub_opts: []]
 
       ## Examples
-        iex> Mqtt.Client.publish_config(msg_map, opts)
+        iex> Mqtt.Client.publish_profile(msg_map, opts)
   """
 
   @doc since: "0.0.8"
-  def publish_config(%{host: host} = msg_map, opts \\ [])
+  def publish_profile(%{host: host} = msg_map, opts \\ [])
       when is_map(msg_map) and is_list(opts) do
-    {feed_template, qos} = Keyword.get(opts, :feed, @config_feed)
+    {feed_template, qos} = Keyword.get(opts, :feed, @host_feed)
     pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
 
     # feed format: _PREFIX_/_HOST_/f/config
