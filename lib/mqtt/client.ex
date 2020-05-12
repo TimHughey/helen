@@ -117,16 +117,13 @@ defmodule Mqtt.Client do
   @doc since: "0.0.8"
   def publish_profile(%{host: host} = msg_map, opts \\ [])
       when is_map(msg_map) and is_list(opts) do
-    default_feed = {[@feed_prefix, host] |> Enum.join("/"), 1}
+    default_feed = {[@feed_prefix, host, "profile"] |> Enum.join("/"), 1}
     {feed, qos} = Keyword.get(opts, :feed, default_feed)
     pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
 
     with {:ok, payload} <- Msgpax.pack(msg_map),
          save_msg <- %{payload: payload, direction: :out},
          %{payload: payload} <- MessageSave.save(save_msg) do
-      ["publishing profile: host=", inspect(host), " feed=", inspect(feed)]
-      |> Logger.info()
-
       GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
     else
       e -> report_publish_error(e)
