@@ -21,7 +21,10 @@ defmodule Mqtt.Client do
   #    }
   #  end
 
+  @feed_prefix get_env(:helen, :feeds, []) |> Keyword.get(:prefix, "dev")
   @cmd_feed get_env(:helen, :feeds, []) |> Keyword.get(:cmd, {nil, nil})
+  @config_feed get_env(:helen, :feeds, [])
+               |> Keyword.get(:config, {"_PREFIX_/_HOST_/f/config", 1})
 
   def start_link(s) when is_map(s) do
     GenServer.start_link(__MODULE__, s, name: __MODULE__)
@@ -100,6 +103,37 @@ defmodule Mqtt.Client do
     # init() return is calculated above in if block
     # at the conclusion of init() we have a running InboundMessage GenServer and
     # potentially a connection to MQTT
+  end
+
+  @doc """
+    Publishes the passed map to the specific configuration feed for a host
+
+      ## Inputs
+        1. msg_map
+        2. optional opts:  [feed: {template_string, qos}, pub_opts: []]
+
+      ## Examples
+        iex> Mqtt.Client.publish_config(msg_map, opts)
+  """
+
+  @doc since: "0.0.8"
+  def publish_config(%{host: host} = msg_map, opts \\ [])
+      when is_map(msg_map) and is_list(opts) do
+    {feed_template, qos} = Keyword.get(opts, :feed, @config_feed)
+    pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
+
+    # feed format: _PREFIX_/_HOST_/f/config
+    feed =
+      String.replace(feed_template, "_PREFIX_", @feed_prefix)
+      |> String.replace("_HOST_", host)
+
+    with {:ok, payload} <- Msgpax.pack(msg_map),
+         save_msg <- %{payload: payload, direction: :out},
+         %{payload: payload} <- MessageSave.save(save_msg) do
+      GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
+    else
+      e -> report_publish_error(e)
+    end
   end
 
   def publish_cmd(msg_map, opts \\ []) when is_map(msg_map) and is_list(opts) do

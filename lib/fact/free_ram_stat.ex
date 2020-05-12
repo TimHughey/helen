@@ -65,7 +65,7 @@ defmodule Fact.FreeRamStat do
      :ok
   """
   def record(%{host: host, mtime: _mtime, freeram: _freeram} = r) do
-    remote = Remote.get_by(host: host, only: :name)
+    remote = Remote.find_by_host(host)
     name = if is_nil(remote), do: r.host, else: remote.name
 
     Map.put_new(r, :name, name) |> record()

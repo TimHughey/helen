@@ -55,6 +55,8 @@ defmodule RemoteTest do
     Map.merge(m, boot_map)
   end
 
+  @moduletag :remote
+
   setup_all do
     ext(99) |> Map.put(:log, false) |> boot() |> Remote.external_update()
     :ok
@@ -78,7 +80,7 @@ defmodule RemoteTest do
       |> Map.merge(%{mtime: later_mtime, log: false})
       |> Remote.external_update()
 
-    rem = Remote.get_by(host: host(16))
+    rem = Remote.find(host(16))
 
     assert res === :ok
     assert Timex.to_unix(rem.last_start_at) >= initial_mtime
@@ -87,7 +89,7 @@ defmodule RemoteTest do
   test "can create a changeset from an external update" do
     eu = ext(19) |> boot() |> Map.merge(%{log: false})
     Remote.external_update(eu)
-    rem = Remote.get_by(name: host(19))
+    rem = Remote.find(host(19))
     changes = %{reset_reason: "esp_restart()", name: rem.name}
 
     cs = Remote.changeset(rem, changes)
@@ -125,11 +127,11 @@ defmodule RemoteTest do
 
   test "mark as seen (default threshold)" do
     ext(6) |> Remote.external_update()
-    before_mark = Remote.get_by(host: host(6))
+    before_mark = Remote.find_by_host(host(6))
 
     Remote.mark_as_seen(host(1), TimeSupport.unix_now(:second))
 
-    after_mark = Remote.get_by(host: host(6))
+    after_mark = Remote.find_by_host(host(6))
 
     assert before_mark.last_seen_at === after_mark.last_seen_at
   end
@@ -137,10 +139,10 @@ defmodule RemoteTest do
   @tag long_running: true
   test "mark as seen (zero threshold)" do
     ext(5) |> Remote.external_update()
-    before_mark = Remote.get_by(host: host(5))
+    before_mark = Remote.find_by_host(host(5))
     :timer.sleep(1001)
     Remote.mark_as_seen(host(5), TimeSupport.unix_now(:second), 0)
-    after_mark = Remote.get_by(host: host(5))
+    after_mark = Remote.find_by_host(host(5))
 
     assert Timex.compare(after_mark.last_seen_at, before_mark.last_seen_at) == 1
   end
@@ -149,7 +151,7 @@ defmodule RemoteTest do
     ext(2) |> Remote.external_update()
 
     res = Remote.change_name(host(2), name(2))
-    %Remote{name: name} = Remote.get_by(name: name(2))
+    %Remote{name: name} = Remote.find(name(2))
 
     assert res === :ok and name === name(2)
   end
@@ -166,60 +168,60 @@ defmodule RemoteTest do
   test "change a name (by id)" do
     n = 13
     ext(n) |> Remote.external_update()
-    r = Remote.get_by(host: host(n))
+    r = Remote.find_by_host(host(n))
     res = Remote.change_name(r.id, name(n))
 
     assert res === name(n)
   end
 
-  test "get_by(name: name)" do
+  test "can find a Remote by name" do
     ext(3) |> Remote.external_update()
 
     Remote.change_name(host(3), name(3))
-    %Remote{name: name} = Remote.get_by(name: name(3))
+    %Remote{name: name} = Remote.find(name(3))
 
     assert name === name(3)
   end
 
-  test "get_by(name: name, only: [:last_seen_at, :last_start_at])" do
-    ext(3) |> Remote.external_update()
-    result = Remote.get_by(host: host(3), only: [:last_seen_at, :last_start_at])
+  # test "get_by(name: name, only: [:last_seen_at, :last_start_at])" do
+  #   ext(3) |> Remote.external_update()
+  #   result = Remote.find_by(host: host(3), only: [:last_seen_at, :last_start_at])
+  #
+  #   seen =
+  #     if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
+  #
+  #   start =
+  #     if is_map(result), do: Map.get(result, :last_start_at, nil), else: result
+  #
+  #   refute is_nil(seen) and is_nil(start)
+  # end
 
-    seen =
-      if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
+  # test "get_by(name: name, only: :last_seen_at)" do
+  #   ext(3) |> Remote.external_update()
+  #   result = Remote.get_by(host: host(3), only: :last_seen_at)
+  #
+  #   last =
+  #     if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
+  #
+  #   refute is_nil(last)
+  # end
 
-    start =
-      if is_map(result), do: Map.get(result, :last_start_at, nil), else: result
-
-    refute is_nil(seen) and is_nil(start)
-  end
-
-  test "get_by(name: name, only: :last_seen_at)" do
-    ext(3) |> Remote.external_update()
-    result = Remote.get_by(host: host(3), only: :last_seen_at)
-
-    last =
-      if is_map(result), do: Map.get(result, :last_seen_at, nil), else: result
-
-    refute is_nil(last)
-  end
-
-  test "get_by(id: id)" do
+  test "can find a Remote by id" do
     num = 14
     host = host(num)
     ext(num) |> Remote.external_update()
 
-    rem1 = Remote.get_by(host: host)
-    rem2 = Remote.get_by(id: rem1.id)
+    rem1 = Remote.find_by_host(host)
+    rem2 = Remote.find(rem1.id)
 
     assert rem1.id === rem2.id
   end
 
-  test "get_by bad params" do
-    msg = capture_log(fn -> Remote.get_by(foo: "foo") end)
-
-    assert(msg =~ "bad arg")
-  end
+  # test "get_by bad params" do
+  #   msg = capture_log(fn -> Remote.get_by(foo: "foo") end)
+  #
+  #   assert(msg =~ "bad arg")
+  # end
 
   test "all Remotes" do
     ext(1) |> Remote.external_update()
@@ -243,7 +245,7 @@ defmodule RemoteTest do
     host = host(num)
     ext(num) |> Remote.external_update()
 
-    rem1 = Remote.get_by(host: host)
+    rem1 = Remote.find_by_host(host)
 
     ota_list = Remote.remote_list(rem1.id)
     first = [ota_list] |> List.flatten() |> hd()
@@ -257,7 +259,7 @@ defmodule RemoteTest do
     host = host(num)
     ext(num) |> Remote.external_update()
 
-    rem1 = Remote.get_by(host: host)
+    rem1 = Remote.find_by_host(host)
 
     ota_list = Remote.remote_list(rem1.name)
     first = [ota_list] |> List.flatten() |> hd()
@@ -309,7 +311,7 @@ defmodule RemoteTest do
   test "OTA update (main)" do
     n = 16
     ext(n) |> boot() |> Map.put(:log, false) |> Remote.external_update()
-    rem = Remote.get_by(host: host(n))
+    rem = Remote.find_by_host(host(n))
 
     list = Remote.ota_update(rem.host, reboot_delay_ms: 1000, log: false)
 
@@ -322,7 +324,7 @@ defmodule RemoteTest do
   test "OTA update (log message)" do
     n = 17
     ext(n) |> boot() |> Map.put(:log, false) |> Remote.external_update()
-    rem = Remote.get_by(host: host(n))
+    rem = Remote.find_by_host(host(n))
 
     msg =
       capture_log(fn ->
@@ -336,7 +338,7 @@ defmodule RemoteTest do
   test "remote restart" do
     n = 12
     ext(n) |> boot() |> Map.put(:log, false) |> Remote.external_update()
-    rem = Remote.get_by(host: host(n))
+    rem = Remote.find_by_host(host(n))
 
     list = Remote.restart(rem.host, reboot_delay_ms: 0, log: false)
 
@@ -348,7 +350,7 @@ defmodule RemoteTest do
   test "can deprecate a Remote" do
     n = 15
     ext(n) |> Remote.external_update()
-    rem = Remote.get_by(host: host(n))
+    rem = Remote.find_by_host(host(n))
 
     {rc, res} = Remote.deprecate(rem.id)
 

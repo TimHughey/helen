@@ -172,17 +172,17 @@ defmodule SwitchCommandTest do
     r: _r,
     sd: {_rc, %Device{last_cmd_at: _last_cmd_at} = sd}
   } do
-    for _x <- 0..30 do
+    for _x <- 0..12 do
       {elapsed, {rc, _res}} =
         Duration.measure(fn ->
           Device.add_cmd(sd, "cmd_test", TimeSupport.utc_now())
         end)
 
       assert rc == :ok
-      if Duration.to_microseconds(elapsed) < 750, do: Process.sleep(10)
+      if Duration.to_milliseconds(elapsed) < 100, do: Process.sleep(100)
     end
 
-    {rc, res} = Command.purge(older_than: [seconds: 1, milliseconds: 200])
+    {rc, res} = Command.purge(older_than: [seconds: 1, milliseconds: 100])
 
     assert :purge_queued == rc
 

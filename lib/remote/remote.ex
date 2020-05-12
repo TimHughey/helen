@@ -24,6 +24,7 @@ defmodule Remote do
   schema "remote" do
     field(:host, :string)
     field(:name, :string)
+    field(:profile, :string, default: "default")
     field(:hw, :string)
     field(:firmware_vsn, :string)
     field(:preferred_vsn, :string)
@@ -53,7 +54,7 @@ defmodule Remote do
       default: %{external_update: false, cmd_rt: true}
     )
 
-    timestamps(usec: true)
+    timestamps(type: :utc_datetime_usec)
   end
 
   # 15 minutes (as millesconds)
@@ -84,7 +85,7 @@ defmodule Remote do
 
   def add(list) when is_list(list) do
     for %Remote{} = r <- list do
-      case get_by(host: r.host) do
+      case find_by_host(r.host) do
         nil ->
           insert!(r)
 
@@ -122,6 +123,7 @@ defmodule Remote do
     rem
     |> cast(params, [
       :name,
+      :profile,
       :hw,
       :firmware_vsn,
       :project_name,
@@ -142,7 +144,7 @@ defmodule Remote do
       :heap_min,
       :uptime_us
     ])
-    |> validate_required([:name])
+    |> validate_required([:name, :profile])
     |> validate_format(:name, name_regex())
     |> unique_constraint(:name)
   end
@@ -164,8 +166,8 @@ defmodule Remote do
 
   def change_name(host, new_name)
       when is_binary(host) and is_binary(new_name) do
-    remote = get_by(host: host)
-    check = get_by(name: new_name)
+    remote = find_by_host(host)
+    check = find(new_name)
 
     if is_nil(check) do
       case remote do
@@ -189,18 +191,24 @@ defmodule Remote do
 
   def change_name(_, _), do: {:error, :bad_args}
 
-  def delete(id) when is_integer(id),
-    do:
-      from(s in Remote, where: s.id == ^id)
-      |> Repo.delete_all(timeout: @delete_timeout_ms)
+  def delete(id) when is_integer(id) do
+    with %Remote{} = x <- find(id) do
+      Repo.delete(x)
+    else
+      _catchall -> {:not_found, id}
+    end
+  end
 
-  def delete_all(:dangerous),
-    do:
-      from(rem in Remote, where: rem.id >= 0)
-      |> Repo.delete_all(timeout: @delete_timeout_ms)
+  def delete_all(:dangerous) do
+    import Ecto.Query, only: [from: 2]
+
+    for x <- from(x in Remote, select: [:id]) |> Repo.all() do
+      Repo.delete(x)
+    end
+  end
 
   def deprecate(id) when is_integer(id) do
-    r = get_by(id: id)
+    r = find(id)
 
     if is_nil(r) do
       Logger.warn(["deprecate(", inspect(id), " failed"])
@@ -275,30 +283,39 @@ defmodule Remote do
     :error
   end
 
-  def get_by(opts) when is_list(opts) do
-    filter = Keyword.take(opts, [:id, :host, :name])
+  def find(id) when is_integer(id),
+    do: Repo.get_by(__MODULE__, id: id)
 
-    select =
-      Keyword.take(opts, [:only]) |> Keyword.get_values(:only) |> List.flatten()
+  def find(name) when is_binary(name),
+    do: Repo.get_by(__MODULE__, name: name)
 
-    if Enum.empty?(filter) do
-      Logger.warn(["get_by bad args: ", inspect(opts, pretty: true)])
-      []
-    else
-      rem = from(remote in Remote, where: ^filter) |> one()
+  def find_by_host(host) when is_binary(host),
+    do: Repo.get_by(__MODULE__, host: host)
 
-      if is_nil(rem) or Enum.empty?(select),
-        do: rem,
-        else: Map.take(rem, select)
-    end
-  end
+  # def get_by(opts) when is_list(opts) do
+  #   filter = Keyword.take(opts, [:id, :host, :name])
+  #
+  #   select =
+  #     Keyword.take(opts, [:only]) |> Keyword.get_values(:only) |> List.flatten()
+  #
+  #   if Enum.empty?(filter) do
+  #     Logger.warn(["get_by bad args: ", inspect(opts, pretty: true)])
+  #     []
+  #   else
+  #     rem = from(remote in Remote, where: ^filter) |> one()
+  #
+  #     if is_nil(rem) or Enum.empty?(select),
+  #       do: rem,
+  #       else: Map.take(rem, select)
+  #   end
+  # end
 
   # header to define default parameter for multiple functions
   def mark_as_seen(host, time, threshold_secs \\ 3)
 
   def mark_as_seen(host, mtime, threshold_secs)
       when is_binary(host) and is_integer(mtime) do
-    case get_by(host: host) do
+    case find_by_host(host) do
       nil ->
         host
 
@@ -342,7 +359,7 @@ defmodule Remote do
 
   # create a list
   def remote_list(id) when is_integer(id) do
-    with %Remote{} = r <- get_by(id: id),
+    with %Remote{} = r <- find(id),
          map <- ota_update_map(r) do
       [map]
     else
@@ -406,6 +423,10 @@ defmodule Remote do
     # all devices are sent their name
     SetName.new_cmd(rem.host, rem.name)
     |> Client.publish_cmd()
+
+    # NOTE HACK
+    # also send the configuration
+    Mqtt.SetConfig.send(rem)
 
     log = Map.get(eu, :log, true)
 

@@ -32,7 +32,7 @@ defmodule PulseWidth do
 
     has_many(:cmds, PulseWidthCmd, foreign_key: :pwm_id)
 
-    timestamps(usec: true)
+    timestamps(type: :utc_datetime_usec)
   end
 
   def add(%{device: device, host: _host, mtime: mtime} = r) do

@@ -9,7 +9,8 @@
   Switch.Device,
   PulseWidth,
   Sensor,
-  Remote
+  Remote,
+  RemoteProfile.Schema
 ]
 |> HelenTest.delete_all()
 
@@ -18,5 +19,8 @@
 #   exclude: [ota: true, mixtank: true, dutycycle: true],
 #   include: [thermostat: true]
 # )
+
+# create the default Remote Profile
+RemoteProfile.Schema.create("default")
 
 ExUnit.start()

@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.1
--- Dumped by pg_dump version 12.1
+-- Dumped from database version 12.2
+-- Dumped by pg_dump version 12.2
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -207,10 +207,10 @@ CREATE TABLE public.pwm_cmd (
     acked boolean DEFAULT false NOT NULL,
     orphan boolean DEFAULT false NOT NULL,
     rt_latency_us integer DEFAULT 0 NOT NULL,
-    sent_at timestamp(0) without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    ack_at timestamp(0) without time zone DEFAULT NULL::timestamp without time zone,
-    inserted_at timestamp(0) without time zone NOT NULL,
-    updated_at timestamp(0) without time zone NOT NULL
+    sent_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    ack_at timestamp without time zone,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
 
 
@@ -285,7 +285,8 @@ CREATE TABLE public.remote (
     bssid character varying(255) DEFAULT 'xx:xx:xx:xx:xx:xx'::character varying,
     metric_freq_secs integer DEFAULT 60,
     metric_at timestamp(0) without time zone DEFAULT NULL::timestamp without time zone,
-    runtime_metrics jsonb DEFAULT '{"cmd_rt": true, "external_update": false}'::jsonb NOT NULL
+    runtime_metrics jsonb DEFAULT '{"cmd_rt": true, "external_update": false}'::jsonb NOT NULL,
+    profile character varying(255) DEFAULT 'default'::character varying NOT NULL
 );
 
 
@@ -306,6 +307,82 @@ CREATE SEQUENCE public.remote_id_seq
 --
 
 ALTER SEQUENCE public.remote_id_seq OWNED BY public.remote.id;
+
+
+--
+-- Name: remote_profile; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.remote_profile (
+    id bigint NOT NULL,
+    name character varying(255) NOT NULL,
+    version uuid NOT NULL,
+    dalsemi_enable boolean DEFAULT true NOT NULL,
+    dalsemi_core_stack integer DEFAULT 1536 NOT NULL,
+    dalsemi_core_priority integer DEFAULT 1 NOT NULL,
+    dalsemi_discover_stack integer DEFAULT 4096 NOT NULL,
+    dalsemi_discover_priority integer DEFAULT 12 NOT NULL,
+    dalsemi_report_stack integer DEFAULT 3072 NOT NULL,
+    dalsemi_report_priority integer DEFAULT 13 NOT NULL,
+    dalsemi_convert_stack integer DEFAULT 2048 NOT NULL,
+    dalsemi_convert_priority integer DEFAULT 13 NOT NULL,
+    dalsemi_command_stack integer DEFAULT 3072 NOT NULL,
+    dalsemi_command_priority integer DEFAULT 14 NOT NULL,
+    dalsemi_core_interval_secs integer DEFAULT 30 NOT NULL,
+    dalsemi_discover_interval_secs integer DEFAULT 30 NOT NULL,
+    dalsemi_convert_interval_secs integer DEFAULT 7 NOT NULL,
+    dalsemi_report_interval_secs integer DEFAULT 7 NOT NULL,
+    i2c_enable boolean DEFAULT true NOT NULL,
+    i2c_use_multiplexer boolean DEFAULT false NOT NULL,
+    i2c_core_stack integer DEFAULT 1536 NOT NULL,
+    i2c_core_priority integer DEFAULT 1 NOT NULL,
+    i2c_discover_stack integer DEFAULT 4096 NOT NULL,
+    i2c_discover_priority integer DEFAULT 12 NOT NULL,
+    i2c_report_stack integer DEFAULT 3072 NOT NULL,
+    i2c_report_priority integer DEFAULT 13 NOT NULL,
+    i2c_command_stack integer DEFAULT 3072 NOT NULL,
+    i2c_command_priority integer DEFAULT 14 NOT NULL,
+    i2c_core_interval_secs integer DEFAULT 7 NOT NULL,
+    i2c_discover_interval_secs integer DEFAULT 60 NOT NULL,
+    i2c_report_interval_secs integer DEFAULT 7 NOT NULL,
+    pwm_enable boolean DEFAULT true NOT NULL,
+    pwm_core_stack integer DEFAULT 1536 NOT NULL,
+    pwm_core_priority integer DEFAULT 1 NOT NULL,
+    pwm_discover_stack integer DEFAULT 2048 NOT NULL,
+    pwm_discover_priority integer DEFAULT 12 NOT NULL,
+    pwm_report_stack integer DEFAULT 2048 NOT NULL,
+    pwm_report_priority integer DEFAULT 12 NOT NULL,
+    pwm_command_stack integer DEFAULT 2048 NOT NULL,
+    pwm_command_priority integer DEFAULT 14 NOT NULL,
+    pwm_core_interval_secs integer DEFAULT 10 NOT NULL,
+    pwm_report_interval_secs integer DEFAULT 10 NOT NULL,
+    timestamp_task_stack integer DEFAULT 1536 NOT NULL,
+    timestamp_task_priority integer DEFAULT 0 NOT NULL,
+    timestamp_watch_stacks boolean DEFAULT false NOT NULL,
+    timestamp_core_interval_secs integer DEFAULT 3 NOT NULL,
+    timestamp_report_interval_secs integer DEFAULT 3600 NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: remote_profile_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.remote_profile_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: remote_profile_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.remote_profile_id_seq OWNED BY public.remote_profile.id;
 
 
 --
@@ -700,6 +777,13 @@ ALTER TABLE ONLY public.remote ALTER COLUMN id SET DEFAULT nextval('public.remot
 
 
 --
+-- Name: remote_profile id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_profile ALTER COLUMN id SET DEFAULT nextval('public.remote_profile_id_seq'::regclass);
+
+
+--
 -- Name: sensor id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -816,6 +900,14 @@ ALTER TABLE ONLY public.pwm
 
 ALTER TABLE ONLY public.remote
     ADD CONSTRAINT remote_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: remote_profile remote_profile_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_profile
+    ADD CONSTRAINT remote_profile_pkey PRIMARY KEY (id);
 
 
 --
@@ -994,6 +1086,13 @@ CREATE UNIQUE INDEX remote_host_index ON public.remote USING btree (host);
 --
 
 CREATE UNIQUE INDEX remote_name_index ON public.remote USING btree (name);
+
+
+--
+-- Name: remote_profile_name_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX remote_profile_name_index ON public.remote_profile USING btree (name);
 
 
 --
@@ -1198,5 +1297,5 @@ ALTER TABLE ONLY public.thermostat_profile
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220);
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326);
 

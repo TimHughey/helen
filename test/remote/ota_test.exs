@@ -22,7 +22,8 @@ defmodule OTATest do
     [log: false]
   end
 
-  @tag :ota
+  @moduletag :ota
+
   test "default url exists in environment" do
     ota_env = Application.get_env(:helen, OTA)
 
@@ -30,7 +31,6 @@ defmodule OTATest do
     assert Keyword.has_key?(ota_env, :url)
   end
 
-  @tag :ota
   test "send OTA with correct list format" do
     ext(0) |> Remote.external_update()
     hosts = [%{host: host(0), name: name(0)}]
@@ -42,7 +42,6 @@ defmodule OTATest do
     assert {_name, _host, :ok} = hd(list)
   end
 
-  @tag :ota
   test "send OTA with incorrect list format" do
     ext(0) |> Remote.external_update()
     hosts = [host(0)]

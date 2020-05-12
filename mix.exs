@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.7",
+      version: "0.0.8",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -255,6 +255,7 @@ defmodule Helen.Mixfile do
       # default settings for dev and test, must override in prod
       {:feeds,
        [
+         prefix: "dev",
          cmd: {"dev/ruth/f/command", 1},
          rpt: {"dev/+/f/report", 0}
        ]},
