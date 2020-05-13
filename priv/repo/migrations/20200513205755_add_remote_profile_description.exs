@@ -6,6 +6,6 @@ defmodule Repo.Migrations.AddRemoteProfileDescription do
       add(:description, :string, default: " ")
     end
 
-    Remote.Profile.Schema.create("default")
+
   end
 end
