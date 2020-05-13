@@ -10,7 +10,7 @@
   PulseWidth,
   Sensor,
   Remote,
-  RemoteProfile.Schema
+  Remote.Profile.Schema
 ]
 |> HelenTest.delete_all()
 
@@ -21,6 +21,6 @@
 # )
 
 # create the default Remote Profile
-RemoteProfile.Schema.create("default")
+Remote.Profile.Schema.create("default")
 
 ExUnit.start()

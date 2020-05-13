@@ -1,4 +1,4 @@
-defmodule RemoteProfile.Schema do
+defmodule Remote.Profile.Schema do
   @moduledoc """
     Schema definition for Remote Profiles (configuration)
   """
@@ -9,10 +9,11 @@ defmodule RemoteProfile.Schema do
 
   import Common.DB, only: [name_regex: 0]
 
-  alias RemoteProfile.Schema
+  alias Remote.Profile.Schema
 
   schema "remote_profile" do
     field(:name, :string)
+    field(:description, :string)
     field(:version, Ecto.UUID, autogenerate: true)
 
     field(:dalsemi_enable, :boolean, default: true)
@@ -70,9 +71,13 @@ defmodule RemoteProfile.Schema do
     Creates a new Remote Profile with specified name and optional parameters
 
       ## Examples
-        iex> RemoteProfile.Schema.create("default", dalsemi_enable: true,
+        iex> Remote.Profile.Schema.create("default", dalsemi_enable: true,
             i2c_enable: true, pwm_enable: false)
-            %RemoteProfile.Schema{}
+            {:ok, }%Remote.Profile.Schema{}}
+
+            {:duplicate, name}
+
+            {:error, anything}
   """
   @doc since: "0.0.8"
   def create(name, opts \\ []) when is_binary(name) and is_list(opts) do
@@ -99,16 +104,43 @@ defmodule RemoteProfile.Schema do
   end
 
   @doc """
-    Get a %RemoteProfile.Schema{} by id or name
+    Duplicate an existing Remote Profile
+
+    Ultimately calls create/2 so same return results
+
+      ## Examples
+        iex> Remote.Profile.Schema.duplicate(name, copy_name)
+        {:ok, %Remote.Profile.Schema{}}
+
+        {:not_found, name}
+  """
+
+  @doc since: "0.0.8"
+  def duplicate(name, copy_name)
+      when is_binary(name) and is_binary(copy_name) do
+    with {:find, %Schema{} = x} <- {:find, find(name)},
+         source_map <- Map.from_struct(x) |> Map.take(keys(:create_opts)),
+         description <- ["copy of", name] |> Enum.join(" "),
+         source_map <- Map.put(source_map, :description, description),
+         copy_opts <- Map.to_list(source_map) do
+      create(copy_name, copy_opts)
+    else
+      {:find, nil} -> {:not_found, name}
+      error -> {:error, error}
+    end
+  end
+
+  @doc """
+    Get a %Remote.Profile.Schema{} by id or name
 
     Same return values as Repo.get_by/2
 
       1. nil if not found
-      2. %RemoteProfile.Schema{}
+      2. %Remote.Profile.Schema{}
 
       ## Examples
-        iex> RemoteProfile.Schema.find("default")
-        {:ok, %RemoteProfile.Schema{}}
+        iex> Remote.Profile.Schema.find("default")
+        %Remote.Profile.Schema{}
   """
 
   @doc since: "0.0.8"
@@ -121,13 +153,13 @@ defmodule RemoteProfile.Schema do
   def find(bad_args), do: {:bad_args, bad_args}
 
   @doc """
-    Reload a previously loaded RemoteProfile.Schema or get by id
+    Reload a previously loaded Remote.Profile.Schema or get by id
 
     Leverages Repo.get!/2 and raises on failure
 
     ## Examples
-      iex> RemoteProfile.Schema.reload(1)
-      %RemoteProfile.Schema{}
+      iex> Remote.Profile.Schema.reload(1)
+      %Remote.Profile.Schema{}
   """
 
   @doc since: "0.0.8"
@@ -143,7 +175,7 @@ defmodule RemoteProfile.Schema do
     Converts a Remote Profile to a map that can be used externally.
 
       ## Examples
-        iex> RemoteProfile.Schema.to_external_map("default")
+        iex> Remote.Profile.Schema.to_external_map("default")
         %{
          meta: %{version: "", updated_mtime: 12345, inserted_mtime: 12345},
          ds: %{enable: true,
@@ -155,43 +187,44 @@ defmodule RemoteProfile.Schema do
 
   @doc since: "0.0.8"
   def to_external_map(name) do
-    p = find(name)
-
-    %{
-      meta: %{
-        profile: p.name,
-        version: p.version,
-        updated_mtime: Timex.to_unix(p.updated_at),
-        inserted_mtime: Timex.to_unix(p.inserted_at)
-      },
-      ds: %{
-        enable: p.dalsemi_enable,
-        core: %{
-          stack: p.dalsemi_core_stack,
-          pri: p.dalsemi_core_priority,
-          interval_secs: p.dalsemi_core_interval_secs
+    with %Schema{} = p <- find(name) do
+      %{
+        meta: %{
+          profile: p.name,
+          version: p.version,
+          updated_mtime: Timex.to_unix(p.updated_at),
+          inserted_mtime: Timex.to_unix(p.inserted_at)
         },
-        discover: %{
-          stack: p.dalsemi_discover_stack,
-          pri: p.dalsemi_discover_priority,
-          interval_secs: p.dalsemi_discover_interval_secs
-        },
-        report: %{
-          stack: p.dalsemi_report_stack,
-          pri: p.dalsemi_report_priority,
-          interval_secs: p.dalsemi_report_interval_secs
-        },
-        convert: %{
-          stack: p.dalsemi_convert_stack,
-          pri: p.dalsemi_convert_priority,
-          interval_secs: p.dalsemi_convert_interval_secs
-        },
-        command: %{
-          stack: p.dalsemi_command_stack,
-          pri: p.dalsemi_command_priority
+        ds: %{
+          enable: p.dalsemi_enable,
+          core: %{
+            stack: p.dalsemi_core_stack,
+            pri: p.dalsemi_core_priority,
+            interval_secs: p.dalsemi_core_interval_secs
+          },
+          discover: %{
+            stack: p.dalsemi_discover_stack,
+            pri: p.dalsemi_discover_priority,
+            interval_secs: p.dalsemi_discover_interval_secs
+          },
+          report: %{
+            stack: p.dalsemi_report_stack,
+            pri: p.dalsemi_report_priority,
+            interval_secs: p.dalsemi_report_interval_secs
+          },
+          convert: %{
+            stack: p.dalsemi_convert_stack,
+            pri: p.dalsemi_convert_priority,
+            interval_secs: p.dalsemi_convert_interval_secs
+          },
+          command: %{
+            stack: p.dalsemi_command_stack,
+            pri: p.dalsemi_command_priority
+          }
         },
         i2c: %{
           enable: p.i2c_enable,
+          use_multiplexer: p.i2c_use_multiplexer,
           core: %{
             stack: p.i2c_core_stack,
             pri: p.i2c_core_priority,
@@ -241,7 +274,9 @@ defmodule RemoteProfile.Schema do
           report_interval_secs: p.timestamp_report_interval_secs
         }
       }
-    }
+    else
+      _not_found -> %{}
+    end
   end
 
   @doc """
@@ -252,7 +287,7 @@ defmodule RemoteProfile.Schema do
     >
 
       ## Examples
-        iex> RemoteProfile.Schema.update("default", [i2c_enable: false])
+        iex> Remote.Profile.Schema.update("default", [i2c_enable: false])
   """
 
   @doc since: "0.0.8"
@@ -313,7 +348,7 @@ defmodule RemoteProfile.Schema do
       [keys_base(), keys_dalsemi(), keys_i2c(), keys_pwm(), keys_timestamp()]
       |> List.flatten()
 
-  defp keys_base, do: [:name, :version]
+  defp keys_base, do: [:name, :description, :version]
 
   defp keys_dalsemi,
     do: [

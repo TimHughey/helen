@@ -10,12 +10,12 @@ defmodule Mqtt.SetProfile do
   def new_cmd(%Remote{host: host, name: name, profile: profile}) do
     Map.merge(
       %{
-        cmd: "config",
+        payload: "profile",
         mtime: TimeSupport.unix_now(:second),
         host: host,
-        hostname: String.replace_prefix(name, "ruth.", "")
+        assigned_name: name
       },
-      RemoteProfile.Schema.to_external_map(profile)
+      Remote.Profile.Schema.to_external_map(profile)
     )
   end
 end

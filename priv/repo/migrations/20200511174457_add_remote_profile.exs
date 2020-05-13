@@ -1,4 +1,4 @@
-defmodule Repo.Migrations.AddRemoteProfile do
+defmodule Repo.Migrations.AddRemote.Profile do
   use Ecto.Migration
 
   def change do

@@ -3,7 +3,7 @@ defmodule RemoteProfileSchemaTest do
 
   use ExUnit.Case, async: true
 
-  alias RemoteProfile.Schema
+  alias Remote.Profile.Schema
 
   @moduletag :remote_profile_schema
 
@@ -44,5 +44,17 @@ defmodule RemoteProfileSchemaTest do
     {rc3, res3} = Schema.update("test2", ic2_enable: false)
     assert rc3 == :unrecognized_opts
     assert Keyword.has_key?(res3, :ic2_enable)
+  end
+
+  test "can duplicate an existing Remote Profile" do
+    {rc1, res1} = Schema.create("test3")
+    assert rc1 == :ok
+    assert %Schema{} = res1
+
+    {rc2, res2} = Schema.duplicate("test3", "test3 copy")
+    assert rc2 == :ok
+    assert %Schema{} = res2
+    %Schema{name: copy_name} = res2
+    assert copy_name == "test3 copy"
   end
 end
