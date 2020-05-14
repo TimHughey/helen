@@ -298,9 +298,9 @@ defmodule Remote.Profile.Schema do
          cs <- changeset(x, opts),
          {:cs_valid, cs, true} <- {:cs_valid, cs, cs.valid?},
          {:changes, true} <- {:changes, map_size(cs.changes) > 0},
-         cs <- cast(x, %{version: Ecto.UUID.generate()}, [:version]),
+         cs <- cast(cs, %{version: Ecto.UUID.generate()}, [:version]),
          {:cs_valid, cs, true} <- {:cs_valid, cs, cs.valid?} do
-      Repo.update(cs)
+      Repo.update(cs, returning: true)
     else
       {:bad_opts, u} -> {:unrecognized_opts, u}
       {:changes, false} -> {:no_changes, x}
