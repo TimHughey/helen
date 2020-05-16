@@ -174,13 +174,18 @@ defmodule RemoteTest do
     assert res === name(n)
   end
 
-  test "can find a Remote by name" do
+  test "can find a Remote by name and using like" do
     ext(3) |> Remote.external_update()
 
     Remote.change_name(host(3), name(3))
     %Remote{name: name} = Remote.find(name(3))
 
     assert name === name(3)
+
+    list = Remote.names_begin_with("remote")
+
+    assert is_list(list)
+    assert length(list) > 1
   end
 
   # test "get_by(name: name, only: [:last_seen_at, :last_start_at])" do

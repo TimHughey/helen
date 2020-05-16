@@ -28,7 +28,15 @@ defmodule OTATest do
     ota_env = Application.get_env(:helen, OTA)
 
     assert is_list(ota_env)
-    assert Keyword.has_key?(ota_env, :url)
+    assert Keyword.has_key?(ota_env, :uri)
+  end
+
+  test "can create the default ota uri from config" do
+    uri = OTA.ota_uri([])
+
+    assert Keyword.has_key?(uri, :uri)
+    assert Keyword.get(uri, :uri) |> String.contains?("https://")
+    assert Keyword.get(uri, :uri) |> String.contains?("latest.bin")
   end
 
   test "send OTA with correct list format" do

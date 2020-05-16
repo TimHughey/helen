@@ -317,6 +317,20 @@ defmodule Remote do
 
   def mark_as_seen(nil, _, _), do: nil
 
+  @doc """
+    Retrieve a list of Remote names that begin with a pattern
+  """
+
+  @doc since: "0.0.9"
+  def names_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+
+    from(r in Remote, where: like(r.name, ^like_string), select: r.name)
+    |> Repo.all()
+  end
+
   def ota_update(what, opts \\ []) do
     opts = Keyword.put_new(opts, :log, false)
     update_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)

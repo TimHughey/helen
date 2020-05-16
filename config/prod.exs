@@ -52,15 +52,6 @@ config :helen, Mqtt.Inbound,
     repeat: {:hrs, 60}
   ]
 
-config :helen, OTA, [
-  {:url,
-   [
-     host: "www.wisslanding.com",
-     uri: "helen/firmware",
-     fw_file: "latest.bin"
-   ]}
-]
-
 config :helen, Fact.Influx,
   database: "helen_prod",
   host: "** set in prod.secret.exs",

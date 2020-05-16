@@ -16,4 +16,13 @@ config :logger,
 
 config :scribe, style: Scribe.Style.GithubMarkdown
 
+config :helen, OTA, [
+  {:uri,
+   [
+     host: "www.wisslanding.com",
+     path: "helen/firmware",
+     file: "latest.bin"
+   ]}
+]
+
 import_config "#{Mix.env()}.exs"

@@ -108,16 +108,17 @@ defmodule Mqtt.Client do
 
       ## Inputs
         1. msg_map
-        2. optional opts:  [feed: {template_string, qos}, pub_opts: []]
+        2. subtopic
+        3. optional opts:  [feed: {template_string, qos}, pub_opts: []]
 
       ## Examples
-        iex> Mqtt.Client.publish_profile(msg_map, opts)
+        iex> Mqtt.Client.publish_to_host(%{host: "xyz"}, "profile", opts)
   """
 
   @doc since: "0.0.8"
-  def publish_profile(%{host: host} = msg_map, opts \\ [])
-      when is_map(msg_map) and is_list(opts) do
-    default_feed = {[@feed_prefix, host, "profile"] |> Enum.join("/"), 1}
+  def publish_to_host(%{host: host} = msg_map, subtopic, opts \\ [])
+      when is_map(msg_map) and is_binary(subtopic) and is_list(opts) do
+    default_feed = host_feed(host, subtopic)
     {feed, qos} = Keyword.get(opts, :feed, default_feed)
     pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
 
@@ -128,6 +129,22 @@ defmodule Mqtt.Client do
     else
       e -> report_publish_error(e)
     end
+  end
+
+  @doc """
+    Publishes the passed map to the host specific profile feed
+
+      ## Inputs
+        1. msg_map
+        2. optional opts:  [feed: {template_string, qos}, pub_opts: []]
+
+      ## Examples
+        iex> Mqtt.Client.publish_profile(%{host: "xyz"}, opts)
+  """
+
+  @doc since: "0.0.8"
+  def publish_profile(msg_map, opts \\ []) when is_map(msg_map) do
+    publish_to_host(msg_map, "profile", opts)
   end
 
   def publish_cmd(msg_map, opts \\ []) when is_map(msg_map) and is_list(opts) do
@@ -397,6 +414,10 @@ defmodule Mqtt.Client do
   defp config(key)
        when is_atom(key) do
     get_env(:helen, Mqtt.Client) |> Keyword.get(key)
+  end
+
+  defp host_feed(host, subtopic) when is_binary(host) and is_binary(subtopic) do
+    {[@feed_prefix, host, subtopic] |> Enum.join("/"), 1}
   end
 
   defp log_unhandled(type, message) do

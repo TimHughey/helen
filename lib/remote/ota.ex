@@ -10,25 +10,22 @@ defmodule OTA do
   @ota_https "ota.https"
   @restart_cmd "restart"
 
-  def config_url do
-    def = [
-      url: [
-        host: "nohost",
-        uri: "nouri",
-        fw_file: "nofile.bin"
+  def ota_uri(opts) when is_list(opts) do
+    uri_opts = Keyword.take(opts, [:host, :path, :file])
+    other_opts = Keyword.drop(opts, uri_opts)
+
+    final_uri_opts = Keyword.merge(uri_default_opts(), uri_opts)
+
+    actual_uri =
+      [
+        "https:/",
+        Keyword.get(final_uri_opts, :host),
+        Keyword.get(final_uri_opts, :path),
+        Keyword.get(final_uri_opts, :file)
       ]
-    ]
+      |> Enum.join("/")
 
-    config = Application.get_env(:helen, OTA, def)
-    host = Kernel.get_in(config, [:url, :host])
-    uri = Kernel.get_in(config, [:url, :uri])
-    fw_file = Kernel.get_in(config, [:url, :fw_file])
-
-    Enum.join(["https:/", host, uri, fw_file], "/")
-  end
-
-  def ota_url(opts) when is_list(opts) do
-    if Keyword.has_key?(opts, :url), do: opts, else: opts ++ [url: config_url()]
+    [uri: actual_uri] ++ other_opts
   end
 
   def restart(false, opts) when is_list(opts), do: {:restart_bad_opts, opts}
@@ -87,19 +84,25 @@ defmodule OTA do
       for %{host: host, name: name} <- Keyword.get(opts, :update_list) do
         log && Logger.info(["send ota https to: ", inspect(host, pretty: true)])
 
-        # TODO: design and implement new firmware version handling
-        # fw_file_version()
+        cmd = %{
+          cmd: @ota_https,
+          mtime: TimeSupport.unix_now(:second),
+          host: host,
+          name: name,
+          # include :uri and deprecated :fw_url
+          uri: Keyword.get(opts, :uri),
+          fw_url: Keyword.get(opts, :uri),
+          reboot_delay_ms: Keyword.get(opts, :reboot_delay_ms, 0)
+        }
 
-        {rc, _ref} =
-          %{
-            cmd: @ota_https,
-            mtime: TimeSupport.unix_now(:second),
-            host: host,
-            name: name,
-            fw_url: Keyword.get(opts, :url),
-            reboot_delay_ms: Keyword.get(opts, :reboot_delay_ms, 0)
-          }
-          |> Client.publish_cmd()
+        # as of 2020-05-16 publish to the deprecated generic feed and
+        # the host specific feed
+
+        # DEPRECATED generic feed
+        Client.publish_cmd(cmd)
+
+        # NEW host specific feed
+        {rc, _res} = Client.publish_to_host(cmd, "ota")
 
         {name, host, rc}
       end
@@ -110,7 +113,7 @@ defmodule OTA do
   end
 
   def send_cmd(opts) when is_list(opts) do
-    opts = ota_url(opts)
+    opts = ota_uri(opts)
     send_cmd(send_opts_valid?(opts), opts)
   end
 
@@ -127,5 +130,16 @@ defmodule OTA do
       not is_map(hd(update_list)) -> false
       true -> true
     end
+  end
+
+  defp uri_default_opts do
+    Application.get_env(:helen, OTA,
+      uri: [
+        host: "localhost",
+        path: "example_path",
+        file: "example.bin"
+      ]
+    )
+    |> Keyword.get(:uri)
   end
 end

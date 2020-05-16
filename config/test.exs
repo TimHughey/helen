@@ -49,13 +49,6 @@ config :helen, Mqtt.Inbound,
   ],
   periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
-config :helen, OTA,
-  url: [
-    host: "www.wisslanding.com",
-    uri: "helen/firmware",
-    fw_file: "latest.bin"
-  ]
-
 config :helen, Fact.Influx,
   database: "helen_test",
   host: "influx.test.wisslanding.com",

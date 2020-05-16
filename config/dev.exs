@@ -59,15 +59,6 @@ config :helen, Mqtt.Inbound,
     switch_redesign: true
   ]
 
-config :helen, OTA, [
-  {:url,
-   [
-     host: "www.wisslanding.com",
-     uri: "helen/firmware",
-     fw_file: "latest.bin"
-   ]}
-]
-
 config :helen, PulseWidthCmd,
   orphan: [
     at_startup: true,

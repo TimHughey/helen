@@ -172,6 +172,21 @@ defmodule Remote.Profile.Schema do
   def reload(catchall), do: {:error, catchall}
 
   @doc """
+    Retrieve Remote Profile Names
+
+    ## Examples
+      iex> Remote.Profile.Schema.names()
+      ["default"]
+  """
+
+  @doc since: "0.0.8"
+  def names do
+    import Ecto.Query, only: [from: 2]
+
+    from(x in Schema, select: x.name) |> Repo.all()
+  end
+
+  @doc """
     Converts a Remote Profile to a map that can be used externally.
 
       ## Examples
@@ -283,11 +298,25 @@ defmodule Remote.Profile.Schema do
     Updates an existing Remote Profile using the provided list of opts
 
     >
-    > `:version` is updated if any changes to other data are performed.
+    > `:version` is updated when changeset contains changes.
     >
 
       ## Examples
+
+        Update by profile name
+
         iex> Remote.Profile.Schema.update("default", [i2c_enable: false])
+        {:ok, %Remote.Profile.Schema{}}
+
+        Update by profile id
+
+        iex> Remote.Profile.Schema.update(12, [i2c_enable: false])
+        {:ok, %Remote.Profile.Schema{}}
+
+        Update in a pipeline (e.g. Remote.Profile.Schema.duplicate/2)
+
+        iex> Remote.Profile.Schema.update({:ok, %Remote.Profile.Schema{}}, opts)
+        {:ok, %Remote.Profile.Schema{}}
   """
 
   @doc since: "0.0.8"
@@ -307,6 +336,14 @@ defmodule Remote.Profile.Schema do
       {:cs_valid, cs, false} -> {:invalid_changes, cs}
       error -> {:error, error}
     end
+  end
+
+  def update({:ok, %Schema{id: _} = x}, opts) when is_list(opts) do
+    update(x, opts)
+  end
+
+  def update({rc, error}, _opts) do
+    {rc, error}
   end
 
   def update(id_or_name, opts)
