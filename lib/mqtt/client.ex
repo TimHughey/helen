@@ -285,8 +285,10 @@ defmodule Mqtt.Client do
     Logger.debug(["mqtt endpoint connected"])
 
     # subscribe to the report feed
+    new_feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt2, nil)
+
     feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt, nil)
-    res = Connection.subscribe(s.client_id, [feed])
+    res = Connection.subscribe(s.client_id, [feed, new_feed])
 
     s = Map.put(s, :rpt_feed_subscribed, res)
 

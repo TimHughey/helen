@@ -252,13 +252,6 @@ defmodule Helen.Mixfile do
 
   defp base_env do
     [
-      # default settings for dev and test, must override in prod
-      {:feeds,
-       [
-         prefix: "dev",
-         cmd: {"dev/ruth/f/command", 1},
-         rpt: {"dev/+/f/report", 0}
-       ]},
       # Supervision Tree and Initial Opts (listed in startup order)
       {:sup_tree,
        [

@@ -16,6 +16,15 @@ config :logger,
 
 config :scribe, style: Scribe.Style.GithubMarkdown
 
+# default settings for dev and test, must override in prod
+config :helen,
+  feeds: [
+    prefix: "dev",
+    cmd: {"dev/ruth/f/command", 1},
+    rpt: {"prod/+/f/report/#", 0},
+    rpt2: {"prod/r/#", 0}
+  ]
+
 config :helen, OTA, [
   {:uri,
    [

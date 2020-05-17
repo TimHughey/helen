@@ -347,16 +347,7 @@ defmodule MessageSave do
        when direction == :in and first_byte > 0x00 and first_byte != 0x7B do
     inflight = Map.put(inflight, :msgpack, payload)
 
-    with {:ok, msg_map} <- Reading.decode(payload),
-         host when is_binary(host) <-
-           Map.get(msg_map, :host, "<undefined>"),
-         inflight <- Map.put(inflight, :src_host, host) do
-      Map.put(s, :inflight, inflight)
-    else
-      _anything ->
-        inflight = Map.put(inflight, :src_host, "<bad msg>")
-        Map.put(s, :inflight, inflight)
-    end
+    Map.put(s, :inflight, inflight)
     |> insert_msg()
   end
 
