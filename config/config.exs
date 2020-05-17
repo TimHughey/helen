@@ -21,8 +21,7 @@ config :helen,
   feeds: [
     prefix: "dev",
     cmd: {"dev/ruth/f/command", 1},
-    rpt: {"prod/+/f/report/#", 0},
-    rpt2: {"prod/r/#", 0}
+    rpt: {"prod/r/#", 0}
   ]
 
 config :helen, OTA, [

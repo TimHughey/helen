@@ -5,14 +5,16 @@ defmodule Mqtt.Handler do
   alias Mqtt.Client
 
   def init(args) do
-    {:ok, args}
+    {:ok, Enum.into(args, %{}) |> Map.put(:runtime_metrics, false)}
   end
 
+  @doc """
+    Invokved when the MQTT client connection status changes
+
+    The first parameter will be either :up or :down to indicate
+    the status.
+  """
   def connection(:up, state) do
-    # `status` will be either `:up` or `:down`; you can use this to
-    # inform the rest of your system if the connection is currently
-    # open or closed; tortoise should be busy reconnecting if you get
-    # a `:down`
     Client.connected()
 
     {:ok, state}
@@ -24,20 +26,64 @@ defmodule Mqtt.Handler do
     {:ok, state}
   end
 
-  #  topic filter room/+/temp
-  def handle_message(["room", _room, "temp"], _payload, state) do
-    # :ok = Temperature.record(room, payload)
+  def handle_message([_env, "r", src_host] = topic, payload, state) do
+    %{direction: :in, payload: payload, topic: topic, host: src_host}
+    |> MessageSave.save()
+    |> Mqtt.Inbound.process(runtime_metrics: state.runtime_metrics)
+
+    {:ok, state}
+  end
+
+  def handle_message(
+        [_env, "f", src_host, device] = topic,
+        payload,
+        state
+      ) do
+    %{
+      direction: :in,
+      payload: payload,
+      topic: topic,
+      src_host: src_host,
+      device: device
+    }
+    |> MessageSave.save()
+    |> Mqtt.Inbound.process(runtime_metrics: state.runtime_metrics)
+
     {:ok, state}
   end
 
   def handle_message(topic, payload, state) do
-    Client.inbound_msg(topic, payload)
+    [
+      "default handle_msssage(): topic=",
+      inspect(topic),
+      " payload=",
+      inspect(payload, pretty: true),
+      " state=",
+      inspect(pretty: true)
+    ]
+    |> Logger.warn()
+
+    {:ok, state}
+  end
+
+  def subscription(:up, topic_filter, state) do
+    [
+      "subscribed to reporting topic: ",
+      inspect(topic_filter, pretty: true)
+    ]
+    |> Logger.info()
 
     {:ok, state}
   end
 
   def subscription(status, topic_filter, state) do
-    ["subscribed to ", inspect(topic_filter), ""] |> Logger.info()
+    [
+      "subscription ",
+      inspect(topic_filter, pretty: true),
+      " status ",
+      inspect(status, pretty: true)
+    ]
+    |> Logger.warn()
 
     {:ok, state}
   end

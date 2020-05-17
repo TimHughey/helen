@@ -12,7 +12,7 @@ defmodule Mqtt.Client do
 
   #  def child_spec(opts) do
   #
-  #    %{
+  #
   #      id: Mqtt.Client,
   #      start: {Mqtt.Client, :start_link, [opts]},
   #      restart: :permanent,
@@ -53,10 +53,6 @@ defmodule Mqtt.Client do
   def forward(bad_args) do
     Logger.warn(["forward/1 bad args: ", inspect(bad_args, pretty: true)])
     {:bad_args, bad_args}
-  end
-
-  def inbound_msg(topic, payload) do
-    GenServer.cast(__MODULE__, {:inbound_msg, topic, payload})
   end
 
   def init(s) when is_map(s) do
@@ -233,10 +229,8 @@ defmodule Mqtt.Client do
     Logger.debug(["mqtt endpoint connected"])
 
     # subscribe to the report feed
-    new_feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt2, nil)
-
     feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt, nil)
-    res = Connection.subscribe(s.client_id, [new_feed, feed])
+    res = Connection.subscribe(s.client_id, [feed])
 
     s = Map.put(s, :rpt_feed_subscribed, res)
 
@@ -281,14 +275,6 @@ defmodule Mqtt.Client do
       end
 
     {:noreply, Map.put(s, :last_forward_rc, rc)}
-  end
-
-  def handle_cast({:inbound_msg, topic, payload}, s) do
-    %{direction: :in, payload: payload, topic: topic}
-    |> MessageSave.save()
-    |> Mqtt.Inbound.process(runtime_metrics: s.runtime_metrics)
-
-    {:noreply, s}
   end
 
   def handle_cast(unhandled_msg, s) do

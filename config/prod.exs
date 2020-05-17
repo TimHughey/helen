@@ -11,8 +11,7 @@ config :helen,
   feeds: [
     prefix: "prod",
     cmd: {"prod/ruth/f/command", 1},
-    rpt: {"prod/+/f/report/#", 0},
-    rpt2: {"prod/r/#", 0}
+    rpt: {"prod/r/#", 0}
   ]
 
 #
