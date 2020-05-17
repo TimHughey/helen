@@ -175,35 +175,10 @@ defmodule Mqtt.Client do
     end
   end
 
-  def report_subscribe do
-    feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt, nil)
-    subscribe(feed)
-  end
-
   def runtime_metrics, do: GenServer.call(__MODULE__, {:runtime_metrics})
 
   def runtime_metrics(flag) when is_boolean(flag) or flag == :toggle do
     GenServer.call(__MODULE__, {:runtime_metrics, flag})
-  end
-
-  def subscribe(feed) when is_nil(feed) do
-    Logger.warn(["can't subscribe to nil feed"])
-    Logger.warn(["hint: check :feeds are defined in the configuration"])
-    :ok
-  end
-
-  def subscribe(feed) when is_tuple(feed) do
-    GenServer.call(__MODULE__, {:subscribe, feed})
-  end
-
-  def subscribe(feed) do
-    Logger.warn([
-      "subscribe feed doesn't make sense, got ",
-      inspect(feed, pretty: true)
-    ])
-
-    Logger.warn(["hint: subscribe feed should be a tuple"])
-    :ok
   end
 
   def handle_call(
@@ -217,19 +192,6 @@ defmodule Mqtt.Client do
         Tortoise.publish(client_id, feed, payload, pub_opts)
       end)
 
-    # Logger.info([
-    #   ":publish ",
-    #   inspect(pub_rc),
-    #   " client_id: ",
-    #   inspect(client_id),
-    #   " feed: ",
-    #   inspect(feed),
-    #   " payload: ",
-    #   inspect(payload, pretty: true),
-    #   " pub_opts: ",
-    #   inspect(pub_opts, pretty: true)
-    # ])
-
     {:reply, pub_rc,
      Map.put(s, :last_pub_rc, elapsed_us: elapsed_us, rc: pub_rc)}
   end
@@ -242,20 +204,6 @@ defmodule Mqtt.Client do
       when is_binary(feed) and is_list(pub_opts) do
     Logger.debug(["not started, dropping ", inspect(payload, pretty: true)])
     {:reply, :not_started, s}
-  end
-
-  def handle_call({:subscribe, feed}, _from, s)
-      when is_tuple(feed) do
-    {:ok, ref} = Connection.subscribe(s.client_id, feed)
-
-    Logger.info([
-      "subscribing to ",
-      inspect(feed, pretty: true),
-      "ref: ",
-      inspect(ref, pretty: true)
-    ])
-
-    {:reply, ref, s}
   end
 
   def handle_call({:runtime_metrics}, _from, %{runtime_metrics: flag} = s),
@@ -288,7 +236,7 @@ defmodule Mqtt.Client do
     new_feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt2, nil)
 
     feed = get_env(:helen, :feeds, []) |> Keyword.get(:rpt, nil)
-    res = Connection.subscribe(s.client_id, [feed, new_feed])
+    res = Connection.subscribe(s.client_id, [new_feed, feed])
 
     s = Map.put(s, :rpt_feed_subscribed, res)
 

@@ -14,12 +14,6 @@ defmodule MqttClientTest do
     assert is_pid(existing_pid)
   end
 
-  test "subscribe to report feed" do
-    msg = capture_log(fn -> Mqtt.Client.report_subscribe() end)
-
-    assert msg =~ "report"
-  end
-
   test "toggle runtime metrics" do
     rc = Mqtt.Client.runtime_metrics(:toggle)
 

@@ -37,16 +37,7 @@ defmodule Mqtt.Handler do
   end
 
   def subscription(status, topic_filter, state) do
-    log = Keyword.get(state, :log_subscriptions, false)
-
-    log &&
-      Logger.warn([
-        "subscription(): status(",
-        inspect(status, pretty: true),
-        ") topic(",
-        inspect(topic_filter, pretty: true),
-        ")"
-      ])
+    ["subscribed to ", inspect(topic_filter), ""] |> Logger.info()
 
     {:ok, state}
   end
