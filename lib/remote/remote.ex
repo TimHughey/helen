@@ -327,7 +327,11 @@ defmodule Remote do
 
     like_string = [pattern, "%"] |> IO.iodata_to_binary()
 
-    from(r in Remote, where: like(r.name, ^like_string), select: r.name)
+    from(r in Remote,
+      where: like(r.name, ^like_string),
+      order_by: r.name,
+      select: r.name
+    )
     |> Repo.all()
   end
 

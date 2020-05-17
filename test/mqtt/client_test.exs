@@ -2,7 +2,6 @@ defmodule MqttClientTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
 
   setup_all do
     :ok
