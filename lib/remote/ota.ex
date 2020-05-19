@@ -38,15 +38,20 @@ defmodule OTA do
       for %{host: host, name: name} <- Keyword.get(opts, :restart_list) do
         log && Logger.info(["send restart to: ", inspect(host, pretty: true)])
 
-        {rc, _ref} =
-          %{
-            cmd: @restart_cmd,
-            mtime: TimeSupport.unix_now(:second),
-            host: host,
-            name: name,
-            reboot_delay_ms: Keyword.get(opts, :reboot_delay_ms, 0)
-          }
-          |> Client.publish_cmd()
+        legacy_cmd = %{
+          cmd: @restart_cmd,
+          mtime: TimeSupport.unix_now(:second),
+          host: host,
+          name: name,
+          reboot_delay_ms: Keyword.get(opts, :reboot_delay_ms, 0)
+        }
+
+        # HACK
+        #  temporarily publish command to host specific feed until
+        #  all hosts have latest firmware
+        Client.publish_to_host(legacy_cmd, "restart")
+
+        {rc, _ref} = Client.publish_cmd(legacy_cmd)
 
         {name, host, rc}
       end
