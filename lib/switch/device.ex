@@ -226,8 +226,9 @@ defmodule Switch.Device do
         "subtopic: ",
         inspect(dev_prefix, pretty: true),
         "msg: ",
-        inspect(msg, pretty: true) |> Logger.info()
+        inspect(msg, pretty: true)
       ]
+      |> Logger.info()
 
       {:pending,
        [
