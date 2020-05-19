@@ -321,7 +321,7 @@ defmodule PulseWidth do
 
   defp record_cmd(%PulseWidth{} = pwm, opts) when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]
-    import Mqtt.Client, only: [publish_cmd: 1]
+    import Mqtt.Client, only: [publish_to_host: 2]
     import Mqtt.SetPulseWidth, only: [create_cmd: 3]
 
     with {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
@@ -337,7 +337,7 @@ defmodule PulseWidth do
              :duty_scale
            ]),
          cmd <- create_cmd(pwm, cmd, cmd_opts),
-         pub_rc <- publish_cmd(cmd) do
+         pub_rc <- publish_to_host(cmd, "pwm") do
       [pwm: pwm, pub_rc: pub_rc] ++ opts
     else
       error ->
