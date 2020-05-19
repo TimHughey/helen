@@ -7,9 +7,6 @@ defmodule OTA do
 
   alias Mqtt.Client
 
-  @ota_https "ota.https"
-  @restart_cmd "restart"
-
   def ota_uri(opts) when is_list(opts) do
     uri_opts = Keyword.take(opts, [:host, :path, :file])
     other_opts = Keyword.drop(opts, uri_opts)
@@ -38,20 +35,12 @@ defmodule OTA do
       for %{host: host, name: name} <- Keyword.get(opts, :restart_list) do
         log && Logger.info(["send restart to: ", inspect(host, pretty: true)])
 
-        legacy_cmd = %{
-          cmd: @restart_cmd,
+        cmd = %{
           mtime: TimeSupport.unix_now(:second),
-          host: host,
-          name: name,
-          reboot_delay_ms: Keyword.get(opts, :reboot_delay_ms, 0)
+          host: host
         }
 
-        # HACK
-        #  temporarily publish command to host specific feed until
-        #  all hosts have latest firmware
-        Client.publish_to_host(legacy_cmd, "restart")
-
-        {rc, _ref} = Client.publish_cmd(legacy_cmd)
+        {rc, _ref} = Client.publish_to_host(cmd, "restart")
 
         {name, host, rc}
       end
@@ -90,21 +79,10 @@ defmodule OTA do
         log && Logger.info(["send ota https to: ", inspect(host, pretty: true)])
 
         cmd = %{
-          cmd: @ota_https,
           mtime: TimeSupport.unix_now(:second),
           host: host,
-          name: name,
-          # include :uri and deprecated :fw_url
-          uri: Keyword.get(opts, :uri),
-          fw_url: Keyword.get(opts, :uri),
-          reboot_delay_ms: Keyword.get(opts, :reboot_delay_ms, 0)
+          uri: Keyword.get(opts, :uri)
         }
-
-        # as of 2020-05-16 publish to the deprecated generic feed and
-        # the host specific feed
-
-        # DEPRECATED generic feed
-        Client.publish_cmd(cmd)
 
         # NEW host specific feed
         {rc, _res} = Client.publish_to_host(cmd, "ota")

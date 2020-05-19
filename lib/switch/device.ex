@@ -17,7 +17,6 @@ defmodule Switch.Device do
   import Ecto.Query, only: [from: 2]
   import Common.DB, only: [name_regex: 0]
   import TimeSupport, only: [from_unix: 1, ttl_check: 4, utc_now: 0]
-  import Mqtt.Client, only: [publish_cmd: 1]
 
   alias Switch.{Alias, Device, Command}
 
@@ -202,6 +201,7 @@ defmodule Switch.Device do
 
   def record_cmd(%Device{} = sd, %Alias{name: sw_alias}, opts)
       when is_list(opts) do
+    import Mqtt.Client, only: [publish_cmd: 1, publish_to_host: 2]
     import Mqtt.SetSwitch, only: [create_cmd: 4]
 
     sd = reload(sd)
@@ -210,15 +210,17 @@ defmodule Switch.Device do
 
     with %{state: state, pio: pio} <- cmd_map,
          # add the command and pass initial_opts which may contain ack: false
-         {:ok, %Device{device: _device} = sd} <-
+         {:ok, %Device{device: device} = sd} <-
            add_cmd(sd, sw_alias, utc_now()),
+         dev_prefix <- String.split(device, "/") |> hd(),
          # NOTE: add_cmd/3 returns the Device with the new Command preloaded
          {:cmd, %Command{refid: refid} = cmd} <- {:cmd, hd(sd.cmds)},
          {:refid, true} <- {:refid, is_binary(refid)},
          state_map <- %{pio: pio, state: state},
          msg <- create_cmd(sd, cmd, state_map, opts),
          # msg <- SetSwitch.new_cmd(device, state_map, refid, opts),
-         pub_rc <- publish_cmd(msg),
+         pub_rc <- publish_to_host(msg, dev_prefix),
+         _pub_rc <- publish_cmd(msg),
          _ignore <- log_record_cmd({sd, pub_rc, cmd}) do
       {:pending,
        [
