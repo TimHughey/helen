@@ -222,14 +222,6 @@ defmodule Switch.Device do
          pub_rc <- publish_to_host(msg, dev_prefix),
          _pub_rc <- publish_cmd(msg),
          _ignore <- log_record_cmd({sd, pub_rc, cmd}) do
-      [
-        "subtopic: ",
-        inspect(dev_prefix, pretty: true),
-        "msg: ",
-        inspect(msg, pretty: true)
-      ]
-      |> Logger.info()
-
       {:pending,
        [
          position: state,

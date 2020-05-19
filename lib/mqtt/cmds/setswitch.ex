@@ -22,6 +22,7 @@ defmodule Mqtt.SetSwitch do
       cmd: @setswitch_cmd,
       mtime: unix_now(:second),
       host: host,
+      device: device,
       switch: device,
       states: [state_map],
       refid: refid,
@@ -48,6 +49,7 @@ defmodule Mqtt.SetSwitch do
       do: %{
         cmd: @setswitch_cmd,
         mtime: TimeSupport.unix_now(:second),
+        device: device,
         switch: device,
         states: states,
         refid: refid,
