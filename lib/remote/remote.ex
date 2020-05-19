@@ -18,9 +18,6 @@ defmodule Remote do
   import Common.DB, only: [name_regex: 0]
   alias TimeSupport
 
-  alias Mqtt.Client
-  alias Mqtt.SetName
-
   schema "remote" do
     field(:host, :string)
     field(:name, :string)
@@ -171,10 +168,10 @@ defmodule Remote do
         %Remote{} ->
           {res, rem} = changeset(remote, %{name: new_name}) |> update()
 
-          if res == :ok,
-            do:
-              SetName.new_cmd(rem.host, rem.name)
-              |> Client.publish_cmd()
+          # Remote names are set upon receipt of their Profile
+          # so, if the %Remote{} update succeeded we need to send a restart
+          # command
+          if res == :ok, do: restart(rem.name)
 
           res
 
@@ -231,7 +228,7 @@ defmodule Remote do
 
     result =
       :timer.tc(fn ->
-        eu |> add() |> send_remote_config(eu)
+        eu |> add() |> send_remote_profile(eu)
       end)
 
     case result do
@@ -415,15 +412,7 @@ defmodule Remote do
   # PRIVATE FUNCTIONS
   #
 
-  # handle boot and deprecated startup messages
-  # NOTE: this function should be renamed in favor of profiles
-  defp send_remote_config([%Remote{} = rem], %{type: "boot"} = eu) do
-    # all devices are sent their name
-    SetName.new_cmd(rem.host, rem.name)
-    |> Client.publish_cmd()
-
-    # NOTE HACK
-    # also send the profile
+  defp send_remote_profile([%Remote{} = rem], %{type: "boot"} = eu) do
     Mqtt.SetProfile.send(rem)
 
     log = Map.get(eu, :log, true)
@@ -459,13 +448,13 @@ defmodule Remote do
     update_from_external(rem, eu)
   end
 
-  defp send_remote_config([%Remote{} = rem], %{type: "remote_runtime"} = eu) do
+  defp send_remote_profile([%Remote{} = rem], %{type: "remote_runtime"} = eu) do
     # use the message mtime to update the last seen at time
     eu = Map.put_new(eu, :last_seen_at, TimeSupport.from_unix(eu.mtime))
     update_from_external(rem, eu)
   end
 
-  defp send_remote_config(_anything, %{} = eu) do
+  defp send_remote_profile(_anything, %{} = eu) do
     log = Map.get(eu, :log, true)
 
     log &&

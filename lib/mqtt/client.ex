@@ -246,8 +246,7 @@ defmodule Mqtt.Client do
   end
 
   def handle_cast(
-        {:forward,
-         %{payload: payload, direction: direction, opts: opts} = inflight},
+        {:forward, %{payload: payload, direction: direction, opts: opts}},
         %{client_id: client_id} = s
       ) do
     forward_feed = get_in(opts, [:forward_opts, direction, :feed])
@@ -255,20 +254,7 @@ defmodule Mqtt.Client do
     rc =
       with {:ok, {feed, qos}} <- get_feed(forward_feed),
            pub_opts <- [qos: qos] ++ Keyword.get(opts, :pub_opts, []) do
-        pub_rc = Tortoise.publish(client_id, feed, payload, pub_opts)
-
-        Logger.debug([
-          "handle_cast(:forward) pub_rc: ",
-          inspect(pub_rc),
-          " client_id: ",
-          inspect(client_id),
-          " feed: ",
-          inspect(feed),
-          " pub_opts: ",
-          inspect(pub_opts, pretty: true),
-          "\ninflight: ",
-          inspect(inflight, pretty: true)
-        ])
+        Tortoise.publish(client_id, feed, payload, pub_opts)
       else
         e ->
           report_publish_error(e)
