@@ -4,7 +4,7 @@ defmodule Mqtt.SetPulseWidth do
   require Logger
 
   def create_cmd(
-        %PulseWidth{device: device},
+        %PulseWidth{device: device, host: host},
         %PulseWidthCmd{refid: refid},
         opts
       )
@@ -22,6 +22,7 @@ defmodule Mqtt.SetPulseWidth do
     Map.merge(
       %{
         cmd: "pwm",
+        host: host,
         mtime: unix_now(:second),
         device: device,
         refid: refid,
