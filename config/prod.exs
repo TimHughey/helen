@@ -10,7 +10,6 @@ config :logger,
 config :helen,
   feeds: [
     prefix: "prod",
-    cmd: {"prod/ruth/f/command", 1},
     rpt: {"prod/r/#", 0}
   ]
 

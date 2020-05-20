@@ -185,7 +185,7 @@ defmodule RemoteTest do
     list = Remote.names_begin_with("remote")
 
     assert is_list(list)
-    assert length(list) > 1
+    assert length(list) >= 1
   end
 
   # test "get_by(name: name, only: [:last_seen_at, :last_start_at])" do
@@ -304,12 +304,10 @@ defmodule RemoteTest do
 
   @tag :ota
   test "OTA update (unsupported)" do
-    msg =
-      capture_log(fn ->
-        Remote.ota_update(:bad, log: true)
-      end)
+    res = Remote.ota_update(:bad, log: true)
 
-    assert msg =~ "can't do ota for"
+    assert is_list(res)
+    assert res == []
   end
 
   @tag :ota

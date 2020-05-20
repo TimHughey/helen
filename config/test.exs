@@ -5,7 +5,6 @@ use Mix.Config
 config :helen,
   feeds: [
     prefix: "test",
-    cmd: {"test/ruth/f/command", 1},
     rpt: {"prod/r/#", 0}
   ]
 

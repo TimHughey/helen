@@ -332,12 +332,25 @@ defmodule Remote do
     |> Repo.all()
   end
 
+  @doc """
+    Request OTA updates based on a prefix pattern
+
+    Simply pipelines names_begin_with/1 and ota_update/2
+
+      ## Examples
+        iex> Remote.ota_names_begin_with("lab-", [])
+  """
+  @doc since: "0.0.11"
+  def ota_names_begin_with(pattern, opts \\ []) when is_binary(pattern) do
+    names_begin_with(pattern) |> ota_update(opts)
+  end
+
   def ota_update(what, opts \\ []) do
     opts = Keyword.put_new(opts, :log, false)
     update_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
 
     if Enum.empty?(update_list) do
-      Logger.warn(["can't do ota for: ", inspect(update_list, pretty: true)])
+      []
     else
       opts = opts ++ [update_list: update_list]
       OTA.send_cmd(opts)
@@ -413,33 +426,35 @@ defmodule Remote do
   #
 
   defp send_remote_profile([%Remote{} = rem], %{type: "boot"} = eu) do
-    Mqtt.SetProfile.send(rem)
+    import Mqtt.SetProfile, only: [send_cmd: 1]
+
+    send_cmd(rem)
 
     log = Map.get(eu, :log, true)
 
-    log &&
-      Logger.info(fn ->
-        heap_free = (Map.get(eu, :heap_free, 0) / 1024) |> Float.round(1)
-        heap_min = (Map.get(eu, :heap_min, 0) / 1024) |> Float.round(1)
+    if log do
+      heap_free = (Map.get(eu, :heap_free, 0) / 1024) |> Float.round(1)
+      heap_min = (Map.get(eu, :heap_min, 0) / 1024) |> Float.round(1)
 
-        [
-          inspect(rem.name),
-          " BOOT ",
-          Map.get(eu, :reset_reason, "no reset reason"),
-          " ",
-          eu.vsn,
-          " ",
-          inspect(Map.get(eu, :batt_mv, "0")),
-          "mv ",
-          inspect(Map.get(eu, :ap_rssi, "0")),
-          "dB ",
-          "heap(",
-          inspect(heap_min),
-          "k,",
-          inspect(heap_free),
-          "k) "
-        ]
-      end)
+      [
+        inspect(rem.name),
+        " BOOT ",
+        Map.get(eu, :reset_reason, "no reset reason"),
+        " ",
+        eu.vsn,
+        " ",
+        inspect(Map.get(eu, :batt_mv, "0")),
+        "mv ",
+        inspect(Map.get(eu, :ap_rssi, "0")),
+        "dB ",
+        "heap(",
+        inspect(heap_min),
+        "k,",
+        inspect(heap_free),
+        "k) "
+      ]
+      |> Logger.info()
+    end
 
     StartupAnnouncement.record(host: rem.name, vsn: eu.vsn, hw: eu.hw)
 

@@ -7,7 +7,6 @@ defmodule Mqtt.Client do
   alias Tortoise.Connection
 
   import Application, only: [get_env: 2, get_env: 3]
-  alias Fact.RunMetric
   alias Mqtt.Timesync
 
   #  def child_spec(opts) do
@@ -22,7 +21,6 @@ defmodule Mqtt.Client do
   #  end
 
   @feed_prefix get_env(:helen, :feeds, []) |> Keyword.get(:prefix, "dev")
-  @cmd_feed get_env(:helen, :feeds, []) |> Keyword.get(:cmd, {nil, nil})
 
   def start_link(s) when is_map(s) do
     GenServer.start_link(__MODULE__, s, name: __MODULE__)
@@ -79,6 +77,7 @@ defmodule Mqtt.Client do
       new_state = %{
         mqtt_pid: mqtt_pid,
         client_id: Keyword.get(opts, :client_id),
+        mqtt_env: @feed_prefix,
         opts: opts
       }
 
@@ -124,50 +123,6 @@ defmodule Mqtt.Client do
       GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
     else
       e -> report_publish_error(e)
-    end
-  end
-
-  @doc """
-    Publishes the passed map to the host specific profile feed
-
-      ## Inputs
-        1. msg_map
-        2. optional opts:  [feed: {template_string, qos}, pub_opts: []]
-
-      ## Examples
-        iex> Mqtt.Client.publish_profile(%{host: "xyz"}, opts)
-  """
-
-  @doc since: "0.0.8"
-  def publish_profile(msg_map, opts \\ []) when is_map(msg_map) do
-    publish_to_host(msg_map, "profile", opts)
-  end
-
-  def publish_cmd(msg_map, opts \\ []) when is_map(msg_map) and is_list(opts) do
-    feed = Keyword.get(opts, :feed, @cmd_feed)
-
-    with {:ok, {feed, qos}} <- get_feed(feed),
-         {:ok, payload} <- Msgpax.pack(msg_map),
-         save_msg <- %{payload: payload, direction: :out},
-         %{payload: payload} <- MessageSave.save(save_msg) do
-      pub_opts = [qos: qos] ++ Keyword.get(opts, :pub_opts, [])
-
-      {elapsed_us, res} =
-        :timer.tc(fn ->
-          GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
-        end)
-
-      RunMetric.record(
-        module: "#{__MODULE__}",
-        metric: "cmd_publish_us",
-        device: "none",
-        val: elapsed_us
-      )
-
-      res
-    else
-      e ->
-        report_publish_error(e)
     end
   end
 
@@ -397,8 +352,9 @@ defmodule Mqtt.Client do
     end
   end
 
-  defp start_timesync_task(s) do
-    task = Task.async(Timesync, :run, [timesync_opts()])
+  defp start_timesync_task(%{mqtt_env: mqtt_env, client_id: client_id} = s) do
+    opts = Map.merge(timesync_opts(), %{feed: mqtt_env, client_id: client_id})
+    task = Task.async(Timesync, :run, [opts])
 
     Map.put(s, :timesync, %{task: task, status: :started})
   end

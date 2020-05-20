@@ -7,57 +7,40 @@ defmodule Mqtt.SetSwitch do
 
   alias Switch.{Device, Command}
 
-  @setswitch_cmd "set.switch"
-
   def create_cmd(
         %Device{device: device, host: host},
         %Command{refid: refid},
         %{pio: _pio, state: _state} = state_map,
-        opts
+        opts \\ []
       )
       when is_list(opts) do
     import TimeSupport, only: [unix_now: 1]
 
     %{
-      cmd: @setswitch_cmd,
+      payload: "switch state",
       mtime: unix_now(:second),
       host: host,
       device: device,
-      switch: device,
       states: [state_map],
       refid: refid,
       ack: Keyword.get(opts, :ack, true)
     }
   end
 
-  def new_cmd(device, states, refid, opts \\ [])
+  def send_cmd(
+        %Device{device: device} = d,
+        %Command{} = c,
+        state_map,
+        opts \\ []
+      )
+      when is_map(state_map) do
+    # remove the keys from opts that are consumed by create_cmd
+    pub_opts = Keyword.drop(opts, [:ack])
 
-  @doc ~S"""
-  Create a setswitch command with all map values required set to appropriate values
+    # extract the prefix of the device and use it as the subtopic
+    subtopic = String.split(device, "/") |> hd()
 
-   ##Examples:
-    iex> new_states = [%{"pio": 0, "state": true}, %{"pio": 1, "state": false}]
-    ...> c = Mqtt.SetSwitch.new_cmd.setswitch("device", new_states, "uuid")
-    ...> %Mqtt.SetSwitch{cmd: "setswitch", mtime: cmd_time} = c
-    ...> (cmd_time > 0) and Map.has_key?(c, :states)
-    true
-  """
-
-  def new_cmd(device, states, refid, opts)
-      when is_binary(device) and is_list(states) and is_binary(refid) and
-             is_list(opts),
-      do: %{
-        cmd: @setswitch_cmd,
-        mtime: TimeSupport.unix_now(:second),
-        device: device,
-        switch: device,
-        states: states,
-        refid: refid,
-        ack: Keyword.get(opts, :ack, true)
-      }
-
-  # if a single state map is passed wrap it in a list and call new_cmd/4 again
-  def new_cmd(device, state, refid, opts)
-      when is_map(state),
-      do: new_cmd(device, [state], refid, opts)
+    create_cmd(d, c, state_map, opts)
+    |> Mqtt.Client.publish_to_host(subtopic, pub_opts)
+  end
 end

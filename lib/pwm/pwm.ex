@@ -121,18 +121,31 @@ defmodule PulseWidth do
   end
 
   def duty(name, opts \\ [])
-      when is_binary(name) and is_list(opts) do
-    lazy = Keyword.get(opts, :lazy, true)
-    log = Keyword.get(opts, :log, false)
+
+  def duty(name, opts) when is_binary(name) and is_list(opts) do
     duty = Keyword.get(opts, :duty, nil)
 
-    with %PulseWidth{duty: curr_duty} = pwm <- find(name),
-         # if the duty opt was passed then an update is requested
-         {:duty, {:opt, true}, _ss} <-
+    with %PulseWidth{} = pwm <- find(name),
+         {:duty_opt, true, pwm} <- {:duty_opt, is_number(duty), pwm},
+         duty <- duty_calculate(pwm, duty) do
+      duty(pwm, Keyword.put(opts, :duty, duty))
+    else
+      {:duty_opt, false, pwm} -> duty(pwm, opts)
+      nil -> {:not_found, name}
+    end
+  end
+
+  def duty(%PulseWidth{duty: curr_duty} = pwm, opts)
+      when is_list(opts) do
+    lazy = Keyword.get(opts, :lazy, true)
+    duty = Keyword.get(opts, :duty, nil)
+
+    # if the duty opt was passed then an update is requested
+    with {:duty, {:opt, true}, _pwm} <-
            {:duty, {:opt, is_integer(duty)}, pwm},
          # the most typical scenario... lazy is true and current duty
          # does not match the requsted duty
-         {:lazy, true, false, _ss} <-
+         {:lazy, true, false, _pwm} <-
            {:lazy, lazy, duty == curr_duty, pwm} do
       # the requested duty does not match the current duty, update it
       duty_update([pwm: pwm, record_cmd: true] ++ opts)
@@ -150,10 +163,29 @@ defmodule PulseWidth do
         # regardless if lazy or not the current duty does not match
         # the requested duty, update it
         duty_update([pwm: pwm, record_cmd: true] ++ opts)
+    end
+  end
 
-      nil ->
-        log && Logger.warn([inspect(name), " not found"])
-        {:not_found, name}
+  def duty_calculate(%PulseWidth{duty_max: duty_max, duty_min: duty_min}, duty)
+      when is_number(duty) do
+    cond do
+      # floats less than zero are considered percentages
+      is_float(duty) and duty < 0.0 ->
+        Float.round(duty_max * duty, 0) |> trunc()
+
+      # floats greate than zero are made integers
+      is_float(duty) and duty >= 0.0 ->
+        Float.round(duty, 0) |> trunc()
+
+      # bound limit duty requests
+      duty > duty_max ->
+        duty_max
+
+      duty < duty_min ->
+        duty_min
+
+      duty ->
+        duty
     end
   end
 
@@ -321,23 +353,12 @@ defmodule PulseWidth do
 
   defp record_cmd(%PulseWidth{} = pwm, opts) when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]
-    import Mqtt.Client, only: [publish_to_host: 2]
-    import Mqtt.SetPulseWidth, only: [create_cmd: 3]
+    import Mqtt.SetPulseWidth, only: [send_cmd: 3]
 
     with {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
          {:cmd, %PulseWidthCmd{} = cmd} <- {:cmd, hd(pwm.cmds)},
-         cmd_opts <-
-           Keyword.take(opts, [
-             :duty,
-             :fade_ms,
-             :ack,
-             :direction,
-             :step_num,
-             :duty_cycle_num,
-             :duty_scale
-           ]),
-         cmd <- create_cmd(pwm, cmd, cmd_opts),
-         pub_rc <- publish_to_host(cmd, "pwm") do
+         cmd_opts <- Keyword.take(opts, [:duty, :ack]),
+         pub_rc <- send_cmd(pwm, cmd, cmd_opts) do
       [pwm: pwm, pub_rc: pub_rc] ++ opts
     else
       error ->

@@ -167,7 +167,9 @@ defmodule Mqtt.Inbound do
     |> Map.merge(s.additional_message_flags)
   end
 
-  defp msg_decode({:ok, %{metadata: :fail}}, _s, _opts), do: nil
+  defp msg_decode({:ok, %{data: :fail}}, _s, _opts), do: nil
+
+  defp msg_decode({:ok, %{metadata: :failed}}, _s, _opts), do: nil
 
   defp msg_decode({:ok, %{metadata: :ok} = r}, s, opts) when is_list(opts) do
     # NOTE: we invoke the module / functions defined in the config

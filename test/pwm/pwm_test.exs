@@ -14,6 +14,8 @@ defmodule PulseWidthTest do
 
   @moduletag :pwm
 
+  @duty_max 8191
+
   setup_all do
     new_pwm = 0..11
 
@@ -37,21 +39,15 @@ defmodule PulseWidthTest do
   test "can set the duty of a PulseWidth" do
     device = device(2, 1)
 
-    PulseWidth.duty(device, duty: :rand.uniform(4095))
+    PulseWidth.duty(device, duty: :rand.uniform(@duty_max))
 
     assert true
   end
 
-  test "can set the fade of a PulseWidth" do
-    device = device(2, 1)
+  test "can specify a percentage for duty" do
+    device = device(3, 1)
 
-    PulseWidth.duty(device,
-      duty: :rand.uniform(4095),
-      direction: 0,
-      step_num: 100,
-      duty_cycle_num: 100,
-      duty_scale: 100
-    )
+    PulseWidth.duty(device, duty: 0.5)
 
     assert true
   end
@@ -74,8 +70,8 @@ defmodule PulseWidthTest do
     pwm_id = Keyword.get(opts, :pwm_id, 0)
     pin_num = Keyword.get(opts, :pin, 1)
     duty_min = Keyword.get(opts, :duty_min, 0)
-    duty_max = Keyword.get(opts, :duty_max, 4095)
-    duty = :rand.uniform(4095)
+    duty_max = Keyword.get(opts, :duty_max, @duty_max)
+    duty = :rand.uniform(@duty_max)
     device = Keyword.get(opts, :device, device(pwm_id, pin_num))
 
     Map.merge(base_ext("pwm-remote", pwm_id), %{

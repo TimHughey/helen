@@ -20,7 +20,6 @@ config :scribe, style: Scribe.Style.GithubMarkdown
 config :helen,
   feeds: [
     prefix: "dev",
-    cmd: {"dev/ruth/f/command", 1},
     rpt: {"prod/r/#", 0}
   ]
 
