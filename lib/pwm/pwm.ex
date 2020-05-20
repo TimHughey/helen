@@ -168,25 +168,39 @@ defmodule PulseWidth do
 
   def duty_calculate(%PulseWidth{duty_max: duty_max, duty_min: duty_min}, duty)
       when is_number(duty) do
-    cond do
+    case duty do
       # floats less than zero are considered percentages
-      is_float(duty) and duty < 0.0 ->
-        Float.round(duty_max * duty, 0) |> trunc()
+      d when is_float(d) and d < 0.0 ->
+        Float.round(duty_max * d, 0) |> trunc()
 
       # floats greate than zero are made integers
-      is_float(duty) and duty >= 0.0 ->
+      d when is_float(d) and d >= 0.0 ->
         Float.round(duty, 0) |> trunc()
 
       # bound limit duty requests
-      duty > duty_max ->
+      d when d > duty_max ->
         duty_max
 
-      duty < duty_min ->
+      d when d < duty_min ->
         duty_min
 
       duty ->
         duty
     end
+  end
+
+  @doc """
+    Execute duty for a list of PulseWidth names that begin with a pattern
+
+    Simply pipelines names_begin_with/1 and duty/2
+
+      ## Examples
+        iex> PulseWidth.duty_names_begin_with("front porch", duty: 256)
+  """
+  @doc since: "0.0.11"
+  def duty_names_begin_with(pattern, opts)
+      when is_binary(pattern) and is_list(opts) do
+    for name <- names_begin_with(pattern), do: PulseWidth.duty(name, opts)
   end
 
   # when processing an external update the reading map will contain
@@ -248,6 +262,24 @@ defmodule PulseWidth do
     like_string = ["%", string, "%"] |> IO.iodata_to_binary()
 
     from(p in PulseWidth, where: like(p.name, ^like_string), select: p.name)
+    |> Repo.all()
+  end
+
+  @doc """
+    Retrieve a list of Remote names that begin with a pattern
+  """
+
+  @doc since: "0.0.11"
+  def names_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+
+    from(p in PulseWidth,
+      where: like(p.name, ^like_string),
+      order_by: p.name,
+      select: p.name
+    )
     |> Repo.all()
   end
 
