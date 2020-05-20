@@ -170,11 +170,11 @@ defmodule PulseWidth do
       when is_number(duty) do
     case duty do
       # floats less than zero are considered percentages
-      d when is_float(d) and d < 0.0 ->
+      d when is_float(d) and d <= 0.99 ->
         Float.round(duty_max * d, 0) |> trunc()
 
       # floats greate than zero are made integers
-      d when is_float(d) and d >= 0.0 ->
+      d when is_float(d) and d > 0.99 ->
         Float.round(duty, 0) |> trunc()
 
       # bound limit duty requests
