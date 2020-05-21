@@ -201,7 +201,7 @@ defmodule Switch.Device do
 
   def record_cmd(%Device{} = sd, %Alias{name: sw_alias}, opts)
       when is_list(opts) do
-    import Mqtt.SetSwitch, only: [create_cmd: 4]
+    import Mqtt.SetSwitch, only: [send_cmd: 4]
 
     sd = reload(sd)
 
@@ -215,7 +215,7 @@ defmodule Switch.Device do
          {:cmd, %Command{refid: refid} = cmd} <- {:cmd, hd(sd.cmds)},
          {:refid, true} <- {:refid, is_binary(refid)},
          state_map <- %{pio: pio, state: state},
-         pub_rc <- create_cmd(sd, cmd, state_map, cmd_opts),
+         pub_rc <- send_cmd(sd, cmd, state_map, cmd_opts),
          _ignore <- log_record_cmd({sd, pub_rc, cmd}) do
       {:pending,
        [
