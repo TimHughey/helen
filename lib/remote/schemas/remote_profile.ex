@@ -15,6 +15,9 @@ defmodule Remote.Profile.Schema do
     field(:name, :string)
     field(:description, :string)
     field(:version, Ecto.UUID, autogenerate: true)
+    field(:watch_stacks, :boolean, default: false)
+    field(:core_loop_interval_ms, :integer, default: 1000)
+    field(:core_timestamp_ms, :integer, default: 6 * 60 * 1000)
 
     field(:dalsemi_enable, :boolean, default: true)
     field(:dalsemi_core_stack, :integer, default: 1536)
@@ -27,10 +30,10 @@ defmodule Remote.Profile.Schema do
     field(:dalsemi_convert_priority, :integer, default: 13)
     field(:dalsemi_command_stack, :integer, default: 3072)
     field(:dalsemi_command_priority, :integer, default: 14)
-    field(:dalsemi_core_interval_secs, :integer, default: 30)
-    field(:dalsemi_discover_interval_secs, :integer, default: 30)
-    field(:dalsemi_convert_interval_secs, :integer, default: 7)
-    field(:dalsemi_report_interval_secs, :integer, default: 7)
+    field(:dalsemi_core_interval_ms, :integer, default: 30)
+    field(:dalsemi_discover_interval_ms, :integer, default: 30)
+    field(:dalsemi_convert_interval_ms, :integer, default: 7)
+    field(:dalsemi_report_interval_ms, :integer, default: 7)
 
     field(:i2c_enable, :boolean, default: true)
     field(:i2c_use_multiplexer, :boolean, default: false)
@@ -42,27 +45,19 @@ defmodule Remote.Profile.Schema do
     field(:i2c_report_priority, :integer, default: 13)
     field(:i2c_command_stack, :integer, default: 3072)
     field(:i2c_command_priority, :integer, default: 14)
-    field(:i2c_core_interval_secs, :integer, default: 7)
-    field(:i2c_discover_interval_secs, :integer, default: 60)
-    field(:i2c_report_interval_secs, :integer, default: 7)
+    field(:i2c_core_interval_ms, :integer, default: 7)
+    field(:i2c_discover_interval_ms, :integer, default: 60)
+    field(:i2c_report_interval_ms, :integer, default: 7)
 
     field(:pwm_enable, :boolean, default: true)
     field(:pwm_core_stack, :integer, default: 1536)
     field(:pwm_core_priority, :integer, default: 1)
-    field(:pwm_discover_stack, :integer, default: 2048)
-    field(:pwm_discover_priority, :integer, default: 12)
     field(:pwm_report_stack, :integer, default: 2048)
     field(:pwm_report_priority, :integer, default: 12)
     field(:pwm_command_stack, :integer, default: 2048)
     field(:pwm_command_priority, :integer, default: 14)
-    field(:pwm_core_interval_secs, :integer, default: 10)
-    field(:pwm_report_interval_secs, :integer, default: 10)
-
-    field(:timestamp_task_stack, :integer, default: 1536)
-    field(:timestamp_task_priority, :integer, default: 0)
-    field(:timestamp_watch_stacks, :boolean, default: false)
-    field(:timestamp_core_interval_secs, :integer, default: 3)
-    field(:timestamp_report_interval_secs, :integer, default: 3600)
+    field(:pwm_core_interval_ms, :integer, default: 10)
+    field(:pwm_report_interval_ms, :integer, default: 10)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -206,31 +201,33 @@ defmodule Remote.Profile.Schema do
       %{
         meta: %{
           profile: p.name,
-          version: p.version,
-          updated_mtime: Timex.to_unix(p.updated_at),
-          inserted_mtime: Timex.to_unix(p.inserted_at)
+          version: p.version
+        },
+        core: %{
+          loop_ms: p.core_loop_interval_ms,
+          timestamp_ms: p.core_timestamp_ms
         },
         ds: %{
           enable: p.dalsemi_enable,
           core: %{
             stack: p.dalsemi_core_stack,
             pri: p.dalsemi_core_priority,
-            interval_secs: p.dalsemi_core_interval_secs
+            interval_ms: p.dalsemi_core_interval_ms
           },
           discover: %{
             stack: p.dalsemi_discover_stack,
             pri: p.dalsemi_discover_priority,
-            interval_secs: p.dalsemi_discover_interval_secs
+            interval_ms: p.dalsemi_discover_interval_ms
           },
           report: %{
             stack: p.dalsemi_report_stack,
             pri: p.dalsemi_report_priority,
-            interval_secs: p.dalsemi_report_interval_secs
+            interval_ms: p.dalsemi_report_interval_ms
           },
           convert: %{
             stack: p.dalsemi_convert_stack,
             pri: p.dalsemi_convert_priority,
-            interval_secs: p.dalsemi_convert_interval_secs
+            interval_ms: p.dalsemi_convert_interval_ms
           },
           command: %{
             stack: p.dalsemi_command_stack,
@@ -239,21 +236,20 @@ defmodule Remote.Profile.Schema do
         },
         i2c: %{
           enable: p.i2c_enable,
-          use_multiplexer: p.i2c_use_multiplexer,
           core: %{
             stack: p.i2c_core_stack,
             pri: p.i2c_core_priority,
-            interval_secs: p.i2c_core_interval_secs
+            interval_ms: p.i2c_core_interval_ms
           },
           discover: %{
             stack: p.i2c_discover_stack,
             pri: p.i2c_discover_priority,
-            interval_secs: p.i2c_discover_interval_secs
+            interval_ms: p.i2c_discover_interval_ms
           },
           report: %{
             stack: p.i2c_report_stack,
             pri: p.i2c_report_priority,
-            interval_secs: p.i2c_report_interval_secs
+            interval_ms: p.i2c_report_interval_ms
           },
           command: %{
             stack: p.i2c_command_stack,
@@ -265,28 +261,21 @@ defmodule Remote.Profile.Schema do
           core: %{
             stack: p.pwm_core_stack,
             pri: p.pwm_core_priority,
-            interval_secs: p.pwm_core_interval_secs
-          },
-          discover: %{
-            stack: p.pwm_discover_stack,
-            pri: p.pwm_discover_priority
+            interval_ms: p.pwm_core_interval_ms
           },
           report: %{
             stack: p.pwm_report_stack,
             pri: p.pwm_report_priority,
-            interval_secs: p.pwm_report_interval_secs
+            interval_ms: p.pwm_report_interval_ms
           },
           command: %{
             stack: p.pwm_command_stack,
             pri: p.pwm_command_priority
           }
         },
-        timestamp: %{
-          stack: p.timestamp_task_stack,
-          pri: p.timestamp_task_priority,
-          watch_stacks: p.timestamp_watch_stacks,
-          core_interval_secs: p.timestamp_core_interval_secs,
-          report_interval_secs: p.timestamp_report_interval_secs
+        misc: %{
+          watch_stacks: p.watch_stacks,
+          i2c_mplex: p.i2c_use_multiplexer
         }
       }
     else
@@ -374,76 +363,22 @@ defmodule Remote.Profile.Schema do
     |> unique_constraint(:name, [:name])
   end
 
-  defp keys(:create_opts) do
-    Map.from_struct(%Schema{})
-    |> Map.drop([:name, :version, :inserted_at, :updated_at])
-    |> Map.keys()
-  end
-
   defp keys(:all),
     do:
-      [keys_base(), keys_dalsemi(), keys_i2c(), keys_pwm(), keys_timestamp()]
+      %Schema{}
+      |> Map.from_struct()
+      |> Map.drop([:__meta__])
+      |> Map.keys()
       |> List.flatten()
 
-  defp keys_base, do: [:name, :description, :version]
+  defp keys(:create_opts),
+    do:
+      keys(:update_opts)
+      |> List.delete(:name)
 
-  defp keys_dalsemi,
-    do: [
-      :dalsemi_enable,
-      :dalsemi_core_stack,
-      :dalsemi_core_priority,
-      :dalsemi_discover_stack,
-      :dalsemi_discover_priority,
-      :dalsemi_report_stack,
-      :dalsemi_report_priority,
-      :dalsemi_convert_stack,
-      :dalsemi_convert_priority,
-      :dalsemi_command_stack,
-      :dalsemi_command_priority,
-      :dalsemi_core_interval_secs,
-      :dalsemi_discover_interval_secs,
-      :dalsemi_convert_interval_secs,
-      :dalsemi_report_interval_secs
-    ]
-
-  defp keys_i2c,
-    do: [
-      :i2c_enable,
-      :i2c_use_multiplexer,
-      :i2c_core_stack,
-      :i2c_core_priority,
-      :i2c_discover_stack,
-      :i2c_discover_priority,
-      :i2c_report_stack,
-      :i2c_report_priority,
-      :i2c_command_stack,
-      :i2c_command_priority,
-      :i2c_core_interval_secs,
-      :i2c_discover_interval_secs,
-      :i2c_report_interval_secs
-    ]
-
-  defp keys_pwm,
-    do: [
-      :pwm_enable,
-      :pwm_core_stack,
-      :pwm_core_priority,
-      :pwm_discover_stack,
-      :pwm_discover_priority,
-      :pwm_report_stack,
-      :pwm_report_priority,
-      :pwm_command_stack,
-      :pwm_command_priority,
-      :pwm_core_interval_secs,
-      :pwm_report_interval_secs
-    ]
-
-  defp keys_timestamp,
-    do: [
-      :timestamp_task_stack,
-      :timestamp_task_priority,
-      :timestamp_watch_stacks,
-      :timestamp_core_interval_secs,
-      :timestamp_report_interval_secs
-    ]
+  defp keys(:update_opts) do
+    all = keys(:all) |> MapSet.new()
+    remove = MapSet.new([:id, :version, :inserted_at, :updated_at])
+    MapSet.difference(all, remove) |> MapSet.to_list()
+  end
 end
