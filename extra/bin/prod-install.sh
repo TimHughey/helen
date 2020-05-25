@@ -45,6 +45,7 @@ if [[ -f ./helen ]]; then
   fi
 fi
 
+# back to devel/helen
 popd -q
 
 print "executing mix ecto.migrate..."
@@ -52,14 +53,33 @@ print "executing mix ecto.migrate..."
 run_cmd env MIX_ENV=prod mix ecto.migrate
 
 pushd -q /usr/local/helen
-print -n "untarring $helen_tarball into `pwd`"
-tar -xf $helen_tarball && print " done."
+print -n "untarring $tarball into `pwd`"
+tar_out=$(tar -xf $tarball)
+
+if [[ ! $? ]]; then
+  print " "
+  print "tar failed:"
+  print "  >> ${tar_out}"
+  print " "
+  print "starting existing version of helen..."
+  $helen_bin/helen daemon
+  popd +q 2
+  exit 1
+fi
+
+print " done"
+
+print -n "correcting permissions... "
+chmod -R g+X . && print "done."
+
+# back to devel/helen
 popd -q
 
-print -n "starting helen..."
+print -n "starting latest release of helen..."
 
 $helen_bin/helen daemon
 
+# back to where we started
 popd -q
 
 print " done."

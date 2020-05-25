@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 if [[ $USER != 'helen' ]]; then
-  sudo su --command '${HOME}/devel/helen/extra/bin/do-prod-release.sh' helen
+  sudo su --command 'pushd ${HOME}/devel/helen/extra/bin/do-prod-release.sh' helen
   exit 0
 fi
 
@@ -16,6 +16,6 @@ fi
 
 pushd -q extra/bin
 
-./prod-install.sh && ./tail-log.sh
+./prod-build.sh && ./prod-install.sh && ./tail-log.sh
 
 popd -q +2
