@@ -12,37 +12,30 @@ function run_cmd {
     return $rc
 }
 
-if [[ $1 == "--clean" ]]; then
-  clean=1
-fi
-
-git rev-parse --show-toplevel 1> /dev/null 2> /dev/null
-if [[ $? -ne 0 ]]; then
-  echo "Must run from project directory"
-  exit 1
-fi
-
 if [[ $USER != 'helen' ]]; then
-  echo "Must run as helen user account"
-  exit 1
+  sudo su - helen --command ./devel/helen/extra/bin/prod-install.sh
 fi
 
-src_base=$(git rev-parse --show-toplevel)
+pushd -q ${HOME}/devel/helen
 
-source $src_base/extra/common/vars.sh
+helen_base=/usr/local/helen
+helen_bin=${helen_base}/bin
 
 setopt local_options rm_star_silent
 
-if [[ ! -d ${helen_base_new} ]]; then
-  echo "${helen_base_new} does not exist, has prod-stage.sh been executed?"
+tarball="$(pwd)/_build/prod/helen.tar.gz"
+if [[ ! -f $tarball ]]; then
+  echo "${tarball} does not exist, has prod-build.sh been executed?"
   exit 1
 fi
 
-if [[ -f $helen_bin/helen ]]; then
+pushd -q /usr/local/helen/bin
+
+if [[ -f ./helen ]]; then
   print -n "stopping helen... "
-  $helen_bin/helen stop 1> /dev/null 2>&1
+  ./helen stop 1> /dev/null 2>&1
   # check helen is really shutdown
-  $helen_bin/helen ping 1> /dev/null 2>&1
+  ./helen ping 1> /dev/null 2>&1
   if [[ $? -eq 0 ]]; then
     print "FAILED, aborting install."
     return 1
@@ -51,28 +44,21 @@ if [[ -f $helen_bin/helen ]]; then
   fi
 fi
 
-print "executing mix ecto.migrate:"
-cd $helen_src_base
+popd -q
+
+print "executing mix ecto.migrate..."
+
 run_cmd env MIX_ENV=prod mix ecto.migrate
-cd $save_cwd
 
-print -n "swapping in new release..."
-
-if [[ -d $helen_base ]]; then
-  run_cmd sudo /bin/rm -rf $helen_base_old 1> /dev/null 2>&1
-  run_cmd sudo /bin/mv $helen_base $helen_base_old 1> /dev/null 2>&1
-fi
-
-run_cmd sudo /bin/mv $helen_base_new $helen_base 1> /dev/null 2>&1 && print " done."
+pushd -q /usr/local/helen
+print -n "untarring $helen_tarball into `pwd`"
+tar -xf $helen_tarball && print " done."
+popd -q
 
 print -n "starting helen..."
 
 $helen_bin/helen daemon
 
-print " done."
+popd -q
 
-if [[ $clean -eq 1 ]]; then
-  print -n "removing $helen_base_old..." && run_cmd sudo /bin/rm -rf $helen_base_old && print " done."
-else
-  print "won't remove ${helen_base_old}, use --clean to do so"
-fi
+print " done."

@@ -5,10 +5,7 @@ if [[ "$terminfo[colors]" -gt 8 ]]; then
     colors
 fi
 
-# save current working directory
-save_cwd=`pwd`
-
-src_base=$(git rev-parse --show-toplevel)
+src_base=${HOME}/devel/helen
 
 # source (devel) paths
 helen_src_base=${src_base}
@@ -18,8 +15,6 @@ helen_build_prod=${helen_src_base}/_build/prod
 
 # prod install path and filenames
 helen_base=/usr/local/helen
-helen_base_new=${helen_base}.new
-helen_base_old=${helen_base}.old
 helen_bin=${helen_base}/bin
 
 # helen prod release tar ball

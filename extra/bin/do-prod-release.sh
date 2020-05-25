@@ -1,22 +1,20 @@
 #!/usr/bin/env zsh
 
-git rev-parse --show-toplevel 1> /dev/null 2> /dev/null
-if [[ $? -ne 0 ]]; then
-  echo "Must run from project directory"
-  exit 1
-fi
-
 if [[ $USER != 'helen' ]]; then
-  echo "Must run as helen user account"
-  exit 1
+  sudo su - helen --command ./devel/helen/extra/bin/prod-install.sh
 fi
 
-base=$(git rev-parse --show-toplevel)
+pushd -q ${HOME}/devel/helen
 
-source $base/extra/common/vars.sh
+if [[ -v SKIP_PULL ]]; then
+  print -P "\n$fg_bold[yellow]* skipping git pull, as requested%f\n"
+  env MIX_ENV=prod mix release helen --overwrite
+else
+  git pull && env MIX_ENV=prod mix release helen --overwrite
+fi
 
-cd $helen_extra/bin
+pushd -q extra/bin
 
-./prod-build.sh && ./prod-stage.sh && ./prod-install.sh && ./tail-log.sh
+./prod-install.sh && ./tail-log.sh
 
-cd $save_cwd
+popd -q +2

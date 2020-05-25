@@ -294,7 +294,13 @@ defmodule Mqtt.Client do
   end
 
   defp host_feed(host, subtopic) when is_binary(host) and is_binary(subtopic) do
-    {[@feed_prefix, host, subtopic] |> Enum.join("/"), 1}
+    import TimeSupport, only: [unix_now: 1]
+
+    # append the current time (in unix seconds since epoch)
+    # to the topic (feed).  the remote device can use this information
+    # to assess if the message is current.
+    mtime = unix_now(:second) |> Integer.to_string()
+    {[@feed_prefix, host, subtopic, mtime] |> Enum.join("/"), 1}
   end
 
   defp log_unhandled(type, message) do

@@ -17,6 +17,6 @@ source $base/extra/common/vars.sh
 
 cd $helen_extra/bin
 
-./prod-build.sh && ./prod-stage.sh && ./prod-install.sh && ./tail-log.sh
+./prod-build.sh && ./prod-install.sh && ./tail-log.sh
 
 cd $save_cwd
