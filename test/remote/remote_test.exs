@@ -303,20 +303,12 @@ defmodule RemoteTest do
   end
 
   @tag :ota
-  test "OTA update (unsupported)" do
-    res = Remote.ota_update(:bad, log: true)
-
-    assert is_list(res)
-    assert res == []
-  end
-
-  @tag :ota
   test "OTA update (main)" do
     n = 16
     ext(n) |> boot() |> Map.put(:log, false) |> Remote.external_update()
     rem = Remote.find_by_host(host(n))
 
-    list = Remote.ota_update(rem.host, reboot_delay_ms: 1000, log: false)
+    list = Remote.ota(rem.host, reboot_delay_ms: 1000, log: false)
 
     assert is_list(list)
     refute Enum.empty?(list)
@@ -331,7 +323,7 @@ defmodule RemoteTest do
 
     msg =
       capture_log(fn ->
-        Remote.ota_update(rem.host, reboot_delay_ms: 1000, log: true)
+        Remote.ota(rem.host, reboot_delay_ms: 1000, log: true)
       end)
 
     assert msg =~ "sent ota https to"

@@ -89,13 +89,8 @@ defmodule Remote do
     end
   end
 
-  def add(no_match) do
-    Logger.warn([
-      "attempt to add non %Remote{} ",
-      inspect(no_match, pretty: true)
-    ])
-
-    no_match
+  def add(_no_match) do
+    {:failed, :not_remote}
   end
 
   def all do
@@ -201,11 +196,12 @@ defmodule Remote do
     end
   end
 
-  def deprecate(id) when is_integer(id) do
-    r = find(id)
+  def deprecate(:help), do: deprecate()
+
+  def deprecate(what) do
+    r = find(what)
 
     if is_nil(r) do
-      Logger.warn(["deprecate(", inspect(id), " failed"])
       {:error, :not_found}
     else
       tobe = "~ #{r.name}-#{Timex.now() |> Timex.format!("{ASN1:UTCtime}")}"
@@ -216,11 +212,9 @@ defmodule Remote do
     end
   end
 
-  def deprecate(:help), do: deprecate()
-
   def deprecate do
     IO.puts("Usage:")
-    IO.puts("\tRemote.deprecate(id)")
+    IO.puts("\tRemote.deprecate(name|id)")
   end
 
   def external_update(%{host: host, mtime: _mtime} = eu) do
@@ -283,6 +277,8 @@ defmodule Remote do
   def find(name) when is_binary(name),
     do: Repo.get_by(__MODULE__, name: name)
 
+  def find(_not_id_or_name), do: nil
+
   def find_by_host(host) when is_binary(host),
     do: Repo.get_by(__MODULE__, host: host)
 
@@ -341,21 +337,21 @@ defmodule Remote do
         iex> Remote.ota_names_begin_with("lab-", [])
   """
   @doc since: "0.0.11"
-  def ota_names_begin_with(pattern, opts \\ []) when is_binary(pattern) do
+  def ota(pattern, opts \\ []) when is_binary(pattern) do
     names_begin_with(pattern) |> ota_update(opts)
   end
 
-  def ota_update(what, opts \\ []) do
-    opts = Keyword.put_new(opts, :log, false)
-    update_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
+  ###
+  ###
+  ### SPECIAL CASE FOR EASE OF OPERATIONS
+  ###
+  ###
 
-    if Enum.empty?(update_list) do
-      []
-    else
-      opts = opts ++ [update_list: update_list]
-      OTA.send_cmd(opts)
-    end
-  end
+  def ota_roost, do: "roost-" |> ota()
+  def ota_lab, do: "lab-" |> ota()
+  def ota_reef, do: "reef-" |> ota()
+  def ota_test, do: "test-" |> ota()
+  def ota_all, do: ["roost-", "lab-", "reef-", "test-"] |> ota()
 
   # create a list of ota updates for all Remotes
   def remote_list(:all) do
@@ -371,7 +367,6 @@ defmodule Remote do
       [map]
     else
       nil ->
-        Logger.warn(["id(", inspect(id), ") not found"])
         [:not_found]
     end
   end
@@ -386,7 +381,6 @@ defmodule Remote do
         [map]
 
       nil ->
-        Logger.warn([inspect(name, pretty: true), " not found"])
         [:not_found]
     end
   end
@@ -400,8 +394,7 @@ defmodule Remote do
   end
 
   def remote_list(catchall) do
-    Logger.warn(["unsupported: ", inspect(catchall, pretty: true)])
-    [:unsupported]
+    [:unsupported, catchall]
   end
 
   defp ota_update_map(%Remote{} = r), do: %{name: r.name, host: r.host}
@@ -411,10 +404,7 @@ defmodule Remote do
     restart_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
 
     if Enum.empty?(restart_list) do
-      Logger.warn([
-        "can't do restart for: ",
-        inspect(restart_list, pretty: true)
-      ])
+      {:failed, restart_list}
     else
       opts = opts ++ [restart_list: restart_list]
       OTA.restart(opts)
@@ -424,6 +414,18 @@ defmodule Remote do
   #
   # PRIVATE FUNCTIONS
   #
+
+  defp ota_update(what, opts) do
+    opts = Keyword.put_new(opts, :log, false)
+    update_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
+
+    if Enum.empty?(update_list) do
+      []
+    else
+      opts = opts ++ [update_list: update_list]
+      OTA.send_cmd(opts)
+    end
+  end
 
   defp send_remote_profile([%Remote{} = rem], %{type: "boot"} = eu) do
     import Mqtt.SetProfile, only: [send_cmd: 1]
@@ -469,17 +471,8 @@ defmodule Remote do
     update_from_external(rem, eu)
   end
 
-  defp send_remote_profile(_anything, %{} = eu) do
-    log = Map.get(eu, :log, true)
-
-    log &&
-      Logger.warn([
-        "attempt to process unknown message type: ",
-        inspect(Map.get(eu, :type, "unknown"))
-      ])
-
-    {:error, "unknown message type"}
-  end
+  defp send_remote_profile(_anything, %{} = _eu),
+    do: {:error, "unknown message type"}
 
   defp update_from_external(%Remote{} = rem, eu) do
     params = %{
