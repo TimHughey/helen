@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 if [[ $USER != 'helen' ]]; then
-  sudo su --command ./devel/helen/extra/bin/prod-install.sh helen 
+  sudo su --command '${HOME}/devel/helen/extra/bin/prod-install.sh' helen 
 fi
 
 pushd -q ${HOME}/devel/helen
