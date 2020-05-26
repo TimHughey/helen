@@ -1,4 +1,4 @@
-defmodule Mqtt.SetPulseWidth do
+defmodule PulseWidth.Payload.Duty do
   @moduledoc false
 
   require Logger
@@ -9,12 +9,9 @@ defmodule Mqtt.SetPulseWidth do
         opts
       )
       when is_list(opts) do
-    import TimeSupport, only: [unix_now: 1]
-
     %{
-      payload: "pwm",
+      duty_cmd: true,
       host: host,
-      mtime: unix_now(:second),
       device: device,
       refid: refid,
       ack: Keyword.get(opts, :ack, true),

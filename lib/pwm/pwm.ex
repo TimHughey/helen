@@ -13,6 +13,7 @@ defmodule PulseWidth do
     field(:device, :string)
     field(:host, :string)
     field(:duty, :integer)
+    field(:sequence, :string, default: "none")
     field(:duty_max, :integer)
     field(:duty_min, :integer)
     field(:dev_latency_us, :integer)
@@ -38,8 +39,6 @@ defmodule PulseWidth do
   def add(%{device: device, host: _host, mtime: mtime} = r) do
     import TimeSupport, only: [from_unix: 1]
 
-    keys = [:device, :host, :duty, :duty_max, :duty_min]
-
     pwm = %PulseWidth{
       # the PulseWidth name defaults to the device when adding
       name: device,
@@ -48,7 +47,7 @@ defmodule PulseWidth do
       discovered_at: from_unix(mtime)
     }
 
-    [Map.merge(pwm, Map.take(r, keys))] |> add()
+    [Map.merge(pwm, Map.take(r, keys(:update_opts)))] |> add()
   end
 
   def add(list) when is_list(list) do
@@ -58,7 +57,7 @@ defmodule PulseWidth do
   end
 
   def add(%PulseWidth{name: _name, device: device} = p) do
-    cs = changeset(p, Map.take(p, possible_changes()))
+    cs = changeset(p, Map.take(p, keys(:all)))
 
     with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
          # the on_conflict: and conflict_target: indicate the insert
@@ -220,7 +219,7 @@ defmodule PulseWidth do
     import TimeSupport, only: [from_unix: 1]
 
     set =
-      Enum.into(Map.take(r, external_changes()), []) ++
+      Enum.into(Map.take(r, keys(:update_opts)), []) ++
         [last_seen_at: msg_recv_at, reading_at: from_unix(mtime)]
 
     update(pwm, set) |> PulseWidthCmd.ack_if_needed(r)
@@ -262,6 +261,21 @@ defmodule PulseWidth do
     like_string = ["%", string, "%"] |> IO.iodata_to_binary()
 
     from(p in PulseWidth, where: like(p.name, ^like_string), select: p.name)
+    |> Repo.all()
+  end
+
+  @doc """
+    Retrieve a list of Remote names
+  """
+
+  @doc since: "0.0.13"
+  def names do
+    import Ecto.Query, only: [from: 2]
+
+    from(p in PulseWidth,
+      order_by: p.name,
+      select: p.name
+    )
     |> Repo.all()
   end
 
@@ -316,6 +330,102 @@ defmodule PulseWidth do
     {:error, catchall}
   end
 
+  def sequence(name, opts) when is_binary(name) and is_list(opts) do
+    seq = Keyword.get(opts, :sequence, nil)
+
+    with %PulseWidth{} = pwm <- find(name),
+         {:seq_opt, true, pwm} <- {:seq_opt, is_map(seq), pwm} do
+      sequence(pwm, List.delete(opts, :sequence))
+    else
+      {:seq_opt, false, pwm} -> sequence(pwm, seq, opts)
+      nil -> {:not_found, name}
+    end
+  end
+
+  def sequence(%PulseWidth{} = pwm, %{name: seq_name} = seq, opts)
+      when is_list(opts) do
+    import TimeSupport, only: [utc_now: 0]
+    import PulseWidth.Payload.Sequence, only: [send_cmd: 4]
+
+    # update the PulseWidth
+    with {:ok, %PulseWidth{} = pwm} <- update(pwm, sequence: seq_name),
+         # add the command
+         {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
+         # get the PulseWidthCmd inserted
+         {:cmd, %PulseWidthCmd{} = cmd} <- {:cmd, hd(pwm.cmds)},
+         # send the command
+         pub_rc <- send_cmd(pwm, cmd, seq, opts) do
+      # assemble return value
+      [sequence_name: seq_name, pub_rc: pub_rc] ++ [opts]
+    else
+      # just pass through any error encountered
+      error -> {:error, error}
+    end
+  end
+
+  def sequence_example(opts \\ []) do
+    import Ecto.UUID, only: [generate: 0]
+    import PulseWidth.Payload.Sequence, only: [create_cmd: 4]
+
+    name = names() |> hd()
+
+    seq = %{
+      name: "flash",
+      steps: [
+        %{duty: 8191, ms: 750},
+        %{duty: 0, ms: 1500},
+        %{duty: 4096, ms: 750},
+        %{duty: 0, ms: 1500},
+        %{duty: 2048, ms: 750},
+        %{duty: 0, ms: 1500},
+        %{duty: 1024, ms: 750},
+        %{duty: 0, ms: 1500}
+      ],
+      run: true,
+      repeat: true
+    }
+
+    with %PulseWidth{name: _} = pwm <- find(name),
+         refid <- generate(),
+         cmd <- create_cmd(pwm, refid, seq, []) do
+      cmd |> sequence_example_opts(opts)
+    else
+      error -> {:error, error}
+    end
+  end
+
+  def sequence_example_opts(%{seq: _seq} = seq, opts) do
+    import Jason, only: [encode!: 2, encode_to_iodata!: 2]
+    import Msgpax, only: [pack!: 1]
+
+    cond do
+      Keyword.has_key?(opts, :encode) ->
+        Jason.encode!(seq)
+
+      Keyword.has_key?(opts, :binary) ->
+        Jason.encode!(seq, []) |> IO.puts()
+
+      Keyword.has_key?(opts, :bytes) ->
+        encode!(seq, []) |> IO.puts() |> String.length()
+
+      Keyword.has_key?(opts, :pack) ->
+        [pack!(seq)] |> IO.iodata_length()
+
+      Keyword.has_key?(opts, :write) ->
+        out = ["\n", encode_to_iodata!(seq, pretty: true), "\n"]
+        home = System.get_env("HOME")
+
+        file =
+          [home, "devel", "helen", "extra", "json-snippets", "sequence.json"]
+          |> Path.join()
+
+        File.write(file, out, [:append])
+
+      true ->
+        seq
+    end
+  end
+
   def update(name, opts) when is_binary(name) and is_list(opts) do
     pwm = find(name)
 
@@ -323,7 +433,7 @@ defmodule PulseWidth do
   end
 
   def update(%PulseWidth{} = pwm, opts) when is_list(opts) do
-    set = Keyword.take(opts, possible_changes()) |> Enum.into(%{})
+    set = Keyword.take(opts, keys(:update_opts)) |> Enum.into(%{})
 
     cs = changeset(pwm, set)
 
@@ -348,8 +458,8 @@ defmodule PulseWidth do
     import Common.DB, only: [name_regex: 0]
 
     pwm
-    |> cast(params, possible_changes())
-    |> validate_required(required_changes())
+    |> cast(params, keys(:update_opts))
+    |> validate_required(keys(:all))
     |> validate_format(:name, name_regex())
     |> validate_number(:duty, greater_than_or_equal_to: 0)
     |> validate_number(:duty_min, greater_than_or_equal_to: 0)
@@ -385,7 +495,7 @@ defmodule PulseWidth do
 
   defp record_cmd(%PulseWidth{} = pwm, opts) when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]
-    import Mqtt.SetPulseWidth, only: [send_cmd: 3]
+    import PulseWidth.Payload.Duty, only: [send_cmd: 3]
 
     with {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
          {:cmd, %PulseWidthCmd{} = cmd} <- {:cmd, hd(pwm.cmds)},
@@ -399,46 +509,23 @@ defmodule PulseWidth do
     end
   end
 
-  # Lists of possible changes for Changeset
+  # Keys For Updating, Creating a PulseWidth
+  defp keys(:all),
+    do:
+      %PulseWidth{}
+      |> Map.from_struct()
+      |> Map.drop([:__meta__])
+      |> Map.keys()
+      |> List.flatten()
 
-  # everything EXCEPT for t%PulseWidth{name: _} can be updated based on the
-  # message from the Remote device
-  defp external_changes,
-    do: [
-      :host,
-      :duty,
-      :duty_max,
-      :duty_min,
-      :dev_latency_us
-    ]
+  defp keys(:create_opts),
+    do:
+      keys(:update_opts)
+      |> List.delete(:name)
 
-  defp possible_changes,
-    do: [
-      :name,
-      :description,
-      :device,
-      :host,
-      :duty,
-      :duty_max,
-      :duty_min,
-      :dev_latency_us,
-      :log,
-      :ttl_ms,
-      :reading_at,
-      :last_seen_at,
-      :metric_at,
-      :metric_freq_secs,
-      :discovered_at,
-      :last_cmd_at
-    ]
-
-  defp required_changes,
-    do: [
-      :name,
-      :device,
-      :host,
-      :duty,
-      :duty_max,
-      :duty_min
-    ]
+  defp keys(:update_opts) do
+    all = keys(:all) |> MapSet.new()
+    remove = MapSet.new([:id, :inserted_at, :updated_at])
+    MapSet.difference(all, remove) |> MapSet.to_list()
+  end
 end

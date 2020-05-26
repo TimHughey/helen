@@ -324,35 +324,23 @@ defmodule Mqtt.Client do
 
   defp report_publish_error(e) do
     case e do
-      # {:ok, _res} ->
-      #   # not an error, pass through "error"
-      #   e
-
-      {:bad_feed, bad_feed} ->
-        Logger.warn([
-          "publish() bad feed: ",
-          inspect(bad_feed, pretty: true)
-        ])
-
-        Logger.warn(["hint: check :feeds are defined in the configuration"])
-
-        {:bad_args, :feed_config_missing}
-
       {rc, error} ->
-        Logger.warn([
+        [
           "publish() unable to pack payload: ",
           inspect(rc),
           " ",
           inspect(error, pretty: true)
-        ])
+        ]
+        |> Logger.warn()
 
         {rc, error}
 
       catchall ->
-        Logger.warn([
+        [
           "publish() unhandled error: ",
           inspect(catchall, pretty: true)
-        ])
+        ]
+        |> Logger.warn()
 
         {:error, catchall}
     end
