@@ -57,7 +57,7 @@ defmodule PulseWidth do
   end
 
   def add(%PulseWidth{name: _name, device: device} = p) do
-    cs = changeset(p, Map.take(p, keys(:all)) |> List.delete(:cmds))
+    cs = changeset(p, Map.take(p, keys(:all)))
 
     with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
          # the on_conflict: and conflict_target: indicate the insert
@@ -514,7 +514,7 @@ defmodule PulseWidth do
     do:
       %PulseWidth{}
       |> Map.from_struct()
-      |> Map.drop([:__meta__])
+      |> Map.drop([:__meta__, :cmds, :runtime_metrics])
       |> Map.keys()
       |> List.flatten()
 
@@ -522,11 +522,10 @@ defmodule PulseWidth do
     do:
       keys(:update_opts)
       |> List.delete(:name)
-      |> List.delete(:cmds)
 
   defp keys(:update_opts) do
     all = keys(:all) |> MapSet.new()
-    remove = MapSet.new([:id, :cmds, :inserted_at, :updated_at])
+    remove = MapSet.new([:id, :inserted_at, :updated_at])
     MapSet.difference(all, remove) |> MapSet.to_list()
   end
 end
