@@ -16,6 +16,6 @@ fi
 
 pushd -q extra/bin
 
-./prod-build.sh && ./prod-install.sh && ./tail-log.sh
+./prod-install.sh && ./tail-log.sh
 
 popd -q +2
