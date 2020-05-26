@@ -5,7 +5,7 @@ defmodule Mqtt.Handler do
   alias Mqtt.Client
 
   def init(args) do
-    basd_state = Enum.init(args, %{})
+    base_state = Enum.into(args, %{})
     extra_state = %{runtime_metrics: false, seen_topics: MapSet.new()}
 
     {:ok, Map.merge(base_state, extra_state)}
@@ -104,6 +104,6 @@ defmodule Mqtt.Handler do
 
     topics = MapSet.put(topics, topic)
 
-    Map.put(s, seen_topics: topics)
+    Map.put(s, :seen_topics, topics)
   end
 end
