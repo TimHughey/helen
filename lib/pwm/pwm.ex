@@ -521,7 +521,8 @@ defmodule PulseWidth do
   defp keys(:create_opts),
     do:
       keys(:update_opts)
-      |> List.delete(:name, :cmds)
+      |> List.delete(:name)
+      |> List.delete(:cmds)
 
   defp keys(:update_opts) do
     all = keys(:all) |> MapSet.new()
