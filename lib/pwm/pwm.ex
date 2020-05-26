@@ -459,7 +459,7 @@ defmodule PulseWidth do
 
     pwm
     |> cast(params, keys(:update_opts))
-    |> validate_required(keys(:all) |> List.delete(:cmds))
+    # |> validate_required(keys(:all) |> List.delete(:cmds))
     |> validate_format(:name, name_regex())
     |> validate_number(:duty, greater_than_or_equal_to: 0)
     |> validate_number(:duty_min, greater_than_or_equal_to: 0)

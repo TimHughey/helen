@@ -66,6 +66,11 @@ defmodule PulseWidthCmd do
     {:not_found, refid}
   end
 
+  def ack_if_needed({:invalid_changes}, cs) do
+    Logger.warn(["invalid changes to PulseWidth: ", inspect(cs, pretty: false)])
+    {:error, cs}
+  end
+
   def ack_if_needed(catchall) do
     Logger.warn(["ack_if_needed() catchall: ", inspect(catchall, pretty: true)])
     {:error, catchall}
