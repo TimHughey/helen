@@ -219,7 +219,7 @@ defmodule PulseWidth do
     import TimeSupport, only: [from_unix: 1]
 
     set =
-      Enum.into(Map.take(r, keys(:update_opts)), []) ++
+      Enum.into(Map.take(r, keys(:create_opts)), []) ++
         [last_seen_at: msg_recv_at, reading_at: from_unix(mtime)]
 
     update(pwm, set) |> PulseWidthCmd.ack_if_needed(r)
