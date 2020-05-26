@@ -525,7 +525,7 @@ defmodule PulseWidth do
 
   defp keys(:update_opts) do
     all = keys(:all) |> MapSet.new()
-    remove = MapSet.new([:id, :inserted_at, :updated_at])
+    remove = MapSet.new([:id, :cmds, :inserted_at, :updated_at])
     MapSet.difference(all, remove) |> MapSet.to_list()
   end
 end
