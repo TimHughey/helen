@@ -5,7 +5,10 @@ defmodule Mqtt.Handler do
   alias Mqtt.Client
 
   def init(args) do
-    {:ok, Enum.into(args, %{}) |> Map.put(:runtime_metrics, false)}
+    basd_state = Enum.init(args, %{})
+    extra_state = %{runtime_metrics: false, seen_topics: MapSet.new()}
+
+    {:ok, Map.merge(base_state, extra_state)}
   end
 
   @doc """
@@ -31,7 +34,7 @@ defmodule Mqtt.Handler do
     |> MessageSave.save()
     |> Mqtt.Inbound.process(runtime_metrics: state.runtime_metrics)
 
-    {:ok, state}
+    {:ok, track_topics(state, topic)}
   end
 
   def handle_message(
@@ -49,7 +52,7 @@ defmodule Mqtt.Handler do
     |> MessageSave.save()
     |> Mqtt.Inbound.process(runtime_metrics: state.runtime_metrics)
 
-    {:ok, state}
+    {:ok, track_topics(state, topic)}
   end
 
   def handle_message(topic, payload, state) do
@@ -63,7 +66,7 @@ defmodule Mqtt.Handler do
     ]
     |> Logger.warn()
 
-    {:ok, state}
+    {:ok, track_topics(state, topic)}
   end
 
   def subscription(:up, topic_filter, state) do
@@ -94,5 +97,13 @@ defmodule Mqtt.Handler do
     # terminate-callback
     Logger.warn(["Tortoise terminate: ", inspect(reason)])
     :ok
+  end
+
+  defp track_topics(%{seen_topics: topics} = s, topic_list) do
+    topic = Enum.join(topic_list, "/")
+
+    topics = MapSet.put(topics, topic)
+
+    Map.put(s, seen_topics: topics)
   end
 end

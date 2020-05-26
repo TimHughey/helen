@@ -63,6 +63,12 @@ defmodule Mqtt.Inbound do
     {:ok, s}
   end
 
+  def seen_topics do
+    %{seen_topics: topics} = :sys.get_state(__MODULE__)
+
+    MapSet.to_list(topics) |> Enum.sort()
+  end
+
   # internal work functions
 
   def process(%{direction: _, payload: payload}, opts \\ [])
