@@ -1,7 +1,7 @@
 defmodule RemoteTest do
   @moduledoc false
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   import ExUnit.CaptureLog
   use Timex
 
@@ -18,7 +18,7 @@ defmodule RemoteTest do
       host: host(num),
       type: "remote_runtime",
       mtime: TimeSupport.unix_now(:second),
-      async: false
+      async: true
     }
 
   def runtime(m) do
@@ -49,7 +49,7 @@ defmodule RemoteTest do
       mword: "0x123456",
       svsn: 813,
       reset_reason: "software reset",
-      async: false
+      async: true
     }
 
     Map.merge(m, boot_map)

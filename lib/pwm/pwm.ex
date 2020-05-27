@@ -12,24 +12,17 @@ defmodule PulseWidth do
     field(:description, :string)
     field(:device, :string)
     field(:host, :string)
-    field(:duty, :integer)
+    field(:duty, :integer, default: 0)
     field(:sequence, :string, default: "none")
-    field(:duty_max, :integer)
-    field(:duty_min, :integer)
-    field(:dev_latency_us, :integer)
+    field(:duty_max, :integer, default: 8191)
+    field(:duty_min, :integer, default: 0)
+    field(:dev_latency_us, :integer, default: 0)
     field(:log, :boolean, default: false)
     field(:ttl_ms, :integer, default: 60_000)
     field(:reading_at, :utc_datetime_usec)
     field(:last_seen_at, :utc_datetime_usec)
-    field(:metric_at, :utc_datetime_usec, default: nil)
-    field(:metric_freq_secs, :integer, default: 60)
     field(:discovered_at, :utc_datetime_usec)
     field(:last_cmd_at, :utc_datetime_usec)
-
-    field(:runtime_metrics, :map,
-      null: false,
-      default: %{external_update: false, cmd_rt: true}
-    )
 
     has_many(:cmds, PulseWidthCmd, foreign_key: :pwm_id)
 
@@ -47,7 +40,7 @@ defmodule PulseWidth do
       discovered_at: from_unix(mtime)
     }
 
-    [Map.merge(pwm, Map.take(r, keys(:update_opts)))] |> add()
+    [Map.merge(pwm, Map.take(r, keys(:create)))] |> add()
   end
 
   def add(list) when is_list(list) do
@@ -57,7 +50,7 @@ defmodule PulseWidth do
   end
 
   def add(%PulseWidth{name: _name, device: device} = p) do
-    cs = changeset(p, Map.take(p, keys(:all)))
+    cs = changeset(p, Map.take(p, keys(:create)))
 
     with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
          # the on_conflict: and conflict_target: indicate the insert
@@ -219,7 +212,7 @@ defmodule PulseWidth do
     import TimeSupport, only: [from_unix: 1]
 
     set =
-      Enum.into(Map.take(r, keys(:create_opts)), []) ++
+      Enum.into(Map.take(r, keys(:create)), []) ++
         [last_seen_at: msg_recv_at, reading_at: from_unix(mtime)]
 
     update(pwm, set) |> PulseWidthCmd.ack_if_needed(r)
@@ -433,7 +426,7 @@ defmodule PulseWidth do
   end
 
   def update(%PulseWidth{} = pwm, opts) when is_list(opts) do
-    set = Keyword.take(opts, keys(:update_opts)) |> Enum.into(%{})
+    set = Keyword.take(opts, keys(:update)) |> Enum.into(%{})
 
     cs = changeset(pwm, set)
 
@@ -458,8 +451,8 @@ defmodule PulseWidth do
     import Common.DB, only: [name_regex: 0]
 
     pwm
-    |> cast(params, keys(:update_opts))
-    # |> validate_required(keys(:all) |> List.delete(:cmds))
+    |> cast(params, keys(:update))
+    |> validate_required(keys(:required))
     |> validate_format(:name, name_regex())
     |> validate_number(:duty, greater_than_or_equal_to: 0)
     |> validate_number(:duty_min, greater_than_or_equal_to: 0)
@@ -514,18 +507,35 @@ defmodule PulseWidth do
     do:
       %PulseWidth{}
       |> Map.from_struct()
-      |> Map.drop([:__meta__, :cmds, :runtime_metrics])
+      |> Map.drop([:__meta__, :cmds])
       |> Map.keys()
       |> List.flatten()
 
-  defp keys(:create_opts),
-    do:
-      keys(:update_opts)
-      |> List.delete(:name)
+  defp keys(:create) do
+    drop = [:name]
+    keys_refine(:update, drop)
+  end
 
-  defp keys(:update_opts) do
-    all = keys(:all) |> MapSet.new()
-    remove = MapSet.new([:id, :inserted_at, :updated_at])
-    MapSet.difference(all, remove) |> MapSet.to_list()
+  defp keys(:required) do
+    drop = [
+      :reading_at,
+      :description,
+      :last_cmd_at,
+      :last_seen_at,
+      :discovered_at
+    ]
+
+    keys_refine(:update, drop)
+  end
+
+  defp keys(:update) do
+    drop = [:id, :inserted_at, :updated_at]
+    keys_refine(:all, drop)
+  end
+
+  defp keys_refine(base_keys, drop) do
+    base = keys(base_keys) |> MapSet.new()
+    remove = MapSet.new(drop)
+    MapSet.difference(base, remove) |> MapSet.to_list()
   end
 end

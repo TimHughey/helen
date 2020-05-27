@@ -1,7 +1,7 @@
 defmodule MqttInboundMessageTest do
   @moduledoc false
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   import ExUnit.CaptureLog
 
   alias TimeSupport
@@ -36,7 +36,7 @@ defmodule MqttInboundMessageTest do
   end
 
   def freeram_ext_msg(n) do
-    %{direction: :in, payload: freeram_ext(n) |> Jason.encode!()}
+    %{payload: freeram_ext(n) |> Jason.encode!()}
     |> Mqtt.Inbound.process()
   end
 
@@ -60,7 +60,7 @@ defmodule MqttInboundMessageTest do
   end
 
   def rh_ext_msg(n \\ 0) do
-    %{direction: :in, payload: rh_ext(n) |> Jason.encode!()}
+    %{payload: rh_ext(n) |> Jason.encode!()}
     |> Mqtt.Inbound.process()
   end
 
@@ -77,7 +77,7 @@ defmodule MqttInboundMessageTest do
   end
 
   def simple_text_ext_msg(n \\ 0) do
-    %{direction: :in, payload: simple_text_ext(n) |> Jason.encode!()}
+    %{payload: simple_text_ext(n) |> Jason.encode!()}
     |> Mqtt.Inbound.process()
   end
 
@@ -96,7 +96,7 @@ defmodule MqttInboundMessageTest do
   end
 
   def switch_ext_msg(n \\ 0) do
-    %{direction: :in, payload: switch_ext(n, 8, false) |> Jason.encode!()}
+    %{payload: switch_ext(n, 8, false) |> Jason.encode!()}
     |> Mqtt.Inbound.process()
   end
 
@@ -116,7 +116,7 @@ defmodule MqttInboundMessageTest do
   end
 
   def temp_ext_msg(n \\ 0) do
-    %{direction: :in, payload: temp_ext(n) |> Jason.encode!()}
+    %{payload: temp_ext(n) |> Jason.encode!()}
     |> Mqtt.Inbound.process()
   end
 

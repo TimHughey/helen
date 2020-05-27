@@ -1,7 +1,7 @@
 defmodule PulseWidthTest do
   @moduledoc false
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   # import ExUnit.CaptureLog
 
@@ -75,7 +75,7 @@ defmodule PulseWidthTest do
     device = Keyword.get(opts, :device, device(pwm_id, pin_num))
 
     Map.merge(base_ext("pwm-remote", pwm_id), %{
-      async: false,
+      async: true,
       type: "pwm",
       duty: duty,
       duty_min: duty_min,

@@ -18,7 +18,6 @@ defmodule Mqtt.Supervisor do
 
     # List all child processes to be supervised
     children = [
-      {MessageSave, args},
       {Mqtt.Client, args},
       {Mqtt.Inbound, args}
     ]

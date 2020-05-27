@@ -65,8 +65,7 @@ defmodule Janitor do
 
         from(x in __MODULE__,
           where:
-            x.acked == false and x.orphan == false and x.inserted_at <= ^before,
-          preload: [:device]
+            x.acked == false and x.orphan == false and x.inserted_at <= ^before
         )
         |> Repo.all()
       end
@@ -100,8 +99,7 @@ defmodule Janitor do
         older = older_than(opts)
 
         from(x in __MODULE__,
-          where: x.inserted_at <= ^older,
-          preload: [:device]
+          where: x.inserted_at <= ^older
         )
         |> Repo.all()
       end

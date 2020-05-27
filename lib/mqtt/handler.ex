@@ -30,11 +30,12 @@ defmodule Mqtt.Handler do
   end
 
   def handle_message([_env, "r", src_host] = topic, payload, state) do
-    %{direction: :in, payload: payload, topic: topic, host: src_host}
-    |> MessageSave.save()
-    |> Mqtt.Inbound.process(runtime_metrics: state.runtime_metrics)
+    import TimeSupport, only: [utc_now: 0]
 
-    {:ok, track_topics(state, topic)}
+    %{payload: payload, topic: topic, host: src_host, msg_recv_dt: utc_now()}
+    |> Mqtt.Inbound.process()
+
+    {:ok, state}
   end
 
   def handle_message(
@@ -42,17 +43,10 @@ defmodule Mqtt.Handler do
         payload,
         state
       ) do
-    %{
-      direction: :in,
-      payload: payload,
-      topic: topic,
-      src_host: src_host,
-      device: device
-    }
-    |> MessageSave.save()
-    |> Mqtt.Inbound.process(runtime_metrics: state.runtime_metrics)
+    %{payload: payload, topic: topic, src_host: src_host, device: device}
+    |> Mqtt.Inbound.process()
 
-    {:ok, track_topics(state, topic)}
+    {:ok, state}
   end
 
   def handle_message(topic, payload, state) do
@@ -66,7 +60,7 @@ defmodule Mqtt.Handler do
     ]
     |> Logger.warn()
 
-    {:ok, track_topics(state, topic)}
+    {:ok, state}
   end
 
   def subscription(:up, topic_filter, state) do
@@ -97,13 +91,5 @@ defmodule Mqtt.Handler do
     # terminate-callback
     Logger.warn(["Tortoise terminate: ", inspect(reason)])
     :ok
-  end
-
-  defp track_topics(%{seen_topics: topics} = s, topic_list) do
-    topic = Enum.join(topic_list, "/")
-
-    topics = MapSet.put(topics, topic)
-
-    Map.put(s, :seen_topics, topics)
   end
 end

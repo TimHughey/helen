@@ -36,23 +36,6 @@ defmodule Mqtt.Client do
     GenServer.cast(__MODULE__, {:disconnected})
   end
 
-  #
-  # forward/2:
-  #   -publish a msg_map to the :feed in opts
-  #   -does NOT call MessageSave
-  #
-  def forward(%{payload: payload, direction: :in, opts: opts} = inflight)
-      when is_bitstring(payload) and is_list(opts) do
-    # Logger.info(["forward/1 ", inspect(inflight, pretty: true)])
-    GenServer.cast(__MODULE__, {:forward, inflight})
-    {:ok}
-  end
-
-  def forward(bad_args) do
-    Logger.warn(["forward/1 bad args: ", inspect(bad_args, pretty: true)])
-    {:bad_args, bad_args}
-  end
-
   def init(s) when is_map(s) do
     #
     ## HACK: clean up opts
@@ -117,9 +100,7 @@ defmodule Mqtt.Client do
     {feed, qos} = Keyword.get(opts, :feed, default_feed)
     pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
 
-    with {:ok, payload} <- Msgpax.pack(msg_map),
-         save_msg <- %{payload: payload, direction: :out},
-         %{payload: payload} <- MessageSave.save(save_msg) do
+    with {:ok, payload} <- Msgpax.pack(msg_map) do
       GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
     else
       e -> report_publish_error(e)
@@ -198,24 +179,6 @@ defmodule Mqtt.Client do
     Logger.warn(["mqtt endpoint disconnected"])
     s = Map.put(s, :connected, false)
     {:noreply, s}
-  end
-
-  def handle_cast(
-        {:forward, %{payload: payload, direction: direction, opts: opts}},
-        %{client_id: client_id} = s
-      ) do
-    forward_feed = get_in(opts, [:forward_opts, direction, :feed])
-
-    rc =
-      with {:ok, {feed, qos}} <- get_feed(forward_feed),
-           pub_opts <- [qos: qos] ++ Keyword.get(opts, :pub_opts, []) do
-        Tortoise.publish(client_id, feed, payload, pub_opts)
-      else
-        e ->
-          report_publish_error(e)
-      end
-
-    {:noreply, Map.put(s, :last_forward_rc, rc)}
   end
 
   def handle_cast(unhandled_msg, s) do
@@ -310,16 +273,6 @@ defmodule Mqtt.Client do
       " message ",
       inspect(message, pretty: true)
     ])
-  end
-
-  defp get_feed(feed_opt) do
-    case feed_opt do
-      {feed, qos} when is_binary(feed) and qos in 0..2 ->
-        {:ok, {feed, qos}}
-
-      feed ->
-        {:bad_feed, feed}
-    end
   end
 
   defp report_publish_error(e) do

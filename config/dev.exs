@@ -2,80 +2,72 @@
 # and its dependencies with the aid of the Mix.Config module.
 use Mix.Config
 
-config :logger,
-  # level: :debug
-  # level: :warn
-  level: :info
+config :helen,
+  feeds: [
+    prefix: "dev",
+    rpt: {"prod/r/#", 0}
+  ]
 
 config :helen,
   # overrides from config.exs
-  protocol_supervisors: [
-    {Fact.Supervisor, [log: [init: false]]}
-  ],
   worker_supervisors: [
     # DynamicSupervisors
     {Dutycycle.Supervisor, [start_workers: false]},
     {Thermostat.Supervisor, [start_workers: false]}
   ]
 
-#
-# NOTE: uncomment to enable saving/forwarding of messages sent and/or
-#       recv'd via MQTT
-#
-# import_config "modules/msg_save_enable.exs"
-# import_config "modules/msg_save_forward.exs"
+config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
+
+config :helen, Janitor,
+  log: [dryrun: false, init: false, init_args: false],
+  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
+
+config :helen, Mqtt.Client,
+  log_dropped_msg: true,
+  runtime_metrics: true,
+  tort_opts: [
+    client_id: "helen-dev",
+    user_name: "mqtt",
+    password: "mqtt",
+    server:
+      {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
+    keep_alive: 15
+  ],
+  timesync: [frequency: {:secs, 5}, loops: 5, forever: false, log: false]
+
+config :helen, Mqtt.Inbound,
+  log: [
+    engine_metrics: false
+  ],
+  periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
 config :helen, Fact.Influx,
-  database: "helen_dev",
-  host: "jophiel.wisslanding.com",
+  database: "helen_test",
+  host: "influx.test.wisslanding.com",
   auth: [method: :basic, username: "helen_test", password: "helen_test"],
   http_opts: [insecure: true],
-  pool: [max_overflow: 10, size: 5, timeout: 150_000, max_connections: 10],
+  pool: [max_overflow: 10, size: 10, timeout: 60_000, max_connections: 30],
   port: 8086,
   scheme: "http",
   writer: Instream.Writer.Line
 
-config :helen, Janitor.Supervisor, log: [init: true, init_args: false]
-
-config :helen, Janitor,
-  log: [init: true, init_args: true],
-  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
-
-config :helen, Mqtt.Client,
-  log_dropped_msgs: true,
-  tort_opts: [
-    client_id: "helen-#{Mix.env()}",
-    user_name: "mqtt",
-    password: "mqtt",
-    server:
-      {Tortoise.Transport.Tcp, host: "jophiel.wisslanding.com", port: 1883},
-    keep_alive: 15
-  ],
-  timesync: [frequency: {:mins, 1}, loops: 5, forever: true, log: false],
-  log: [init: false]
-
-config :helen, Mqtt.Inbound,
-  additional_message_flags: [
-    switch_redesign: true
-  ]
-
 config :helen, PulseWidthCmd,
   orphan: [
     at_startup: true,
-    sent_before: [seconds: 10],
+    sent_before: [seconds: 1],
     log: true
   ],
   purge: [
-    at_startup: true,
+    at_startup: false,
     interval: [minutes: 2],
     older_than: [days: 30],
-    log: false
+    log: true
   ]
 
 config :helen, Repo,
-  database: "helen_dev",
   username: "helen_dev",
   password: "helen_dev",
+  database: "helen_dev",
   port: 15432,
   hostname: "db.dev.wisslanding.com",
   pool_size: 10,
@@ -83,33 +75,39 @@ config :helen, Repo,
   adapter: Ecto.Adapters.Postgres
 
 config :helen, Switch.Command,
-  # NOTE:  older_than lists are passed to Timex to create a
-  #        shifted DateTime in UTC
+  log: [dryrun: false],
+  # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [
     at_startup: true,
-    sent_before: [seconds: 10],
+    sent_before: [seconds: 1],
     log: false
   ],
   purge: [
     at_startup: true,
-    interval: [minutes: 2],
-    older_than: [days: 30],
+    schedule: {:extended, "33 */3 * * *"},
+    older_than: [days: 1],
     log: true
   ]
 
 config :helen, Helen.Scheduler,
+  global: true,
+  run_strategy: Quantum.RunStrategy.Local,
+  timezone: "America/New_York",
   jobs: [
     # Every minute
     {:touch,
      [
-       schedule: {:cron, "* * * * *"},
+       schedule: {:extended, "* * * * *"},
        task: {Jobs, :touch_file, ["/tmp/helen-dev.touch"]},
        run_strategy: Quantum.RunStrategy.Local
-     ]},
-    {:purge_readings,
-     [
-       schedule: {:cron, "22,56 * * * *"},
-       task: {Jobs, :purge_readings, [[days: -30]]},
-       run_strategy: Quantum.RunStrategy.Local
      ]}
+
+    # EXAMPLES:
+    #
+    # Every 15 minutes
+    # {"*/15 * * * *",   fn -> System.cmd("rm", ["/tmp/tmp_"]) end},
+    # Runs on 18, 20, 22, 0, 2, 4, 6:
+    # {"0 18-6/2 * * *", fn -> :mnesia.backup('/var/backup/mnesia') end},
+    # Runs every midnight:
+    # {"@daily",         {Backup, :backup, []}}
   ]

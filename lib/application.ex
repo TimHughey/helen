@@ -29,6 +29,11 @@ defmodule Helen.Application do
     log &&
       Logger.info(["start() ", inspect(args, pretty: true)])
 
+    {cwd_rc, curr_dir} = File.cwd()
+
+    ["start directory: ", inspect(curr_dir, pretty: true)]
+    |> Logger.info()
+
     children =
       for i <- get_env(:helen, :sup_tree, []) do
         if is_tuple(i), do: i, else: get_env(:helen, i)

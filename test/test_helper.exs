@@ -3,7 +3,6 @@
 #
 [
   Thermostat,
-  MessageSave,
   Dutycycle,
   Switch.Alias,
   Switch.Device,

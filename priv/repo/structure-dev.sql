@@ -133,42 +133,6 @@ ALTER SEQUENCE public.dutycycle_state_id_seq OWNED BY public.dutycycle_state.id;
 
 
 --
--- Name: message; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.message (
-    id bigint NOT NULL,
-    direction character varying(15) NOT NULL,
-    src_host text DEFAULT ' '::text NOT NULL,
-    msgpack bytea DEFAULT '\x00'::bytea NOT NULL,
-    json text DEFAULT ' '::text NOT NULL,
-    dropped boolean DEFAULT false NOT NULL,
-    keep_for_testing boolean DEFAULT false NOT NULL,
-    inserted_at timestamp(0) without time zone NOT NULL,
-    updated_at timestamp(0) without time zone NOT NULL
-);
-
-
---
--- Name: message_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.message_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: message_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.message_id_seq OWNED BY public.message.id;
-
-
---
 -- Name: pwm; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -186,13 +150,10 @@ CREATE TABLE public.pwm (
     ttl_ms integer DEFAULT 60000,
     reading_at timestamp without time zone,
     last_seen_at timestamp without time zone,
-    metric_at timestamp without time zone,
-    metric_freq_secs integer DEFAULT 60,
     discovered_at timestamp without time zone,
     last_cmd_at timestamp without time zone,
     inserted_at timestamp(0) without time zone NOT NULL,
     updated_at timestamp(0) without time zone NOT NULL,
-    runtime_metrics jsonb DEFAULT '{"cmd_rt": true, "external_update": false}'::jsonb NOT NULL,
     sequence character varying(255) DEFAULT 'none'::character varying
 );
 
@@ -747,13 +708,6 @@ ALTER TABLE ONLY public.dutycycle_state ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
--- Name: message id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.message ALTER COLUMN id SET DEFAULT nextval('public.message_id_seq'::regclass);
-
-
---
 -- Name: pwm id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -866,14 +820,6 @@ ALTER TABLE ONLY public.dutycycle_profile
 
 ALTER TABLE ONLY public.dutycycle_state
     ADD CONSTRAINT dutycycle_state_pkey PRIMARY KEY (id);
-
-
---
--- Name: message message_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.message
-    ADD CONSTRAINT message_pkey PRIMARY KEY (id);
 
 
 --
@@ -1007,20 +953,6 @@ CREATE UNIQUE INDEX dutycycle_profile_name_dutycycle_id_index ON public.dutycycl
 --
 
 CREATE INDEX dutycycle_state_dutycycle_id_index ON public.dutycycle_state USING btree (dutycycle_id);
-
-
---
--- Name: message_inserted_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX message_inserted_at_index ON public.message USING btree (inserted_at);
-
-
---
--- Name: message_keep_for_testing_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX message_keep_for_testing_index ON public.message USING btree (keep_for_testing);
 
 
 --
@@ -1295,5 +1227,5 @@ ALTER TABLE ONLY public.thermostat_profile
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200522140515), (20200525210412);
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200522140515), (20200525210412), (20200526171324), (20200526172112);
 

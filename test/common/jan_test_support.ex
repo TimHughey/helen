@@ -303,9 +303,17 @@ defmodule HelenTest do
         {rc, res}
       end
 
-      def simulate_msg(msg) do
-        %{payload: msg, topic: "test/ruth/f/report", direction: :in}
-        |> Mqtt.Inbound.process(async: false)
+      def simulate_msg(%{host: host} = msg) when is_map(msg) do
+        %{
+          payload: Msgpax.pack!(msg),
+          topic: ["test/", host] |> IO.iodata_to_binary()
+        }
+        |> Mqtt.Inbound.process(async: true)
+      end
+
+      def simulate_msg(msg) when is_bitstring(msg) do
+        %{payload: msg, topic: "test/ruth.xxxxxxxxxx"}
+        |> Mqtt.Inbound.process(async: true)
       end
     end
   end
@@ -376,9 +384,18 @@ defmodule HelenTest do
 
   def relhum_name(n), do: name("relhum", n + 50)
 
-  defp send(msg) do
-    %{payload: msg, topic: "test/ruth/f/report", direction: :in}
-    |> Mqtt.Inbound.process(async: false)
+  defp send(msg, opts \\ [async: false])
+
+  defp send(%{host: host} = msg, opts) when is_map(msg) do
+    %{payload: Msgpax.pack!(msg), topic: ["test", "f", host]}
+    |> Mqtt.Inbound.process(opts)
+  end
+
+  defp send(msg, opts) when is_bitstring(msg) do
+    %{"host" => host} = Msgpax.unpack!(msg)
+
+    %{payload: msg, topic: ["test", "f", host]}
+    |> Mqtt.Inbound.process(opts)
   end
 
   def sen_dev(n), do: device("sensor", n)

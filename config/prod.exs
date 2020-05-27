@@ -13,13 +13,6 @@ config :helen,
     rpt: {"prod/r/#", 0}
   ]
 
-#
-# NOTE: uncomment to enable saving/forwarding of messages sent and/or
-#       recv'd via MQTT
-#
-# import_config "modules/msg_save_enable.exs"
-# import_config "modules/msg_save_forward.exs"
-
 config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
 
 config :helen, Janitor,

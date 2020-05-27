@@ -73,8 +73,8 @@ defmodule Switch.Command do
       r
     else
       # handle the exception case when the refid wasn't found
-      # NOTE:  this case should only occur when MQTT messages are forwarded
-      #        from another environment that is sending the actual commands
+      # NOTE:  this case should only occur when MQTT messages are
+      #        processed from another environment during dev / test
       {:cmd, nil} ->
         r
 

@@ -1,7 +1,7 @@
 defmodule DutycycleTest do
   @moduledoc false
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   use HelenTest
 
   # import ExUnit.CaptureLog

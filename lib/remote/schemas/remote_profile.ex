@@ -147,6 +147,14 @@ defmodule Remote.Profile.Schema do
 
   def find(bad_args), do: {:bad_args, bad_args}
 
+  def lookup_key(key) do
+    keys(:all)
+    |> Enum.filter(fn x ->
+      str = Atom.to_string(x)
+      String.contains?(str, key)
+    end)
+  end
+
   @doc """
     Reload a previously loaded Remote.Profile.Schema or get by id
 

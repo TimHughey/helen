@@ -13,4 +13,5 @@ defmodule Remote.Profile do
   defdelegate names, to: Schema
   defdelegate to_external_map(name), to: Schema
   defdelegate update(name_or_schema, opts), to: Schema
+  defdelegate lookup_key(key), to: Schema
 end

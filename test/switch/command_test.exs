@@ -2,7 +2,7 @@ defmodule SwitchCommandTest do
   @moduledoc false
 
   use Timex
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   use HelenTest
 

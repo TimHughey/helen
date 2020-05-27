@@ -3,27 +3,6 @@ defmodule Mqtt.Inbound do
 
   require Logger
   use GenServer
-  import Application, only: [get_env: 2]
-  import Process, only: [send_after: 3]
-  import TimeSupport, only: [ms: 1]
-
-  alias Fact.EngineMetric
-  alias Fact.FreeRamStat
-
-  # alias Fact.RunMetric
-
-  alias Mqtt.Reading
-
-  @additional_msg_flags_default [
-    log_invalid_readings: true,
-    log_roundtrip_times: true
-  ]
-
-  @periodic_log_default [
-    enable: true,
-    first: {:secs, 1},
-    repeat: {:mins, 15}
-  ]
 
   def start_link(s) do
     GenServer.start_link(Mqtt.Inbound, s, name: Mqtt.Inbound)
@@ -42,20 +21,28 @@ defmodule Mqtt.Inbound do
     s =
       Map.put_new(s, :log_reading, config(:log_reading, false))
       |> Map.put_new(:messages_dispatched, 0)
-      |> Map.put_new(:temperature_msgs, {Sensor, :external_update})
-      |> Map.put_new(:remote_msgs, {Remote, :external_update})
-      |> Map.put_new(:pwm_msgs, {PulseWidth, :external_update})
       |> Map.put_new(
         :periodic_log,
-        config(:periodic_log, @periodic_log_default)
+        config(
+          :periodic_log,
+          enable: true,
+          first: {:secs, 1},
+          repeat: {:mins, 15}
+        )
       )
       |> Map.put_new(
         :additional_message_flags,
-        config(:additional_message_flags, @additional_msg_flags_default)
+        config(:additional_message_flags,
+          log_invalid_readings: true,
+          log_roundtrip_times: true
+        )
         |> Enum.into(%{})
       )
 
     if Map.get(s, :autostart, false) do
+      import Process, only: [send_after: 3]
+      import TimeSupport, only: [ms: 1]
+
       first = s.periodic_log |> Keyword.get(:first)
       send_after(Mqtt.Inbound, {:periodic, :first}, ms(first))
     end
@@ -69,15 +56,29 @@ defmodule Mqtt.Inbound do
     MapSet.to_list(topics) |> Enum.sort()
   end
 
+  def supported_msg_types,
+    do: [
+      "boot",
+      "startup",
+      "temp",
+      "switch",
+      "relhum",
+      "soil",
+      "remote_runtime",
+      "stats",
+      "text",
+      "pwm"
+    ]
+
   # internal work functions
 
-  def process(%{direction: _, payload: payload}, opts \\ [])
+  def process(%{payload: payload, topic: _} = msg, opts \\ [])
       when is_bitstring(payload) and is_list(opts) do
     async = Keyword.get(opts, :async, true)
 
     if async,
-      do: GenServer.cast(Mqtt.Inbound, {:incoming_message, payload, opts}),
-      else: GenServer.call(Mqtt.Inbound, {:incoming_message, payload, opts})
+      do: GenServer.cast(Mqtt.Inbound, {:incoming_msg, msg, opts}),
+      else: GenServer.call(Mqtt.Inbound, {:incoming_msg, msg, opts})
   end
 
   # GenServer callbacks
@@ -105,7 +106,7 @@ defmodule Mqtt.Inbound do
     end
   end
 
-  def handle_call({:incoming_message, msg, opts}, _from, s) do
+  def handle_call({:incoming_msg, msg, opts}, _from, s) when is_map(msg) do
     {:reply, :ok, incoming_msg(msg, s, opts)}
   end
 
@@ -114,8 +115,7 @@ defmodule Mqtt.Inbound do
     {:reply, {:bad_msg}, s}
   end
 
-  def handle_cast({:incoming_message, msg, opts}, s)
-      when is_binary(msg) and is_map(s) do
+  def handle_cast({:incoming_msg, msg, opts}, s) when is_map(msg) do
     {:noreply, incoming_msg(msg, s, opts)}
   end
 
@@ -126,6 +126,9 @@ defmodule Mqtt.Inbound do
 
   def handle_info({:periodic, flag}, s)
       when is_map(s) do
+    import TimeSupport, only: [ms: 1]
+    import Process, only: [send_after: 3]
+
     log = Kernel.get_in(s, [:periodic_log, :enable])
     repeat = Kernel.get_in(s, [:periodic_log, :repeat])
 
@@ -153,128 +156,395 @@ defmodule Mqtt.Inbound do
   end
 
   defp config(key, default) when is_atom(key) do
+    import Application, only: [get_env: 2]
     get_env(:helen, Mqtt.Inbound) |> Keyword.get(key, default)
   end
 
-  defp incoming_msg(msg, s, opts) do
-    msg |> Reading.decode() |> msg_decode(s, opts)
+  @doc """
+  Process a raw JSON payload into a map
+  """
 
-    %{s | messages_dispatched: s.messages_dispatched + 1}
+  @doc since: "0.0.14"
+  def incoming_msg(
+        %{payload: <<123::utf8, _rest::binary>> = json} = msg,
+        s,
+        opts
+      ) do
+    #
+    # NOTE must return the state
+    #
+
+    with {:ok, r} <- Jason.decode(json, keys: :atoms),
+         # drop the payload from the msg since it has been decoded
+         # this allows the subsequent call to incoming_msg to match on
+         # the decoded / unpacked message
+         msg <- Map.drop(msg, [:payload]),
+         # merge the decoded message and the original message
+         msg <- Map.merge(msg, r) do
+      incoming_msg(msg, s, opts)
+    else
+      {:error, %Jason.DecodeError{data: data} = _e} ->
+        opts = [binaries: :as_strings, pretty: true, limit: :infinity]
+
+        err_msg =
+          ["parse failure:\n", inspect(data, opts)] |> IO.iodata_to_binary()
+
+        Logger.warn(err_msg)
+
+        Map.put(s, :parse_failure, err_msg)
+
+      anything ->
+        err_msg =
+          ["parse failure:\n", inspect(anything, pretty: true)]
+          |> IO.iodata_to_binary()
+
+        Logger.warn(err_msg)
+        Map.put(s, :parse_failure, err_msg)
+    end
   end
 
-  defp msg_ensure_flags(%{} = s, %{} = r, opts) when is_list(opts) do
-    # downstream modules and functions use flags (as part of the reading)
-    # for logging and to control if expensive runtime metrics are collected
-    Map.put_new(r, :log_reading, Map.get(r, :log, s.log_reading))
-    |> Map.put_new(
-      :runtime_metrics,
-      Keyword.get(opts, :runtime_metrics, false)
-    )
-    |> Map.merge(s.additional_message_flags)
+  @doc """
+  Process a raw MsgPack payload into a map
+  """
+
+  @doc since: "0.0.14"
+  def incoming_msg(%{payload: msgpack} = msg, %{} = s, opts)
+      when is_bitstring(msgpack) do
+    #
+    # NOTE must return the state
+    #
+
+    with {:ok, r} <- Msgpax.unpack(msgpack),
+         # drop the payload from the msg since it has been decoded
+         # this allows the subsequent call to incoming_msg to match on
+         # the decoded / unpacked message
+         msg <- Map.drop(msg, [:payload]),
+         # NOTE: Msgpax.unpack() returns maps with binaries as keys so let's
+         #       convert them to atoms
+         msg <- Map.merge(msg, atomize_keys(r)) do
+      incoming_msg(msg, s, opts)
+    else
+      anything ->
+        err_msg =
+          ["parse failure:\n", inspect(anything)] |> IO.iodata_to_binary()
+
+        Logger.warn(err_msg)
+
+        Map.put(s, :parse_failure, err_msg)
+    end
   end
 
-  defp msg_decode({:ok, %{data: :fail}}, _s, _opts), do: nil
+  # incoming_msg is invoked by the handle_* callbacks to:
+  #  a. unpack / decode the raw payload
+  #  b. validate the message format via Reading
+  #  c. populate the message with necessary flags for downstream processing
+  #
+  # if steps (a) and (b) are successful then the message is passed
+  # to msg_process
+  #
+  # this function returns the server state
+  def incoming_msg(%{topic: topic} = msg, s, opts) do
+    with %{metadata: :ok} = r <- metadata(msg),
+         # begin populating the message (aka Reading) with various
+         # flags
 
-  defp msg_decode({:ok, %{metadata: :failed}}, _s, _opts), do: nil
+         # log is a bool that directs downstream if logging
+         # should occur for this message.  the value from the
+         # message takes precedence.  if unspecifed then the
+         # config option from the state is used.
+         log_reading <- Map.get(r, :log, s.log_reading),
+         # runtime_metrics consists of various configuration
+         # items for downstream processing.  for consistency, if
+         # the incoming message does not contain this key look in opts
+         # passed to this function.  finally, if not in the opts default
+         # to false
+         runtime_metrics <- Keyword.get(opts, :runtime_metrics, false),
+         # the base of the extra msg (reading) flags are the additional
+         # message flags present in the state.  these flags are initially
+         # from the configuration (or defaults) however could have been
+         # changed at runtime.
 
-  defp msg_decode({:ok, %{metadata: :ok} = r}, s, opts) when is_list(opts) do
-    # NOTE: we invoke the module / functions defined in the config
-    #       to process incoming messages.  if the async opt is present we'll
-    #       also spin up a task to take advantage of parallel processing
+         # we also include log_reading and runtime_metrics
+         extra <-
+           Map.get(s, :additional_message_flags, %{})
+           |> Map.put(:log_reading, log_reading)
+           |> Map.put(:runtime_metrics, runtime_metrics),
+         # final step in populating the msg (reading) for processing is to
+         # merge in th extra flags
 
-    r = msg_ensure_flags(s, r, opts)
+         # NOTE
+         # the msg (reading) is merged INTO the extra opts to avoid
+         # overriding existing values
+         r <- Map.merge(extra, r),
+         # capture some MQTT metrics for operations
+         s <- track_topics(s, msg) |> track_messages_dispatched() do
+      # now hand off the message for processing
 
-    {mod, func} = msg_process_external(s, r)
+      # NOTE
+      # the new state is returned by msg_process
+      msg_process(s, r, opts)
+    else
+      # metadata failed checks
+      {:ok, %{metadata: :failed}} ->
+        ["metadata failed topic=\"", Enum.join(topic, "/"), "\""]
+        |> Logger.warn()
 
+        s
+
+      # MsgPax or Jason error
+      {:error, _error} ->
+        ["unpack/decode failed topic=\"", Enum.join(topic, "/"), "\""]
+        |> Logger.warn()
+
+        s
+
+      anything ->
+        ["incoming message error: \n", inspect(anything, pretty: true)]
+        |> Logger.info()
+
+        s
+    end
+  end
+
+  def incoming_msg(%{parse_failure: parse_err}, state, _opts) do
+    ["incoming msg parse err: ", inspect(parse_err, pretty: true)]
+    |> Logger.warn()
+
+    state
+  end
+
+  def incoming_msg(msg, state, _opts) do
+    ["incoming_msg unmatched:\n", inspect(msg, pretty: true)] |> Logger.info()
+
+    state
+  end
+
+  defp msg_process(%{} = state, %{type: type, topic: topic} = r, opts) do
+    # unless specified in opts, we process "heavy" messages async
+    # include async in the actual message (reading) for downstream
     async = Keyword.get(opts, :async, true)
+    r = Map.put(r, :async, async)
 
-    cond do
-      # HACK:
-      #   handle the paritial implmentation of pipeline handling of
-      #   messages.  as of 2010-03-25 only switch messages are processed
-      #   using the pipeline methodology
+    case type do
+      # NOTE
+      # msg_pipeline is a new approach for processing messages by
+      # sending the message to all modules that can handle incoming
+      # messages.
 
-      mod == :pipeline ->
-        if async,
-          do: Task.start(Switch.Device, :upsert, [r]),
-          else: Switch.Device.upsert(r)
+      # as of now, only the Switch module is capable of pipeline processing
+      type when type in ["switch"] ->
+        msg_pipeline(r)
 
-      # if msg_handler does not find a mod and function configured to
-      # process the msg then try to process it locally
+      type when type in ["pwm"] ->
+        msg_pwm(r)
 
-      is_nil(mod) or is_nil(func) ->
-        msg_process_locally(r)
-        nil
+      type when type in ["text"] ->
+        msg_remote_log(r)
 
-      :missing == mod ->
-        Logger.warn([
-          "missing configuration for reading type: ",
-          inspect(r.type, pretty: true)
-        ])
+      type when type in ["temp", "relhum", "soil"] ->
+        msg_sensor(r)
 
-      # reading needs to be processed, should we do it async?
-      async ->
-        Task.start(mod, func, [r])
+      type when type in ["boot", "startup", "remote_runtime"] ->
+        msg_remote(r)
 
-      # process msg inline
-      true ->
-        apply(mod, func, [r])
+      type when type in ["stats"] ->
+        import Fact.EngineMetric, only: [valid?: 1]
+
+        if valid?(r), do: msg_remote_stats(r)
+
+      type ->
+        [
+          "unknown message type=",
+          inspect(type, pretty: true),
+          " topic=",
+          Enum.join(topic, "/") |> inspect(pretty: true)
+        ]
+        |> Logger.warn()
     end
 
-    nil
+    # NOTE
+    #  must return the state
+    state
   end
 
-  defp msg_decode({:error, e}, _s, _opts),
-    do: Logger.warn(["msg_decode() error: ", inspect(e, pretty: true)])
-
-  defp msg_process_external(%{} = s, %{} = r) do
-    missing = {:missing, :missing}
-
-    cond do
-      Reading.boot?(r) ->
-        Map.get(s, :remote_msgs, missing)
-
-      Reading.startup?(r) ->
-        Map.get(s, :remote_msgs, missing)
-
-      Reading.remote_runtime?(r) ->
-        Map.get(s, :remote_msgs, missing)
-
-      Reading.relhum?(r) ->
-        Map.get(s, :temperature_msgs, missing)
-
-      Reading.temperature?(r) ->
-        Map.get(s, :temperature_msgs, missing)
-
-      Reading.pwm?(r) ->
-        Map.get(s, :pwm_msgs, missing)
-
-      Reading.switch?(r) ->
-        {:pipeline, nil}
-
-      true ->
-        {nil, nil}
-    end
+  defp msg_pipeline(%{async: async} = r) do
+    if async,
+      do: Task.start(Switch.Device, :upsert, [r]),
+      else: Switch.Device.upsert(r)
   end
 
-  defp msg_process_locally(%{processed: false} = r) do
-    cond do
-      Reading.free_ram_stat?(r) ->
+  defp msg_pwm(%{async: async} = r) do
+    if async,
+      do: Task.start(PulseWidth, :external_update, [r]),
+      else: PulseWidth.external_update(r)
+  end
+
+  defp msg_remote(%{async: async} = r) do
+    if async,
+      do: Task.start(Remote, :external_update, [r]),
+      else: Remote.external_update(r)
+  end
+
+  defp msg_remote_log(%{async: _async} = r) do
+    # simply get the remote log message and log it locally
+    name = Map.get(r, :name, "missing name")
+    text = Map.get(r, :text, "missing log text")
+    log = Map.get(r, :log, true)
+
+    if log, do: ["rlog ", inspect(name), " ", inspect(text)] |> Logger.info()
+
+    :ok
+  end
+
+  defp msg_remote_stats(%{type: type, topic: topic} = r) do
+    alias Fact.{FreeRamStat, EngineMetric}
+
+    case type do
+      type when type == "stats" ->
         Map.put_new(r, :record, r.runtime_metrics) |> FreeRamStat.record()
 
-      Reading.engine_metric?(r) ->
+      type when type == "remote_runtime" ->
         Map.put_new(r, :record, r.runtime_metrics) |> EngineMetric.record()
 
-      Reading.simple_text?(r) ->
-        log = Map.get(r, :log, true)
-        log && Logger.info([r.name, " ", r.text])
-
-      true ->
-        Logger.warn([r.name, " unhandled reading ", inspect(r, pretty: true)])
+      type ->
+        [
+          "unknown message stats type=",
+          inspect(type, pretty: true),
+          " topic=",
+          Enum.join(topic, "/") |> inspect(pretty: true)
+        ]
+        |> Logger.warn()
     end
-
-    nil
   end
 
-  defp msg_process_locally(%{processed: _}), do: nil
+  defp msg_sensor(%{async: async} = r) do
+    if async,
+      do: Task.start(Sensor, :external_update, [r]),
+      else: Sensor.external_update(r)
+  end
+
+  defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),
+    do: %{s | messages_dispatched: dispatched + 1}
+
+  defp track_topics(%{} = s, %{} = msg) do
+    topics = Map.get(s, :seen_topics, MapSet.new())
+    topic_list = Map.get(msg, :topic, ["not", "in", "msg"])
+
+    topics = MapSet.put(topics, Enum.join(topic_list, "/"))
+
+    Map.put(s, :seen_topics, topics)
+  end
+
+  #
+  # Message Decoding and Metadata Check
+  # def check_metadata(%{} = r), do: metadata(r)
+
+  @doc ~S"""
+  Parse a JSON
+  """
+
+  # @doc since: "0.0.14"
+  # def decode(<<123::utf8, _rest::binary>> = json) do
+  #   import Jason, only: [decode: 2]
+  #   import TimeSupport, only: [utc_now: 0]
+  #
+  #   case decode(json, keys: :atoms) do
+  #     {:ok, r} ->
+  #       r =
+  #         Map.put(r, :json, json)
+  #         |> Map.put(:msg_recv_dt, utc_now())
+  #         |> check_metadata()
+  #
+  #       {:ok, r}
+  #
+  #     {:error, %Jason.DecodeError{data: data} = _e} ->
+  #       opts = [binaries: :as_strings, pretty: true, limit: :infinity]
+  #       {:error, "inbound msg parse failed:\n#{inspect(data, opts)}"}
+  #   end
+  # end
+  #
+  # @doc ~S"""
+  # Parse a MsgPack
+  # """
+  #
+  # @doc since: "0.0.14"
+  # def decode(msg) do
+  #   import Msgpax, only: [unpack: 1]
+  #   import TimeSupport, only: [utc_now: 0]
+  #
+  #   case unpack(msg) do
+  #     {:ok, r} ->
+  #       # NOTE: Msgpax.unpack() returns maps with binaries as keys so let's
+  #       #       convert them to atoms
+  #
+  #       {:ok,
+  #        atomize_keys(r)
+  #        |> Map.merge(%{msgpack: msg, msg_recv_dt: utc_now()})
+  #        |> check_metadata()}
+  #
+  #     {:error, error} ->
+  #       {:error, error}
+  #   end
+  # end
+  #
+  # @doc ~S"""
+  # Does the message have the base metadata?
+  # """
+  #
+  @doc since: "0.0.14"
+  def metadata(
+        %{mtime: mtime, type: type, host: <<"ruth.", _rest::binary>>} = r
+      )
+      when is_integer(mtime) and
+             is_binary(type),
+      do: Map.merge(r, %{metadata: :ok, processed: false})
+
+  def metadata(%{mtime: mtime, type: type, host: <<"mcr.", _rest::binary>>} = r)
+      when is_integer(mtime) and
+             is_binary(type),
+      do: Map.merge(r, %{metadata: :ok, processed: false})
+
+  def metadata(bad) do
+    Logger.warn(["bad metadata ", inspect(bad, pretty: true)])
+    %{metadata: :failed}
+  end
+
+  def metadata?(%{metadata: :ok}), do: true
+  def metadata?(%{metadata: :failed}), do: false
+  def metadata?(%{} = r), do: metadata(r) |> metadata?()
+
+  @doc """
+  Is the message current?
+  """
+
+  @doc since: "0.0.14"
+  def mtime_good?(%{} = r) do
+    mtime = Map.get(r, :mtime, 0)
+
+    # if greater than epoch + 1 year then it's good
+    mtime > 365 * 24 * 60 * 60 - 1
+  end
+
+  #
+  # Misc Helpers
+  #
+
+  # don't attempt to atomize structs
+  def atomize_keys(%{} = x) when is_struct(x), do: x
+
+  def atomize_keys(%{} = map) do
+    map
+    |> Enum.map(fn {k, v} -> {String.to_atom(k), atomize_keys(v)} end)
+    |> Enum.into(%{})
+  end
+
+  # Walk the list and atomize the keys of
+  # of any map members
+  def atomize_keys([head | rest]) do
+    [atomize_keys(head) | atomize_keys(rest)]
+  end
+
+  def atomize_keys(not_a_map) do
+    not_a_map
+  end
 end
