@@ -26,13 +26,16 @@ defmodule Helen.Application do
       Keyword.get(mod_opts, :log, [])
       |> Keyword.get(:init, true)
 
+    {_cwd_rc, curr_dir} = File.cwd()
+
     log &&
-      Logger.info(["start() ", inspect(args, pretty: true)])
-
-    {cwd_rc, curr_dir} = File.cwd()
-
-    ["start directory: ", inspect(curr_dir, pretty: true)]
-    |> Logger.info()
+      [
+        "start() cwd=",
+        inspect(curr_dir, pretty: true),
+        " args=",
+        inspect(args, pretty: true)
+      ]
+      |> Logger.info()
 
     children =
       for i <- get_env(:helen, :sup_tree, []) do

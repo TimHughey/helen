@@ -62,7 +62,7 @@ if [[ ! $? ]]; then
   print "  >> ${tar_out}"
   print " "
   print "starting existing version of helen..."
-  $helen_bin/helen daemon
+  ./bin/helen daemon
   popd +q 2
   exit 1
 fi
@@ -72,14 +72,11 @@ print " done"
 print -n "correcting permissions... "
 chmod -R g+X . && print "done."
 
-# back to devel/helen
-popd -q
-
 print -n "starting latest release of helen..."
 
-$helen_bin/helen daemon
+./bin/helen daemon
 
 # back to where we started
-popd -q
+popd -q +2
 
 print " done."

@@ -356,6 +356,31 @@ defmodule PulseWidth do
     end
   end
 
+  @doc """
+  Generate an example Sequence payload using the first PulseWidth
+  known to the system (sorted in ascending order).
+
+  This function embeds documentation in the live system.
+
+    ### Examples
+    iex> PulseWidth.sequence_example(encode: true)
+    Minimized JSON encoded Elixir native representation
+
+    iex> PulseWidth.sequence_example(binary: true)
+    Minimized JSON encoded binary representation
+
+    iex> PulseWidth.sequence_example(bytes: true)
+    Byte count of minimized JSON
+
+    iex> PulseWidth.sequence_example(pack: true)
+    Byte count of MsgPack encoding
+
+    iex> PulseWidth.sequence_example(write: true)
+    Appends pretty version of JSON encoded Sequence to
+     ${HOME}/devel/helen/extra/json-snippets/sequence.json
+  """
+
+  @doc since: "0.0.14"
   def sequence_example(opts \\ []) do
     import Ecto.UUID, only: [generate: 0]
     import PulseWidth.Payload.Sequence, only: [create_cmd: 4]
@@ -387,7 +412,7 @@ defmodule PulseWidth do
     end
   end
 
-  def sequence_example_opts(%{seq: _seq} = seq, opts) do
+  defp sequence_example_opts(%{seq: _seq} = seq, opts) do
     import Jason, only: [encode!: 2, encode_to_iodata!: 2]
     import Msgpax, only: [pack!: 1]
 
