@@ -239,14 +239,14 @@ defmodule Switch.Device do
 
   def reload(nil), do: nil
 
-  # Readings from External Sources
+  # Messages from External Sources
 
-  # Processing of Readings from external sources is performed by
+  # Processing of messages from external sources is performed by
   # calling update/1 of interested modules.  When the :processed key is false
-  # the Reading hasn't been processed by another module.
+  # the message hasn't been processed by another module.
 
-  # If update/1 is called with processed: false and type: "switch" then attempt
-  # to process the Reading.  Switch.Device is not interested in Readings
+  # If upsert/1 is called with processed: false and type: "switch" then attempt
+  # to process the message.  Switch.Device is not interested in messages
   # other than those of type "switch"
   def upsert(
         %{
@@ -256,13 +256,13 @@ defmodule Switch.Device do
           host: _host,
           mtime: mtime,
           states: _states
-        } = r
+        } = msg
       ) do
     what_to_change = [:device, :host, :states, :dev_latency_us, :ttl_ms]
 
     changes =
       Map.merge(
-        Map.take(r, what_to_change),
+        Map.take(msg, what_to_change),
         # NOTE: the second map passed to Map.merge/2 replaces duplicate
         #       keys which is the intended behavior in this instance.
         %{
@@ -272,12 +272,12 @@ defmodule Switch.Device do
         }
       )
 
-    # return reading:
+    # return message:
     #   1. add the upsert results to the map (processed: {rc, res}) to signal
     #      other modules in the pipeline that the reading was processed
-    #   2. send the reading to Command.ack_if_needed/1 to handle tracking
+    #   2. send the message to Command.ack_if_needed/1 to handle tracking
     #      of the command
-    Map.put(r, :processed, upsert(%Device{}, changes))
+    Map.put(msg, :processed, upsert(%Device{}, changes))
     |> Command.ack_if_needed()
   end
 
@@ -290,7 +290,7 @@ defmodule Switch.Device do
   def upsert(%Device{} = x, params) when is_list(params),
     do: upsert(x, Enum.into(params, %{}))
 
-  # Device.update/2 will update a %Device{} using the map passed in
+  # Device.upsert/2 will insert or update a %Device{} using the map passed in
   def upsert(%Device{} = x, params) when is_map(params) do
     cs = changeset(x, Map.take(params, possible_changes()))
 

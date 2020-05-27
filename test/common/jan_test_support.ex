@@ -308,12 +308,12 @@ defmodule HelenTest do
           payload: Msgpax.pack!(msg),
           topic: ["test/", host] |> IO.iodata_to_binary()
         }
-        |> Mqtt.Inbound.process(async: true)
+        |> Mqtt.Inbound.process(async: false)
       end
 
       def simulate_msg(msg) when is_bitstring(msg) do
         %{payload: msg, topic: "test/ruth.xxxxxxxxxx"}
-        |> Mqtt.Inbound.process(async: true)
+        |> Mqtt.Inbound.process(async: false)
       end
     end
   end

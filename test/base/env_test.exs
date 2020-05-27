@@ -1,7 +1,7 @@
 defmodule EnvironmentTest do
   @moduledoc false
 
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   use HelenTest
 

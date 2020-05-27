@@ -1,7 +1,7 @@
 defmodule PulseWidthTest do
   @moduledoc false
 
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   # import ExUnit.CaptureLog
 

@@ -18,7 +18,7 @@ defmodule RemoteTest do
       host: host(num),
       type: "remote_runtime",
       mtime: TimeSupport.unix_now(:second),
-      async: true
+      async: false
     }
 
   def runtime(m) do
@@ -49,7 +49,7 @@ defmodule RemoteTest do
       mword: "0x123456",
       svsn: 813,
       reset_reason: "software reset",
-      async: true
+      async: false
     }
 
     Map.merge(m, boot_map)

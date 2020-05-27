@@ -1,7 +1,7 @@
 defmodule TimeSupportTest do
   @moduledoc false
 
-  # must be async: false because tests build on each other
+  # must be async: true because tests build on each other
   use ExUnit.Case, async: false
   import ExUnit.CaptureLog
 
