@@ -388,11 +388,29 @@ defmodule Mqtt.Inbound do
   defp msg_remote_log(%{async: _async} = r) do
     # simply get the remote log message and log it locally
     name = Map.get(r, :name, "missing name")
-    text = Map.get(r, :text, "missing log text")
+    text = Map.get(r, :text)
     log = Map.get(r, :log, true)
 
-    if log, do: ["rlog ", inspect(name), " ", inspect(text)] |> Logger.info()
+    with true <- log,
+         # if the text message is binary (which is should always be)
+         # don't inspect it to avoid escaping quotes
+         {:binary, true, text} <- {:binary, is_binary(text), text} do
+      ["rlog ", inspect(name), " ", text] |> Logger.info()
+    else
+      # if log is false, do nothing
+      false ->
+        :ok
 
+      # if the text isn't binary then inspect it (e.g. text is missing)
+      {:binary, false, text} ->
+        ["rlog ", inspect(name), " ", inspect(text, pretty: true)]
+        |> Logger.info()
+
+      _anything ->
+        :ok
+    end
+
+    # always return :ok
     :ok
   end
 
