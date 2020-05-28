@@ -368,10 +368,14 @@ defmodule PulseWidth do
   # then calls sequence with the pwm, map and opts
   def sequence(name, opts \\ []) when is_binary(name) and is_list(opts) do
     seq_map = Keyword.get(opts, :sequence, nil)
+    # remove the sequence opt, no need to pass it along now that we have
+    # the actual sequence map
+    opts = Keyword.drop(opts, [:sequence])
 
     with %PulseWidth{} = pwm <- find(name),
          {:seq_opt, true, pwm} <- {:seq_opt, is_map(seq_map), pwm} do
-      sequence(pwm, seq_map, List.drop(opts, :sequence))
+      # call sequence with the actual pwm, the sequence
+      sequence(pwm, seq_map, opts)
     else
       nil -> {:not_found, name}
       {:seq_opt, false, pwm} -> Map.get(pwm, :sequence)
