@@ -182,6 +182,47 @@ defmodule PulseWidth do
   end
 
   @doc """
+  Generate an example Sequence payload using the first PulseWidth
+  known to the system (sorted in ascending order).
+
+  This function embeds documentation in the live system.
+
+    ### Examples
+    iex> PulseWidth.duty_example(encode: true)
+    Minimized JSON encoded Elixir native representation
+
+    iex> PulseWidth.duty_example(binary: true)
+    Minimized JSON encoded binary representation
+
+    iex> PulseWidth.duty_example(bytes: true)
+    Byte count of minimized JSON
+
+    iex> PulseWidth.duty_example(pack: true)
+    Byte count of MsgPack encoding
+
+    iex> PulseWidth.duty_example(write: true)
+    Appends pretty version of JSON encoded Sequence to
+     ${HOME}/devel/helen/extra/json-snippets/duty.json
+  """
+
+  @doc since: "0.0.14"
+  def duty_example(opts \\ []) do
+    import Ecto.UUID, only: [generate: 0]
+    import PulseWidth.Payload.Duty, only: [create_cmd: 3]
+
+    name = names() |> hd()
+
+    with %PulseWidth{name: _, duty: duty} = pwm <- find(name),
+         refid <- generate(),
+         cmd_opts <- [duty: duty],
+         cmd <- create_cmd(pwm, refid, cmd_opts) do
+      cmd |> payload_example_opts(opts)
+    else
+      error -> {:error, error}
+    end
+  end
+
+  @doc """
     Execute duty for a list of PulseWidth names that begin with a pattern
 
     Simply pipelines names_begin_with/1 and duty/2
@@ -345,9 +386,9 @@ defmodule PulseWidth do
          # add the command
          {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
          # get the PulseWidthCmd inserted
-         {:cmd, %PulseWidthCmd{} = cmd} <- {:cmd, hd(pwm.cmds)},
+         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
          # send the command
-         pub_rc <- send_cmd(pwm, cmd, seq, opts) do
+         pub_rc <- send_cmd(pwm, refid, seq, opts) do
       # assemble return value
       [sequence_name: seq_name, pub_rc: pub_rc] ++ [opts]
     else
@@ -406,41 +447,9 @@ defmodule PulseWidth do
     with %PulseWidth{name: _} = pwm <- find(name),
          refid <- generate(),
          cmd <- create_cmd(pwm, refid, seq, []) do
-      cmd |> sequence_example_opts(opts)
+      cmd |> payload_example_opts(opts)
     else
       error -> {:error, error}
-    end
-  end
-
-  defp sequence_example_opts(%{seq: _seq} = seq, opts) do
-    import Jason, only: [encode!: 2, encode_to_iodata!: 2]
-    import Msgpax, only: [pack!: 1]
-
-    cond do
-      Keyword.has_key?(opts, :encode) ->
-        Jason.encode!(seq)
-
-      Keyword.has_key?(opts, :binary) ->
-        Jason.encode!(seq, []) |> IO.puts()
-
-      Keyword.has_key?(opts, :bytes) ->
-        encode!(seq, []) |> IO.puts() |> String.length()
-
-      Keyword.has_key?(opts, :pack) ->
-        [pack!(seq)] |> IO.iodata_length()
-
-      Keyword.has_key?(opts, :write) ->
-        out = ["\n", encode_to_iodata!(seq, pretty: true), "\n"]
-        home = System.get_env("HOME")
-
-        file =
-          [home, "devel", "helen", "extra", "json-snippets", "sequence.json"]
-          |> Path.join()
-
-        File.write(file, out, [:append])
-
-      true ->
-        seq
     end
   end
 
@@ -511,14 +520,63 @@ defmodule PulseWidth do
 
   defp last_seen_at(%PulseWidth{last_seen_at: x}), do: x
 
+  defp payload_example_opts(%{pwm_cmd: _payload} = payload, opts) do
+    import Jason, only: [encode!: 2, encode_to_iodata!: 2]
+    import Msgpax, only: [pack!: 1]
+
+    cond do
+      Keyword.has_key?(opts, :encode) ->
+        Jason.encode!(payload)
+
+      Keyword.has_key?(opts, :binary) ->
+        Jason.encode!(payload, []) |> IO.puts()
+
+      Keyword.has_key?(opts, :bytes) ->
+        encode!(payload, []) |> IO.puts() |> String.length()
+
+      Keyword.has_key?(opts, :pack) ->
+        [pack!(payload)] |> IO.iodata_length()
+
+      Keyword.has_key?(opts, :write) ->
+        out = ["\n", encode_to_iodata!(payload, pretty: true), "\n"]
+        home = System.get_env("HOME")
+
+        name = payload_example_file(payload)
+
+        file =
+          [
+            home,
+            "devel",
+            "helen",
+            "extra",
+            "json-snippets",
+            name
+          ]
+          |> Path.join()
+
+        File.write(file, out, [:append])
+
+      true ->
+        payload
+    end
+  end
+
+  defp payload_example_file(%{pwm_cmd: cmd}) do
+    cond do
+      cmd == 0x10 -> "duty.json"
+      cmd == 0x20 -> "sequence.json"
+      true -> "undefined.json"
+    end
+  end
+
   defp record_cmd(%PulseWidth{} = pwm, opts) when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]
     import PulseWidth.Payload.Duty, only: [send_cmd: 3]
 
     with {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
-         {:cmd, %PulseWidthCmd{} = cmd} <- {:cmd, hd(pwm.cmds)},
+         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
          cmd_opts <- Keyword.take(opts, [:duty, :ack]),
-         pub_rc <- send_cmd(pwm, cmd, cmd_opts) do
+         pub_rc <- send_cmd(pwm, refid, cmd_opts) do
       [pwm: pwm, pub_rc: pub_rc] ++ opts
     else
       error ->

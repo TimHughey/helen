@@ -5,12 +5,12 @@ defmodule PulseWidth.Payload.Duty do
 
   def create_cmd(
         %PulseWidth{device: device, host: host},
-        %PulseWidthCmd{refid: refid},
+        refid,
         opts
       )
-      when is_list(opts) do
+      when is_list(opts) and is_binary(refid) do
     %{
-      duty_cmd: true,
+      pwm_cmd: 0x10,
       host: host,
       device: device,
       refid: refid,
@@ -21,16 +21,17 @@ defmodule PulseWidth.Payload.Duty do
 
   def send_cmd(
         %PulseWidth{device: device} = pwm,
-        %PulseWidthCmd{} = cmd,
+        refid,
         opts \\ []
-      ) do
+      )
+      when is_binary(refid) do
     # remove the keys from opts that are consumed by create_cmd
     pub_opts = Keyword.drop(opts, [:ack, :duty])
 
     # extract the prefix of the device and use it as the subtopic
     subtopic = String.split(device, "/") |> hd()
 
-    create_cmd(pwm, cmd, opts)
+    create_cmd(pwm, refid, opts)
     |> Mqtt.Client.publish_to_host(subtopic, pub_opts)
   end
 end

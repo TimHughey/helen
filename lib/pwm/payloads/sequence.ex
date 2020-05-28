@@ -13,7 +13,7 @@ defmodule PulseWidth.Payload.Sequence do
     # def = %{name: "none", steps: [], run: false, repeat: false}
 
     %{
-      seq_cmd: true,
+      pwm_cmd: 0x20,
       device: device,
       refid: refid,
       host: host,
@@ -24,10 +24,11 @@ defmodule PulseWidth.Payload.Sequence do
 
   def send_cmd(
         %PulseWidth{device: device} = pwm,
-        %PulseWidthCmd{refid: refid},
+        refid,
         %{name: _seq_name} = seq,
         opts \\ []
-      ) do
+      )
+      when is_binary(refid) do
     import Mqtt.Client, only: [publish_to_host: 3]
     # remove the keys from opts that are consumed by create_cmd
     pub_opts = Keyword.drop(opts, [:ack])
