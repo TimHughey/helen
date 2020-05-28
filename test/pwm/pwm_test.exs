@@ -24,6 +24,42 @@ defmodule PulseWidthTest do
     :ok
   end
 
+  test "can create a PulseWidth duty command" do
+    alias PulseWidth.Payload.Duty
+
+    pwm = PulseWidth.names() |> hd() |> PulseWidth.find()
+
+    assert %PulseWidth{} = pwm
+
+    cmd = Duty.create_cmd(pwm, Ecto.UUID.generate(), duty: 1924)
+
+    assert is_map(cmd)
+
+    %{pwm_cmd: type, duty: duty, refid: refid} = cmd
+
+    assert type == 0x10
+    assert duty == 1924
+    assert is_binary(refid)
+  end
+
+  test "can create a PulseWidth sequence command" do
+    alias PulseWidth.Payload.Sequence
+
+    pwm = PulseWidth.names() |> hd() |> PulseWidth.find()
+
+    assert %PulseWidth{} = pwm
+
+    cmd = Sequence.create_cmd(pwm, Ecto.UUID.generate(), %{name: "test"}, [])
+
+    assert is_map(cmd)
+
+    %{pwm_cmd: type, refid: refid, seq: seq} = cmd
+
+    assert type == 0x20
+    assert is_map(seq)
+    assert is_binary(refid)
+  end
+
   test "can add a PulseWidthCmd to an existing PulseWidth" do
     pwm = PulseWidth.find_by_device(device(1, 1))
 
