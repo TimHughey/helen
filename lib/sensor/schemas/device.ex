@@ -1,6 +1,6 @@
 defmodule Sensor.Schemas.Device do
   @moduledoc """
-  Definition and database functions for Sensor.Scheme.Device
+  Definition and database functions for Sensor.Schemes.Device
   """
 
   require Logger
@@ -8,6 +8,7 @@ defmodule Sensor.Schemas.Device do
   use Ecto.Schema
 
   alias Sensor.Schemas.Device
+  alias Sensor.Schemas.DataPoint
 
   schema "sensor_device" do
     field(:device, :string)
@@ -15,6 +16,8 @@ defmodule Sensor.Schemas.Device do
     field(:dev_latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
     field(:discovered_at, :utc_datetime_usec)
+
+    has_many(:datapoints, DataPoint)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -53,11 +56,11 @@ defmodule Sensor.Schemas.Device do
     params = Map.merge(params_default, Map.take(msg, params))
 
     # assemble the return message with the results of upsert/2
-    Map.put(msg, :switch_device, upsert(%Device{}, params))
+    Map.put(msg, :sensor_device, upsert(%Device{}, params))
   end
 
   def upsert(msg) when is_map(msg),
-    do: Map.put(msg, :switch_device, {:error, :badmsg})
+    do: Map.put(msg, :sensor_device, {:error, :badmsg})
 
   def upsert(%Device{} = x, params) when is_map(params) or is_list(params) do
     # make certain the params are a map
@@ -109,7 +112,7 @@ defmodule Sensor.Schemas.Device do
     |> validate_format(:host, name_regex())
     |> validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
 
-    # |> unique_constraint(:device, name: :switch_device_unique_device_index)
+    # |> unique_constraint(:device, name: :sensor_device_unique_device_index)
   end
 
   defp keys(:all),
@@ -119,12 +122,19 @@ defmodule Sensor.Schemas.Device do
       |> Map.keys()
       |> List.flatten()
 
-  defp keys(:cast), do: keys_refine(:all, [:id])
+  defp keys(:cast), do: keys_refine(:all, [:id, :datapoints])
 
   # defp keys(:upsert), do: keys_refine(:all, [:id, :device])
 
   defp keys(:replace),
-    do: keys_refine(:all, [:id, :device, :discovered_at, :inserted_at])
+    do:
+      keys_refine(:all, [
+        :id,
+        :device,
+        :datapoints,
+        :discovered_at,
+        :inserted_at
+      ])
 
   defp keys(:required),
     do: keys_refine(:cast, [:updated_at, :inserted_at])

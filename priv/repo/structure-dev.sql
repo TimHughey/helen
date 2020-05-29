@@ -375,6 +375,75 @@ CREATE TABLE public.sensor (
 
 
 --
+-- Name: sensor_alias; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sensor_alias (
+    id bigint NOT NULL,
+    name character varying(255) NOT NULL,
+    device_id bigint,
+    description character varying(50) DEFAULT '<none>'::character varying,
+    type character varying(20) DEFAULT 'auto'::character varying NOT NULL,
+    ttl_ms integer DEFAULT 60000 NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: sensor_alias_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sensor_alias_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sensor_alias_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.sensor_alias_id_seq OWNED BY public.sensor_alias.id;
+
+
+--
+-- Name: sensor_datapoint; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sensor_datapoint (
+    id bigint NOT NULL,
+    temp_f real,
+    temp_c real,
+    relhum real,
+    moisture real,
+    device_id bigint,
+    reading_at timestamp without time zone
+);
+
+
+--
+-- Name: sensor_datapoint_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sensor_datapoint_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sensor_datapoint_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.sensor_datapoint_id_seq OWNED BY public.sensor_datapoint.id;
+
+
+--
 -- Name: sensor_device; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -777,6 +846,20 @@ ALTER TABLE ONLY public.sensor ALTER COLUMN id SET DEFAULT nextval('public.senso
 
 
 --
+-- Name: sensor_alias id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sensor_alias ALTER COLUMN id SET DEFAULT nextval('public.sensor_alias_id_seq'::regclass);
+
+
+--
+-- Name: sensor_datapoint id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sensor_datapoint ALTER COLUMN id SET DEFAULT nextval('public.sensor_datapoint_id_seq'::regclass);
+
+
+--
 -- Name: sensor_device id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -901,6 +984,22 @@ ALTER TABLE ONLY public.remote_profile
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: sensor_alias sensor_alias_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sensor_alias
+    ADD CONSTRAINT sensor_alias_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sensor_datapoint sensor_datapoint_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sensor_datapoint
+    ADD CONSTRAINT sensor_datapoint_pkey PRIMARY KEY (id);
 
 
 --
@@ -1075,6 +1174,27 @@ CREATE UNIQUE INDEX remote_profile_name_index ON public.remote_profile USING btr
 
 
 --
+-- Name: sensor_alias_name_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sensor_alias_name_index ON public.sensor_alias USING btree (name);
+
+
+--
+-- Name: sensor_datapoint_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sensor_datapoint_device_id_index ON public.sensor_datapoint USING btree (device_id);
+
+
+--
+-- Name: sensor_datapoint_reading_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sensor_datapoint_reading_at_index ON public.sensor_datapoint USING btree (reading_at);
+
+
+--
 -- Name: sensor_device_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1232,6 +1352,22 @@ ALTER TABLE ONLY public.pwm_cmd
 
 
 --
+-- Name: sensor_alias sensor_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sensor_alias
+    ADD CONSTRAINT sensor_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.sensor_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: sensor_datapoint sensor_datapoint_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sensor_datapoint
+    ADD CONSTRAINT sensor_datapoint_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.sensor_device(id);
+
+
+--
 -- Name: sensor_relhum sensor_relhum_sensor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1283,5 +1419,5 @@ ALTER TABLE ONLY public.thermostat_profile
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200522140515), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830);
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200522140515), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741);
 

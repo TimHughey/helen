@@ -38,8 +38,10 @@ config :helen, Mqtt.Client,
 config :helen, Mqtt.Inbound,
   log: [
     engine_metrics: false
-  ],
-  periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
+  ]
+
+# ],
+# periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
 config :helen, Fact.Influx,
   database: "helen_test",

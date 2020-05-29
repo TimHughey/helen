@@ -21,15 +21,15 @@ defmodule Mqtt.Inbound do
     s =
       Map.put_new(s, :log_reading, config(:log_reading, false))
       |> Map.put_new(:messages_dispatched, 0)
-      |> Map.put_new(
-        :periodic_log,
-        config(
-          :periodic_log,
-          enable: true,
-          first: {:secs, 1},
-          repeat: {:mins, 15}
-        )
-      )
+      # |> Map.put_new(
+      #   :periodic_log,
+      #   config(
+      #     :periodic_log,
+      #     enable: true,
+      #     first: {:secs, 1},
+      #     repeat: {:mins, 15}
+      #   )
+      # )
       |> Map.put_new(
         :additional_message_flags,
         config(:additional_message_flags,
@@ -39,13 +39,13 @@ defmodule Mqtt.Inbound do
         |> Enum.into(%{})
       )
 
-    if Map.get(s, :autostart, false) do
-      import Process, only: [send_after: 3]
-      import TimeSupport, only: [ms: 1]
-
-      first = s.periodic_log |> Keyword.get(:first)
-      send_after(Mqtt.Inbound, {:periodic, :first}, ms(first))
-    end
+    # if Map.get(s, :autostart, false) do
+    #   import Process, only: [send_after: 3]
+    #   import TimeSupport, only: [ms: 1]
+    #
+    #   first = s.periodic_log |> Keyword.get(:first)
+    #   send_after(Mqtt.Inbound, {:periodic, :first}, ms(first))
+    # end
 
     {:ok, s}
   end
@@ -124,31 +124,31 @@ defmodule Mqtt.Inbound do
     {:noreply, s}
   end
 
-  def handle_info({:periodic, flag}, s)
-      when is_map(s) do
-    import TimeSupport, only: [ms: 1]
-    import Process, only: [send_after: 3]
-
-    log = Kernel.get_in(s, [:periodic_log, :enable])
-    repeat = Kernel.get_in(s, [:periodic_log, :repeat])
-
-    msg_text = fn flag, x, repeat ->
-      a = if x == 0, do: ["no "], else: ["#{x} "]
-
-      b =
-        if flag == :first,
-          do: [" (future reports every ", "#{repeat})"],
-          else: []
-
-      [a, "messages dispatched", b]
-    end
-
-    log && Logger.info(msg_text.(flag, s.messages_dispatched, repeat))
-
-    send_after(self(), {:periodic, :none}, ms(repeat))
-
-    {:noreply, s}
-  end
+  # def handle_info({:periodic, flag}, s)
+  #     when is_map(s) do
+  #   import TimeSupport, only: [ms: 1]
+  #   import Process, only: [send_after: 3]
+  #
+  #   log = Kernel.get_in(s, [:periodic_log, :enable])
+  #   repeat = Kernel.get_in(s, [:periodic_log, :repeat])
+  #
+  #   msg_text = fn flag, x, repeat ->
+  #     a = if x == 0, do: ["no "], else: ["#{x} "]
+  #
+  #     b =
+  #       if flag == :first,
+  #         do: [" (future reports every ", "#{repeat})"],
+  #         else: []
+  #
+  #     [a, "messages dispatched", b]
+  #   end
+  #
+  #   log && Logger.info(msg_text.(flag, s.messages_dispatched, repeat))
+  #
+  #   send_after(self(), {:periodic, :none}, ms(repeat))
+  #
+  #   {:noreply, s}
+  # end
 
   def handle_info(catch_all, s) do
     Logger.warn(["unknown handle_info(", inspect(catch_all, pretty: true), ")"])
@@ -435,10 +435,25 @@ defmodule Mqtt.Inbound do
     end
   end
 
-  defp msg_sensor(%{async: async} = r) do
+  defp msg_sensor(%{async: async} = msg) do
+    alias Sensor.Schemas.DataPoint
+
+    if async do
+      Task.start(fn ->
+        with %{sensor_datapoint: datap} <- DataPoint.save(msg),
+             {:ok, %DataPoint{}} <- datap do
+          :ok
+        else
+          anything ->
+            ["sensor datapoint failed: ", inspect(anything, pretty: true)]
+            |> Logger.info()
+        end
+      end)
+    end
+
     if async,
-      do: Task.start(Sensor, :external_update, [r]),
-      else: Sensor.external_update(r)
+      do: Task.start(Sensor, :external_update, [msg]),
+      else: Sensor.external_update(msg)
   end
 
   defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),
