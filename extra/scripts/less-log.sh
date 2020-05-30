@@ -2,9 +2,7 @@
 
 pushd -q /usr/local/helen/tmp/log
 
-log_file="erlang.*(om[1])"
-
-less ${log_file}
+less erlang.*(om[1]) 
 
 popd -q
 
