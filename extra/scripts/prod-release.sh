@@ -6,8 +6,8 @@ if [[ $USER != 'helen' ]]; then
   exit $?
 fi
 
-pushd -q extra/scripts
+pushd -q ${HOME}/devel/helen/extra/scripts
 
 ./prod-build.sh && ./prod-install.sh
 
-popd -q +2
+popd -q 
