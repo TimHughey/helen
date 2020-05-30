@@ -20,9 +20,10 @@ print "done, pid=${helen_pid}"
 
 pushd -q /usr/local/helen/tmp/log
 
-print "tailing helen log file. (use CTRL+C to stop)"
+log_file="erlang.*(om[1])"
 
-tail --lines=40 --pid=${helen_pid} -f erlang.*(om[1])
+print "tailing ${log_file} log file. (use CTRL+C to stop)"
+tail --lines=40 --pid=${helen_pid} -f ${log_file}
 
 popd -q
 
