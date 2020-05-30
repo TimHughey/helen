@@ -1,6 +1,6 @@
 defmodule PulseWidth do
   @moduledoc """
-    The Sensor module provides the base of a sensor reading.
+    The PulseWidth module provides the base of a sensor reading.
   """
 
   require Logger
@@ -446,8 +446,8 @@ defmodule PulseWidth do
         %{duty: 1024, ms: 750},
         %{duty: 0, ms: 1500}
       ],
-      run: true,
-      repeat: true
+      repeat: false,
+      activate: true
     }
 
     with %PulseWidth{name: _} = pwm <- find(name),
