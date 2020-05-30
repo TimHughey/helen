@@ -139,13 +139,24 @@ defmodule Remote.Profile.Schema do
   """
 
   @doc since: "0.0.8"
-  def find(id) when is_integer(id),
-    do: Repo.get_by(__MODULE__, id: id)
+  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
+    check_args = fn
+      x when is_binary(x) -> [name: x]
+      x when is_integer(x) -> [id: x]
+      x -> {:bad_args, x}
+    end
 
-  def find(name) when is_binary(name),
-    do: Repo.get_by(__MODULE__, name: name)
+    import Repo, only: [get_by: 2, preload: 2]
 
-  def find(bad_args), do: {:bad_args, bad_args}
+    with opts when is_list(opts) <- check_args.(id_or_name),
+         %Schema{} = found <- get_by(Schema, opts) do
+      found
+    else
+      x when is_tuple(x) -> x
+      x when is_nil(x) -> nil
+      x -> {:error, x}
+    end
+  end
 
   def lookup_key(key) do
     keys(:all)
@@ -166,13 +177,22 @@ defmodule Remote.Profile.Schema do
   """
 
   @doc since: "0.0.8"
-  def reload({:ok, %Schema{id: id}}), do: reload(id)
+  def reload(opt) do
+    handle_args = fn
+      {:ok, %Schema{id: id}} -> id
+      %Schema{id: id} -> id
+      id when is_integer(id) -> id
+      x -> x
+    end
 
-  def reload(%Schema{id: id}), do: reload(id)
+    import Repo, only: [get!: 2]
 
-  def reload(id) when is_number(id), do: Repo.get!(__MODULE__, id)
-
-  def reload(catchall), do: {:error, catchall}
+    with id when is_integer(id) <- handle_args.(opt) do
+      get!(Schema, id)
+    else
+      x -> {:error, x}
+    end
+  end
 
   @doc """
     Retrieve Remote Profile Names
@@ -186,7 +206,7 @@ defmodule Remote.Profile.Schema do
   def names do
     import Ecto.Query, only: [from: 2]
 
-    from(x in Schema, select: x.name) |> Repo.all()
+    from(x in Schema, select: x.name, order_by: [:name]) |> Repo.all()
   end
 
   @doc """
@@ -345,7 +365,12 @@ defmodule Remote.Profile.Schema do
 
   def update(id_or_name, opts)
       when is_integer(id_or_name) or is_binary(id_or_name) do
-    find(id_or_name) |> update(opts)
+    with {:ok, %Schema{name: name} = p} <- find(id_or_name) |> update(opts),
+         res <- Map.take(p, opts) |> Enum.to_list() do
+      [name: name] ++ res
+    else
+      error -> error
+    end
   end
 
   def update(catchall) do
