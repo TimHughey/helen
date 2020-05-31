@@ -28,14 +28,10 @@ defmodule Helen.Application do
 
     {_cwd_rc, curr_dir} = File.cwd()
 
-    log &&
-      [
-        "start() cwd=",
-        inspect(curr_dir, pretty: true),
-        " args=",
-        inspect(args, pretty: true)
-      ]
-      |> Logger.info()
+    # make the hot module compile directory
+    _rc = [curr_dir, "hot-stage"] |> Path.join() |> File.mkdir()
+
+    # ["mkdir rc=\"", inspect(rc, pretty: true), "\""] |> Logger.info()
 
     children =
       for i <- get_env(:helen, :sup_tree, []) do
