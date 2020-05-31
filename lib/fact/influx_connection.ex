@@ -3,6 +3,18 @@ defmodule Fact.Influx do
 
   use Instream.Connection, otp_app: :helen
 
+  @doc """
+    Retrieves a map of all Influx Shards for the specified database
+
+      ### Examples
+      iex> Fact.Influx.shards("database")
+      %{columns: ["binary", "binary", ...],
+        name: "database name",
+        values: [<matches columns>]}
+
+
+  """
+  @doc since: "0.0.15"
   def shards(db) do
     Fact.Influx.execute("show shards")
     |> Map.get(:results)
