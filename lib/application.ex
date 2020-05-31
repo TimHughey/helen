@@ -8,9 +8,33 @@ defmodule Helen.Application do
   require Logger
 
   @doc """
+      Compile files located in hot-stage
+
+
+        ### Examples
+        iex> Helen.Application.hot_load()
+
+  """
+  @doc since: "0.0.15"
+  def hot_load do
+    import File, only: [cwd: 0, ls: 1, rm: 1]
+    import Path, only: [join: 1]
+
+    with {:ok, curr_dir} <- cwd(),
+         {:ok, files} <- [curr_dir, "hot-stage"] |> join() |> ls() do
+      for f <- files do
+        f_actual = [curr_dir, "hot-stage", f] |> join()
+        {mod, _bytecode} = Code.compile_file(f_actual) |> hd()
+        _rc = rm(f_actual)
+        mod
+      end
+    else
+      error -> error
+    end
+  end
+
+  @doc """
     Starts Helen Supervisor
-
-
   """
   @doc since: "0.0.3"
   @impl true

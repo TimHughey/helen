@@ -104,6 +104,8 @@ defmodule Helen.Mixfile do
       {:crontab, "~> 1.1"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:agnus, "~> 0.0.2"}
+      # {:vera, path: "../vera"}
+      # {:vera, git: "https://github.com/TimHughey/vera.git", tag: "0.0.3"}
       # {:phoenix, "~> 1.4.0"},
       # {:phoenix_pubsub, "~> 1.0"},
       # {:phoenix_ecto, "~> 4.0"},
@@ -245,7 +247,12 @@ defmodule Helen.Mixfile do
         applications: [runtime_tools: :permanent],
         cookie: "augury-kinship-swain-circus",
         strip_beams: false,
-        steps: [&sym_link_to_tar_rm/1, :assemble, :tar, &sym_link_to_tar/1]
+        steps: [
+          &sym_link_to_tar_rm/1,
+          :assemble,
+          :tar,
+          &sym_link_to_tar/1
+        ]
       ]
     ]
   end
@@ -290,10 +297,6 @@ defmodule Helen.Mixfile do
       {:misc_workers,
        [
          {Helen.Scheduler, []}
-       ]},
-      {:helen,
-       [
-         {Helen.Supervisor, []}
        ]}
     ]
   end
