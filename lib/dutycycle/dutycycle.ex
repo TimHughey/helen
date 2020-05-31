@@ -573,15 +573,14 @@ defmodule Dutycycle do
             " (should be equal)"
           ])
 
+      {:ttl_expired, device} ->
+        {:ttl_expired, device}
+
       {:not_found, _} ->
         log?(dc) && Logger.warn([control_device_log(dc), " does not exist"])
 
       anything ->
-        Logger.warn([
-          control_device_log(dc),
-          " unmatched result ",
-          inspect(anything, pretty: true)
-        ])
+        anything
     end
 
     {:control_device, sw_state, dc}
