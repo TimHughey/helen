@@ -270,8 +270,7 @@ defmodule Helen.Mixfile do
          :protocol_supervisors,
          :support_workers,
          :worker_supervisors,
-         :misc_workers,
-         :helen
+         :misc_workers
        ]},
       {:core_supervisors,
        [
