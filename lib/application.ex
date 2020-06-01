@@ -16,14 +16,14 @@ defmodule Helen.Application do
 
   """
   @doc since: "0.0.15"
-  def hot_load do
+  def hot_load(dir) do
     import File, only: [cwd: 0, ls: 1, rm: 1]
     import Path, only: [join: 1]
 
     with {:ok, curr_dir} <- cwd(),
-         {:ok, files} <- [curr_dir, "hot-stage"] |> join() |> ls() do
+         {:ok, files} <- [curr_dir, dir] |> join() |> ls() do
       for f <- files do
-        f_actual = [curr_dir, "hot-stage", f] |> join()
+        f_actual = [curr_dir, dir, f] |> join()
         {mod, _bytecode} = Code.compile_file(f_actual) |> hd()
         _rc = rm(f_actual)
         mod
@@ -50,12 +50,10 @@ defmodule Helen.Application do
       Keyword.get(mod_opts, :log, [])
       |> Keyword.get(:init, true)
 
-    {_cwd_rc, curr_dir} = File.cwd()
+    create_extra_module_dirs(["hot-stage", "extra-mods"])
 
-    # make the hot module compile directory
-    _rc = [curr_dir, "hot-stage"] |> Path.join() |> File.mkdir()
-
-    # ["mkdir rc=\"", inspect(rc, pretty: true), "\""] |> Logger.info()
+    # always load the modules in extra-mods before starting the children
+    hot_load("extra-mods")
 
     children =
       for i <- get_env(:helen, :sup_tree, []) do
@@ -93,4 +91,16 @@ defmodule Helen.Application do
 
   @type start_type :: :normal
   @type args :: term
+
+  ###
+  ### PRIVATE
+  ###
+
+  defp create_extra_module_dirs(dirs) do
+    {_cwd_rc, curr_dir} = File.cwd()
+
+    for d <- dirs do
+      _rc = [curr_dir, d] |> Path.join() |> File.mkdir()
+    end
+  end
 end
