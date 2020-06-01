@@ -35,10 +35,12 @@ defmodule RemoteProfileTest do
     assert %Schema{} = res1
     %Schema{version: vsn1} = res1
 
-    {rc2, res2} = Profile.update("test2", i2c_enable: false)
-    assert rc2 == :ok
-    assert %Schema{} = res2
-    %Schema{version: vsn2} = res2
+    res2 = Profile.update("test2", i2c_enable: false)
+    assert is_list(res2)
+    refute Keyword.get(res2, :i2c_enable)
+
+    res3 = Profile.find("test2")
+    assert %Schema{version: vsn2} = res3
 
     refute vsn1 == vsn2
 

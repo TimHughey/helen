@@ -12,7 +12,7 @@ defmodule SensorSoil do
   schema "sensor_soil" do
     field(:moisture, :integer)
     field(:ttl_ms, :integer)
-    belongs_to(:sensor, Sensor)
+    belongs_to(:sensor, SensorOld)
 
     timestamps(usec: true)
   end

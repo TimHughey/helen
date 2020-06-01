@@ -135,13 +135,13 @@ defmodule MqttInboundMessageTest do
     assert res === :ok
   end
 
-  test "inbound Sensor (temperature) message" do
+  test "inbound SensorOld (temperature) message" do
     res = temp_ext_msg(2)
 
     assert res === :ok
   end
 
-  test "inbound Sensor (relhum) message" do
+  test "inbound SensorOld (relhum) message" do
     res = rh_ext_msg(3)
 
     assert res === :ok

@@ -1,7 +1,6 @@
 defmodule Fact.Remote do
   @moduledoc false
 
-  require Logger
   use Timex
 
   #   %{

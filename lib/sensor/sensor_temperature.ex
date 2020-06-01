@@ -13,7 +13,7 @@ defmodule SensorTemperature do
     field(:tc, :float)
     field(:tf, :float)
     field(:ttl_ms, :integer)
-    belongs_to(:sensor, Sensor)
+    belongs_to(:sensor, SensorOld)
 
     timestamps(usec: true)
   end

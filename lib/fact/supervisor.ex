@@ -6,6 +6,7 @@ defmodule Fact.Supervisor do
 
   alias Fact.Influx
 
+  @impl true
   def init(args) do
     Logger.debug(["init() args: ", inspect(args, pretty: true)])
 

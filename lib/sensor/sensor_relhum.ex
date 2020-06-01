@@ -15,7 +15,7 @@ defmodule SensorRelHum do
   schema "sensor_relhum" do
     field(:rh, :float)
     field(:ttl_ms, :integer)
-    belongs_to(:sensor, Sensor)
+    belongs_to(:sensor, SensorOld)
 
     timestamps(usec: true)
   end

@@ -44,9 +44,9 @@ config :helen, Mqtt.Inbound,
 # periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
 config :helen, Fact.Influx,
-  database: "helen_test",
-  host: "influx.test.wisslanding.com",
-  auth: [method: :basic, username: "helen_test", password: "helen_test"],
+  database: "helen_dev",
+  host: "influx.dev.wisslanding.com",
+  auth: [method: :basic, username: "helen_dev", password: "helen_dev"],
   http_opts: [insecure: true],
   pool: [max_overflow: 10, size: 10, timeout: 60_000, max_connections: 30],
   port: 8086,

@@ -436,24 +436,23 @@ defmodule Mqtt.Inbound do
   end
 
   defp msg_sensor(%{async: async} = msg) do
-    alias Sensor.Schemas.DataPoint
-
     if async do
       Task.start(fn ->
-        with %{sensor_datapoint: datap} <- DataPoint.save(msg),
-             {:ok, %DataPoint{}} <- datap do
-          :ok
+        # the "happy path" of this with is to check for errors
+        with %{sensor_fault: error} = msg <- Sensor.handle_message(msg) do
+          ["sensor datapoint failed: ", inspect(error, pretty: true)]
+          |> Logger.error()
+
+          {:failed, msg}
         else
-          anything ->
-            ["sensor datapoint failed: ", inspect(anything, pretty: true)]
-            |> Logger.info()
+          _all_is_well -> :ok
         end
       end)
     end
 
     if async,
-      do: Task.start(Sensor, :external_update, [msg]),
-      else: Sensor.external_update(msg)
+      do: Task.start(SensorOld, :external_update, [msg]),
+      else: SensorOld.external_update(msg)
   end
 
   defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),

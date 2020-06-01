@@ -1,4 +1,4 @@
-defmodule SensorTest do
+defmodule SensorOld.Test do
   @moduledoc false
 
   use ExUnit.Case, async: false
@@ -36,7 +36,7 @@ defmodule SensorTest do
     if num = context[:num] do
       device = sen_dev(num)
 
-      sensor = Sensor.get_by(device: device)
+      sensor = SensorOld.get_by(device: device)
       [device: device, sensor: sensor]
     else
       :ok
@@ -57,21 +57,21 @@ defmodule SensorTest do
 
   @tag num: 11
   test "can get avg temperature (F)", context do
-    tf = Sensor.fahrenheit(device: context[:device])
+    tf = SensorOld.fahrenheit(device: context[:device])
 
     assert is_number(tf)
   end
 
   @tag num: 11
   test "can get avg temperature (C)", context do
-    tc = Sensor.celsius(device: context[:device])
+    tc = SensorOld.celsius(device: context[:device])
 
     assert is_number(tc)
   end
 
   @tag num: 11
   test "can get avg temperature map", context do
-    map = Sensor.temperature(device: context[:device])
+    map = SensorOld.temperature(device: context[:device])
 
     tf = Map.get(map, :tf)
     tc = Map.get(map, :tc)
@@ -83,7 +83,7 @@ defmodule SensorTest do
   @tag num: 9
   test "can deprecate a sensor", context do
     id = context[:sensor] |> Map.get(:id)
-    {rc, sensor} = Sensor.deprecate(id)
+    {rc, sensor} = SensorOld.deprecate(id)
 
     assert rc == :ok and String.contains?(sensor.name, "~")
   end
@@ -91,20 +91,20 @@ defmodule SensorTest do
   # sensor011 has temperatures of all the same value
   @tag num: 11
   test "average is calculated correctly", context do
-    tc = Sensor.celsius(device: context[:device], since_secs: 1)
+    tc = SensorOld.celsius(device: context[:device], since_secs: 1)
 
     assert tc === 50.0
   end
 
   @tag num: 20
   test "can get avg soil moisture", context do
-    moisture = Sensor.soil_moisture(device: context[:device])
+    moisture = SensorOld.soil_moisture(device: context[:device])
 
     assert is_number(moisture)
   end
 
   test "can handle unknown sensor" do
-    tc = Sensor.celsius(device: "bad_sensor", since_secs: 60)
+    tc = SensorOld.celsius(device: "bad_sensor", since_secs: 60)
 
     assert is_nil(tc)
   end
@@ -124,9 +124,9 @@ defmodule SensorTest do
   @tag num: 2
   test "can replace sensor", context do
     old = context[:sensor]
-    new = Sensor.get_by(device: sen_dev(context[:num]))
-    res = Sensor.replace(old.name, new.id)
+    new = SensorOld.get_by(device: sen_dev(context[:num]))
+    res = SensorOld.replace(old.name, new.id)
 
-    assert {:ok, {:ok, %Sensor{}}, {:ok, %Sensor{}}} = res
+    assert {:ok, {:ok, %SensorOld{}}, {:ok, %SensorOld{}}} = res
   end
 end

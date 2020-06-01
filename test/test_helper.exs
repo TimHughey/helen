@@ -7,7 +7,7 @@
   Switch.Alias,
   Switch.Device,
   PulseWidth,
-  Sensor,
+  SensorOld,
   Remote,
   Remote.Profile.Schema
 ]

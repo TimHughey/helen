@@ -20,7 +20,7 @@ defmodule HelenServerTest do
   test "helen server handles a quoted block" do
     block =
       quote do
-        Sensor.temperature(name: "unknown sensor", since_secs: 30)
+        SensorOld.temperature(name: "unknown sensor", since_secs: 30)
       end
 
     res = GenServer.call({:global, :helen_server}, block)
