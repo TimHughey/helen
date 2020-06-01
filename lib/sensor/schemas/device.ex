@@ -39,8 +39,6 @@ defmodule Sensor.Schemas.Device do
     |> validate_format(:device, name_regex())
     |> validate_format(:host, name_regex())
     |> validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
-
-    # |> unique_constraint(:device, name: :sensor_device_unique_device_index)
   end
 
   def keys(:all),

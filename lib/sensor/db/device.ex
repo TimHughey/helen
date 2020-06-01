@@ -43,22 +43,19 @@ defmodule Sensor.DB.Device do
   """
 
   @doc since: "0.0.16"
-  def reload(id) when is_integer(id) do
-    import Repo, only: [get!: 2, preload: 2]
-
-    get!(Schema, id) |> preload([:_alias_])
-  end
-
   # reload was passed something other than an id, let's figure out what
   # it was then call reload/1 with the id or return an error
   def reload(args) do
-    cond do
+    import Repo, only: [get!: 2, preload: 2]
+
+    case args do
       # results of a Repo function
-      {:ok, %Schema{id: id}} = args -> reload(id)
+      {:ok, %Schema{id: id}} -> get!(Schema, id) |> preload(:_alias_)
       # an existing struct
-      %Schema{id: id} = args -> reload(id)
+      %Schema{id: id} -> get!(Schema, id) |> preload(:_alias_)
       # something we can't handle
-      true -> {:error, args}
+      id when is_integer(id) -> get!(Schema, id) |> preload(:_alias_)
+      args -> {:error, args}
     end
   end
 

@@ -63,6 +63,8 @@ defmodule Sensor do
       # this isn't technically a failure however we do want to signal to
       # the caller something is amiss
       {msg, {:processed, :no_match} = write_rc} ->
+        ["no match: ", inspect(msg, pretty: true)] |> IO.puts()
+
         Map.merge(msg, %{
           processed: true,
           warning: :sensor_warning,
