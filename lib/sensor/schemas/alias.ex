@@ -45,16 +45,16 @@ defmodule Sensor.Schemas.Alias do
   def keys(:all),
     do:
       Map.from_struct(%Alias{})
-      |> Map.drop([:__meta__])
+      |> Map.drop([:__meta__, :id, :device])
       |> Map.keys()
       |> List.flatten()
 
-  def keys(:cast), do: keys_refine(:all, [:id, :devices])
+  def keys(:cast), do: keys(:all)
 
   # defp keys(:upsert), do: keys_refine(:all, [:id, :device])
 
   def keys(:replace),
-    do: keys_refine(:all, [:id, :name, :devices, :inserted_at])
+    do: keys_refine(:all, [:name, :inserted_at])
 
   def keys(:required),
     do:
