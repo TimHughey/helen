@@ -106,4 +106,26 @@ defmodule Sensor do
       create_alias(dev, name, Map.take(s, [:description, :ttl_ms]))
     end
   end
+
+  # def relhum(opts) when is_list(opts) do
+  #   since_secs = Keyword.get(opts, :since_secs, 30) * -1
+  #   sen = get_by(opts)
+  #
+  #   if is_nil(sen) do
+  #     nil
+  #   else
+  #     dt = TimeSupport.utc_now() |> Timex.shift(seconds: since_secs)
+  #
+  #     query =
+  #       from(
+  #         relhum in SensorRelHum,
+  #         join: s in assoc(relhum, :sensor),
+  #         where: s.id == ^sen.id,
+  #         where: relhum.inserted_at >= ^dt,
+  #         select: avg(relhum.rh)
+  #       )
+  #
+  #     if res = Repo.all(query), do: hd(res), else: nil
+  #   end
+  # end
 end

@@ -1,0 +1,1347 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": 24,
+  "links": [],
+  "panels": [
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Influx DB",
+      "decimals": 0,
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "height": "",
+      "hiddenSeries": false,
+      "id": 6,
+      "interval": ">5m",
+      "legend": {
+        "alignAsTable": true,
+        "avg": false,
+        "current": true,
+        "max": true,
+        "min": true,
+        "rightSide": true,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "paceLength": 10,
+      "percentage": false,
+      "pointradius": 1,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "Dryer Exhaust",
+          "color": "#BA43A9",
+          "fill": 0
+        },
+        {
+          "alias": "HVAC1 Liquid Line",
+          "color": "#BF1B00",
+          "fill": 0,
+          "linewidth": 2
+        },
+        {
+          "alias": "HVAC1 Suction Line",
+          "color": "#3F6833",
+          "fill": 0,
+          "linewidth": 2
+        },
+        {
+          "alias": "HVAC1 Supply",
+          "color": "#D683CE",
+          "fill": 0,
+          "linewidth": 3
+        },
+        {
+          "alias": "HVAC1 Return",
+          "fill": 0
+        },
+        {
+          "alias": "HVAC2 Return",
+          "fill": 0
+        },
+        {
+          "alias": "HVAC2 High Side",
+          "fill": 0
+        },
+        {
+          "alias": "HVAC2 Low Side",
+          "color": "#64B0C8",
+          "fill": 0
+        },
+        {
+          "alias": "HVAC2 Supply",
+          "fill": 0
+        },
+        {
+          "alias": "Washer Drain",
+          "color": "#B7DBAB",
+          "fill": 0
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "alias": "Dryer Exhaust",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "hide": false,
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_dryer_exhaust' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "dryer_exhaust"
+            }
+          ]
+        },
+        {
+          "alias": "Washer Drain",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_supply' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "J",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "washer_drain"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC1 Return",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_return' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "hvac1_return"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC1 Supply",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_supply' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "C",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "hvac1_supply"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC1 Liquid Line",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_supply' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "E",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "hvac1_liquid_line"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC1 Suction Line",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_supply' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "D",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "hvac1_suction_line"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC2 Return",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_return' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "G",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "hvac2_return"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC2 Supply",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_return' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "I",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "hvac2_supply"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC2 Suction Side",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_return' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "H",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "device",
+              "operator": "=",
+              "value": "ds/28ff5e18721603"
+            },
+            {
+              "condition": "OR",
+              "key": "name",
+              "operator": "=",
+              "value": "hvac2_low_side"
+            }
+          ]
+        },
+        {
+          "alias": "HVAC2 Liquid Side",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_hvac_supply' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "F",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "device",
+              "operator": "=",
+              "value": "ds/28ff43a3701604"
+            },
+            {
+              "condition": "OR",
+              "key": "name",
+              "operator": "=",
+              "value": "hvac2_high_side"
+            }
+          ]
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": "12h",
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "HVAC",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "transparent": true,
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "farenheit",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "Attic RH": "#70dbed",
+        "Attic Roof South": "semi-dark-red",
+        "Bistro RH": "#fce2de",
+        "Exterior NE": "#fce2de",
+        "ts_exterior.mean": "#BA43A9"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Influx DB",
+      "decimals": 0,
+      "editable": true,
+      "error": false,
+      "fill": 0,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "height": "300",
+      "hiddenSeries": false,
+      "id": 1,
+      "interval": "10m",
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "max": true,
+        "min": true,
+        "rightSide": true,
+        "show": true,
+        "sortDesc": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "paceLength": 10,
+      "percentage": false,
+      "pointradius": 1,
+      "points": true,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "Sump Ambient",
+          "color": "#629E51",
+          "fill": 0,
+          "points": false,
+          "yaxis": 1,
+          "zindex": -3
+        },
+        {
+          "alias": "Basement RH",
+          "color": "#CFFAFF",
+          "fill": 0,
+          "lines": false,
+          "linewidth": 2,
+          "yaxis": 2
+        },
+        {
+          "alias": "Exterior SE",
+          "fill": 0,
+          "linewidth": 2,
+          "points": false,
+          "zindex": -2
+        },
+        {
+          "alias": "Sump In",
+          "color": "#82B5D8",
+          "fill": 0,
+          "points": false
+        },
+        {
+          "alias": "Basement",
+          "color": "#9AC48A",
+          "fill": 0,
+          "linewidth": 2,
+          "points": false,
+          "zindex": 3
+        },
+        {
+          "alias": "Exterior NE",
+          "fill": 0,
+          "linewidth": 5,
+          "points": false,
+          "zindex": -2
+        },
+        {
+          "alias": "Attic",
+          "color": "#E5A8E2",
+          "fill": 0,
+          "linewidth": 2,
+          "points": false
+        },
+        {
+          "alias": "Laundry Room Ambient",
+          "fill": 0,
+          "linewidth": 5,
+          "points": false,
+          "zindex": -3
+        },
+        {
+          "alias": "Attic RH",
+          "fill": 0,
+          "lines": false,
+          "linewidth": 2,
+          "yaxis": 2
+        },
+        {
+          "alias": "Bistro",
+          "fill": 0,
+          "points": false
+        },
+        {
+          "alias": "Bistro RH",
+          "fill": 0,
+          "lines": false,
+          "yaxis": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "alias": "Attic",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "hide": false,
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_basement2' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "F",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "attic_equip_room"
+            }
+          ],
+          "target": ""
+        },
+        {
+          "alias": "Attic South Exterior Wall",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "K",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "attic_south_exterior"
+            }
+          ]
+        },
+        {
+          "alias": "Attic Roof South",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "L",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "attic_south_roof"
+            }
+          ]
+        },
+        {
+          "alias": "Basement",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "hide": false,
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_basement2' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "basement_equip_room"
+            },
+            {
+              "condition": "OR",
+              "key": "device",
+              "operator": "=",
+              "value": "i2c/lab-sensors.00.sht31"
+            }
+          ],
+          "target": ""
+        },
+        {
+          "alias": "Exterior NE",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT median(\"val\") FROM \"celsius\" WHERE (\"friendly_name\" = 'exterior_ne') AND $timeFilter GROUP BY time($__interval) fill(null)",
+          "rawQuery": false,
+          "refId": "E",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "exterior_ne"
+            }
+          ]
+        },
+        {
+          "alias": "Exterior SE",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_exterior' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval) fill(null)",
+          "refId": "C",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "exterior_se"
+            }
+          ],
+          "target": ""
+        },
+        {
+          "alias": "Laundry Room Ambient",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            }
+          ],
+          "hide": false,
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_basement2' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval)",
+          "refId": "G",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "laundry_room"
+            }
+          ],
+          "target": ""
+        },
+        {
+          "alias": "Sump Ambient",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "hide": false,
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"temperature\" WHERE \"sensor\" = 'ts_basement' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval) fill(null)",
+          "rawQuery": false,
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "sump_ambient"
+            },
+            {
+              "condition": "OR",
+              "key": "device",
+              "operator": "=",
+              "value": "ds/28fff20f721603"
+            }
+          ]
+        },
+        {
+          "alias": "Bistro",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "fahrenheit",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "I",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "bistro:onboard.hires"
+            }
+          ]
+        },
+        {
+          "alias": "Attic RH",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "interval": "30m",
+          "measurement": "relative_humidity",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"humidity\" WHERE \"sensor\" = 'hs_basement' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval) fill(null)",
+          "refId": "H",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "attic_equip_room"
+            }
+          ],
+          "target": ""
+        },
+        {
+          "alias": "Basement RH",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "interval": "30m",
+          "measurement": "relative_humidity",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"humidity\" WHERE \"sensor\" = 'hs_basement' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval) fill(null)",
+          "refId": "D",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "median"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "name",
+              "operator": "=",
+              "value": "basement_equip_room"
+            }
+          ],
+          "target": ""
+        },
+        {
+          "alias": "Bistro RH",
+          "dsType": "influxdb",
+          "groupBy": [
+            {
+              "params": [
+                "auto"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "interval": "30m",
+          "measurement": "relative_humidity",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT mean(\"value\") FROM \"humidity\" WHERE \"sensor\" = 'hs_basement' AND \"node\" = 'mcp' AND \"env\" = 'prod' AND $timeFilter GROUP BY time($interval) fill(null)",
+          "refId": "J",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "val"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "device",
+              "operator": "=",
+              "value": "i2c/bistro.02.sht31"
+            },
+            {
+              "condition": "OR",
+              "key": "name",
+              "operator": "=",
+              "value": "bistro"
+            }
+          ],
+          "target": ""
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": "2d",
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Wiss Landing Environmental",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "transparent": true,
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "farenheit",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "decimals": 0,
+          "format": "humidity",
+          "label": "",
+          "logBase": 1,
+          "max": null,
+          "min": "1",
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 21,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now/d",
+    "to": "now/d"
+  },
+  "timepicker": {
+    "collapse": false,
+    "enable": true,
+    "notice": false,
+    "now": true,
+    "nowDelay": "1m",
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "status": "Stable",
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "3h",
+      "8h",
+      "12h",
+      "1d",
+      "3d",
+      "7d",
+      "30d"
+    ],
+    "type": "timepicker"
+  },
+  "timezone": "browser",
+  "title": "HVAC",
+  "uid": "mYxMyYdZz",
+  "version": 2
+}

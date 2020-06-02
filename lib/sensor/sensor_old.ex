@@ -14,11 +14,6 @@ defmodule SensorOld do
   import Common.DB, only: [name_regex: 0]
   alias TimeSupport
 
-  # alias Fact.Celsius
-  alias Fact.Fahrenheit
-  alias Fact.RelativeHumidity
-  alias Fact.SoilMoisture
-
   schema "sensor" do
     field(:name, :string)
     field(:description, :string)
@@ -207,7 +202,7 @@ defmodule SensorOld do
 
     sensor = add(%SensorOld{device: device, type: type}, r)
 
-    {sensor, r} |> update_reading() |> record_metrics(:limit)
+    {sensor, r} |> update_reading()
   end
 
   def external_update(%{} = eu) do
@@ -409,137 +404,6 @@ defmodule SensorOld do
       has_tf -> Map.put_new(r, :tc, Float.round(r.tf - 32 * (5.0 / 9.0), 3))
       true -> r
     end
-  end
-
-  defp record_metrics(
-         {%SensorOld{metric_at: last_metric, metric_freq_secs: freq_secs} = s,
-          %{} = r},
-         :limit
-       ) do
-    new_reading_at = TimeSupport.from_unix(r.mtime)
-
-    if is_nil(last_metric) or
-         Timex.diff(new_reading_at, last_metric, :seconds) >= freq_secs do
-      {change(s, %{
-         metric_at: TimeSupport.from_unix(r.mtime)
-       })
-       |> update!(), r}
-      |> record_metrics()
-    else
-      {s, r}
-    end
-  end
-
-  defp record_metrics(
-         {%SensorOld{type: "temp", name: name} = s,
-          %{hostname: hostname, tc: tc} = r}
-       )
-       when tc > 80.0 do
-    log = Map.get(r, :log_invalid_readings, false)
-
-    log &&
-      Logger.warn([
-        inspect(name),
-        " dropping invalid temperature from ",
-        inspect(hostname)
-      ])
-
-    {s, r}
-  end
-
-  defp record_metrics(
-         {%SensorOld{type: "temp", device: device, name: name} = s,
-          %{hostname: hostname, mtime: mtime, tc: _tc, tf: tf} = r}
-       ) do
-    Fahrenheit.record(
-      remote_host: hostname,
-      device: device,
-      name: name,
-      mtime: mtime,
-      val: tf
-    )
-
-    # Celsius.record(
-    #   remote_host: hostname,
-    #   device: device,
-    #   name: name,
-    #   mtime: mtime,
-    #   val: tc
-    # )
-
-    {s, r}
-  end
-
-  defp record_metrics(
-         {%SensorOld{type: "relhum", device: device, name: name} = s,
-          %{hostname: hostname, mtime: mtime, rh: rh, tc: _tc, tf: tf} = r}
-       ) do
-    Fahrenheit.record(
-      remote_host: hostname,
-      device: device,
-      name: name,
-      mtime: mtime,
-      val: tf
-    )
-
-    # Celsius.record(
-    #   remote_host: hostname,
-    #   device: device,
-    #   name: name,
-    #   mtime: mtime,
-    #   val: tc
-    # )
-
-    RelativeHumidity.record(
-      remote_host: hostname,
-      device: device,
-      name: name,
-      mtime: mtime,
-      val: rh
-    )
-
-    {s, r}
-  end
-
-  defp record_metrics(
-         {%SensorOld{type: "soil", device: device, name: name} = s,
-          %{hostname: hostname, mtime: mtime, cap: cap, tc: _tc, tf: tf} = r}
-       ) do
-    Fahrenheit.record(
-      remote_host: hostname,
-      device: device,
-      name: name,
-      mtime: mtime,
-      val: tf
-    )
-
-    # Celsius.record(
-    #   remote_host: hostname,
-    #   device: device,
-    #   name: name,
-    #   mtime: mtime,
-    #   val: tc
-    # )
-
-    SoilMoisture.record(
-      remote_host: hostname,
-      device: device,
-      name: name,
-      mtime: mtime,
-      val: cap
-    )
-
-    {s, r}
-  end
-
-  defp record_metrics({%SensorOld{name: name} = s, %{} = r}) do
-    Logger.warn([
-      inspect(name),
-      " unable to record metrics: ",
-      inspect(r, pretty: true)
-    ])
-
-    {s, r}
   end
 
   defp update_reading({%SensorOld{type: "temp"} = s, r})

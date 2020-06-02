@@ -4,6 +4,7 @@ defmodule Sensor.DB.Device do
   """
 
   alias Sensor.Schemas.Device, as: Schema
+  alias Sensor.Schemas.DataPoint
 
   @doc """
     Get a sensor alias by id or name
@@ -36,6 +37,24 @@ defmodule Sensor.DB.Device do
       x when is_nil(x) -> nil
       x -> {:error, x}
     end
+  end
+
+  @doc """
+  Loads datapoints for a device
+  """
+  @doc since: "0.0.16"
+  def load_datapoints(%Schema{} = dev, opts \\ []) do
+    import Ecto.Query, only: [from: 2]
+    import Repo, only: [preload: 2]
+    import TimeSupport, only: [utc_now: 0]
+
+    since_secs = Keyword.get(opts, :since_secs, 30) * -1
+
+    dt = Timex.shift(utc_now(), seconds: since_secs)
+
+    q = from(dp in DataPoint, where: dp.reading_at >= ^dt)
+
+    dev |> preload(datapoints: q)
   end
 
   @doc """
