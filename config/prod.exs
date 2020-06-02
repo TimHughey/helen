@@ -108,12 +108,6 @@ config :helen, Helen.Scheduler,
        task: {Jobs, :touch_file, ["/tmp/helen-prod.touch"]},
        run_strategy: run_strategy
      ]},
-    {:purge_readings,
-     [
-       schedule: {:cron, "22,56 * * * *"},
-       task: {Jobs, :purge_readings, [[days: -30]]},
-       run_strategy: run_strategy
-     ]},
     {:seedlings_day,
      [
        schedule: {:cron, "* 06-20 * * *"},
