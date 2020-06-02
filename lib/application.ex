@@ -16,7 +16,7 @@ defmodule Helen.Application do
 
   """
   @doc since: "0.0.15"
-  def hot_load(dir) do
+  def hot_load(dir, delete \\ :rm) do
     import File, only: [cwd: 0, ls: 1, rm: 1]
     import Path, only: [join: 1]
 
@@ -25,7 +25,7 @@ defmodule Helen.Application do
       for f <- files do
         f_actual = [curr_dir, dir, f] |> join()
         {mod, _bytecode} = Code.compile_file(f_actual) |> hd()
-        _rc = rm(f_actual)
+        if delete == :rm, do: _rc = rm(f_actual)
         mod
       end
     else
@@ -53,7 +53,7 @@ defmodule Helen.Application do
     create_extra_module_dirs(["hot-stage", "extra-mods"])
 
     # always load the modules in extra-mods before starting the children
-    hot_load("extra-mods")
+    hot_load("extra-mods", :no_rm)
 
     children =
       for i <- get_env(:helen, :sup_tree, []) do

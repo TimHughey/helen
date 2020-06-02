@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.19",
+      version: "0.0.20",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -61,7 +61,8 @@ defmodule Helen.Mixfile do
         :runtime_tools,
         :parse_trans,
         :httpoison,
-        :agnus
+        :agnus,
+        :observer
       ],
       env: base_env()
     ]
