@@ -61,8 +61,7 @@ defmodule Helen.Mixfile do
         :runtime_tools,
         :parse_trans,
         :httpoison,
-        :agnus,
-        :observer
+        :agnus
       ],
       env: base_env()
     ]
