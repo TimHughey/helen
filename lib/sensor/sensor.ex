@@ -1,7 +1,7 @@
 defmodule Sensor do
   @moduledoc """
 
-  Publix API for Sensors
+  Public API for Sensors
     a. Devices
     b. Datapoints
     c. Aliases
@@ -14,7 +14,7 @@ defmodule Sensor do
     Public API for creating a Sensor Alias
   """
   @doc since: "0.0.16"
-  def create_alias(device_or_id, alias_name, opts \\ []) do
+  def alias_create(device_or_id, alias_name, opts \\ []) do
     alias Sensor.DB
     alias Sensor.Schemas.{Alias, Device}
 
@@ -27,6 +27,58 @@ defmodule Sensor do
       nil -> {:not_found, device_or_id}
       error -> error
     end
+  end
+
+  @doc """
+    Public API for retrieving a list of Sensor Alias names
+  """
+  @doc since: "0.0.19"
+  def alias_names do
+    Sensor.DB.Alias.names()
+  end
+
+  @doc """
+    Public API for retrieving Sensor Alias names that begin with a patteen
+  """
+  @doc since: "0.0.19"
+  def alias_names_begin_with(pattern) when is_binary(pattern) do
+    Sensor.DB.Alias.names_begin_with(pattern)
+  end
+
+  @doc """
+    Public API for renaming a Sensor Alias
+  """
+  @doc since: "0.0.19"
+  def alias_rename(name_or_id, new_name) do
+    alias Sensor.DB
+    alias Sensor.Schemas.Alias
+
+    # first, find the alias to update
+    with %Alias{name: name_before} = sa <- DB.Alias.find(name_or_id),
+         # update the Alias with the new name
+         {:ok, %Alias{name: name_after}} <-
+           DB.Alias.update(sa, %{name: new_name}, []) do
+      [renamed: [before: name_before, after: name_after]]
+    else
+      nil -> {:not_found, name_or_id}
+      error -> error
+    end
+  end
+
+  @doc """
+    Public API for retrieving a list of Sensor Device names
+  """
+  @doc since: "0.0.19"
+  def devices do
+    Sensor.DB.Device.devices()
+  end
+
+  @doc """
+    Public API for retrieving Sensor Device names that begin with a patteen
+  """
+  @doc since: "0.0.19"
+  def devices_begin_with(pattern) when is_binary(pattern) do
+    Sensor.DB.Device.devices_begin_with(pattern)
   end
 
   ##

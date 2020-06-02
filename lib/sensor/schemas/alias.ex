@@ -51,14 +51,17 @@ defmodule Sensor.Schemas.Alias do
 
   def keys(:cast), do: keys(:all)
 
-  # defp keys(:upsert), do: keys_refine(:all, [:id, :device])
+  # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
 
   def keys(:replace),
-    do: keys_refine(:all, [:name, :inserted_at])
+    do: keys_drop(:all, [:name, :inserted_at])
+
+  def keys(:update),
+    do: keys_drop(:all, [:inserted_at])
 
   def keys(:required),
     do:
-      keys_refine(:cast, [
+      keys_drop(:cast, [
         :description,
         :type,
         :ttl_ms,
@@ -66,7 +69,7 @@ defmodule Sensor.Schemas.Alias do
         :inserted_at
       ])
 
-  defp keys_refine(base_keys, drop),
+  defp keys_drop(base_keys, drop),
     do:
       MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
       |> MapSet.to_list()
