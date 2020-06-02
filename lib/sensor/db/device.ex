@@ -52,9 +52,13 @@ defmodule Sensor.DB.Device do
 
     dt = Timex.shift(utc_now(), seconds: since_secs)
 
-    q = from(dp in DataPoint, where: dp.reading_at >= ^dt)
+    q =
+      from(dp in DataPoint,
+        where: dp.reading_at >= ^dt,
+        order_by: [desc: dp.reading_at]
+      )
 
-    dev |> preload(datapoints: q)
+    dev |> preload(datapoints: q) |> preload(:_alias_)
   end
 
   @doc """

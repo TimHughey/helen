@@ -35,7 +35,7 @@ defmodule Thermostat.Control do
   end
 
   def current_val(%Thermostat{sensor: sensor}) do
-    SensorOld.fahrenheit(name: sensor, since_secs: 30)
+    Sensor.fahrenheit(sensor, since_secs: 30)
   end
 
   # handle the case when a thermostat is disabled

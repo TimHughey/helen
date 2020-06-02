@@ -22,6 +22,29 @@ defmodule Sensor.Schemas.DataPoint do
     # timestamps(type: :utc_datetime_usec)
   end
 
+  @doc """
+  Returns the average of a specific field (column) from a list of %DataPoints{}
+  """
+
+  @doc since: "0.9.19"
+  def avg_of(datapoints, column)
+      when is_list(datapoints) and
+             column in [:temp_f, :temp_c, :relhum, :moisture] do
+    vals =
+      Enum.into(datapoints, [], fn
+        %DataPoint{} = dp -> Map.get(dp, column)
+        _x -> nil
+      end)
+
+    with count when count > 0 <- Enum.count(vals),
+         true <- Enum.all?(vals, &is_number/1) do
+      Float.round(Enum.sum(vals) / count, 3)
+    else
+      _anything -> nil
+    end
+  end
+
+  @doc since: "0.0.16"
   def changeset(x, %{device: device} = p) when is_map(p) do
     import Ecto.Changeset,
       only: [
@@ -35,6 +58,7 @@ defmodule Sensor.Schemas.DataPoint do
     |> validate_required(keys(:required))
   end
 
+  @doc since: "0.0.16"
   def keys(:all),
     do:
       Map.from_struct(%DataPoint{})

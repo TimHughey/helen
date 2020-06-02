@@ -14,7 +14,7 @@ defmodule Sensor do
     Public API for creating a Sensor Alias
   """
   @doc since: "0.0.16"
-  def create_alias(device_or_id, alias_name, opts) do
+  def create_alias(device_or_id, alias_name, opts \\ []) do
     alias Sensor.DB
     alias Sensor.Schemas.{Alias, Device}
 
@@ -26,6 +26,46 @@ defmodule Sensor do
     else
       nil -> {:not_found, device_or_id}
       error -> error
+    end
+  end
+
+  ##
+  ## DataPoint Access
+  ##
+
+  @doc """
+  Returns the fahrenheit temperature for a Sensor by alias
+  """
+  @doc since: "0.0.19"
+  def fahrenheit(sensor_alias, opts \\ [])
+      when is_binary(sensor_alias) and is_list(opts) do
+    alias Sensor.Schemas.{Alias, DataPoint, Device}
+    alias Sensor.DB
+
+    with %Alias{device: dev} <- DB.Alias.find(sensor_alias),
+         %Device{datapoints: dp} <- DB.Device.load_datapoints(dev, opts),
+         val when is_number(val) <- DataPoint.avg_of(dp, :temp_f) do
+      val
+    else
+      _error -> nil
+    end
+  end
+
+  @doc """
+  Returns the relative humidity for a Sensor by alias
+  """
+  @doc since: "0.0.19"
+  def relhum(sensor_alias, opts \\ [])
+      when is_binary(sensor_alias) and is_list(opts) do
+    alias Sensor.Schemas.{Alias, DataPoint, Device}
+    alias Sensor.DB
+
+    with %Alias{device: dev} <- DB.Alias.find(sensor_alias),
+         %Device{datapoints: dp} <- DB.Device.load_datapoints(dev, opts),
+         val when is_number(val) <- DataPoint.avg_of(dp, :relhum) do
+      val
+    else
+      _error -> nil
     end
   end
 
@@ -84,48 +124,4 @@ defmodule Sensor do
   # since it wasn't for sensor and/or has already been processed in the
   # pipeline
   def handle_message(%{} = msg_in), do: msg_in
-
-  @doc """
-    Migrate to v0.0.17 database model
-
-    ### Example
-    iex> Sensor.migrate_to("0.0.17")
-  """
-  @doc since: "0.0.17"
-  def migrate_to("0.0.17") do
-    alias SensorOld, as: Old
-
-    # named? = fn
-    #   %Old{name: name, device: dev_name} -> name != dev_name
-    #   _x -> true
-    # end
-
-    old = Repo.all(SensorOld)
-
-    for s = %Old{name: name, device: dev} when name != dev <- old do
-      create_alias(dev, name, Map.take(s, [:description, :ttl_ms]))
-    end
-  end
-
-  # def relhum(opts) when is_list(opts) do
-  #   since_secs = Keyword.get(opts, :since_secs, 30) * -1
-  #   sen = get_by(opts)
-  #
-  #   if is_nil(sen) do
-  #     nil
-  #   else
-  #     dt = TimeSupport.utc_now() |> Timex.shift(seconds: since_secs)
-  #
-  #     query =
-  #       from(
-  #         relhum in SensorRelHum,
-  #         join: s in assoc(relhum, :sensor),
-  #         where: s.id == ^sen.id,
-  #         where: relhum.inserted_at >= ^dt,
-  #         select: avg(relhum.rh)
-  #       )
-  #
-  #     if res = Repo.all(query), do: hd(res), else: nil
-  #   end
-  # end
 end

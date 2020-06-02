@@ -347,11 +347,6 @@ defmodule Mqtt.Inbound do
       type when type in ["boot", "startup", "remote_runtime"] ->
         msg_remote(r)
 
-      type when type in ["stats"] ->
-        import Fact.EngineMetric, only: [valid?: 1]
-
-        if valid?(r), do: msg_remote_stats(r)
-
       type ->
         [
           "unknown message type=",
@@ -414,42 +409,24 @@ defmodule Mqtt.Inbound do
     :ok
   end
 
-  defp msg_remote_stats(%{type: type, topic: topic} = r) do
-    alias Fact.{FreeRamStat, EngineMetric}
-
-    case type do
-      type when type == "remote_runtime" ->
-        Map.put_new(r, :record, r.runtime_metrics) |> EngineMetric.record()
-
-      type ->
-        [
-          "unknown message stats type=",
-          inspect(type, pretty: true),
-          " topic=",
-          Enum.join(topic, "/") |> inspect(pretty: true)
-        ]
-        |> Logger.warn()
-    end
-  end
-
   defp msg_sensor(%{async: async} = msg) do
-    if async do
-      Task.start(fn ->
-        # the "happy path" of this with is to check for errors
-        with %{sensor_fault: error} = msg <- Sensor.handle_message(msg) do
-          ["sensor datapoint failed: ", inspect(error, pretty: true)]
-          |> Logger.error()
+    process = fn ->
+      # the "happy path" of this with is to check for errors
+      with %{sensor_fault: error} = msg <- Sensor.handle_message(msg) do
+        ["sensor datapoint failed: ", inspect(error, pretty: true)]
+        |> Logger.error()
 
-          {:failed, msg}
-        else
-          _all_is_well -> :ok
-        end
-      end)
+        {:failed, msg}
+      else
+        _all_is_well -> :ok
+      end
     end
 
-    if async,
-      do: Task.start(SensorOld, :external_update, [msg]),
-      else: SensorOld.external_update(msg)
+    if async do
+      Task.start(process)
+    else
+      process.()
+    end
   end
 
   defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),
