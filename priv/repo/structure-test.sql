@@ -355,26 +355,6 @@ CREATE TABLE public.schema_migrations (
 
 
 --
--- Name: sensor; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sensor (
-    id bigint NOT NULL,
-    name character varying(40) NOT NULL,
-    description text DEFAULT 'new sensor'::text,
-    device character varying(40) NOT NULL,
-    type character varying(10) DEFAULT 'undef'::character varying NOT NULL,
-    dev_latency_us bigint,
-    reading_at timestamp without time zone DEFAULT (timezone('utc'::text, now()) - '03:00:00'::interval),
-    last_seen_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    metric_freq_secs integer DEFAULT 60,
-    metric_at timestamp(0) without time zone DEFAULT NULL::timestamp without time zone
-);
-
-
---
 -- Name: sensor_alias; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -476,125 +456,6 @@ CREATE SEQUENCE public.sensor_device_id_seq
 --
 
 ALTER SEQUENCE public.sensor_device_id_seq OWNED BY public.sensor_device.id;
-
-
---
--- Name: sensor_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.sensor_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: sensor_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.sensor_id_seq OWNED BY public.sensor.id;
-
-
---
--- Name: sensor_relhum; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sensor_relhum (
-    id bigint NOT NULL,
-    sensor_id bigint,
-    rh double precision,
-    ttl_ms integer DEFAULT 10000 NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: sensor_relhum_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.sensor_relhum_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: sensor_relhum_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.sensor_relhum_id_seq OWNED BY public.sensor_relhum.id;
-
-
---
--- Name: sensor_soil; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sensor_soil (
-    id bigint NOT NULL,
-    sensor_id bigint,
-    moisture double precision,
-    ttl_ms integer DEFAULT 10000 NOT NULL,
-    inserted_at timestamp(0) without time zone NOT NULL,
-    updated_at timestamp(0) without time zone NOT NULL
-);
-
-
---
--- Name: sensor_soil_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.sensor_soil_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: sensor_soil_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.sensor_soil_id_seq OWNED BY public.sensor_soil.id;
-
-
---
--- Name: sensor_temperature; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sensor_temperature (
-    id bigint NOT NULL,
-    sensor_id bigint,
-    tc double precision,
-    tf double precision,
-    ttl_ms integer DEFAULT 10000 NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: sensor_temperature_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.sensor_temperature_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: sensor_temperature_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.sensor_temperature_id_seq OWNED BY public.sensor_temperature.id;
 
 
 --
@@ -839,13 +700,6 @@ ALTER TABLE ONLY public.remote_profile ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
--- Name: sensor id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor ALTER COLUMN id SET DEFAULT nextval('public.sensor_id_seq'::regclass);
-
-
---
 -- Name: sensor_alias id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -864,27 +718,6 @@ ALTER TABLE ONLY public.sensor_datapoint ALTER COLUMN id SET DEFAULT nextval('pu
 --
 
 ALTER TABLE ONLY public.sensor_device ALTER COLUMN id SET DEFAULT nextval('public.sensor_device_id_seq'::regclass);
-
-
---
--- Name: sensor_relhum id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_relhum ALTER COLUMN id SET DEFAULT nextval('public.sensor_relhum_id_seq'::regclass);
-
-
---
--- Name: sensor_soil id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_soil ALTER COLUMN id SET DEFAULT nextval('public.sensor_soil_id_seq'::regclass);
-
-
---
--- Name: sensor_temperature id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_temperature ALTER COLUMN id SET DEFAULT nextval('public.sensor_temperature_id_seq'::regclass);
 
 
 --
@@ -1008,38 +841,6 @@ ALTER TABLE ONLY public.sensor_datapoint
 
 ALTER TABLE ONLY public.sensor_device
     ADD CONSTRAINT sensor_device_pkey PRIMARY KEY (id);
-
-
---
--- Name: sensor sensor_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor
-    ADD CONSTRAINT sensor_pkey PRIMARY KEY (id);
-
-
---
--- Name: sensor_relhum sensor_relhum_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_relhum
-    ADD CONSTRAINT sensor_relhum_pkey PRIMARY KEY (id);
-
-
---
--- Name: sensor_soil sensor_soil_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_soil
-    ADD CONSTRAINT sensor_soil_pkey PRIMARY KEY (id);
-
-
---
--- Name: sensor_temperature sensor_temperature_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_temperature
-    ADD CONSTRAINT sensor_temperature_pkey PRIMARY KEY (id);
 
 
 --
@@ -1195,13 +996,6 @@ CREATE INDEX sensor_datapoint_reading_at_index ON public.sensor_datapoint USING 
 
 
 --
--- Name: sensor_device_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX sensor_device_index ON public.sensor USING btree (device);
-
-
---
 -- Name: sensor_device_last_seen_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1213,62 +1007,6 @@ CREATE INDEX sensor_device_last_seen_at_index ON public.sensor_device USING btre
 --
 
 CREATE UNIQUE INDEX sensor_device_unique_index ON public.sensor_device USING btree (device);
-
-
---
--- Name: sensor_last_seen_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_last_seen_at_index ON public.sensor USING btree (last_seen_at);
-
-
---
--- Name: sensor_name_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX sensor_name_index ON public.sensor USING btree (name);
-
-
---
--- Name: sensor_reading_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_reading_at_index ON public.sensor USING btree (reading_at);
-
-
---
--- Name: sensor_relhum_inserted_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_relhum_inserted_at_index ON public.sensor_relhum USING btree (inserted_at);
-
-
---
--- Name: sensor_relhum_sensor_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_relhum_sensor_id_index ON public.sensor_relhum USING btree (sensor_id);
-
-
---
--- Name: sensor_soil_sensor_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_soil_sensor_id_index ON public.sensor_soil USING btree (sensor_id);
-
-
---
--- Name: sensor_temperature_inserted_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_temperature_inserted_at_index ON public.sensor_temperature USING btree (inserted_at);
-
-
---
--- Name: sensor_temperature_sensor_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_temperature_sensor_id_index ON public.sensor_temperature USING btree (sensor_id);
 
 
 --
@@ -1375,30 +1113,6 @@ ALTER TABLE ONLY public.sensor_datapoint
 
 
 --
--- Name: sensor_relhum sensor_relhum_sensor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_relhum
-    ADD CONSTRAINT sensor_relhum_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensor(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: sensor_soil sensor_soil_sensor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_soil
-    ADD CONSTRAINT sensor_soil_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensor(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: sensor_temperature sensor_temperature_sensor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sensor_temperature
-    ADD CONSTRAINT sensor_temperature_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensor(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
 -- Name: switch_alias switch_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1426,5 +1140,5 @@ ALTER TABLE ONLY public.thermostat_profile
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652);
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652), (20200602194456);
 
