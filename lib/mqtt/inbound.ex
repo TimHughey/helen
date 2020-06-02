@@ -418,9 +418,6 @@ defmodule Mqtt.Inbound do
     alias Fact.{FreeRamStat, EngineMetric}
 
     case type do
-      type when type == "stats" ->
-        Map.put_new(r, :record, r.runtime_metrics) |> FreeRamStat.record()
-
       type when type == "remote_runtime" ->
         Map.put_new(r, :record, r.runtime_metrics) |> EngineMetric.record()
 
