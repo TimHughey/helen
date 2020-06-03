@@ -465,14 +465,16 @@ defmodule Remote do
     update_from_external(rem, eu)
   end
 
-  defp send_remote_profile([%Remote{} = rem], %{type: "remote_runtime"} = eu) do
+  defp send_remote_profile([%Remote{} = rem], %{type: "remote"} = eu) do
     # use the message mtime to update the last seen at time
     eu = Map.put_new(eu, :last_seen_at, TimeSupport.from_unix(eu.mtime))
     update_from_external(rem, eu)
   end
 
-  defp send_remote_profile(_anything, %{} = _eu),
-    do: {:error, "unknown message type"}
+  defp send_remote_profile(_anything, %{type: type} = _eu),
+    do:
+      {:error,
+       ["unknown message type=\"", inspect(type), "\""] |> IO.iodata_to_binary()}
 
   defp update_from_external(%Remote{} = rem, eu) do
     params = %{
