@@ -6,215 +6,20 @@ defmodule Remote do
 
   require Logger
   use Timex
-  use Ecto.Schema
 
-  import Ecto.Changeset
-  import Ecto.Query, only: [from: 2]
-  import Repo, only: [insert!: 1, one: 1, update: 1]
+  # alias Fact.RunMetric
+  alias Fact.Remote.Boot
 
-  alias Fact.RunMetric
-  alias Fact.StartupAnnouncement
+  alias Remote.Schemas.Remote, as: Schema
+  alias Remote.DB.Remote, as: DB
 
-  import Common.DB, only: [name_regex: 0]
   alias TimeSupport
 
-  schema "remote" do
-    field(:host, :string)
-    field(:name, :string)
-    field(:profile, :string, default: "default")
-    field(:hw, :string)
-    field(:firmware_vsn, :string)
-    field(:preferred_vsn, :string)
-    field(:project_name, :string)
-    field(:idf_vsn, :string)
-    field(:app_elf_sha256, :string)
-    field(:build_date, :string)
-    field(:build_time, :string)
-    field(:magic_word, :string)
-    field(:secure_vsn, :integer)
-    field(:last_start_at, :utc_datetime_usec)
-    field(:last_seen_at, :utc_datetime_usec)
-    field(:metric_at, :utc_datetime_usec, default: nil)
-    field(:metric_freq_secs, :integer, default: 60)
-    field(:batt_mv, :integer)
-    field(:reset_reason, :string)
-    field(:bssid, :string)
-    field(:ap_rssi, :integer)
-    field(:ap_pri_chan, :integer)
-    field(:ap_sec_chan, :integer)
-    field(:heap_free, :integer)
-    field(:heap_min, :integer)
-    field(:uptime_us, :integer)
-
-    field(:runtime_metrics, :map,
-      null: false,
-      default: %{external_update: false, cmd_rt: true}
-    )
-
-    timestamps(type: :utc_datetime_usec)
-  end
-
-  def add(%Remote{} = r), do: add([r])
-
-  def add(%{host: host, mtime: mtime} = r) do
-    [
-      %Remote{
-        host: host,
-        hw: Map.get(r, :hw, "unknown hw"),
-        name: Map.get(r, :name, host),
-        firmware_vsn: Map.get(r, :vsn, "not available"),
-        project_name: Map.get(r, :proj, "not available"),
-        idf_vsn: Map.get(r, :idf, "not available"),
-        app_elf_sha256: Map.get(r, :sha, "not available"),
-        build_date: Map.get(r, :bdate, "not available"),
-        build_time: Map.get(r, :btime, "not available"),
-        magic_word: Map.get(r, :mword, "0x000000"),
-        secure_vsn: Map.get(r, :svsn, 0),
-        last_seen_at: TimeSupport.from_unix(mtime),
-        last_start_at: TimeSupport.from_unix(mtime)
-      }
-    ]
-    |> add()
-  end
-
-  def add(list) when is_list(list) do
-    for %Remote{} = r <- list do
-      case find_by_host(r.host) do
-        nil ->
-          insert!(r)
-
-        found ->
-          found
-      end
-    end
-  end
-
-  def add(_no_match) do
-    {:failed, :not_remote}
-  end
-
-  def all do
-    from(
-      rem in Remote,
-      select: rem
-    )
-    |> Repo.all()
-  end
-
   def browse do
+    import Remote.DB.Remote, only: [all: 0]
+
     sorted = all() |> Enum.sort(fn a, b -> a.name <= b.name end)
     Scribe.console(sorted, data: [:id, :name, :host, :hw, :inserted_at])
-  end
-
-  def changeset(rem, params \\ %{})
-
-  def changeset(%Remote{} = rem, params) do
-    rem
-    |> cast(params, [
-      :name,
-      :profile,
-      :hw,
-      :firmware_vsn,
-      :project_name,
-      :idf_vsn,
-      :app_elf_sha256,
-      :build_date,
-      :build_time,
-      :magic_word,
-      :secure_vsn,
-      :batt_mv,
-      :reset_reason,
-      :last_start_at,
-      :last_seen_at,
-      :bssid,
-      :ap_rssi,
-      :ap_pri_chan,
-      :heap_free,
-      :heap_min,
-      :uptime_us
-    ])
-    |> validate_required([:name, :profile])
-    |> validate_format(:name, name_regex())
-    |> unique_constraint(:name)
-  end
-
-  def changeset(nil, _params), do: %Ecto.Changeset{}
-
-  def change_name(id, new_name) when is_integer(id) and is_binary(new_name) do
-    remote = Repo.get(Remote, id)
-
-    if remote do
-      case change_name(remote.host, new_name) do
-        :ok -> new_name
-        failed -> failed
-      end
-    else
-      :not_found
-    end
-  end
-
-  def change_name(host, new_name)
-      when is_binary(host) and is_binary(new_name) do
-    remote = find_by_host(host)
-    check = find(new_name)
-
-    if is_nil(check) do
-      case remote do
-        %Remote{} ->
-          {res, rem} = changeset(remote, %{name: new_name}) |> update()
-
-          # Remote names are set upon receipt of their Profile
-          # so, if the %Remote{} update succeeded we need to send a restart
-          # command
-          if res == :ok, do: restart(rem.name)
-
-          res
-
-        _nomatch ->
-          :not_found
-      end
-    else
-      :name_in_use
-    end
-  end
-
-  def change_name(_, _), do: {:error, :bad_args}
-
-  def delete(id) when is_integer(id) do
-    with %Remote{} = x <- find(id) do
-      Repo.delete(x)
-    else
-      _catchall -> {:not_found, id}
-    end
-  end
-
-  def delete_all(:dangerous) do
-    import Ecto.Query, only: [from: 2]
-
-    for x <- from(x in Remote, select: [:id]) |> Repo.all() do
-      Repo.delete(x)
-    end
-  end
-
-  def deprecate(:help), do: deprecate()
-
-  def deprecate(what) do
-    r = find(what)
-
-    if is_nil(r) do
-      {:error, :not_found}
-    else
-      tobe = "~ #{r.name}-#{Timex.now() |> Timex.format!("{ASN1:UTCtime}")}"
-
-      r
-      |> changeset(%{name: tobe})
-      |> update()
-    end
-  end
-
-  def deprecate do
-    IO.puts("Usage:")
-    IO.puts("\tRemote.deprecate(name|id)")
   end
 
   def external_update(%{host: host, mtime: _mtime} = eu) do
@@ -222,20 +27,20 @@ defmodule Remote do
 
     result =
       :timer.tc(fn ->
-        eu |> add() |> send_remote_profile(eu)
+        eu |> DB.add() |> send_remote_profile(eu)
       end)
 
     case result do
-      {t, {:ok, rem}} ->
-        RunMetric.record(
-          module: "#{__MODULE__}",
-          metric: "external_update",
-          # use the local name
-          device: rem.name,
-          val: t,
-          record: false
-          # record: Map.get(eu, :runtime_metrics, false)
-        )
+      {_t, {:ok, _rem}} ->
+        # RunMetric.record(
+        #   module: "#{__MODULE__}",
+        #   metric: "external_update",
+        #   # use the local name
+        #   device: rem.name,
+        #   val: t,
+        #   record: false
+        #   # record: Map.get(eu, :runtime_metrics, false)
+        # )
 
         Fact.Remote.record(eu)
 
@@ -271,73 +76,18 @@ defmodule Remote do
     :error
   end
 
-  def find(id) when is_integer(id),
-    do: Repo.get_by(__MODULE__, id: id)
-
-  def find(name) when is_binary(name),
-    do: Repo.get_by(__MODULE__, name: name)
-
-  def find(_not_id_or_name), do: nil
-
-  def find_by_host(host) when is_binary(host),
-    do: Repo.get_by(__MODULE__, host: host)
-
-  # header to define default parameter for multiple functions
-  def mark_as_seen(host, time, threshold_secs \\ 3)
-
-  def mark_as_seen(host, mtime, threshold_secs)
-      when is_binary(host) and is_integer(mtime) do
-    case find_by_host(host) do
-      nil ->
-        host
-
-      rem ->
-        mark_as_seen(rem, TimeSupport.from_unix(mtime), threshold_secs)
-    end
-  end
-
-  def mark_as_seen(%Remote{} = rem, %DateTime{} = dt, threshold_secs) do
-    # only update last seen if more than threshold_secs different
-    # this is to avoid high rates of updates when a device hosts many sensors
-    if Timex.diff(dt, rem.last_seen_at, :seconds) >= threshold_secs do
-      opts = [last_seen_at: dt]
-      {res, updated} = change(rem, opts) |> update()
-      if res == :ok, do: updated.name, else: rem.name
-    else
-      rem.name
-    end
-  end
-
-  def mark_as_seen(nil, _, _), do: nil
-
-  @doc """
-    Retrieve a list of Remote names that begin with a pattern
-  """
-
-  @doc since: "0.0.9"
-  def names_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
-
-    from(r in Remote,
-      where: like(r.name, ^like_string),
-      order_by: r.name,
-      select: r.name
-    )
-    |> Repo.all()
-  end
-
   @doc """
     Request OTA updates based on a prefix pattern
 
     Simply pipelines names_begin_with/1 and ota_update/2
 
       ## Examples
-        iex> Remote.ota_names_begin_with("lab-", [])
+        iex> Schema.ota_names_begin_with("lab-", [])
   """
   @doc since: "0.0.11"
   def ota(pattern, opts \\ []) when is_binary(pattern) do
+    import Remote.DB.Remote, only: [names_begin_with: 1]
+
     names_begin_with(pattern) |> ota_update(opts)
   end
 
@@ -353,53 +103,9 @@ defmodule Remote do
   def ota_test, do: "test-" |> ota()
   def ota_all, do: ["roost-", "lab-", "reef-", "test-"] |> ota()
 
-  # create a list of ota updates for all Remotes
-  def remote_list(:all) do
-    remotes = all()
-
-    for r <- remotes, do: ota_update_map(r)
-  end
-
-  # create a list
-  def remote_list(id) when is_integer(id) do
-    with %Remote{} = r <- find(id),
-         map <- ota_update_map(r) do
-      [map]
-    else
-      nil ->
-        [:not_found]
-    end
-  end
-
-  def remote_list(name) when is_binary(name) do
-    q = from(remote in Remote, where: [name: ^name], or_where: [host: ^name])
-    rem = one(q)
-
-    case rem do
-      %Remote{} = r ->
-        map = ota_update_map(r)
-        [map]
-
-      nil ->
-        [:not_found]
-    end
-  end
-
-  def remote_list(list) when is_list(list) do
-    make_list = fn list ->
-      for l <- list, do: remote_list(l)
-    end
-
-    make_list.(list) |> List.flatten()
-  end
-
-  def remote_list(catchall) do
-    [:unsupported, catchall]
-  end
-
-  defp ota_update_map(%Remote{} = r), do: %{name: r.name, host: r.host}
-
   def restart(what, opts \\ []) do
+    import Remote.DB.Remote, only: [remote_list: 1]
+
     opts = Keyword.put_new(opts, :log, false)
     restart_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
 
@@ -416,6 +122,8 @@ defmodule Remote do
   #
 
   defp ota_update(what, opts) do
+    import Remote.DB.Remote, only: [remote_list: 1]
+
     opts = Keyword.put_new(opts, :log, false)
     update_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
 
@@ -427,7 +135,7 @@ defmodule Remote do
     end
   end
 
-  defp send_remote_profile([%Remote{} = rem], %{type: "boot"} = eu) do
+  defp send_remote_profile([%Schema{} = rem], %{type: "boot"} = eu) do
     import Mqtt.SetProfile, only: [send_cmd: 1]
 
     send_cmd(rem)
@@ -458,58 +166,20 @@ defmodule Remote do
       |> Logger.info()
     end
 
-    StartupAnnouncement.record(host: rem.name, vsn: eu.vsn, hw: eu.hw)
+    Boot.record(host: rem.name, vsn: eu.vsn, hw: eu.hw)
 
     # use the message mtime to update the last start at time
     eu = Map.put_new(eu, :last_start_at, TimeSupport.from_unix(eu.mtime))
-    update_from_external(rem, eu)
+    DB.update_from_external(rem, eu)
   end
 
-  defp send_remote_profile([%Remote{} = rem], %{type: type} = eu)
-       when type in ["remote_runtime", "remote"] do
+  defp send_remote_profile([%Schema{} = rem], %{type: "remote"} = eu) do
     # use the message mtime to update the last seen at time
     eu = Map.put_new(eu, :last_seen_at, TimeSupport.from_unix(eu.mtime))
-    update_from_external(rem, eu)
+    DB.update_from_external(rem, eu)
   end
 
   defp send_remote_profile(_anything, %{type: type} = _eu),
     do:
       {:error, ["unknown message type=\"", type, "\""] |> IO.iodata_to_binary()}
-
-  defp update_from_external(%Remote{} = rem, eu) do
-    params = %{
-      # remote_runtime messages:
-      #  :last_start_at is added to map for boot messages when not available
-      #   keep existing time
-      last_seen_at: Map.get(eu, :last_seen_at, rem.last_seen_at),
-      firmware_vsn: Map.get(eu, :vsn, rem.firmware_vsn),
-      hw: Map.get(eu, :hw, rem.hw),
-      project_name: Map.get(eu, :proj, rem.project_name),
-      idf_vsn: Map.get(eu, :idf, rem.idf_vsn),
-      app_elf_sha256: Map.get(eu, :sha, rem.app_elf_sha256),
-      build_date: Map.get(eu, :bdate, rem.build_date),
-      build_time: Map.get(eu, :btime, rem.build_time),
-      magic_word: Map.get(eu, :mword, rem.magic_word),
-      secure_vsn: Map.get(eu, :svsn, rem.secure_vsn),
-      # reset the following metrics when not present
-      ap_rssi: Map.get(eu, :ap_rssi, 0),
-      ap_pri_chan: Map.get(eu, :ap_pri_chan, 0),
-      bssid: Map.get(eu, :bssid, "xx:xx:xx:xx:xx:xx"),
-      # ap_sec_chan: Map.get(eu, :ap_sec_chan, 0),
-      batt_mv: Map.get(eu, :batt_mv, 0),
-      heap_free: Map.get(eu, :heap_free, 0),
-      heap_min: Map.get(eu, :heap_min, 0),
-      uptime_us: Map.get(eu, :uptime_us, 0),
-
-      # boot messages:
-      #  :last_start_at is added to map for boot messages not present
-      #   keep existing time
-      last_start_at: Map.get(eu, :last_start_at, rem.last_start_at),
-      reset_reason: Map.get(eu, :reset_reason, rem.reset_reason)
-    }
-
-    changeset(rem, params) |> update()
-  end
-
-  defp update_from_external({:error, _}, _), do: {:error, "bad update"}
 end

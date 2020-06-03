@@ -1,9 +1,9 @@
-defmodule Fact.StartupAnnouncement do
+defmodule Fact.Remote.Boot do
   @moduledoc false
 
   use Instream.Series
 
-  alias Fact.StartupAnnouncement
+  alias Fact.Remote.Boot
   import(Fact.Influx, only: [write: 2])
 
   alias TimeSupport
@@ -23,7 +23,7 @@ defmodule Fact.StartupAnnouncement do
   def record(opts)
       when is_list(opts) do
     def_mtime = TimeSupport.unix_now(:second)
-    f = %StartupAnnouncement{}
+    f = %Boot{}
 
     f = set_tag(f, opts, :host)
     f = set_tag(f, opts, :vsn)

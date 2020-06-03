@@ -5,7 +5,9 @@ defmodule Mqtt.SetProfile do
 
   alias TimeSupport
 
-  def create_cmd(%Remote{host: host, name: name, profile: profile}, _opts \\ []) do
+  alias Remote.Schemas.Remote, as: Schema
+
+  def create_cmd(%Schema{host: host, name: name, profile: profile}, _opts \\ []) do
     Map.merge(
       %{
         payload: "profile",
@@ -13,11 +15,11 @@ defmodule Mqtt.SetProfile do
         host: host,
         assigned_name: name
       },
-      Remote.Profile.Schema.to_external_map(profile)
+      Remote.Schemas.Profile.to_external_map(profile)
     )
   end
 
-  def send_cmd(%Remote{} = r, opts \\ []) do
+  def send_cmd(%Schema{} = r, opts \\ []) do
     # no opts consumed by create_cmd so pass them unchanged to publish_to_host
     create_cmd(r, opts) |> Mqtt.Client.publish_to_host("profile", opts)
   end

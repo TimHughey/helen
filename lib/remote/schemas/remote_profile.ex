@@ -1,4 +1,4 @@
-defmodule Remote.Profile.Schema do
+defmodule Remote.Schemas.Profile do
   @moduledoc """
     Schema definition for Remote Profiles (configuration)
   """
@@ -9,7 +9,7 @@ defmodule Remote.Profile.Schema do
 
   import Common.DB, only: [name_regex: 0]
 
-  alias Remote.Profile.Schema
+  alias Remote.Schemas.Profile, as: Schema
 
   schema "remote_profile" do
     field(:name, :string)
@@ -66,9 +66,9 @@ defmodule Remote.Profile.Schema do
     Creates a new Remote Profile with specified name and optional parameters
 
       ## Examples
-        iex> Remote.Profile.Schema.create("default", dalsemi_enable: true,
+        iex> Remote.Schemas.Profile.create("default", dalsemi_enable: true,
             i2c_enable: true, pwm_enable: false)
-            {:ok, }%Remote.Profile.Schema{}}
+            {:ok, }%Remote.Schemas.Profile{}}
 
             {:duplicate, name}
 
@@ -104,8 +104,8 @@ defmodule Remote.Profile.Schema do
     Ultimately calls create/2 so same return results
 
       ## Examples
-        iex> Remote.Profile.Schema.duplicate(name, copy_name)
-        {:ok, %Remote.Profile.Schema{}}
+        iex> Remote.Schemas.Profile.duplicate(name, copy_name)
+        {:ok, %Remote.Schemas.Profile{}}
 
         {:not_found, name}
   """
@@ -126,16 +126,16 @@ defmodule Remote.Profile.Schema do
   end
 
   @doc """
-    Get a %Remote.Profile.Schema{} by id or name
+    Get a %Remote.Schemas.Profile{} by id or name
 
     Same return values as Repo.get_by/2
 
       1. nil if not found
-      2. %Remote.Profile.Schema{}
+      2. %Remote.Schemas.Profile{}
 
       ## Examples
-        iex> Remote.Profile.Schema.find("default")
-        %Remote.Profile.Schema{}
+        iex> Remote.Schemas.Profile.find("default")
+        %Remote.Schemas.Profile{}
   """
 
   @doc since: "0.0.8"
@@ -167,13 +167,13 @@ defmodule Remote.Profile.Schema do
   end
 
   @doc """
-    Reload a previously loaded Remote.Profile.Schema or get by id
+    Reload a previously loaded Remote.Schemas.Profile or get by id
 
     Leverages Repo.get!/2 and raises on failure
 
     ## Examples
-      iex> Remote.Profile.Schema.reload(1)
-      %Remote.Profile.Schema{}
+      iex> Remote.Schemas.Profile.reload(1)
+      %Remote.Schemas.Profile{}
   """
 
   @doc since: "0.0.8"
@@ -198,7 +198,7 @@ defmodule Remote.Profile.Schema do
     Retrieve Remote Profile Names
 
     ## Examples
-      iex> Remote.Profile.Schema.names()
+      iex> Remote.Schemas.Profile.names()
       ["default"]
   """
 
@@ -213,7 +213,7 @@ defmodule Remote.Profile.Schema do
     Converts a Remote Profile to a map that can be used externally.
 
       ## Examples
-        iex> Remote.Profile.Schema.to_external_map("default")
+        iex> Remote.Schemas.Profile.to_external_map("default")
         %{
          meta: %{version: "", updated_mtime: 12345, inserted_mtime: 12345},
          ds: %{enable: true,
@@ -322,18 +322,18 @@ defmodule Remote.Profile.Schema do
 
         Update by profile name
 
-        iex> Remote.Profile.Schema.update("default", [i2c_enable: false])
-        {:ok, %Remote.Profile.Schema{}}
+        iex> Remote.Schemas.Profile.update("default", [i2c_enable: false])
+        {:ok, %Remote.Schemas.Profile{}}
 
         Update by profile id
 
-        iex> Remote.Profile.Schema.update(12, [i2c_enable: false])
-        {:ok, %Remote.Profile.Schema{}}
+        iex> Remote.Schemas.Profile.update(12, [i2c_enable: false])
+        {:ok, %Remote.Schemas.Profile{}}
 
-        Update in a pipeline (e.g. Remote.Profile.Schema.duplicate/2)
+        Update in a pipeline (e.g. Remote.Schemas.Profile.duplicate/2)
 
-        iex> Remote.Profile.Schema.update({:ok, %Remote.Profile.Schema{}}, opts)
-        {:ok, %Remote.Profile.Schema{}}
+        iex> Remote.Schemas.Profile.update({:ok, %Remote.Schemas.Profile{}}, opts)
+        {:ok, %Remote.Schemas.Profile{}}
   """
 
   @doc since: "0.0.8"

@@ -3,8 +3,6 @@ defmodule Sensor.Schemas.Device do
   Definition and database functions for Sensor.Schemes.Device
   """
 
-  require Logger
-  use Timex
   use Ecto.Schema
 
   alias Sensor.Schemas.{Alias, DataPoint, Device}
@@ -23,7 +21,7 @@ defmodule Sensor.Schemas.Device do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def changeset(x, p) when is_map(p) do
+  def changeset(x, p) when is_map(p) or is_list(p) do
     import Ecto.Changeset,
       only: [
         cast: 3,
@@ -34,7 +32,7 @@ defmodule Sensor.Schemas.Device do
 
     import Common.DB, only: [name_regex: 0]
 
-    cast(x, p, keys(:cast))
+    cast(x, Enum.into(p, %{}), keys(:cast))
     |> validate_required(keys(:required))
     |> validate_format(:device, name_regex())
     |> validate_format(:host, name_regex())
@@ -50,20 +48,20 @@ defmodule Sensor.Schemas.Device do
 
   def keys(:cast), do: keys(:all)
 
-  # defp keys(:upsert), do: keys_refine(:all, [:id, :device])
+  # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
 
   def keys(:replace),
     do:
-      keys_refine(:all, [
+      keys_drop(:all, [
         :device,
         :discovered_at,
         :inserted_at
       ])
 
   def keys(:required),
-    do: keys_refine(:cast, [:updated_at, :inserted_at])
+    do: keys_drop(:cast, [:updated_at, :inserted_at])
 
-  defp keys_refine(base_keys, drop),
+  defp keys_drop(base_keys, drop),
     do:
       MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
       |> MapSet.to_list()

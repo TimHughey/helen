@@ -4,7 +4,7 @@ defmodule Remote.Profile do
   Definition of Runtime Functionality for Remotes
   """
 
-  alias Remote.Profile.Schema
+  alias Remote.Schemas.Profile, as: Schema
 
   defdelegate create(name, opts \\ []), to: Schema
   defdelegate duplicate(name, new_name), to: Schema
