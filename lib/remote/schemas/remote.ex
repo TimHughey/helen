@@ -11,17 +11,17 @@ defmodule Remote.Schemas.Remote do
     field(:host, :string)
     field(:name, :string)
     field(:profile, :string, default: "default")
-    field(:firmware_vsn, :string, default: "<none>")
+    field(:firmware_vsn, :string)
     field(:firmware_etag, :string, default: "<none>")
-    field(:idf_vsn, :string, default: "<none>")
-    field(:app_elf_sha256, :string, default: "<none>")
-    field(:build_date, :string, default: "<none>")
-    field(:build_time, :string, defaulf: "<none>")
+    field(:idf_vsn, :string)
+    field(:app_elf_sha256, :string)
+    field(:build_date, :string)
+    field(:build_time, :string)
     field(:last_start_at, :utc_datetime_usec)
     field(:last_seen_at, :utc_datetime_usec)
     field(:batt_mv, :integer, default: 0)
-    field(:reset_reason, :string, default: "<none>")
-    field(:bssid, :string, default: "xx:xx:xx:xx:xx:xx")
+    field(:reset_reason, :string)
+    field(:bssid, :string)
     field(:ap_rssi, :integer, default: 0)
     field(:ap_pri_chan, :integer, default: 0)
     field(:heap_free, :integer, default: 0)
@@ -64,12 +64,13 @@ defmodule Remote.Schemas.Remote do
   # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
 
   def keys(:replace),
-    do: keys_drop(:all, [:host, :profile])
+    do: keys_drop(:all, [:host, :name, :profile])
 
   def keys(:required),
     do:
       keys_drop(:cast, [
         :app_elf_sha256,
+        :bssid,
         :build_date,
         :build_time,
         :firmware_vsn,

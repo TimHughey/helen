@@ -191,7 +191,7 @@ defmodule Remote do
 
       heap = ["heap(", heap_min, "k,", heap_free, "k)"] |> IO.iodata_to_binary()
       ap_db = [Integer.to_string(ap_rssi), "dB"] |> IO.iodata_to_binary()
-      batt_mv = [Float.to_string(batt_mv), "mV"] |> IO.iodata_to_binary()
+      batt_mv = [Integer.to_string(batt_mv), "mV"] |> IO.iodata_to_binary()
 
       [name, "BOOT", reset, vsn, ap_db, batt_mv, heap]
       |> Enum.join(" ")

@@ -254,7 +254,7 @@ defmodule Remote.DB.Remote do
       :name,
       :firmware_vsn,
       :idf_vsn,
-      :app_elf_hsa256,
+      :app_elf_sha256,
       :build_date,
       :ap_rssi,
       :ap_pri_chan,
