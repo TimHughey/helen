@@ -59,13 +59,9 @@ defmodule Mqtt.Inbound do
   def supported_msg_types,
     do: [
       "boot",
-      "startup",
-      "temp",
+      "sensor",
       "switch",
-      "relhum",
-      "soil",
       "remote_runtime",
-      "stats",
       "text",
       "pwm"
     ]
@@ -341,7 +337,7 @@ defmodule Mqtt.Inbound do
       type when type in ["text"] ->
         msg_remote_log(r)
 
-      type when type in ["temp", "relhum", "soil"] ->
+      type when type in ["temp", "relhum", "soil", "sensor"] ->
         msg_sensor(r)
 
       type when type in ["boot", "startup", "remote_runtime"] ->

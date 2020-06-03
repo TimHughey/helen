@@ -1,7 +1,7 @@
 SET intervalstyle = 'postgres';
 SET timezone='UTC';
   SELECT DISTINCT ON (sa.name) sa.name, s.id,
-  AVG(sd.temp_f) as "TempF", AVG(sd.relhum) as "RH",
+  AVG(sd.temp_f) as "TempF", AVG(sd.temp_c) as "TempC", AVG(sd.relhum) as "RH",
   s.dev_latency_us,
   EXTRACT(EPOCH from DATE_TRUNC('milliseconds', now() at TIME ZONE 'UTC')) - EXTRACT(EPOCH FROM  DATE_TRUNC('milliseconds', sd.reading_at)) as "Reading At",
     EXTRACT(EPOCH from DATE_TRUNC('milliseconds', now() at TIME ZONE 'UTC')) - EXTRACT(EPOCH FROM  DATE_TRUNC('milliseconds', s.last_seen_at)) as "Last Seen At",
