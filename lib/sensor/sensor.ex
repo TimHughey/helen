@@ -127,7 +127,7 @@ defmodule Sensor do
      - if the message hasn't been processed, then attempt to
   """
   @doc since: "0.0.16"
-  def handle_message(%{processed: false} = msg_in) do
+  def handle_message(%{processed: false, type: "sensor"} = msg_in) do
     alias Sensor.Schemas.Device
     alias Sensor.DB
     alias Fact.Influx
