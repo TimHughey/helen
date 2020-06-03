@@ -66,6 +66,12 @@ defmodule Remote do
   def handle_message(%{} = msg_in), do: msg_in
 
   @doc """
+    Set the profile for a Remote
+  """
+  @doc since: "0.0.20"
+  defdelegate set_profile(name_or_id, profile_name), to: Remote.DB.Remote
+
+  @doc """
     Request OTA updates based on a prefix pattern
 
     Simply pipelines names_begin_with/1 and ota_update/2

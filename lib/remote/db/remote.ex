@@ -7,41 +7,6 @@ defmodule Remote.DB.Remote do
 
   alias Remote.Schemas.Remote, as: Schema
 
-  # def add(%Schema{} = r), do: add([r])
-  #
-  # def add(%{host: host, mtime: mtime} = r) do
-  #   [
-  #     %Schema{
-  #       host: host,
-  #       name: Map.get(r, :name, host),
-  #       firmware_vsn: Map.get(r, :vsn, "not available"),
-  #       idf_vsn: Map.get(r, :idf, "not available"),
-  #       app_elf_sha256: Map.get(r, :sha, "not available"),
-  #       build_date: Map.get(r, :bdate, "not available"),
-  #       build_time: Map.get(r, :btime, "not available"),
-  #       last_seen_at: TimeSupport.from_unix(mtime),
-  #       last_start_at: TimeSupport.from_unix(mtime)
-  #     }
-  #   ]
-  #   |> add()
-  # end
-  #
-  # def add(list) when is_list(list) do
-  #   for %Schema{} = r <- list do
-  #     case find_by_host(r.host) do
-  #       nil ->
-  #         Repo.insert!(r)
-  #
-  #       found ->
-  #         found
-  #     end
-  #   end
-  # end
-  #
-  # def add(_no_match) do
-  #   {:failed, :not_remote}
-  # end
-
   def all do
     import Ecto.Query, only: [from: 2]
 
@@ -247,6 +212,25 @@ defmodule Remote.DB.Remote do
     [:unsupported, catchall]
   end
 
+  def set_profile(name_or_id, profile) do
+    import Remote.Schemas.Remote, only: [changeset_profile: 2]
+    alias Remote.Schemas.Profile
+    alias Remote.DB.Profile, as: DBP
+
+    with %Schema{} = x <- find(name_or_id),
+         {:profile, %Profile{name: name}} <- {:profile, DBP.find(profile)},
+         cs <- changeset_profile(x, %{profile: name}),
+         {:cs_valid, cs, true} <- {:cs_valid, cs, cs.valid?},
+         {:ok, %Schema{name: name, profile: profile}} <- Repo.update(cs) do
+      [remote: [name: name, profile: profile]]
+    else
+      nil -> {:not_found, name_or_id}
+      {:profile, nil} -> {:not_found, profile}
+      {:cs_valid, cs, false} -> {:invalid_changes, cs}
+      error -> {:error, error}
+    end
+  end
+
   @doc """
   Upsert (insert or update) a Sensor.Schemas.Device
 
@@ -343,38 +327,4 @@ defmodule Remote.DB.Remote do
       _ -> params
     end
   end
-
-  # def update_from_external(%Schema{} = rem, eu) do
-  #   import Remote.Schemas.Remote, only: [changeset: 2]
-  #
-  #   params = %{
-  #     # remote_runtime messages:
-  #     #  :last_start_at is added to map for boot messages when not available
-  #     #   keep existing time
-  #     last_seen_at: Map.get(eu, :last_seen_at, rem.last_seen_at),
-  #     firmware_vsn: Map.get(eu, :vsn, rem.firmware_vsn),
-  #     idf_vsn: Map.get(eu, :idf, rem.idf_vsn),
-  #     app_elf_sha256: Map.get(eu, :sha, rem.app_elf_sha256),
-  #     build_date: Map.get(eu, :bdate, rem.build_date),
-  #     build_time: Map.get(eu, :btime, rem.build_time),
-  #     # reset the following metrics when not present
-  #     ap_rssi: Map.get(eu, :ap_rssi, 0),
-  #     ap_pri_chan: Map.get(eu, :ap_pri_chan, 0),
-  #     bssid: Map.get(eu, :bssid, "xx:xx:xx:xx:xx:xx"),
-  #     batt_mv: Map.get(eu, :batt_mv, 0),
-  #     heap_free: Map.get(eu, :heap_free, 0),
-  #     heap_min: Map.get(eu, :heap_min, 0),
-  #     uptime_us: Map.get(eu, :uptime_us, 0),
-  #
-  #     # boot messages:
-  #     #  :last_start_at is added to map for boot messages not present
-  #     #   keep existing time
-  #     last_start_at: Map.get(eu, :last_start_at, rem.last_start_at),
-  #     reset_reason: Map.get(eu, :reset_reason, rem.reset_reason)
-  #   }
-  #
-  #   changeset(rem, params) |> Repo.update()
-  # end
-  #
-  # def update_from_external({:error, _}, _), do: {:error, "bad update"}
 end

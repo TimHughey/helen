@@ -31,8 +31,6 @@ defmodule Remote.Schemas.Remote do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def changeset(rem, params \\ %{})
-
   def changeset(%Schema{} = rem, params) do
     import Ecto.Changeset,
       only: [cast: 3, validate_required: 2, validate_format: 3]
@@ -45,7 +43,14 @@ defmodule Remote.Schemas.Remote do
     |> validate_format(:host, name_regex())
   end
 
-  def changeset(nil, _params), do: %Ecto.Changeset{}
+  def changeset_profile(%Schema{} = rem, params) do
+    import Ecto.Changeset,
+      only: [cast: 3, validate_required: 2]
+
+    rem
+    |> cast(params, keys(:set_profile))
+    |> validate_required(keys(:set_profile))
+  end
 
   def keys(:all),
     do:
@@ -59,7 +64,7 @@ defmodule Remote.Schemas.Remote do
   # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
 
   def keys(:replace),
-    do: keys_drop(:all, [:host])
+    do: keys_drop(:all, [:host, :profile])
 
   def keys(:required),
     do:
@@ -75,6 +80,8 @@ defmodule Remote.Schemas.Remote do
         :updated_at,
         :inserted_at
       ])
+
+  def keys(:set_profile), do: [:profile]
 
   defp keys_drop(base_keys, drop),
     do:
