@@ -7,40 +7,40 @@ defmodule Remote.DB.Remote do
 
   alias Remote.Schemas.Remote, as: Schema
 
-  def add(%Schema{} = r), do: add([r])
-
-  def add(%{host: host, mtime: mtime} = r) do
-    [
-      %Schema{
-        host: host,
-        name: Map.get(r, :name, host),
-        firmware_vsn: Map.get(r, :vsn, "not available"),
-        idf_vsn: Map.get(r, :idf, "not available"),
-        app_elf_sha256: Map.get(r, :sha, "not available"),
-        build_date: Map.get(r, :bdate, "not available"),
-        build_time: Map.get(r, :btime, "not available"),
-        last_seen_at: TimeSupport.from_unix(mtime),
-        last_start_at: TimeSupport.from_unix(mtime)
-      }
-    ]
-    |> add()
-  end
-
-  def add(list) when is_list(list) do
-    for %Schema{} = r <- list do
-      case find_by_host(r.host) do
-        nil ->
-          Repo.insert!(r)
-
-        found ->
-          found
-      end
-    end
-  end
-
-  def add(_no_match) do
-    {:failed, :not_remote}
-  end
+  # def add(%Schema{} = r), do: add([r])
+  #
+  # def add(%{host: host, mtime: mtime} = r) do
+  #   [
+  #     %Schema{
+  #       host: host,
+  #       name: Map.get(r, :name, host),
+  #       firmware_vsn: Map.get(r, :vsn, "not available"),
+  #       idf_vsn: Map.get(r, :idf, "not available"),
+  #       app_elf_sha256: Map.get(r, :sha, "not available"),
+  #       build_date: Map.get(r, :bdate, "not available"),
+  #       build_time: Map.get(r, :btime, "not available"),
+  #       last_seen_at: TimeSupport.from_unix(mtime),
+  #       last_start_at: TimeSupport.from_unix(mtime)
+  #     }
+  #   ]
+  #   |> add()
+  # end
+  #
+  # def add(list) when is_list(list) do
+  #   for %Schema{} = r <- list do
+  #     case find_by_host(r.host) do
+  #       nil ->
+  #         Repo.insert!(r)
+  #
+  #       found ->
+  #         found
+  #     end
+  #   end
+  # end
+  #
+  # def add(_no_match) do
+  #   {:failed, :not_remote}
+  # end
 
   def all do
     import Ecto.Query, only: [from: 2]
@@ -247,37 +247,134 @@ defmodule Remote.DB.Remote do
     [:unsupported, catchall]
   end
 
-  def update_from_external(%Schema{} = rem, eu) do
-    import Remote.Schemas.Remote, only: [changeset: 2]
+  @doc """
+  Upsert (insert or update) a Sensor.Schemas.Device
 
-    params = %{
-      # remote_runtime messages:
-      #  :last_start_at is added to map for boot messages when not available
-      #   keep existing time
-      last_seen_at: Map.get(eu, :last_seen_at, rem.last_seen_at),
-      firmware_vsn: Map.get(eu, :vsn, rem.firmware_vsn),
-      idf_vsn: Map.get(eu, :idf, rem.idf_vsn),
-      app_elf_sha256: Map.get(eu, :sha, rem.app_elf_sha256),
-      build_date: Map.get(eu, :bdate, rem.build_date),
-      build_time: Map.get(eu, :btime, rem.build_time),
-      # reset the following metrics when not present
-      ap_rssi: Map.get(eu, :ap_rssi, 0),
-      ap_pri_chan: Map.get(eu, :ap_pri_chan, 0),
-      bssid: Map.get(eu, :bssid, "xx:xx:xx:xx:xx:xx"),
-      batt_mv: Map.get(eu, :batt_mv, 0),
-      heap_free: Map.get(eu, :heap_free, 0),
-      heap_min: Map.get(eu, :heap_min, 0),
-      uptime_us: Map.get(eu, :uptime_us, 0),
+  input:
+    a. message from an external source or or a map with necessary keys:
+       %{device: string, host: string, dev_latency_us: integer, mtime: integer}
 
-      # boot messages:
-      #  :last_start_at is added to map for boot messages not present
-      #   keep existing time
-      last_start_at: Map.get(eu, :last_start_at, rem.last_start_at),
-      reset_reason: Map.get(eu, :reset_reason, rem.reset_reason)
-    }
+  returns input message populated with:
+   a. sensor_device: the results of upsert/2
+     * {:ok, %Sensor.Schemas.Device{}}
+     * {:invalid_changes, %Changeset{}}
+     * {:error, actual error results from upsert/2}
+  """
 
-    changeset(rem, params) |> Repo.update()
+  @doc since: "0.0.15"
+  def upsert(%{host: _, name: _, mtime: _mtime} = msg) do
+    import TimeSupport, only: [from_unix: 1, utc_now: 0]
+
+    params = [
+      :host,
+      :name,
+      :firmware_vsn,
+      :idf_vsn,
+      :app_elf_hsa256,
+      :build_date,
+      :ap_rssi,
+      :ap_pri_chan,
+      :bssid,
+      :batt_mv,
+      :heap_free,
+      :heap_min,
+      :uptime_us,
+      :last_seen_at,
+      :last_start_at,
+      :reset_reason
+    ]
+
+    # create a map of defaults for keys that may not exist in the msg
+    params_default = %{last_seen_at: utc_now()} |> add_last_start_if_needed(msg)
+
+    # assemble a map of changes
+    # NOTE:  the second map passed to Map.merge/2 replaces duplicate keys
+    #        in the first map.  in this case we want all available data from
+    #        the message however if some isn't available we provide it via
+    #        changes_default
+    params = Map.merge(params_default, Map.take(msg, params))
+
+    # assemble the return message with the results of upsert/2
+    Map.put(msg, :remote_host, upsert(%Schema{}, params))
   end
 
-  def update_from_external({:error, _}, _), do: {:error, "bad update"}
+  def upsert(msg) when is_map(msg),
+    do: Map.put(msg, :remote_host, {:error, :badmsg})
+
+  def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
+    import Remote.Schemas.Remote, only: [changeset: 2, keys: 1]
+
+    # assemble the opts for upsert
+    # check for conflicts on :host
+    # if there is a conflict only replace keys(:replace)
+    opts = [
+      on_conflict: {:replace, keys(:replace)},
+      returning: true,
+      conflict_target: :host
+    ]
+
+    # make certain the params are a map
+    cs = changeset(x, Enum.into(params, %{}))
+
+    with {cs, true} <- {cs, cs.valid?},
+         {:ok, %Schema{id: _id} = rem} <- Repo.insert(cs, opts) do
+      {:ok, rem}
+    else
+      {cs, false} ->
+        {:invalid_changes, cs}
+
+      {:error, rc} ->
+        {:error, rc}
+
+      error ->
+        {:error, error}
+    end
+  end
+
+  def upsert(_x, params) do
+    {:error, params}
+  end
+
+  defp add_last_start_if_needed(params, %{type: type} = _msg) do
+    import TimeSupport, only: [utc_now: 0]
+
+    case type do
+      "boot" -> Map.put(params, :last_start_at, utc_now())
+      _ -> params
+    end
+  end
+
+  # def update_from_external(%Schema{} = rem, eu) do
+  #   import Remote.Schemas.Remote, only: [changeset: 2]
+  #
+  #   params = %{
+  #     # remote_runtime messages:
+  #     #  :last_start_at is added to map for boot messages when not available
+  #     #   keep existing time
+  #     last_seen_at: Map.get(eu, :last_seen_at, rem.last_seen_at),
+  #     firmware_vsn: Map.get(eu, :vsn, rem.firmware_vsn),
+  #     idf_vsn: Map.get(eu, :idf, rem.idf_vsn),
+  #     app_elf_sha256: Map.get(eu, :sha, rem.app_elf_sha256),
+  #     build_date: Map.get(eu, :bdate, rem.build_date),
+  #     build_time: Map.get(eu, :btime, rem.build_time),
+  #     # reset the following metrics when not present
+  #     ap_rssi: Map.get(eu, :ap_rssi, 0),
+  #     ap_pri_chan: Map.get(eu, :ap_pri_chan, 0),
+  #     bssid: Map.get(eu, :bssid, "xx:xx:xx:xx:xx:xx"),
+  #     batt_mv: Map.get(eu, :batt_mv, 0),
+  #     heap_free: Map.get(eu, :heap_free, 0),
+  #     heap_min: Map.get(eu, :heap_min, 0),
+  #     uptime_us: Map.get(eu, :uptime_us, 0),
+  #
+  #     # boot messages:
+  #     #  :last_start_at is added to map for boot messages not present
+  #     #   keep existing time
+  #     last_start_at: Map.get(eu, :last_start_at, rem.last_start_at),
+  #     reset_reason: Map.get(eu, :reset_reason, rem.reset_reason)
+  #   }
+  #
+  #   changeset(rem, params) |> Repo.update()
+  # end
+  #
+  # def update_from_external({:error, _}, _), do: {:error, "bad update"}
 end

@@ -64,8 +64,14 @@ defmodule Remote.Schemas.Remote do
   def keys(:required),
     do:
       keys_drop(:cast, [
+        :app_elf_sha256,
+        :build_date,
+        :build_time,
+        :firmware_vsn,
+        :idf_vsn,
         :last_start_at,
         :last_seen_at,
+        :reset_reason,
         :updated_at,
         :inserted_at
       ])

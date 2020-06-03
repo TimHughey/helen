@@ -5,15 +5,6 @@ defmodule Remote do
   """
 
   require Logger
-  use Timex
-
-  # alias Fact.RunMetric
-  alias Fact.Remote.Boot
-
-  alias Remote.Schemas.Remote, as: Schema
-  alias Remote.DB.Remote, as: DB
-
-  alias TimeSupport
 
   def browse do
     import Remote.DB.Remote, only: [all: 0]
@@ -22,59 +13,57 @@ defmodule Remote do
     Scribe.console(sorted, data: [:id, :name, :host, :hw, :inserted_at])
   end
 
-  def external_update(%{host: host, mtime: _mtime} = eu) do
-    log = Map.get(eu, :log, true)
+  @doc """
+    Handles all aspects of processing Remote messages of "remote" type
+    (periodic updates)
 
-    result =
-      :timer.tc(fn ->
-        eu |> DB.add() |> send_remote_profile(eu)
-      end)
+     - if the message hasn't been processed, then attempt to
+  """
+  @doc since: "0.0.16"
+  def handle_message(%{processed: false, type: type} = msg_in)
+      when type in ["remote", "boot"] do
+    alias Remote.Schemas.Remote, as: Schema
+    alias Remote.DB.Remote, as: DB
+    alias Fact.Influx
 
-    case result do
-      {_t, {:ok, _rem}} ->
-        # RunMetric.record(
-        #   module: "#{__MODULE__}",
-        #   metric: "external_update",
-        #   # use the local name
-        #   device: rem.name,
-        #   val: t,
-        #   record: false
-        #   # record: Map.get(eu, :runtime_metrics, false)
-        # )
+    # the with begins with processing the message through Device.DB.upsert/1
+    with %{remote_host: remote_host} = msg <- DB.upsert(msg_in),
+         # was the upset a success?
+         {:ok, %Schema{}} <- remote_host,
+         msg <- Map.put(msg, :processed, true),
+         msg <- send_profile_if_needed(msg),
+         msg <- log_boot_if_needed(msg),
+         # now send the augmented message to the timeseries database
+         msg <- Influx.handle_message(msg),
+         write_rc <- Map.get(msg, :write_rc),
+         {msg, {:processed, :ok}} <- {msg, write_rc} do
+      msg
+    else
+      # we didn't match when attempting to write the timeseries metric
+      # this isn't technically a failure however we do want to signal to
+      # the caller something is amiss
+      {msg, {:processed, :no_match} = write_rc} ->
+        ["no match: ", inspect(msg, pretty: true)] |> IO.puts()
 
-        Fact.Remote.record(eu)
+        Map.merge(msg, %{
+          processed: true,
+          warning: :remote_host_warning,
+          remote_host_warning: write_rc
+        })
 
-        :ok
-
-      {_t, {err, details}} ->
-        log &&
-          Logger.warn([
-            "external update failed host(",
-            inspect(host, pretty: true),
-            ") ",
-            "err(",
-            inspect(err, pretty: true),
-            ") ",
-            "details(",
-            inspect(details, pretty: true),
-            ")"
-          ])
-
-        :error
+      error ->
+        Map.merge(msg_in, %{
+          processed: true,
+          fault: :remote_host_fault,
+          remote_host_fault: error
+        })
     end
   end
 
-  def external_update(no_match) do
-    log = is_map(no_match) and Map.get(no_match, :log, true)
-
-    log &&
-      Logger.warn([
-        "external update received a bad map ",
-        inspect(no_match, pretty: true)
-      ])
-
-    :error
-  end
+  # if the primary handle_message does not match then simply return the msg
+  # since it wasn't for sensor and/or has already been processed in the
+  # pipeline
+  def handle_message(%{} = msg_in), do: msg_in
 
   @doc """
     Request OTA updates based on a prefix pattern
@@ -102,6 +91,28 @@ defmodule Remote do
   def ota_reef, do: "reef-" |> ota()
   def ota_test, do: "test-" |> ota()
   def ota_all, do: ["roost-", "lab-", "reef-", "test-"] |> ota()
+
+  defdelegate profile_create(name, opts \\ []),
+    to: Remote.DB.Profile,
+    as: :create
+
+  defdelegate profile_duplicate(name, new_name),
+    to: Remote.DB.Profile,
+    as: :duplicate
+
+  defdelegate profile_find(name_or_id), to: Remote.DB.Profile, as: :find
+  defdelegate profile_reload(varies), to: Remote.DB.Profile, as: :reload
+  defdelegate profile_names, to: Remote.DB.Profile, as: :names
+
+  defdelegate profile_to_external_map(name),
+    to: Remote.DB.Profile,
+    as: :to_external_map
+
+  defdelegate profile_update(name_or_schema, opts),
+    to: Remote.DB.Profile,
+    as: :update
+
+  defdelegate profile_lookup_key(key), to: Remote.DB.Profile, as: :lookup_key
 
   def restart(what, opts \\ []) do
     import Remote.DB.Remote, only: [remote_list: 1]
@@ -135,51 +146,63 @@ defmodule Remote do
     end
   end
 
-  defp send_remote_profile([%Schema{} = rem], %{type: "boot"} = eu) do
-    import Mqtt.SetProfile, only: [send_cmd: 1]
+  defp send_profile_if_needed(%{type: type, remote_host: remote_host} = msg) do
+    import Mqtt.Command.Remote.Profile, only: [send_cmd: 1]
+    # alias Fact.Remote.Boot
+    alias Remote.Schemas.Remote, as: Schema
 
-    send_cmd(rem)
+    with {:ok, %Schema{name: _name} = rem} <- remote_host,
+         "boot" <- type do
+      send_cmd(rem)
 
-    log = Map.get(eu, :log, true)
+      # Boot.record(host: name, vsn: vsn)
 
-    if log do
-      heap_free = (Map.get(eu, :heap_free, 0) / 1024) |> Float.round(1)
-      heap_min = (Map.get(eu, :heap_min, 0) / 1024) |> Float.round(1)
+      msg
+    else
+      _error -> msg
+    end
+  end
 
-      [
-        inspect(rem.name),
-        " BOOT ",
-        Map.get(eu, :reset_reason, "no reset reason"),
-        " ",
-        eu.vsn,
-        " ",
-        inspect(Map.get(eu, :batt_mv, "0")),
-        "mv ",
-        inspect(Map.get(eu, :ap_rssi, "0")),
-        "dB ",
-        "heap(",
-        inspect(heap_min),
-        "k,",
-        inspect(heap_free),
-        "k) "
-      ]
+  defp log_boot_if_needed(
+         %{
+           type: "boot",
+           firmware_vsn: vsn,
+           reset_reason: reset,
+           heap_free: heap_free,
+           heap_min: heap_min,
+           batt_mv: batt_mv,
+           ap_rssi: ap_rssi,
+           remote_host: remote_host
+         } = msg
+       ) do
+    alias Remote.Schemas.Remote, as: Schema
+    log = Map.get(msg, :log, true)
+
+    with {:ok, %Schema{name: name}} <- remote_host,
+         true <- log do
+      heap_free = (heap_free / 1024) |> Float.round(1) |> Float.to_string()
+      heap_min = (heap_min / 1024) |> Float.round(1) |> Float.to_string()
+
+      heap = ["heap(", heap_min, "k,", heap_free, "k)"] |> IO.iodata_to_binary()
+      ap_db = [Integer.to_string(ap_rssi), "dB"] |> IO.iodata_to_binary()
+      batt_mv = [Float.to_string(batt_mv), "mV"] |> IO.iodata_to_binary()
+
+      [name, "BOOT", reset, vsn, ap_db, batt_mv, heap]
+      |> Enum.join(" ")
       |> Logger.info()
+    else
+      _ -> nil
     end
 
-    Boot.record(host: rem.name, vsn: eu.vsn, hw: eu.hw)
-
-    # use the message mtime to update the last start at time
-    eu = Map.put_new(eu, :last_start_at, TimeSupport.from_unix(eu.mtime))
-    DB.update_from_external(rem, eu)
+    msg
   end
 
-  defp send_remote_profile([%Schema{} = rem], %{type: "remote"} = eu) do
-    # use the message mtime to update the last seen at time
-    eu = Map.put_new(eu, :last_seen_at, TimeSupport.from_unix(eu.mtime))
-    DB.update_from_external(rem, eu)
+  defp log_boot_if_needed(%{host: host, reset_reason: _reason} = msg) do
+    ["BOOT message from host=\"", host, "\" did not match"]
+    |> Logger.warn()
+
+    msg
   end
 
-  defp send_remote_profile(_anything, %{type: type} = _eu),
-    do:
-      {:error, ["unknown message type=\"", type, "\""] |> IO.iodata_to_binary()}
+  defp log_boot_if_needed(msg), do: msg
 end

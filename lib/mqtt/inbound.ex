@@ -370,15 +370,29 @@ defmodule Mqtt.Inbound do
       else: PulseWidth.external_update(r)
   end
 
-  defp msg_remote(%{async: async} = r) do
-    if async,
-      do: Task.start(Remote, :external_update, [r]),
-      else: Remote.external_update(r)
+  defp msg_remote(%{async: async} = msg) do
+    process = fn ->
+      # the "happy path" of this with is to check for errors
+      with %{remote_host_fault: error} = msg <- Remote.handle_message(msg) do
+        ["remote host message failed: ", inspect(error, pretty: true)]
+        |> Logger.error()
+
+        {:failed, msg}
+      else
+        _all_is_well -> :ok
+      end
+    end
+
+    if async do
+      Task.start(process)
+    else
+      process.()
+    end
   end
 
   defp msg_remote_log(%{async: _async} = r) do
     # simply get the remote log message and log it locally
-    name = Map.get(r, :name, "missing name")
+    name = Map.get(r, :name, "<no name>")
     text = Map.get(r, :text)
     log = Map.get(r, :log, true)
 

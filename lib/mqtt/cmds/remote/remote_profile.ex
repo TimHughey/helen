@@ -1,4 +1,4 @@
-defmodule Mqtt.SetProfile do
+defmodule Mqtt.Command.Remote.Profile do
   @moduledoc false
 
   require Logger
@@ -15,7 +15,7 @@ defmodule Mqtt.SetProfile do
         host: host,
         assigned_name: name
       },
-      Remote.Schemas.Profile.to_external_map(profile)
+      Remote.DB.Profile.to_external_map(profile)
     )
   end
 
