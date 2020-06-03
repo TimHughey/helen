@@ -61,7 +61,7 @@ defmodule Mqtt.Inbound do
       "boot",
       "sensor",
       "switch",
-      "remote_runtime",
+      "remote",
       "text",
       "pwm"
     ]
@@ -340,7 +340,7 @@ defmodule Mqtt.Inbound do
       type when type in ["sensor"] ->
         msg_sensor(r)
 
-      type when type in ["boot", "remote_runtime", "remote"] ->
+      type when type in ["boot", "remote"] ->
         msg_remote(r)
 
       type ->
