@@ -33,23 +33,22 @@ defmodule Remote.Schemas.Remote do
 
   def changeset(%Schema{} = rem, params) do
     import Ecto.Changeset,
-      only: [cast: 3, validate_required: 2, validate_format: 3]
+      only: [
+        cast: 3,
+        validate_required: 2,
+        validate_format: 3,
+        unique_constraint: 2
+      ]
 
     import Common.DB, only: [name_regex: 0]
 
     rem
-    |> cast(params, keys(:cast))
+    # since this changeset is used by upsert and update we only want to
+    # cast the keys of the parameters
+    |> cast(params, Map.keys(Enum.into(params, %{})))
     |> validate_required(keys(:required))
     |> validate_format(:host, name_regex())
-  end
-
-  def changeset_profile(%Schema{} = rem, params) do
-    import Ecto.Changeset,
-      only: [cast: 3, validate_required: 2]
-
-    rem
-    |> cast(params, keys(:set_profile))
-    |> validate_required(keys(:set_profile))
+    |> unique_constraint(:name)
   end
 
   def keys(:all),
@@ -61,8 +60,7 @@ defmodule Remote.Schemas.Remote do
 
   def keys(:cast), do: keys(:all)
 
-  # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
-
+  # keys to replace when upserting
   def keys(:replace),
     do: keys_drop(:all, [:host, :name, :profile])
 
@@ -82,7 +80,13 @@ defmodule Remote.Schemas.Remote do
         :inserted_at
       ])
 
-  def keys(:set_profile), do: [:profile]
+  def keys_replace(params),
+    do:
+      MapSet.difference(
+        MapSet.new(Map.keys(params)),
+        MapSet.new([:host, :name, :profile])
+      )
+      |> MapSet.to_list()
 
   defp keys_drop(base_keys, drop),
     do:

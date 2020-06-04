@@ -213,13 +213,13 @@ defmodule Remote.DB.Remote do
   end
 
   def set_profile(name_or_id, profile) do
-    import Remote.Schemas.Remote, only: [changeset_profile: 2]
+    import Remote.Schemas.Remote, only: [changeset: 2]
     alias Remote.Schemas.Profile
     alias Remote.DB.Profile, as: DBP
 
     with %Schema{} = x <- find(name_or_id),
          {:profile, %Profile{name: name}} <- {:profile, DBP.find(profile)},
-         cs <- changeset_profile(x, %{profile: name}),
+         cs <- changeset(x, %{profile: name}),
          {:cs_valid, cs, true} <- {:cs_valid, cs, cs.valid?},
          {:ok, %Schema{name: name, profile: profile}} <- Repo.update(cs) do
       [remote: [name: name, profile: profile]]
@@ -256,6 +256,7 @@ defmodule Remote.DB.Remote do
       :idf_vsn,
       :app_elf_sha256,
       :build_date,
+      :build_time,
       :ap_rssi,
       :ap_pri_chan,
       :bssid,
@@ -286,13 +287,13 @@ defmodule Remote.DB.Remote do
     do: Map.put(msg, :remote_host, {:error, :badmsg})
 
   def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
-    import Remote.Schemas.Remote, only: [changeset: 2, keys: 1]
+    import Remote.Schemas.Remote, only: [changeset: 2, keys_replace: 1]
 
     # assemble the opts for upsert
     # check for conflicts on :host
     # if there is a conflict only replace keys(:replace)
     opts = [
-      on_conflict: {:replace, keys(:replace)},
+      on_conflict: {:replace, keys_replace(params)},
       returning: true,
       conflict_target: :host
     ]

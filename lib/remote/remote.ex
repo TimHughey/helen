@@ -13,6 +13,11 @@ defmodule Remote do
     Scribe.console(sorted, data: [:id, :name, :host, :hw, :inserted_at])
   end
 
+  defdelegate change_name(name_id_host, new_name),
+    to: Remote.DB.Remote
+
+  defdelegate find(name_or_id), to: Remote.DB.Remote
+
   @doc """
     Handles all aspects of processing Remote messages of "remote" type
     (periodic updates)
