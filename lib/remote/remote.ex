@@ -326,7 +326,6 @@ defmodule Remote do
          {:pfile, %Profile{} = profile} <- {:pfile, profile_find(pname)},
          # create the payload using the remote and profile
          cmd <- Profile.create_profile_payload(rem, profile) do
-      [inspect(cmd, pretty: true)] |> IO.puts()
       {rc, ref} = publish_to_host(cmd, "profile")
 
       Map.put(msg, :remote_profile_send, {rc, ref})
