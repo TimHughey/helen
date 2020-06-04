@@ -6,17 +6,46 @@ defmodule Remote do
 
   require Logger
 
-  def browse do
-    import Remote.DB.Remote, only: [all: 0]
+  alias Remote.DB
+  alias Remote.Schemas
 
-    sorted = all() |> Enum.sort(fn a, b -> a.name <= b.name end)
-    Scribe.console(sorted, data: [:id, :name, :host, :hw, :inserted_at])
+  def browse do
+    alias Schemas.Remote, as: Schema
+
+    sorted = Repo.all(Schema) |> Enum.sort(fn a, b -> a.name <= b.name end)
+
+    Scribe.console(sorted, data: [:id, :name, :host, :inserted_at])
   end
 
-  defdelegate change_name(name_id_host, new_name),
-    to: Remote.DB.Remote
+  @doc """
+    Delete a Remote by name, id or (as a last resort) host
+  """
 
-  defdelegate find(name_or_id), to: Remote.DB.Remote
+  @doc since: "0.0.21"
+  defdelegate delete(name_id_host), to: DB.Remote
+
+  @doc """
+    Deprecate a Remote by renaming to "~ name-time"
+  """
+
+  @doc since: "0.0.21"
+  defdelegate deprecate(name_id_host), to: DB.Remote
+
+  @doc """
+    Get a Remmote by id, name or (as a last resort) host
+
+    Same return values as Repo.get_by/2
+
+      1. nil if not found
+      2. %Remote.Schemas.Remote{}
+
+      ## Examples
+        iex> Remote.DB.Remote.find("test-builder")
+        %Remote.Schemas.Remote{}
+  """
+
+  @doc since: "0.0.21"
+  defdelegate find(name_or_id), to: DB.Remote
 
   @doc """
     Handles all aspects of processing Remote messages of "remote" type
@@ -27,8 +56,8 @@ defmodule Remote do
   @doc since: "0.0.16"
   def handle_message(%{processed: false, type: type} = msg_in)
       when type in ["remote", "boot"] do
-    alias Remote.Schemas.Remote, as: Schema
-    alias Remote.DB.Remote, as: DB
+    alias Schemas.Remote, as: Schema
+    alias DB.Remote, as: DB
     alias Fact.Influx
 
     # the with begins with processing the message through Device.DB.upsert/1
@@ -71,24 +100,40 @@ defmodule Remote do
   def handle_message(%{} = msg_in), do: msg_in
 
   @doc """
-    Set the profile for a Remote
+    Retrieve all Remote names
   """
-  @doc since: "0.0.20"
-  defdelegate set_profile(name_or_id, profile_name), to: Remote.DB.Remote
+
+  @doc since: "0.0.21"
+  defdelegate names, to: DB.Remote
 
   @doc """
-    Request OTA updates based on a prefix pattern
-
-    Simply pipelines names_begin_with/1 and ota_update/2
-
-      ## Examples
-        iex> Schema.ota_names_begin_with("lab-", [])
+    Retrieve a list of Remote names that begin with a pattern
   """
-  @doc since: "0.0.11"
-  def ota(pattern, opts \\ []) when is_binary(pattern) do
-    import Remote.DB.Remote, only: [names_begin_with: 1]
 
-    names_begin_with(pattern) |> ota_update(opts)
+  @doc since: "0.0.21"
+  defdelegate names_begin_with(pattern), to: DB.Remote
+
+  @doc """
+    Request OTA updates based on a name pattern
+
+    If opts is empty then the configuration from the app env is used
+    to build the uri of the firmware.
+
+    Possible Opts:
+      :host -> host to make the https request to
+      :path -> path name to the firmware file
+      :file -> actual firmware file name
+  """
+  @doc since: "0.0.21"
+  def ota(name_pattern, opts \\ []) do
+    with remotes when is_list(remotes) <- names_begin_with(name_pattern),
+         false <- Enum.empty?(remotes),
+         # ota commands must include the uri of the firmware in the payload
+         ota_cmd_map <- ota_uri_build(opts) do
+      remote_send_cmds(remotes, "ota", ota_cmd_map)
+    else
+      _not_found -> {:not_found, name_pattern}
+    end
   end
 
   ###
@@ -103,39 +148,96 @@ defmodule Remote do
   def ota_test, do: "test-" |> ota()
   def ota_all, do: ["roost-", "lab-", "reef-", "test-"] |> ota()
 
+  @doc """
+    Set the profile for a Remote
+  """
+  @doc since: "0.0.20"
+  defdelegate profile_assign(name_or_id, profile_name), to: DB.Remote
+
   defdelegate profile_create(name, opts \\ []),
-    to: Remote.DB.Profile,
+    to: DB.Profile,
     as: :create
 
   defdelegate profile_duplicate(name, new_name),
-    to: Remote.DB.Profile,
+    to: DB.Profile,
     as: :duplicate
 
-  defdelegate profile_find(name_or_id), to: Remote.DB.Profile, as: :find
-  defdelegate profile_reload(varies), to: Remote.DB.Profile, as: :reload
-  defdelegate profile_names, to: Remote.DB.Profile, as: :names
+  defdelegate profile_find(name_or_id), to: DB.Profile, as: :find
+  defdelegate profile_reload(varies), to: DB.Profile, as: :reload
+  defdelegate profile_names, to: DB.Profile, as: :names
+
+  @doc """
+    Output the Profile Payload for a Remote
+  """
+  @doc since: "0.0.21"
+  def profile_payload_puts(name_or_id) do
+    alias Schemas.Profile, as: Profile
+    alias Schemas.Remote, as: Remote
+
+    with %Remote{profile: pname} = rem <- find(name_or_id),
+         # find the profile assigned to this remote
+         {:pfile, %Profile{} = profile} <- {:pfile, profile_find(pname)},
+         # create the payload using the remote and profile
+         cmd <- Profile.create_profile_payload(rem, profile) do
+      ["\n", "payload = ", inspect(cmd, pretty: true), "\n"]
+      |> IO.puts()
+    else
+      _error -> {:not_found, name_or_id}
+    end
+  end
 
   defdelegate profile_to_external_map(name),
-    to: Remote.DB.Profile,
+    to: DB.Profile,
     as: :to_external_map
 
   defdelegate profile_update(name_or_schema, opts),
-    to: Remote.DB.Profile,
+    to: DB.Profile,
     as: :update
 
-  defdelegate profile_lookup_key(key), to: Remote.DB.Profile, as: :lookup_key
+  defdelegate profile_lookup_key(key), to: DB.Profile, as: :lookup_key
 
-  def restart(what, opts \\ []) do
-    import Remote.DB.Remote, only: [remote_list: 1]
+  @doc """
+    Rename a Remote
 
-    opts = Keyword.put_new(opts, :log, false)
-    restart_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
+    NOTE: the remote to rename is found by id, name or host
+  """
 
-    if Enum.empty?(restart_list) do
-      {:failed, restart_list}
+  @doc since: "0.0.21"
+  defdelegate rename(existing_name_id_host, new_name), to: DB.Remote
+
+  @doc """
+    Issue a restart request to a single or list of Remotes
+  """
+
+  @doc since: "0.0.21"
+  def restart(name_pattern) do
+    with remotes when is_list(remotes) <- names_begin_with(name_pattern),
+         false <- Enum.empty?(remotes) do
+      # restart commands are trivial, they only require the base cmd info
+      # which is provided by remote_send_cmds/2
+      remote_send_cmds(remotes, "restart")
     else
-      opts = opts ++ [restart_list: restart_list]
-      OTA.restart(opts)
+      _not_found -> {:not_found, name_pattern}
+    end
+  end
+
+  @doc """
+    Rename and restart a Remote
+
+    NOTE:  To effectuate the new name the Remote must be restarted.
+  """
+
+  def rename_and_restart(name_id_host, new_name) do
+    alias DB.Remote, as: DB
+
+    # rename/2 will return a list upon success
+    with res when is_list(res) <- DB.rename(name_id_host, new_name),
+         remote_key <- Keyword.get(res, :remote),
+         new_name <- Keyword.get(remote_key, :now_named),
+         restart_res <- restart(new_name) do
+      Keyword.put(res, :restart, restart_res)
+    else
+      error -> error
     end
   end
 
@@ -143,34 +245,97 @@ defmodule Remote do
   # PRIVATE FUNCTIONS
   #
 
-  defp ota_update(what, opts) do
-    import Remote.DB.Remote, only: [remote_list: 1]
+  defp ota_uri_build(opts) when is_list(opts) do
+    # filter down the opts supplied to only those of interest
+    opts = Keyword.take(opts, [:host, :path, :file])
 
-    opts = Keyword.put_new(opts, :log, false)
-    update_list = remote_list(what) |> Enum.filter(fn x -> is_map(x) end)
+    # add any required opts that were not provided
+    final_uri_opts = Keyword.merge(ota_uri_default_opts(), opts)
 
-    if Enum.empty?(update_list) do
-      []
-    else
-      opts = opts ++ [update_list: update_list]
-      OTA.send_cmd(opts)
+    # return a map that will be used as additional payload for the command
+    %{
+      uri:
+        [
+          "https:/",
+          Keyword.get(final_uri_opts, :host),
+          Keyword.get(final_uri_opts, :path),
+          Keyword.get(final_uri_opts, :file)
+        ]
+        |> Enum.join("/")
+    }
+  end
+
+  defp ota_uri_default_opts do
+    Application.get_env(:helen, OTA,
+      uri: [
+        host: "localhost",
+        path: "example_path",
+        file: "example.bin"
+      ]
+    )
+    |> Keyword.get(:uri)
+  end
+
+  defp remote_send_cmds(remotes, cmd, payload \\ %{})
+
+  defp remote_send_cmds(remotes, cmd, %{} = payload) when is_list(remotes) do
+    alias Schemas.Remote, as: Schema
+    alias DB.Remote, as: DB
+
+    for x <- remotes do
+      with %Schema{} = found <- DB.find(x) do
+        remote_send_cmds(found, cmd, payload)
+      else
+        _not_found -> {:not_found, x}
+      end
     end
+    |> List.flatten()
+  end
+
+  defp remote_send_cmds(
+         %Schemas.Remote{name: name, host: host},
+         cmd,
+         %{} = payload
+       )
+       when cmd in ["restart", "ota"] do
+    import Mqtt.Client, only: [publish_to_host: 2]
+    import TimeSupport, only: [unix_now: 0]
+
+    # all commands must include the basic information
+    base_cmd = %{name: name, host: host, mtime: unix_now()}
+
+    # merge in (or override) the command base with the payload (if any)
+    #
+    # for example, restart commands only require the basic command info
+    # where, on the other hand, ota updates must supply additional information
+    cmd_map = Map.merge(base_cmd, payload)
+    {rc, ref} = publish_to_host(cmd_map, cmd)
+
+    # return [cmd: [{name, rc, ref}]]
+    [{String.to_atom(cmd), {name, rc, ref}}]
   end
 
   defp send_profile_if_needed(%{type: type, remote_host: remote_host} = msg) do
-    import Mqtt.Command.Remote.Profile, only: [send_cmd: 1]
-    # alias Fact.Remote.Boot
-    alias Remote.Schemas.Remote, as: Schema
+    import Mqtt.Client, only: [publish_to_host: 2]
+    alias Schemas.Remote, as: Schema
+    alias Schemas.Profile, as: Profile
 
-    with {:ok, %Schema{name: _name} = rem} <- remote_host,
-         "boot" <- type do
-      send_cmd(rem)
+    with {:ok, %Schema{name: _name, profile: pname} = rem} <- remote_host,
+         "boot" <- type,
+         # find the profile assigned to this remote
+         {:pfile, %Profile{} = profile} <- {:pfile, profile_find(pname)},
+         # create the payload using the remote and profile
+         cmd <- Profile.create_profile_payload(rem, profile) do
+      [inspect(cmd, pretty: true)] |> IO.puts()
+      {rc, ref} = publish_to_host(cmd, "profile")
 
-      # Boot.record(host: name, vsn: vsn)
-
-      msg
+      Map.put(msg, :remote_profile_send, {rc, ref})
     else
-      _error -> msg
+      {:pfile, nil} ->
+        Map.put(msg, :remote_profile_send, {:failed, :not_found})
+
+      error ->
+        Map.put(msg, :remote_profile_send, {:failed, error})
     end
   end
 
@@ -186,7 +351,7 @@ defmodule Remote do
            remote_host: remote_host
          } = msg
        ) do
-    alias Remote.Schemas.Remote, as: Schema
+    alias Schemas.Remote, as: Schema
     log = Map.get(msg, :log, true)
 
     with {:ok, %Schema{name: name}} <- remote_host,

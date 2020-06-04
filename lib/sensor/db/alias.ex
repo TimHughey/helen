@@ -36,7 +36,7 @@ defmodule Sensor.DB.Alias do
   """
 
   @doc since: "0.0.16"
-  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
+  def find(id_or_name) do
     check_args = fn
       x when is_binary(x) -> [name: x]
       x when is_integer(x) -> [id: x]

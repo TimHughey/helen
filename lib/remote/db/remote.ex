@@ -7,70 +7,19 @@ defmodule Remote.DB.Remote do
 
   alias Remote.Schemas.Remote, as: Schema
 
-  def all do
-    import Ecto.Query, only: [from: 2]
-
-    from(
-      rem in Schema,
-      select: rem
-    )
-    |> Repo.all()
-  end
-
-  def change_name(id, new_name) when is_integer(id) and is_binary(new_name) do
-    remote = Repo.get(Schema, id)
-
-    if remote do
-      case change_name(remote.host, new_name) do
-        :ok -> new_name
-        failed -> failed
-      end
-    else
-      :not_found
-    end
-  end
-
-  def change_name(host, new_name)
-      when is_binary(host) and is_binary(new_name) do
-    import Remote.Schemas.Remote, only: [changeset: 2]
-
-    remote = find_by_host(host)
-    check = find(new_name)
-
-    if is_nil(check) do
-      case remote do
-        %Schema{} ->
-          {res, rem} = changeset(remote, %{name: new_name}) |> Repo.update()
-
-          # Remote names are set upon receipt of their Profile
-          # so, if the %Schema{} update succeeded we need to send a restart
-          # command
-          if res == :ok, do: Remote.restart(rem.name)
-
-          res
-
-        _nomatch ->
-          :not_found
-      end
-    else
-      :name_in_use
-    end
-  end
-
-  def change_name(_, _), do: {:error, :bad_args}
-
   @doc """
-  Delete a Remote by Name or id
+  Delete a Remote by Name, ID or (as last resort) Host
   """
 
   @doc since: "0.0.21"
-  def delete(id) when is_integer(id) do
+  def delete(name_id_host) do
     alias Remote.Schemas.Remote, as: Schema
 
-    with %Schema{} = x <- find(id) do
+    with %Schema{} = x <- find(name_id_host) do
       Repo.delete(x)
     else
-      _catchall -> {:not_found, id}
+      nil -> {:not_found, name_id_host}
+      error -> error
     end
   end
 
@@ -82,71 +31,53 @@ defmodule Remote.DB.Remote do
     end
   end
 
-  def deprecate(:help), do: deprecate()
-
-  def deprecate(what) do
+  def deprecate(name_id_host) do
     import Remote.Schemas.Remote, only: [changeset: 2]
 
-    r = find(what)
-
-    if is_nil(r) do
-      {:error, :not_found}
+    with %Schema{name: name} <- find(name_id_host),
+         time_str <- Timex.now() |> Timex.format!("{ASN1:UTCtime}"),
+         tobe_name <- ["~ ", name, ":", time_str] |> IO.iodata_to_binary() do
+      rename(name_id_host, tobe_name)
     else
-      tobe = "~ #{r.name}-#{Timex.now() |> Timex.format!("{ASN1:UTCtime}")}"
-
-      r
-      |> changeset(%{name: tobe})
-      |> Repo.update()
+      _not_found -> {:not_found, name_id_host}
     end
   end
 
-  def deprecate do
-    IO.puts("Usage:")
-    IO.puts("\tRemote.deprecate(name|id)")
-  end
+  @doc """
+    Get a Remmote by id, name or (as a last resort) by host
 
-  def find(id) when is_integer(id),
-    do: Repo.get_by(Schema, id: id)
+    Same return values as Repo.get_by/2
 
-  def find(name) when is_binary(name),
-    do: Repo.get_by(Schema, name: name)
+      1. nil if not found
+      2. %Remote.Schemas.Remote{}
 
-  def find(_not_id_or_name), do: nil
+      ## Examples
+        iex> Remote.DB.Remote.find("test-builder")
+        %Remote.Schemas.Remote{}
+  """
 
-  def find_by_host(host) when is_binary(host),
-    do: Repo.get_by(Schema, host: host)
-
-  # header to define default parameter for multiple functions
-  def mark_as_seen(host, time, threshold_secs \\ 3)
-
-  def mark_as_seen(host, mtime, threshold_secs)
-      when is_binary(host) and is_integer(mtime) do
-    case find_by_host(host) do
-      nil ->
-        host
-
-      rem ->
-        mark_as_seen(rem, TimeSupport.from_unix(mtime), threshold_secs)
+  @doc since: "0.0.21"
+  def find(id_or_name) do
+    check_args = fn
+      x when is_binary(x) -> [name: x]
+      x when is_integer(x) -> [id: x]
+      x -> {:bad_args, x}
     end
-  end
 
-  def mark_as_seen(%Schema{} = rem, %DateTime{} = dt, threshold_secs) do
-    import Remote.Schemas.Remote, only: [changeset: 2]
+    import Repo, only: [get_by: 2]
 
-    # only update last seen if more than threshold_secs different
-    # this is to avoid high rates of updates when a device hosts many sensors
-    if Timex.diff(dt, rem.last_seen_at, :seconds) >= threshold_secs do
-      opts = [last_seen_at: dt]
-      {res, updated} = changeset(rem, opts) |> Repo.update()
-      if res == :ok, do: updated.name, else: rem.name
+    with opts when is_list(opts) <- check_args.(id_or_name),
+         %Schema{} = found <- get_by(Schema, opts) do
+      found
     else
-      rem.name
+      {:bad_args, _} = x -> x
+      x when is_nil(x) -> get_by(Schema, host: id_or_name)
+      x -> {:error, x}
     end
   end
 
-  def mark_as_seen(nil, _, _), do: nil
-
-  def ota_update_map(%Schema{} = r), do: %{name: r.name, host: r.host}
+  @doc since: "0.0.21"
+  def names, do: names_begin_with("")
 
   @doc """
     Retrieve a list of Remote names that begin with a pattern
@@ -166,53 +97,7 @@ defmodule Remote.DB.Remote do
     |> Repo.all()
   end
 
-  # create a list of ota updates for all Remotes
-  def remote_list(:all) do
-    remotes = all()
-
-    for r <- remotes, do: ota_update_map(r)
-  end
-
-  # create a list
-  def remote_list(id) when is_integer(id) do
-    with %Schema{} = r <- find(id),
-         map <- ota_update_map(r) do
-      [map]
-    else
-      nil ->
-        [:not_found]
-    end
-  end
-
-  def remote_list(name) when is_binary(name) do
-    import Ecto.Query, only: [from: 2]
-
-    q = from(remote in Schema, where: [name: ^name], or_where: [host: ^name])
-    rem = Repo.one(q)
-
-    case rem do
-      %Schema{} = r ->
-        map = ota_update_map(r)
-        [map]
-
-      nil ->
-        [:not_found]
-    end
-  end
-
-  def remote_list(list) when is_list(list) do
-    make_list = fn list ->
-      for l <- list, do: remote_list(l)
-    end
-
-    make_list.(list) |> List.flatten()
-  end
-
-  def remote_list(catchall) do
-    [:unsupported, catchall]
-  end
-
-  def set_profile(name_or_id, profile) do
+  def profile_assign(name_or_id, profile) do
     import Remote.Schemas.Remote, only: [changeset: 2]
     alias Remote.Schemas.Profile
     alias Remote.DB.Profile, as: DBP
@@ -226,6 +111,30 @@ defmodule Remote.DB.Remote do
     else
       nil -> {:not_found, name_or_id}
       {:profile, nil} -> {:not_found, profile}
+      {:cs_valid, cs, false} -> {:invalid_changes, cs}
+      error -> {:error, error}
+    end
+  end
+
+  @doc """
+    Rename a Remote
+
+    NOTE: the remote to rename is found by id, name or host
+  """
+
+  @doc since: "0.0.21"
+  def rename(existing_name_id_host, new_name) when is_binary(new_name) do
+    import Remote.Schemas.Remote, only: [changeset: 2]
+
+    to_find = existing_name_id_host
+
+    with {:find, %Schema{name: was} = x} <- {:find, find(to_find)},
+         cs <- changeset(x, %{name: new_name}),
+         {:cs_valid, cs, true} <- {:cs_valid, cs, cs.valid?},
+         {:ok, %Schema{name: name}} <- Repo.update(cs) do
+      [remote: [was_named: was, now_named: name]]
+    else
+      {:find, nil} -> {:not_found, to_find}
       {:cs_valid, cs, false} -> {:invalid_changes, cs}
       error -> {:error, error}
     end

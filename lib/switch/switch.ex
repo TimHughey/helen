@@ -7,7 +7,7 @@ defmodule Switch do
 
   require Logger
 
-  alias Switch.{Alias}
+  alias Switch.{Alias, Device}
 
   defmacro __using__([]) do
     quote do
@@ -55,6 +55,70 @@ defmodule Switch do
       true ->
         Enum.count(aliases)
     end
+  end
+
+  @doc """
+    Public API for creating a Sensor Alias
+  """
+  @doc since: "0.0.21"
+  def alias_create(device_or_id, name, pio, opts \\ []) do
+    alias Switch.{Alias, Device}
+
+    # first, find the device to alias
+    with %Device{device: dev_name} = dev <- device_find(device_or_id),
+         # create the alias and capture it's name
+         {:ok, %Alias{name: name}} <- Alias.create(dev, name, pio, opts) do
+      [created: [name: name, device: dev_name, pio: pio]]
+    else
+      nil -> {:not_found, device_or_id}
+      error -> error
+    end
+  end
+
+  @doc """
+  Finds a Switch Alias by name or id
+
+  opts are passed as-is to Repo.preload/2
+  """
+
+  @doc since: "0.0.21"
+  defdelegate alias_find(name_or_id, opts), to: Alias, as: :find
+
+  @doc """
+    Find a Switch Device by device or id
+  """
+  @doc since: "0.0.21"
+  defdelegate device_find(device_or_id), to: Device, as: :find
+
+  @doc """
+    Find a the alias of a Device using pio
+  """
+  @doc since: "0.0.21"
+  def device_find_alias(device_or_id, name, pio, opts \\ []) do
+    alias Switch.Device
+
+    with %Device{} = dev <- device_find(device_or_id) do
+      Device.find_alias(dev, name, pio, opts)
+    else
+      _not_found -> {:not_found, device_or_id}
+    end
+  end
+
+  @doc """
+    Retrieve a list of devices that begin with a pattern
+  """
+  @doc since: "0.0.21"
+  def devices_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+
+    from(x in Device,
+      where: like(x.device, ^like_string),
+      order_by: x.device,
+      select: x.device
+    )
+    |> Repo.all()
   end
 
   def position(name, opts \\ []) when is_binary(name) and is_list(opts) do

@@ -78,6 +78,23 @@ defmodule Remote.Schemas.Profile do
     |> unique_constraint(:name, [:name])
   end
 
+  @doc """
+    Create the command payload for a Profile
+
+  """
+  @doc since: "0.0.21"
+  def create_profile_payload(%{host: host, name: name}, %Schema{} = p) do
+    Map.merge(
+      %{
+        payload: "profile",
+        mtime: TimeSupport.unix_now(:second),
+        host: host,
+        assigned_name: name
+      },
+      as_external_map(p)
+    )
+  end
+
   def keys(:all),
     do:
       %Schema{}
@@ -101,7 +118,7 @@ defmodule Remote.Schemas.Profile do
     Converts a Remote Profile to a map that can be used externally.
 
       ## Examples
-        iex> Remote.Schemas.Profile.external_map("default")
+        iex> Remote.Schemas.Profile.as_external_map("default")
         %{
          meta: %{version: "", updated_mtime: 12345, inserted_mtime: 12345},
          ds: %{enable: true,
@@ -112,7 +129,7 @@ defmodule Remote.Schemas.Profile do
   """
 
   @doc since: "0.0.8"
-  def external_map(%Schema{} = p) do
+  def as_external_map(%Schema{} = p) do
     %{
       meta: %{
         profile: p.name,

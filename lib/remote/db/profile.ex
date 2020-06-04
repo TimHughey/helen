@@ -166,10 +166,10 @@ defmodule Remote.DB.Profile do
 
   @doc since: "0.0.20"
   def to_external_map(name) do
-    import Remote.Schemas.Profile, only: [external_map: 1]
+    import Remote.Schemas.Profile, only: [as_external_map: 1]
 
     with %Schema{} = p <- find(name) do
-      external_map(p)
+      as_external_map(p)
     else
       _not_found -> %{}
     end
