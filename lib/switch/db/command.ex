@@ -1,11 +1,9 @@
 defmodule Switch.DB.Command do
-  @moduledoc false
+  @moduledoc """
+  Database functionality for Switch Command
+  """
 
-  require Logger
   use Ecto.Schema
-
-  import Ecto.Changeset
-
   use Janitor
 
   alias Switch.DB.Command, as: Schema
@@ -121,12 +119,11 @@ defmodule Switch.DB.Command do
   def reload(id) when is_integer(id),
     do: Repo.get_by(Schema, id: id) |> Repo.preload([:device])
 
-  defp changeset(pwmc, params) when is_list(params),
-    do: changeset(pwmc, Enum.into(params, %{}))
+  defp changeset(x, params) when is_map(params) do
+    import Ecto.Changeset,
+      only: [cast: 3, validate_required: 2, unique_constraint: 3]
 
-  defp changeset(pwmc, params) when is_map(params) do
-    pwmc
-    |> cast(params, cast_changes())
+    cast(x, Enum.into(params, %{}), cast_changes())
     |> validate_required([:sw_alias, :acked, :orphan, :sent_at])
     |> unique_constraint(:refid, name: :switch_command_refid_index)
   end

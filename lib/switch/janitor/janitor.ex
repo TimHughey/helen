@@ -13,6 +13,8 @@ defmodule Janitor do
 
   defmacro __using__(_opts) do
     quote do
+      require Logger
+
       use Config.Helper
       import TimeSupport, only: [utc_now: 0]
 
