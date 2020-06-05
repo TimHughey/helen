@@ -3,7 +3,7 @@ defmodule Fact.Remote do
     Specific processing for Remote messages
   """
 
-  alias Remote.Schemas.Remote
+  alias Remote.DB.Remote, as: Remote
 
   # handle temperature metrics
 

@@ -6,12 +6,11 @@ defmodule Remote do
 
   require Logger
 
+  alias Remote.DB.Remote, as: Schema
   alias Remote.DB
-  alias Remote.Schemas
+  alias Remote.DB.Profile
 
   def browse do
-    alias Schemas.Remote, as: Schema
-
     sorted = Repo.all(Schema) |> Enum.sort(fn a, b -> a.name <= b.name end)
 
     Scribe.console(sorted, data: [:id, :name, :host, :inserted_at])
@@ -56,12 +55,10 @@ defmodule Remote do
   @doc since: "0.0.16"
   def handle_message(%{processed: false, type: type} = msg_in)
       when type in ["remote", "boot"] do
-    alias Schemas.Remote, as: Schema
-    alias DB.Remote, as: DB
     alias Fact.Influx
 
     # the with begins with processing the message through Device.DB.upsert/1
-    with %{remote_host: remote_host} = msg <- DB.upsert(msg_in),
+    with %{remote_host: remote_host} = msg <- Schema.upsert(msg_in),
          # was the upset a success?
          {:ok, %Schema{}} <- remote_host,
          msg <- Map.put(msg, :processed, true),
@@ -171,10 +168,7 @@ defmodule Remote do
   """
   @doc since: "0.0.21"
   def profile_payload_puts(name_or_id) do
-    alias Schemas.Profile, as: Profile
-    alias Schemas.Remote, as: Remote
-
-    with %Remote{profile: pname} = rem <- find(name_or_id),
+    with %Schema{profile: pname} = rem <- find(name_or_id),
          # find the profile assigned to this remote
          {:pfile, %Profile{} = profile} <- {:pfile, profile_find(pname)},
          # create the payload using the remote and profile
@@ -228,10 +222,8 @@ defmodule Remote do
   """
 
   def rename_and_restart(name_id_host, new_name) do
-    alias DB.Remote, as: DB
-
     # rename/2 will return a list upon success
-    with res when is_list(res) <- DB.rename(name_id_host, new_name),
+    with res when is_list(res) <- Schema.rename(name_id_host, new_name),
          remote_key <- Keyword.get(res, :remote),
          new_name <- Keyword.get(remote_key, :now_named),
          restart_res <- restart(new_name) do
@@ -279,11 +271,8 @@ defmodule Remote do
   defp remote_send_cmds(remotes, cmd, payload \\ %{})
 
   defp remote_send_cmds(remotes, cmd, %{} = payload) when is_list(remotes) do
-    alias Schemas.Remote, as: Schema
-    alias DB.Remote, as: DB
-
     for x <- remotes do
-      with %Schema{} = found <- DB.find(x) do
+      with %Schema{} = found <- Schema.find(x) do
         remote_send_cmds(found, cmd, payload)
       else
         _not_found -> {:not_found, x}
@@ -293,7 +282,7 @@ defmodule Remote do
   end
 
   defp remote_send_cmds(
-         %Schemas.Remote{name: name, host: host},
+         %Schema{name: name, host: host},
          cmd,
          %{} = payload
        )
@@ -317,8 +306,6 @@ defmodule Remote do
 
   defp send_profile_if_needed(%{type: type, remote_host: remote_host} = msg) do
     import Mqtt.Client, only: [publish_to_host: 2]
-    alias Schemas.Remote, as: Schema
-    alias Schemas.Profile, as: Profile
 
     with {:ok, %Schema{name: _name, profile: pname} = rem} <- remote_host,
          "boot" <- type,
@@ -350,7 +337,6 @@ defmodule Remote do
            remote_host: remote_host
          } = msg
        ) do
-    alias Schemas.Remote, as: Schema
     log = Map.get(msg, :log, true)
 
     with {:ok, %Schema{name: name}} <- remote_host,

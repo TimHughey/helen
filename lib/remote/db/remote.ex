@@ -3,9 +3,54 @@ defmodule Remote.DB.Remote do
   Database implementation for Remote
   """
 
+  use Ecto.Schema
   use Timex
 
-  alias Remote.Schemas.Remote, as: Schema
+  schema "remote" do
+    field(:host, :string)
+    field(:name, :string)
+    field(:profile, :string, default: "default")
+    field(:firmware_vsn, :string)
+    field(:firmware_etag, :string, default: "<none>")
+    field(:idf_vsn, :string)
+    field(:app_elf_sha256, :string)
+    field(:build_date, :string)
+    field(:build_time, :string)
+    field(:last_start_at, :utc_datetime_usec)
+    field(:last_seen_at, :utc_datetime_usec)
+    field(:batt_mv, :integer, default: 0)
+    field(:reset_reason, :string)
+    field(:bssid, :string)
+    field(:ap_rssi, :integer, default: 0)
+    field(:ap_pri_chan, :integer, default: 0)
+    field(:heap_free, :integer, default: 0)
+    field(:heap_min, :integer, default: 0)
+    field(:uptime_us, :integer, default: 0)
+
+    timestamps(type: :utc_datetime_usec)
+  end
+
+  alias Remote.DB.Remote, as: Schema
+
+  def changeset(%Schema{} = rem, params) do
+    import Ecto.Changeset,
+      only: [
+        cast: 3,
+        validate_required: 2,
+        validate_format: 3,
+        unique_constraint: 2
+      ]
+
+    import Common.DB, only: [name_regex: 0]
+
+    rem
+    # since this changeset is used by upsert and update we only want to
+    # cast the keys of the parameters
+    |> cast(params, Map.keys(Enum.into(params, %{})))
+    |> validate_required(keys(:required))
+    |> validate_format(:host, name_regex())
+    |> unique_constraint(:name)
+  end
 
   @doc """
   Delete a Remote by Name, ID or (as last resort) Host
@@ -13,8 +58,6 @@ defmodule Remote.DB.Remote do
 
   @doc since: "0.0.21"
   def delete(name_id_host) do
-    alias Remote.Schemas.Remote, as: Schema
-
     with %Schema{} = x <- find(name_id_host) do
       Repo.delete(x)
     else
@@ -32,8 +75,6 @@ defmodule Remote.DB.Remote do
   end
 
   def deprecate(name_id_host) do
-    import Remote.Schemas.Remote, only: [changeset: 2]
-
     with %Schema{name: name} <- find(name_id_host),
          time_str <- Timex.now() |> Timex.format!("{ASN1:UTCtime}"),
          tobe_name <- ["~ ", name, ":", time_str] |> IO.iodata_to_binary() do
@@ -76,6 +117,48 @@ defmodule Remote.DB.Remote do
     end
   end
 
+  def keys(:all),
+    do:
+      Map.from_struct(%Schema{})
+      |> Map.drop([:__meta__, :id])
+      |> Map.keys()
+      |> List.flatten()
+
+  def keys(:cast), do: keys(:all)
+
+  # keys to replace when upserting
+  def keys(:replace),
+    do: keys_drop(:all, [:host, :name, :profile])
+
+  def keys(:required),
+    do:
+      keys_drop(:cast, [
+        :app_elf_sha256,
+        :bssid,
+        :build_date,
+        :build_time,
+        :firmware_vsn,
+        :idf_vsn,
+        :last_start_at,
+        :last_seen_at,
+        :reset_reason,
+        :updated_at,
+        :inserted_at
+      ])
+
+  def keys_replace(params),
+    do:
+      MapSet.difference(
+        MapSet.new(Map.keys(params)),
+        MapSet.new([:host, :name, :profile])
+      )
+      |> MapSet.to_list()
+
+  defp keys_drop(base_keys, drop),
+    do:
+      MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
+      |> MapSet.to_list()
+
   @doc since: "0.0.21"
   def names, do: names_begin_with("")
 
@@ -98,12 +181,10 @@ defmodule Remote.DB.Remote do
   end
 
   def profile_assign(name_or_id, profile) do
-    import Remote.Schemas.Remote, only: [changeset: 2]
-    alias Remote.Schemas.Profile
-    alias Remote.DB.Profile, as: DBP
+    alias Remote.DB.Profile
 
     with %Schema{} = x <- find(name_or_id),
-         {:profile, %Profile{name: name}} <- {:profile, DBP.find(profile)},
+         {:profile, %Profile{name: name}} <- {:profile, Profile.find(profile)},
          cs <- changeset(x, %{profile: name}),
          {:cs_valid, cs, true} <- {:cs_valid, cs, cs.valid?},
          {:ok, %Schema{name: name, profile: profile}} <- Repo.update(cs) do
@@ -124,8 +205,6 @@ defmodule Remote.DB.Remote do
 
   @doc since: "0.0.21"
   def rename(existing_name_id_host, new_name) when is_binary(new_name) do
-    import Remote.Schemas.Remote, only: [changeset: 2]
-
     to_find = existing_name_id_host
 
     with {:find, %Schema{name: was} = x} <- {:find, find(to_find)},
@@ -196,8 +275,6 @@ defmodule Remote.DB.Remote do
     do: Map.put(msg, :remote_host, {:error, :badmsg})
 
   def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
-    import Remote.Schemas.Remote, only: [changeset: 2, keys_replace: 1]
-
     # assemble the opts for upsert
     # check for conflicts on :host
     # if there is a conflict only replace keys(:replace)

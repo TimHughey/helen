@@ -49,7 +49,7 @@ defmodule Fact.Influx do
   """
   @doc since: "0.0.16"
   def handle_message(%{remote_host: remote_host, msg_recv_dt: _} = msg) do
-    alias Remote.Schemas.Remote, as: Schema
+    alias Remote.DB.Remote, as: Schema
     alias Fact.Remote
 
     # begin by confirming the datapoint was saved

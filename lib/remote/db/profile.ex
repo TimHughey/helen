@@ -3,9 +3,178 @@ defmodule Remote.DB.Profile do
   Database implementation for Remote Profile
   """
 
-  require Logger
+  use Ecto.Schema
 
-  alias Remote.Schemas.Profile, as: Schema
+  schema "remote_profile" do
+    field(:name, :string)
+    field(:description, :string)
+    field(:version, Ecto.UUID, autogenerate: true)
+    field(:watch_stacks, :boolean, default: false)
+    field(:core_loop_interval_ms, :integer, default: 1000)
+    field(:core_timestamp_ms, :integer, default: 6 * 60 * 1000)
+
+    field(:dalsemi_enable, :boolean, default: true)
+    field(:dalsemi_core_stack, :integer, default: 1536)
+    field(:dalsemi_core_priority, :integer, default: 1)
+    field(:dalsemi_discover_stack, :integer, default: 4096)
+    field(:dalsemi_discover_priority, :integer, default: 12)
+    field(:dalsemi_report_stack, :integer, default: 3072)
+    field(:dalsemi_report_priority, :integer, default: 13)
+    field(:dalsemi_convert_stack, :integer, default: 2048)
+    field(:dalsemi_convert_priority, :integer, default: 13)
+    field(:dalsemi_command_stack, :integer, default: 3072)
+    field(:dalsemi_command_priority, :integer, default: 14)
+    field(:dalsemi_core_interval_ms, :integer, default: 30)
+    field(:dalsemi_discover_interval_ms, :integer, default: 30)
+    field(:dalsemi_convert_interval_ms, :integer, default: 7)
+    field(:dalsemi_report_interval_ms, :integer, default: 7)
+
+    field(:i2c_enable, :boolean, default: true)
+    field(:i2c_use_multiplexer, :boolean, default: false)
+    field(:i2c_core_stack, :integer, default: 1536)
+    field(:i2c_core_priority, :integer, default: 1)
+    field(:i2c_discover_stack, :integer, default: 4096)
+    field(:i2c_discover_priority, :integer, default: 12)
+    field(:i2c_report_stack, :integer, default: 3072)
+    field(:i2c_report_priority, :integer, default: 13)
+    field(:i2c_command_stack, :integer, default: 3072)
+    field(:i2c_command_priority, :integer, default: 14)
+    field(:i2c_core_interval_ms, :integer, default: 7)
+    field(:i2c_discover_interval_ms, :integer, default: 60)
+    field(:i2c_report_interval_ms, :integer, default: 7)
+
+    field(:pwm_enable, :boolean, default: true)
+    field(:pwm_core_stack, :integer, default: 1536)
+    field(:pwm_core_priority, :integer, default: 1)
+    field(:pwm_report_stack, :integer, default: 2048)
+    field(:pwm_report_priority, :integer, default: 12)
+    field(:pwm_command_stack, :integer, default: 2048)
+    field(:pwm_command_priority, :integer, default: 14)
+    field(:pwm_core_interval_ms, :integer, default: 10)
+    field(:pwm_report_interval_ms, :integer, default: 10)
+
+    timestamps(type: :utc_datetime_usec)
+  end
+
+  alias Remote.DB.Profile, as: Schema
+
+  @doc """
+    Converts a Remote Profile to a map that can be used externally.
+
+      ## Examples
+        iex> Remote.Schemas.Profile.as_external_map("default")
+        %{
+         meta: %{version: "", updated_mtime: 12345, inserted_mtime: 12345},
+         ds: %{enable: true,
+          core: %{stack: 2048, pri: 0},
+          convert: %{stack: 2048, pri: 14},
+          ...
+        }
+  """
+
+  @doc since: "0.0.8"
+  def as_external_map(%Schema{} = p) do
+    %{
+      meta: %{
+        profile: p.name,
+        version: p.version
+      },
+      core: %{
+        loop_ms: p.core_loop_interval_ms,
+        timestamp_ms: p.core_timestamp_ms
+      },
+      ds: %{
+        enable: p.dalsemi_enable,
+        core: %{
+          stack: p.dalsemi_core_stack,
+          pri: p.dalsemi_core_priority,
+          interval_ms: p.dalsemi_core_interval_ms
+        },
+        discover: %{
+          stack: p.dalsemi_discover_stack,
+          pri: p.dalsemi_discover_priority,
+          interval_ms: p.dalsemi_discover_interval_ms
+        },
+        report: %{
+          stack: p.dalsemi_report_stack,
+          pri: p.dalsemi_report_priority,
+          interval_ms: p.dalsemi_report_interval_ms
+        },
+        convert: %{
+          stack: p.dalsemi_convert_stack,
+          pri: p.dalsemi_convert_priority,
+          interval_ms: p.dalsemi_convert_interval_ms
+        },
+        command: %{
+          stack: p.dalsemi_command_stack,
+          pri: p.dalsemi_command_priority
+        }
+      },
+      i2c: %{
+        enable: p.i2c_enable,
+        core: %{
+          stack: p.i2c_core_stack,
+          pri: p.i2c_core_priority,
+          interval_ms: p.i2c_core_interval_ms
+        },
+        discover: %{
+          stack: p.i2c_discover_stack,
+          pri: p.i2c_discover_priority,
+          interval_ms: p.i2c_discover_interval_ms
+        },
+        report: %{
+          stack: p.i2c_report_stack,
+          pri: p.i2c_report_priority,
+          interval_ms: p.i2c_report_interval_ms
+        },
+        command: %{
+          stack: p.i2c_command_stack,
+          pri: p.i2c_command_priority
+        }
+      },
+      pwm: %{
+        enable: p.pwm_enable,
+        core: %{
+          stack: p.pwm_core_stack,
+          pri: p.pwm_core_priority,
+          interval_ms: p.pwm_core_interval_ms
+        },
+        report: %{
+          stack: p.pwm_report_stack,
+          pri: p.pwm_report_priority,
+          interval_ms: p.pwm_report_interval_ms
+        },
+        command: %{
+          stack: p.pwm_command_stack,
+          pri: p.pwm_command_priority
+        }
+      },
+      misc: %{
+        watch_stacks: p.watch_stacks,
+        i2c_mplex: p.i2c_use_multiplexer
+      }
+    }
+  end
+
+  def changeset(x, params) when is_list(params) do
+    changeset(x, Enum.into(params, %{}))
+  end
+
+  def changeset(x, params) when is_map(params) do
+    import Ecto.Changeset,
+      only: [
+        cast: 3,
+        unique_constraint: 3,
+        validate_format: 3
+      ]
+
+    import Common.DB, only: [name_regex: 0]
+
+    x
+    |> cast(params, keys(:all))
+    |> validate_format(:name, name_regex())
+    |> unique_constraint(:name, [:name])
+  end
 
   @doc """
     Creates a new Remote Profile with specified name and optional parameters
@@ -21,8 +190,6 @@ defmodule Remote.DB.Profile do
   """
   @doc since: "0.0.8"
   def create(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    import Remote.Schemas.Profile, only: [changeset: 2, keys: 1]
-
     params =
       Keyword.take(opts, keys(:create_opts))
       |> Enum.into(%{})
@@ -46,6 +213,42 @@ defmodule Remote.DB.Profile do
   end
 
   @doc """
+    Create the command payload for a Profile
+
+  """
+  @doc since: "0.0.21"
+  def create_profile_payload(%{host: host, name: name}, %Schema{} = p) do
+    Map.merge(
+      %{
+        payload: "profile",
+        mtime: TimeSupport.unix_now(:second),
+        host: host,
+        assigned_name: name
+      },
+      as_external_map(p)
+    )
+  end
+
+  def keys(:all),
+    do:
+      %Schema{}
+      |> Map.from_struct()
+      |> Map.drop([:__meta__])
+      |> Map.keys()
+      |> List.flatten()
+
+  def keys(:create_opts),
+    do:
+      keys(:update_opts)
+      |> List.delete(:name)
+
+  def keys(:update_opts) do
+    all = keys(:all) |> MapSet.new()
+    remove = MapSet.new([:id, :version, :inserted_at, :updated_at])
+    MapSet.difference(all, remove) |> MapSet.to_list()
+  end
+
+  @doc """
     Duplicate an existing Remote Profile
 
     Ultimately calls create/2 so same return results
@@ -60,8 +263,6 @@ defmodule Remote.DB.Profile do
   @doc since: "0.0.8"
   def duplicate(name, copy_name)
       when is_binary(name) and is_binary(copy_name) do
-    import Remote.Schemas.Profile, only: [keys: 1]
-
     with {:find, %Schema{} = x} <- {:find, find(name)},
          source_map <- Map.from_struct(x) |> Map.take(keys(:create_opts)),
          description <- ["copy of", name] |> Enum.join(" "),
@@ -108,8 +309,6 @@ defmodule Remote.DB.Profile do
   end
 
   def lookup_key(key) do
-    import Remote.Schemas.Profile, only: [keys: 1]
-
     keys(:all)
     |> Enum.filter(fn x ->
       str = Atom.to_string(x)
@@ -166,8 +365,6 @@ defmodule Remote.DB.Profile do
 
   @doc since: "0.0.20"
   def to_external_map(name) do
-    import Remote.Schemas.Profile, only: [as_external_map: 1]
-
     with %Schema{} = p <- find(name) do
       as_external_map(p)
     else
@@ -203,7 +400,6 @@ defmodule Remote.DB.Profile do
   @doc since: "0.0.8"
   def update(%Schema{id: id} = x, opts) when is_integer(id) and is_list(opts) do
     import Ecto.Changeset, only: [cast: 3]
-    import Remote.Schemas.Profile, only: [changeset: 2, keys: 1]
 
     with {:bad_opts, []} <- {:bad_opts, Keyword.drop(opts, keys(:all))},
          cs <- changeset(x, opts),
@@ -239,7 +435,6 @@ defmodule Remote.DB.Profile do
   end
 
   def update(catchall) do
-    Logger.warn(["update/2 error: ", inspect(catchall, pretty: true)])
     {:error, catchall}
   end
 end
