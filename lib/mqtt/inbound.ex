@@ -329,7 +329,7 @@ defmodule Mqtt.Inbound do
 
       # as of now, only the Switch module is capable of pipeline processing
       type when type in ["switch"] ->
-        msg_pipeline(r)
+        msg_switch(r)
 
       type when type in ["pwm"] ->
         msg_pwm(r)
@@ -358,12 +358,24 @@ defmodule Mqtt.Inbound do
     state
   end
 
-  defp msg_pipeline(%{async: async} = r) do
-    alias Switch.DB.Device, as: Device
+  defp msg_switch(%{async: async} = msg) do
+    process = fn ->
+      # the "happy path" of this with is to check for errors
+      with %{switch_device_fault: error} = msg <- Switch.handle_message(msg) do
+        ["switch message failed: ", inspect(error, pretty: true)]
+        |> Logger.error()
 
-    if async,
-      do: Task.start(Device, :upsert, [r]),
-      else: Device.upsert(r)
+        {:failed, msg}
+      else
+        _all_is_well -> :ok
+      end
+    end
+
+    if async do
+      Task.start(process)
+    else
+      process.()
+    end
   end
 
   defp msg_pwm(%{async: async} = r) do

@@ -101,15 +101,70 @@ defmodule Switch do
     |> Repo.all()
   end
 
-  def position(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    Alias.position(name, opts)
+  @doc """
+    Handles all aspects of processing messages for Sensors
+
+     - if the message hasn't been processed, then attempt to
+  """
+  @doc since: "0.0.21"
+  def handle_message(%{processed: false, type: "switch"} = msg_in) do
+    # the with begins with processing the message through DB.Device.upsert/1
+    with %{switch_device: switch_device} = msg <- Device.upsert(msg_in),
+         # was the upset a success?
+         {:ok, %Device{}} <- switch_device,
+         # technically the message has been processed at this point
+         msg <- Map.put(msg, :processed, true),
+         # Switch does not write any data to the timeseries database
+         # (unlike Sensor, Remote) so simulate the write_rc success
+         # now send the augmented message to the timeseries database
+         msg <- Map.put(msg, :write_rc, {:processed, :ok}) do
+      msg
+    else
+      # if there was an error, add fault: <device_fault> to the message and
+      # the corresponding <device_fault>: <error> to signal to downstream
+      # functions there was an issue
+      error ->
+        Map.merge(msg_in, %{
+          processed: true,
+          fault: :switch_fault,
+          switch_fault: error
+        })
+    end
   end
 
-  #
-  ## Private
-  #
+  # if the primary handle_message does not match then simply return the msg
+  # since it wasn't for switch and/or has already been processed in the
+  # pipeline
+  def handle_message(%{} = msg_in), do: msg_in
 
-  def position_ensure(name, opts) do
+  @doc """
+    Set the position (state) of a Switch PIO using it's Alias
+
+    opts:
+      position: true | false
+          true = switch state set to on
+          false = switch state set to off
+
+      ensure: true | false
+          true = checks the switch position prior to setting
+                 if the current position does not match the new position
+                 then lazy: false is appened to the opts
+
+      lazy: true | false
+          true = if the requested position matches the database position
+                 then do nothing to avoid redundant commands to remotes
+          false = always send the position command
+  """
+  def position(name, opts \\ []) when is_binary(name) and is_list(opts) do
+    ensure = Keyword.get(opts, :ensure, false)
+
+    case ensure do
+      true -> position_ensure(name, opts)
+      false -> Alias.position(name, opts)
+    end
+  end
+
+  defp position_ensure(name, opts) do
     pos_wanted = Keyword.get(opts, :position)
     {rc, pos_current} = sw_rc = Alias.position(name)
 
@@ -127,29 +182,6 @@ defmodule Switch do
         # force the position change
         opts = Keyword.put(opts, :lazy, false)
         Alias.position(name, opts)
-
-      error ->
-        log_position_ensure(sw_rc, error, name, opts)
     end
-  end
-
-  #
-  ## Logging
-  #
-
-  defp log_position_ensure(sw_rc, error, name, opts) do
-    Logger.warn([
-      "unhandled position_ensure() condition\n",
-      "name: ",
-      inspect(name, pretty: true),
-      "\n",
-      "opts: ",
-      inspect(opts, pretty: true),
-      "\n",
-      "error: ",
-      inspect(error, pretty: true)
-    ])
-
-    sw_rc
   end
 end

@@ -42,6 +42,35 @@ defmodule Sensor.DB.Device do
   end
 
   @doc """
+    Retrieve sensor device names
+  """
+
+  @doc since: "0.0.19"
+  def devices do
+    import Ecto.Query, only: [from: 2]
+
+    from(x in Schema, select: x.device, order_by: x.device) |> Repo.all()
+  end
+
+  @doc """
+    Retrieve sensor device names that begin with a pattern
+  """
+
+  @doc since: "0.0.19"
+  def devices_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+
+    from(x in Schema,
+      where: like(x.device, ^like_string),
+      order_by: x.device,
+      select: x.device
+    )
+    |> Repo.all()
+  end
+
+  @doc """
     Get a sensor alias by id or name
 
     Same return values as Repo.get_by/2
@@ -124,41 +153,10 @@ defmodule Sensor.DB.Device do
   end
 
   @doc """
-    Retrieve sensor device names
-  """
-
-  @doc since: "0.0.19"
-  def devices do
-    import Ecto.Query, only: [from: 2]
-
-    from(x in Schema, select: x.device, order_by: x.device) |> Repo.all()
-  end
-
-  @doc """
-    Retrieve sensor device names that begin with a pattern
-  """
-
-  @doc since: "0.0.19"
-  def devices_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
-
-    from(x in Schema,
-      where: like(x.device, ^like_string),
-      order_by: x.device,
-      select: x.device
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-  Reload a %Sensor.Schemas.Device{}
+  Reload a %Sensor.DB.Device{}
   """
 
   @doc since: "0.0.16"
-  # reload was passed something other than an id, let's figure out what
-  # it was then call reload/1 with the id or return an error
   def reload(args) do
     import Repo, only: [get!: 2, preload: 2]
 

@@ -45,7 +45,7 @@ defmodule Switch.DB.Command do
           cmdack: true,
           refid: refid,
           msg_recv_dt: recv_dt,
-          processed: {:ok, %Device{}}
+          switch_device: {:ok, %Device{}}
         } = msg
       ) do
     #
@@ -68,17 +68,10 @@ defmodule Switch.DB.Command do
   end
 
   # primary entry point when called from Switch and an ack is not needed
-  def ack_if_needed(%{processed: {:ok, %Device{}}} = r), do: r
+  def ack_if_needed(%{switch_device: {:ok, %Device{}}} = msg), do: msg
 
-  # error / unmatched function call handling
-  def ack_if_needed(unhandled) do
-    Logger.warn([
-      "ack_if_needed() unhandleds: ",
-      inspect(unhandled, pretty: true)
-    ])
-
-    unhandled
-  end
+  # no match, just pass through
+  def ack_if_needed(msg), do: msg
 
   def ack_immediate_if_needed({:pending, res} = rc, opts)
       when is_list(res) and is_list(opts) do

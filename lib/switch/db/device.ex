@@ -1,28 +1,14 @@
 defmodule Switch.DB.Device do
-  @moduledoc false
+  @moduledoc """
+  Database functionality for Switch Device
+  """
 
-  require Logger
   use Ecto.Schema
-
-  import Ecto.Changeset,
-    only: [
-      cast: 3,
-      cast_embed: 3,
-      validate_required: 2,
-      validate_format: 3,
-      validate_number: 3,
-      unique_constraint: 3
-    ]
-
-  import Ecto.Query, only: [from: 2]
-  import Common.DB, only: [name_regex: 0]
-  import TimeSupport, only: [from_unix: 1, ttl_check: 4, utc_now: 0]
 
   alias Switch.DB.Alias, as: Alias
   alias Switch.DB.Command, as: Command
   alias Switch.DB.Device, as: Device
-
-  @timestamps_opts [type: :utc_datetime_usec]
+  alias Switch.DB.Device, as: Schema
 
   schema "switch_device" do
     field(:device, :string)
@@ -43,10 +29,8 @@ defmodule Switch.DB.Device do
 
     has_many(:aliases, Alias, foreign_key: :device_id, references: :id)
 
-    timestamps()
+    timestamps(type: :utc_datetime_usec)
   end
-
-  alias Switch.DB.Device.State, as: State
 
   def add(list) when is_list(list) do
     for %Device{} = x <- list do
@@ -56,6 +40,9 @@ defmodule Switch.DB.Device do
 
   def add_cmd(%Device{} = sd, sw_alias, %DateTime{} = dt)
       when is_binary(sw_alias) do
+    import Ecto.Query, only: [from: 2]
+    import Repo, only: [preload: 2]
+
     sd = reload(sd)
     %Command{refid: refid} = Command.add(sd, sw_alias, dt)
 
@@ -64,10 +51,7 @@ defmodule Switch.DB.Device do
     cmd_query = from(c in Command, where: c.refid == ^refid)
 
     if rc == :ok,
-      do:
-        {:ok,
-         reload(sd)
-         |> Repo.preload(cmds: cmd_query)},
+      do: {:ok, reload(sd) |> preload(cmds: cmd_query)},
       else: {rc, sd}
   end
 
@@ -82,10 +66,62 @@ defmodule Switch.DB.Device do
     dev_alias(device, opts)
   end
 
-  def dev_alias(device, opts) when is_binary(device) and is_list(opts) do
-    sd = find(device)
+  def changeset(x, p) when is_map(p) or is_list(p) do
+    import Ecto.Changeset,
+      only: [
+        cast: 3,
+        cast_embed: 3,
+        validate_required: 2,
+        validate_format: 3,
+        validate_number: 3
+      ]
 
-    if is_nil(sd), do: {:not_found, device}, else: dev_alias(sd, opts)
+    import Common.DB, only: [name_regex: 0]
+
+    cast(x, Enum.into(p, %{}), keys(:cast))
+    |> cast_embed(:states, with: &states_changeset/2, required: true)
+    |> validate_required(keys(:required))
+    |> validate_format(:device, name_regex())
+    |> validate_format(:host, name_regex())
+    |> validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
+    |> validate_number(:ttl_ms, greater_than_or_equal_to: 0)
+  end
+
+  @doc """
+    Retrieve Switch Device names
+  """
+
+  @doc since: "0.0.21"
+  def devices do
+    import Ecto.Query, only: [from: 2]
+
+    from(x in Schema, select: x.device, order_by: x.device) |> Repo.all()
+  end
+
+  @doc """
+    Retrieve switch device names that begin with a pattern
+  """
+
+  @doc since: "0.0.21"
+  def devices_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+
+    from(x in Schema,
+      where: like(x.device, ^like_string),
+      order_by: x.device,
+      select: x.device
+    )
+    |> Repo.all()
+  end
+
+  def dev_alias(device_or_id, opts) when is_list(opts) do
+    with %Device{} = x <- find(device_or_id) do
+      dev_alias(x, opts)
+    else
+      _not_found -> {:not_found, device_or_id}
+    end
   end
 
   def dev_alias(%Device{} = sd, opts) when is_list(opts) do
@@ -119,16 +155,40 @@ defmodule Switch.DB.Device do
     if rc in [:ok, :ttl_expired], do: true, else: false
   end
 
-  def find(id) when is_integer(id) do
-    Repo.get_by(Device, id: id)
-    |> preload_unacked_cmds()
-    |> Repo.preload(:aliases)
-  end
+  @doc """
+    Get a Switch Device id or name
 
-  def find(device) when is_binary(device) do
-    Repo.get_by(Device, device: device)
-    |> preload_unacked_cmds()
-    |> Repo.preload(:aliases)
+    Same return values as Repo.get_by/2
+
+      1. nil if not found
+      2. %Sensor.Schemas.Alias{}
+
+      ## Examples
+        iex> Sensor.DB.Alias.find("default")
+        %Sensor.Schemas.Alias{}
+  """
+
+  @doc since: "0.0.21"
+  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
+    check_args = fn
+      x when is_binary(x) -> [device: x]
+      x when is_integer(x) -> [id: x]
+      x -> {:bad_args, x}
+    end
+
+    import Repo, only: [get_by: 2, preload: 2]
+
+    with opts when is_list(opts) <- check_args.(id_or_name),
+         %Schema{} = found <-
+           get_by(Schema, opts)
+           |> preload_unacked_cmds()
+           |> Repo.preload(:aliases) do
+      found
+    else
+      x when is_tuple(x) -> x
+      x when is_nil(x) -> nil
+      x -> {:error, x}
+    end
   end
 
   def find_alias(
@@ -147,6 +207,23 @@ defmodule Switch.DB.Device do
       do: {:not_found, {alias_name, alias_pio}},
       else: {:ok, hd(found)}
   end
+
+  def keys(:all),
+    do:
+      Map.from_struct(%Device{})
+      |> Map.drop([:__meta__, :id])
+      |> Map.keys()
+      |> List.flatten()
+
+  def keys(:cast),
+    do: keys_drop(:all, [:aliases, :cmds, :states])
+
+  def keys(:replace),
+    do:
+      keys_drop(:all, [:cmds, :aliases, :device, :discovered_at, :inserted_at])
+
+  def keys(:required),
+    do: keys_drop(:all, [:aliases, :cmds, :inserted_at, :updated_at])
 
   def find_alias_by_pio(
         %Device{aliases: aliases},
@@ -197,6 +274,7 @@ defmodule Switch.DB.Device do
   def record_cmd(%Device{} = sd, %Alias{name: sw_alias}, opts)
       when is_list(opts) do
     import Mqtt.SetSwitch, only: [send_cmd: 4]
+    import TimeSupport, only: [utc_now: 0]
 
     sd = reload(sd)
 
@@ -217,103 +295,117 @@ defmodule Switch.DB.Device do
     end
   end
 
-  def reload(%Device{id: id}) do
-    Repo.get_by!(Device, id: id)
-    |> preload_unacked_cmds()
-    |> Repo.preload(:aliases)
+  @doc """
+  Reload a %Switch.DB.Device{}
+  """
+
+  @doc since: "0.0.21"
+  def reload(args) do
+    import Repo, only: [get!: 2, preload: 2]
+
+    case args do
+      # results of a Repo function
+      {:ok, %Schema{id: id}} ->
+        get!(Schema, id)
+        |> preload_unacked_cmds()
+        |> Repo.preload(:aliases)
+
+      # an existing struct
+      %Schema{id: id} ->
+        get!(Schema, id)
+        |> preload_unacked_cmds()
+        |> Repo.preload(:aliases)
+
+      # something we can't handle
+      id when is_integer(id) ->
+        get!(Schema, id)
+        |> preload_unacked_cmds()
+        |> Repo.preload(:aliases)
+
+      args ->
+        {:error, args}
+    end
   end
 
-  def reload(nil), do: nil
+  def states_changeset(schema, params) do
+    import Ecto.Changeset, only: [cast: 3]
 
-  # Messages from External Sources
-
-  # Processing of messages from external sources is performed by
-  # calling update/1 of interested modules.  When the :processed key is false
-  # the message hasn't been processed by another module.
-
-  # If upsert/1 is called with processed: false and type: "switch" then attempt
-  # to process the message.  Switch.Device is not interested in messages
-  # other than those of type "switch"
-  def upsert(
-        %{
-          processed: false,
-          type: "switch",
-          device: _device,
-          host: _host,
-          mtime: mtime,
-          states: _states
-        } = msg
-      ) do
-    what_to_change = [:device, :host, :states, :dev_latency_us, :ttl_ms]
-
-    changes =
-      Map.merge(
-        Map.take(msg, what_to_change),
-        # NOTE: the second map passed to Map.merge/2 replaces duplicate
-        #       keys which is the intended behavior in this instance.
-        %{
-          discovered_at: from_unix(mtime),
-          last_cmd_at: utc_now(),
-          last_seen_at: utc_now()
-        }
-      )
-
-    # return message:
-    #   1. add the upsert results to the map (processed: {rc, res}) to signal
-    #      other modules in the pipeline that the reading was processed
-    #   2. send the message to Command.ack_if_needed/1 to handle tracking
-    #      of the command
-    Map.put(msg, :processed, upsert(%Device{}, changes))
-    |> Command.ack_if_needed()
+    cast(schema, params, [:pio, :state])
   end
 
-  def upsert(%{processed: _anything} = r),
-    do: r
+  def upsert(%{device: _, host: _, mtime: mtime, states: _} = msg) do
+    import TimeSupport, only: [from_unix: 1, utc_now: 0]
 
-  def upsert(catchall), do: {:bad_args, catchall}
-
-  # support Keyword list of updates
-  def upsert(%Device{} = x, params) when is_list(params),
-    do: upsert(x, Enum.into(params, %{}))
-
-  # Device.upsert/2 will insert or update a %Device{} using the map passed in
-  def upsert(%Device{} = x, params) when is_map(params) do
-    cs = changeset(x, Map.take(params, possible_changes()))
-
-    replace_cols = [
+    params = [
+      :device,
       :host,
       :states,
       :dev_latency_us,
-      :last_seen_at,
+      :ttl_ms,
+      :discovered_at,
       :last_cmd_at,
-      :updated_at,
-      :ttl_ms
+      :last_seen_at
     ]
 
-    with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
+    params_default = %{
+      discovered_at: from_unix(mtime),
+      last_cmd_at: utc_now(),
+      last_seen_at: utc_now()
+    }
+
+    # assemble a map of changes
+    # NOTE:  the second map passed to Map.merge/2 replaces duplicate keys
+    #        in the first map.  in this case we want all available data from
+    #        the message however if some isn't available we provide it via
+    #        changes_default
+    params = Map.merge(params_default, Map.take(msg, params))
+
+    # assemble the return message with the results of upsert/2
+    # and send it through Command.ack_if_needed/1
+    Map.put(msg, :switch_device, upsert(%Device{}, params))
+    |> Command.ack_if_needed()
+  end
+
+  # Device.upsert/2 will insert or update a %Device{} using the map passed in
+  def upsert(%Device{} = x, params) when is_map(params) or is_list(params) do
+    import Repo, only: [preload: 2]
+
+    # make certain the params are a map
+    params = Enum.into(params, %{})
+
+    # assemble the opts for upsert
+    # check for conflicts on :device
+    # if there is a conflict only replace keys(:replace)
+    opts = [
+      on_conflict: {:replace, keys(:replace)},
+      returning: true,
+      conflict_target: :device
+    ]
+
+    cs = changeset(x, params)
+
+    with {cs, true} <- {cs, cs.valid?()},
          # the keys on_conflict: and conflict_target: indicate the insert
          # is an "upsert"
-         {:ok, %Device{id: _id} = x} <-
-           Repo.insert(cs,
-             on_conflict: {:replace, replace_cols},
-             returning: true,
-             conflict_target: :device
-           ) do
-      {:ok, x}
+         {:ok, %Device{id: _id} = x} <- Repo.insert(cs, opts) do
+      {:ok, x |> preload(:aliases)}
     else
-      {:cs_valid, false} ->
+      {cs, false} ->
         {:invalid_changes, cs}
 
       {:error, rc} ->
         {:error, rc}
 
       error ->
-        error
+        {:error, error}
     end
-    |> check_result(x, __ENV__)
   end
 
   defp actual_pio_state(%Device{device: device} = sd, pio, opts) do
+    import TimeSupport, only: [ttl_check: 4]
+
+    alias Switch.DB.Device.State, as: State
+
     find_fn = fn %State{pio: p} -> p == pio end
 
     with %Device{states: states, last_seen_at: seen_at, ttl_ms: ttl_ms} <- sd,
@@ -325,65 +417,12 @@ defmodule Switch.DB.Device do
     end
   end
 
-  defp changeset(x, params) when is_list(params) do
-    changeset(x, Enum.into(params, %{}))
-  end
-
-  defp changeset(x, params) when is_map(params) do
-    x
-    |> cast(params, cast_changes())
-    |> cast_embed(:states, with: &states_changeset/2, required: true)
-    |> validate_required(possible_changes())
-    |> validate_format(:device, name_regex())
-    |> validate_format(:host, name_regex())
-    |> validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
-    |> validate_number(:ttl_ms,
-      greater_than_or_equal_to: 0
-    )
-    |> unique_constraint(:device, name: :switch_device_device_index)
-  end
-
-  defp check_result(res, x, env) do
-    case res do
-      # all is well, simply return the res
-      {:ok, %Device{}} ->
-        true
-
-      {:invalid_changes, cs} ->
-        Logger.warn([
-          caller(env),
-          " invalid changes: ",
-          inspect(cs, pretty: true)
-        ])
-
-      {:error, rc} ->
-        Logger.warn([
-          caller(env),
-          " failed rc: ",
-          inspect(rc, pretty: true),
-          " for: ",
-          inspect(x, pretty: true)
-        ])
-
-      true ->
-        Logger.warn([
-          caller(env),
-          " error: ",
-          inspect(res, pretty: true),
-          " for: ",
-          inspect(x, pretty: true)
-        ])
-    end
-
-    res
-  end
-
-  defp caller(%{function: {func, arity}}),
-    do: [Atom.to_string(func), "/", Integer.to_string(arity)]
-
   defp preload_unacked_cmds(sd, limit \\ 1)
        when is_integer(limit) and limit >= 1 do
-    Repo.preload(sd,
+    import Ecto.Query, only: [from: 2]
+    import Repo, only: [preload: 2]
+
+    preload(sd,
       cmds:
         from(sc in Command,
           where: sc.acked == false,
@@ -394,38 +433,11 @@ defmodule Switch.DB.Device do
   end
 
   #
-  # Changeset Functions
-  #
-
-  defp states_changeset(schema, params) do
-    schema
-    |> cast(params, [:pio, :state])
-  end
-
-  #
   # Changeset Lists
   #
 
-  defp cast_changes,
-    do: [
-      :device,
-      :host,
-      :dev_latency_us,
-      :ttl_ms,
-      :discovered_at,
-      :last_cmd_at,
-      :last_seen_at
-    ]
-
-  defp possible_changes,
-    do: [
-      :device,
-      :host,
-      :states,
-      :dev_latency_us,
-      :ttl_ms,
-      :discovered_at,
-      :last_cmd_at,
-      :last_seen_at
-    ]
+  defp keys_drop(base_keys, drop),
+    do:
+      MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
+      |> MapSet.to_list()
 end
