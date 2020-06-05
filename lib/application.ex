@@ -12,24 +12,36 @@ defmodule Helen.Application do
 
 
         ### Examples
-        iex> Helen.Application.hot_load()
+        iex> Helen.Application.hot_load("hot-stage", :rm)
+
+        Options:
+          directory to load (default: "hot-stage")
+          :rm  = delete files after loading (default)
+          :no_rm = keep files after loading
 
   """
   @doc since: "0.0.15"
-  def hot_load(dir, delete \\ :rm) do
+  def hot_load(dir \\ "hot-stage", delete \\ :rm)
+      when is_binary(dir) and is_atom(delete) do
     import File, only: [cwd: 0, ls: 1, rm: 1]
     import Path, only: [join: 1]
 
-    with {:ok, curr_dir} <- cwd(),
+    # ignore any redefinitions of modules
+    with :ok <- Code.put_compiler_option(:ignore_module_conflict, true),
+         {:ok, curr_dir} <- cwd(),
          {:ok, files} <- [curr_dir, dir] |> join() |> ls() do
       for f <- files do
         f_actual = [curr_dir, dir, f] |> join()
         {mod, _bytecode} = Code.compile_file(f_actual) |> hd()
         if delete == :rm, do: _rc = rm(f_actual)
+
+        Code.put_compiler_option(:ignore_module_conflict, true)
         mod
       end
     else
-      error -> error
+      error ->
+        Code.put_compiler_option(:ignore_module_conflict, true)
+        error
     end
   end
 

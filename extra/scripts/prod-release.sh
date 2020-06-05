@@ -8,6 +8,6 @@ fi
 
 pushd -q ${HOME}/devel/helen/extra/scripts
 
-./prod-build.sh && ./prod-install.sh
+./prod-build.sh && ./prod-install.sh && ./prod-cp-extra-mods.sh
 
-popd -q 
+popd -q
