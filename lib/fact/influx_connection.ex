@@ -19,7 +19,7 @@ defmodule Fact.Influx do
   """
   @doc since: "0.0.16"
   def handle_message(%{sensor_datapoint: datapoint, msg_recv_dt: _} = msg) do
-    alias Sensor.Schemas.DataPoint, as: Schema
+    alias Sensor.DB.DataPoint, as: Schema
     alias Fact.Sensor
 
     # begin by confirming the datapoint was saved

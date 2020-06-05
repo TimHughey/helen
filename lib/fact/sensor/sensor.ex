@@ -3,7 +3,7 @@ defmodule Fact.Sensor do
     Specific processing for Sensor messages
   """
 
-  alias Sensor.Schemas.{Alias, DataPoint, Device}
+  alias Sensor.DB.{Alias, DataPoint, Device}
 
   # handle temperature metrics
 

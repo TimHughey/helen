@@ -10,18 +10,17 @@ defmodule Sensor do
     * querying for datapoint values
   """
 
+  alias Sensor.DB.{Alias, Device, DataPoint}
+
   @doc """
     Public API for creating a Sensor Alias
   """
   @doc since: "0.0.16"
   def alias_create(device_or_id, alias_name, opts \\ []) do
-    alias Sensor.DB
-    alias Sensor.Schemas.{Alias, Device}
-
     # first, find the device to alias
-    with %Device{device: dev_name} = dev <- DB.Device.find(device_or_id),
+    with %Device{device: dev_name} = dev <- Device.find(device_or_id),
          # create the alias and capture it's name
-         {:ok, %Alias{name: name}} <- DB.Alias.create(dev, alias_name, opts) do
+         {:ok, %Alias{name: name}} <- Alias.create(dev, alias_name, opts) do
       [created: [name: name, device: dev_name]]
     else
       nil -> {:not_found, device_or_id}
@@ -42,7 +41,7 @@ defmodule Sensor do
   """
   @doc since: "0.0.19"
   def alias_names_begin_with(pattern) when is_binary(pattern) do
-    Sensor.DB.Alias.names_begin_with(pattern)
+    Alias.names_begin_with(pattern)
   end
 
   @doc """
@@ -50,14 +49,11 @@ defmodule Sensor do
   """
   @doc since: "0.0.19"
   def alias_rename(name_or_id, new_name) do
-    alias Sensor.DB
-    alias Sensor.Schemas.Alias
-
     # first, find the alias to update
-    with %Alias{name: name_before} = sa <- DB.Alias.find(name_or_id),
+    with %Alias{name: name_before} = sa <- Alias.find(name_or_id),
          # update the Alias with the new name
          {:ok, %Alias{name: name_after}} <-
-           DB.Alias.update(sa, %{name: new_name}, []) do
+           Alias.update(sa, %{name: new_name}, []) do
       [renamed: [before: name_before, after: name_after]]
     else
       nil -> {:not_found, name_or_id}
@@ -70,7 +66,7 @@ defmodule Sensor do
   """
   @doc since: "0.0.19"
   def devices do
-    Sensor.DB.Device.devices()
+    Device.devices()
   end
 
   @doc """
@@ -78,7 +74,7 @@ defmodule Sensor do
   """
   @doc since: "0.0.19"
   def devices_begin_with(pattern) when is_binary(pattern) do
-    Sensor.DB.Device.devices_begin_with(pattern)
+    Device.devices_begin_with(pattern)
   end
 
   ##
@@ -91,11 +87,8 @@ defmodule Sensor do
   @doc since: "0.0.19"
   def fahrenheit(sensor_alias, opts \\ [])
       when is_binary(sensor_alias) and is_list(opts) do
-    alias Sensor.Schemas.{Alias, DataPoint, Device}
-    alias Sensor.DB
-
-    with %Alias{device: dev} <- DB.Alias.find(sensor_alias),
-         %Device{datapoints: dp} <- DB.Device.load_datapoints(dev, opts),
+    with %Alias{device: dev} <- Alias.find(sensor_alias),
+         %Device{datapoints: dp} <- Device.load_datapoints(dev, opts),
          val when is_number(val) <- DataPoint.avg_of(dp, :temp_f) do
       val
     else
@@ -109,11 +102,8 @@ defmodule Sensor do
   @doc since: "0.0.19"
   def relhum(sensor_alias, opts \\ [])
       when is_binary(sensor_alias) and is_list(opts) do
-    alias Sensor.Schemas.{Alias, DataPoint, Device}
-    alias Sensor.DB
-
-    with %Alias{device: dev} <- DB.Alias.find(sensor_alias),
-         %Device{datapoints: dp} <- DB.Device.load_datapoints(dev, opts),
+    with %Alias{device: dev} <- Alias.find(sensor_alias),
+         %Device{datapoints: dp} <- Device.load_datapoints(dev, opts),
          val when is_number(val) <- DataPoint.avg_of(dp, :relhum) do
       val
     else
@@ -128,16 +118,14 @@ defmodule Sensor do
   """
   @doc since: "0.0.16"
   def handle_message(%{processed: false, type: "sensor"} = msg_in) do
-    alias Sensor.Schemas.Device
-    alias Sensor.DB
     alias Fact.Influx
 
     # the with begins with processing the message through Device.DB.upsert/1
-    with %{sensor_device: sensor_device} = msg <- DB.Device.upsert(msg_in),
+    with %{sensor_device: sensor_device} = msg <- Device.upsert(msg_in),
          # was the upset a success?
          {:ok, %Device{} = dev} <- sensor_device,
          # now process the datapoint
-         %{sensor_datapoint: {:ok, _dp}} = msg <- DB.DataPoint.save(dev, msg),
+         %{sensor_datapoint: {:ok, _dp}} = msg <- DataPoint.save(dev, msg),
          # technically the message has been processed at this point
          msg <- Map.put(msg, :processed, true),
          # now send the augmented message to the timeseries database
