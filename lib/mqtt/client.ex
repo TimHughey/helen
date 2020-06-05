@@ -7,7 +7,8 @@ defmodule Mqtt.Client do
   alias Tortoise.Connection
 
   import Application, only: [get_env: 2, get_env: 3]
-  alias Mqtt.Timesync
+
+  # alias Mqtt.Timesync
 
   #  def child_spec(opts) do
   #
@@ -170,7 +171,7 @@ defmodule Mqtt.Client do
 
     s = Map.put(s, :rpt_feed_subscribed, res)
 
-    s = start_timesync_task(s)
+    # s = start_timesync_task(s)
 
     {:noreply, s}
   end
@@ -299,16 +300,16 @@ defmodule Mqtt.Client do
     end
   end
 
-  defp start_timesync_task(%{mqtt_env: mqtt_env, client_id: client_id} = s) do
-    opts = Map.merge(timesync_opts(), %{feed: mqtt_env, client_id: client_id})
-    task = Task.async(Timesync, :run, [opts])
+  # defp start_timesync_task(%{mqtt_env: mqtt_env, client_id: client_id} = s) do
+  #   opts = Map.merge(timesync_opts(), %{feed: mqtt_env, client_id: client_id})
+  #   task = Task.async(Timesync, :run, [opts])
+  #
+  #   Map.put(s, :timesync, %{task: task, status: :started})
+  # end
 
-    Map.put(s, :timesync, %{task: task, status: :started})
-  end
-
-  defp timesync_opts do
-    get_env(:helen, Mqtt.Client, [])
-    |> Keyword.get(:timesync, [])
-    |> Enum.into(%{})
-  end
+  # defp timesync_opts do
+  #   get_env(:helen, Mqtt.Client, [])
+  #   |> Keyword.get(:timesync, [])
+  #   |> Enum.into(%{})
+  # end
 end

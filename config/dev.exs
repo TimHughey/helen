@@ -31,7 +31,7 @@ config :helen, Mqtt.Client,
     password: "mqtt",
     server:
       {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
-    keep_alive: 15
+    keep_alive: 36
   ],
   timesync: [frequency: {:secs, 5}, loops: 5, forever: false, log: false]
 
