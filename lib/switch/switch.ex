@@ -7,24 +7,8 @@ defmodule Switch do
 
   require Logger
 
-  alias Switch.{Alias, Device}
-
-  defmacro __using__([]) do
-    quote do
-      def sw_position(name, opts \\ [])
-
-      def sw_position(name, opts) when is_list(opts) do
-        ensure = Keyword.get(opts, :ensure, false)
-        position = Keyword.get(opts, :position, nil)
-
-        if ensure and is_boolean(position) do
-          unquote(__MODULE__).position_ensure(name, opts)
-        else
-          Switch.Alias.position(name, opts)
-        end
-      end
-    end
-  end
+  alias Switch.DB.Alias, as: Alias
+  alias Switch.DB.Device, as: Device
 
   #
   ## Public API
@@ -36,8 +20,8 @@ defmodule Switch do
     cols = [{"Name", :name}, {"Status", :status}, {"Position", :position}]
 
     aliases =
-      for %Switch.Alias{name: name} <-
-            from(x in Switch.Alias, order_by: x.name) |> Repo.all() do
+      for %Alias{name: name} <-
+            from(x in Alias, order_by: x.name) |> Repo.all() do
         {rc, position} = Switch.position(name)
         %{name: name, status: rc, position: position}
       end
@@ -62,8 +46,6 @@ defmodule Switch do
   """
   @doc since: "0.0.21"
   def alias_create(device_or_id, name, pio, opts \\ []) do
-    alias Switch.{Alias, Device}
-
     # first, find the device to alias
     with %Device{device: dev_name} = dev <- device_find(device_or_id),
          # create the alias and capture it's name
@@ -82,7 +64,7 @@ defmodule Switch do
   """
 
   @doc since: "0.0.21"
-  defdelegate alias_find(name_or_id, opts), to: Alias, as: :find
+  defdelegate alias_find(name_or_id), to: Alias, as: :find
 
   @doc """
     Find a Switch Device by device or id
@@ -95,8 +77,6 @@ defmodule Switch do
   """
   @doc since: "0.0.21"
   def device_find_alias(device_or_id, name, pio, opts \\ []) do
-    alias Switch.Device
-
     with %Device{} = dev <- device_find(device_or_id) do
       Device.find_alias(dev, name, pio, opts)
     else
@@ -122,7 +102,7 @@ defmodule Switch do
   end
 
   def position(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    Switch.Alias.position(name, opts)
+    Alias.position(name, opts)
   end
 
   #

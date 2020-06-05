@@ -37,7 +37,7 @@ defmodule HelenTest do
       end
 
       def base_context(context) do
-        alias Switch.{Alias, Device}
+        alias Switch.DB.{Alias, Device}
 
         base =
           unquote(__CALLER__.module) |> Atom.to_string() |> String.downcase()

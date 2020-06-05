@@ -74,7 +74,7 @@ config :helen, Repo,
   migration_timestamps: [type: :utc_datetime_usec],
   adapter: Ecto.Adapters.Postgres
 
-config :helen, Switch.Command,
+config :helen, Switch.DB.Command,
   log: [dryrun: false],
   # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [

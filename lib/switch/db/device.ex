@@ -1,4 +1,4 @@
-defmodule Switch.Device do
+defmodule Switch.DB.Device do
   @moduledoc false
 
   require Logger
@@ -18,7 +18,9 @@ defmodule Switch.Device do
   import Common.DB, only: [name_regex: 0]
   import TimeSupport, only: [from_unix: 1, ttl_check: 4, utc_now: 0]
 
-  alias Switch.{Alias, Device, Command}
+  alias Switch.DB.Alias, as: Alias
+  alias Switch.DB.Command, as: Command
+  alias Switch.DB.Device, as: Device
 
   @timestamps_opts [type: :utc_datetime_usec]
 
@@ -37,19 +39,14 @@ defmodule Switch.Device do
     field(:last_cmd_at, :utc_datetime_usec)
     field(:discovered_at, :utc_datetime_usec)
 
-    embeds_one :log_opts, LogOpts do
-      field(:log, :boolean, default: false)
-      field(:external_update, :boolean, default: false)
-      field(:cmd_rt, :boolean, default: false)
-      field(:dev_latency, :boolean, default: false)
-    end
-
     has_many(:cmds, Command, foreign_key: :device_id, references: :id)
 
     has_many(:aliases, Alias, foreign_key: :device_id, references: :id)
 
     timestamps()
   end
+
+  alias Switch.DB.Device.State, as: State
 
   def add(list) when is_list(list) do
     for %Device{} = x <- list do
@@ -123,13 +120,13 @@ defmodule Switch.Device do
   end
 
   def find(id) when is_integer(id) do
-    Repo.get_by(__MODULE__, id: id)
+    Repo.get_by(Device, id: id)
     |> preload_unacked_cmds()
     |> Repo.preload(:aliases)
   end
 
   def find(device) when is_binary(device) do
-    Repo.get_by(__MODULE__, device: device)
+    Repo.get_by(Device, device: device)
     |> preload_unacked_cmds()
     |> Repo.preload(:aliases)
   end
@@ -166,8 +163,6 @@ defmodule Switch.Device do
       do: {:not_found, {alias_pio}},
       else: {:ok, hd(found)}
   end
-
-  def log?(%Device{log_opts: %{log: log}}), do: log
 
   def pio_count(%Device{states: states}), do: Enum.count(states)
 
@@ -215,24 +210,15 @@ defmodule Switch.Device do
          {:cmd, %Command{refid: refid} = cmd} <- {:cmd, hd(sd.cmds)},
          {:refid, true} <- {:refid, is_binary(refid)},
          state_map <- %{pio: pio, state: state},
-         pub_rc <- send_cmd(sd, cmd, state_map, cmd_opts),
-         _ignore <- log_record_cmd({sd, pub_rc, cmd}) do
-      {:pending,
-       [
-         position: state,
-         refid: refid,
-         pub_rc: pub_rc
-       ]}
+         pub_rc <- send_cmd(sd, cmd, state_map, cmd_opts) do
+      {:pending, [position: state, refid: refid, pub_rc: pub_rc]}
     else
-      error ->
-        Logger.warn(["record_cmd() error: ", inspect(error, pretty: true)])
-
-        {:failed, error}
+      error -> {:failed, error}
     end
   end
 
   def reload(%Device{id: id}) do
-    Repo.get_by!(__MODULE__, id: id)
+    Repo.get_by!(Device, id: id)
     |> preload_unacked_cmds()
     |> Repo.preload(:aliases)
   end
@@ -328,8 +314,6 @@ defmodule Switch.Device do
   end
 
   defp actual_pio_state(%Device{device: device} = sd, pio, opts) do
-    alias Switch.Device.State
-
     find_fn = fn %State{pio: p} -> p == pio end
 
     with %Device{states: states, last_seen_at: seen_at, ttl_ms: ttl_ms} <- sd,
@@ -347,13 +331,8 @@ defmodule Switch.Device do
 
   defp changeset(x, params) when is_map(params) do
     x
-    |> ensure_log_opts()
     |> cast(params, cast_changes())
     |> cast_embed(:states, with: &states_changeset/2, required: true)
-    |> cast_embed(:log_opts,
-      with: &log_opts_changeset/2,
-      required: true
-    )
     |> validate_required(possible_changes())
     |> validate_format(:device, name_regex())
     |> validate_format(:host, name_regex())
@@ -399,21 +378,11 @@ defmodule Switch.Device do
     res
   end
 
-  defp ensure_log_opts(%Device{log_opts: rtm} = x) do
-    if is_nil(rtm),
-      do: Map.put(x, :log_opts, %Device.LogOpts{}),
-      else: x
-  end
-
   defp caller(%{function: {func, arity}}),
     do: [Atom.to_string(func), "/", Integer.to_string(arity)]
 
-  # defp log?(%Device{log_opts: opts}), do: Keyword.get(opts, :log, false)
-
   defp preload_unacked_cmds(sd, limit \\ 1)
        when is_integer(limit) and limit >= 1 do
-    alias Switch.Command
-
     Repo.preload(sd,
       cmds:
         from(sc in Command,
@@ -425,33 +394,8 @@ defmodule Switch.Device do
   end
 
   #
-  ## Logging
-  #
-  defp log_record_cmd({%Device{} = sd, rc, cmd}) do
-    log?(sd) &&
-      Logger.info([
-        "record_cmd() rc: ",
-        inspect(rc, pretty: true),
-        "cmd: ",
-        inspect(cmd, pretty: true)
-      ])
-  end
-
-  defp log_record_cmd(anything),
-    do: Logger.warn(["bad args: ", inspect(anything, pretty: true)])
-
-  #
   # Changeset Functions
   #
-
-  defp log_opts_changeset(schema, params) when is_list(params) do
-    log_opts_changeset(schema, Enum.into(params, %{}))
-  end
-
-  defp log_opts_changeset(schema, params) when is_map(params) do
-    schema
-    |> cast(params, [:log, :external_update, :cmd_rt, :dev_latency])
-  end
 
   defp states_changeset(schema, params) do
     schema
@@ -482,7 +426,6 @@ defmodule Switch.Device do
       :ttl_ms,
       :discovered_at,
       :last_cmd_at,
-      :last_seen_at,
-      :log_opts
+      :last_seen_at
     ]
 end

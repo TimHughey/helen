@@ -361,7 +361,7 @@ defmodule Dutycycle.Server do
         _from,
         %{dutycycle: %Dutycycle{device: device}} = s
       ) do
-    state = Switch.Alias.position(device)
+    state = Switch.position(device)
 
     {:reply, state, s}
   end

@@ -539,7 +539,7 @@ defmodule Dutycycle do
        )
        when is_list(opts) do
     sw_state =
-      Switch.Alias.position(device,
+      Switch.position(device,
         position: dev_state,
         lazy: Keyword.get(opts, :lazy, true),
         ack: Keyword.get(opts, :ack, true),

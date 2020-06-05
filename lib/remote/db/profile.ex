@@ -62,7 +62,7 @@ defmodule Remote.DB.Profile do
     Converts a Remote Profile to a map that can be used externally.
 
       ## Examples
-        iex> Remote.Schemas.Profile.as_external_map("default")
+        iex> Remote.DB.Profile.as_external_map("default")
         %{
          meta: %{version: "", updated_mtime: 12345, inserted_mtime: 12345},
          ds: %{enable: true,
@@ -180,9 +180,9 @@ defmodule Remote.DB.Profile do
     Creates a new Remote Profile with specified name and optional parameters
 
       ## Examples
-        iex> Remote.Schemas.Profile.create("default", dalsemi_enable: true,
+        iex> Remote.DB.Profile.create("default", dalsemi_enable: true,
             i2c_enable: true, pwm_enable: false)
-            {:ok, }%Remote.Schemas.Profile{}}
+            {:ok, }%Remote.DB.Profile{}}
 
             {:duplicate, name}
 
@@ -254,8 +254,8 @@ defmodule Remote.DB.Profile do
     Ultimately calls create/2 so same return results
 
       ## Examples
-        iex> Remote.Schemas.Profile.duplicate(name, copy_name)
-        {:ok, %Remote.Schemas.Profile{}}
+        iex> Remote.DB.Profile.duplicate(name, copy_name)
+        {:ok, %Remote.DB.Profile{}}
 
         {:not_found, name}
   """
@@ -276,16 +276,16 @@ defmodule Remote.DB.Profile do
   end
 
   @doc """
-    Get a %Remote.Schemas.Profile{} by id or name
+    Get a %Remote.DB.Profile{} by id or name
 
     Same return values as Repo.get_by/2
 
       1. nil if not found
-      2. %Remote.Schemas.Profile{}
+      2. %Remote.DB.Profile{}
 
       ## Examples
-        iex> Remote.Schemas.Profile.find("default")
-        %Remote.Schemas.Profile{}
+        iex> Remote.DB.Profile.find("default")
+        %Remote.DB.Profile{}
   """
 
   @doc since: "0.0.8"
@@ -317,13 +317,13 @@ defmodule Remote.DB.Profile do
   end
 
   @doc """
-    Reload a previously loaded Remote.Schemas.Profile or get by id
+    Reload a previously loaded Remote.DB.Profile or get by id
 
     Leverages Repo.get!/2 and raises on failure
 
     ## Examples
-      iex> Remote.Schemas.Profile.reload(1)
-      %Remote.Schemas.Profile{}
+      iex> Remote.DB.Profile.reload(1)
+      %Remote.DB.Profile{}
   """
 
   @doc since: "0.0.8"
@@ -348,7 +348,7 @@ defmodule Remote.DB.Profile do
     Retrieve Remote Profile Names
 
     ## Examples
-      iex> Remote.Schemas.Profile.names()
+      iex> Remote.DB.Profile.names()
       ["default"]
   """
 
@@ -383,18 +383,18 @@ defmodule Remote.DB.Profile do
 
         Update by profile name
 
-        iex> Remote.Schemas.Profile.update("default", [i2c_enable: false])
-        {:ok, %Remote.Schemas.Profile{}}
+        iex> Remote.DB.Profile.update("default", [i2c_enable: false])
+        {:ok, %Remote.DB.Profile{}}
 
         Update by profile id
 
-        iex> Remote.Schemas.Profile.update(12, [i2c_enable: false])
-        {:ok, %Remote.Schemas.Profile{}}
+        iex> Remote.DB.Profile.update(12, [i2c_enable: false])
+        {:ok, %Remote.DB.Profile{}}
 
-        Update in a pipeline (e.g. Remote.Schemas.Profile.duplicate/2)
+        Update in a pipeline (e.g. Remote.DB.Profile.duplicate/2)
 
-        iex> Remote.Schemas.Profile.update({:ok, %Remote.Schemas.Profile{}}, opts)
-        {:ok, %Remote.Schemas.Profile{}}
+        iex> Remote.DB.Profile.update({:ok, %Remote.DB.Profile{}}, opts)
+        {:ok, %Remote.DB.Profile{}}
   """
 
   @doc since: "0.0.8"

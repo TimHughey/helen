@@ -5,7 +5,8 @@ defmodule Mqtt.SetSwitch do
 
   alias TimeSupport
 
-  alias Switch.{Device, Command}
+  alias Switch.DB.Device, as: Device
+  alias Switch.DB.Command, as: Command
 
   def create_cmd(
         %Device{device: device, host: host},

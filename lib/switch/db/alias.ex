@@ -1,4 +1,4 @@
-defmodule Switch.Alias do
+defmodule Switch.DB.Alias do
   @moduledoc false
 
   require Logger
@@ -7,7 +7,6 @@ defmodule Switch.Alias do
   import Ecto.Changeset,
     only: [
       cast: 3,
-      cast_embed: 3,
       validate_required: 2,
       validate_format: 3,
       validate_number: 3,
@@ -16,8 +15,9 @@ defmodule Switch.Alias do
 
   import Common.DB, only: [name_regex: 0]
 
-  # alias TimeSupport
-  alias Switch.{Alias, Command, Device}
+  alias Switch.DB.Alias, as: Schema
+  alias Switch.DB.Command, as: Command
+  alias Switch.DB.Device, as: Device
 
   @timestamps_opts [type: :utc_datetime_usec]
 
@@ -29,14 +29,7 @@ defmodule Switch.Alias do
     field(:invert_state, :boolean, default: false)
     field(:ttl_ms, :integer, default: 60_000)
 
-    embeds_one :log_opts, LogOpts do
-      field(:log, :boolean, default: false)
-      field(:external_update, :boolean, default: false)
-      field(:cmd_rt, :boolean, default: false)
-      field(:dev_latency, :boolean, default: false)
-    end
-
-    belongs_to(:device, Switch.Device,
+    belongs_to(:device, Device,
       source: :device_id,
       references: :id,
       foreign_key: :device_id,
@@ -58,13 +51,38 @@ defmodule Switch.Alias do
     |> upsert()
   end
 
-  def find(x, opts \\ [preload: true])
+  @doc """
+    Get a %Switch.DB.Alias{} by id or name
 
-  def find(id, opts) when is_integer(id) and is_list(opts),
-    do: Repo.get_by(__MODULE__, id: id) |> preload(opts)
+    Same return values as Repo.get_by/2
 
-  def find(name, opts) when is_binary(name) and is_list(opts),
-    do: Repo.get_by(__MODULE__, name: name) |> preload(opts)
+      1. nil if not found
+      2. %Switch.DB.Alias{}
+
+      ## Examples
+        iex> Switch.DB.Alias.find("sample switch")
+        %Switch.DB.Alias{}
+  """
+
+  @doc since: "0.0.21"
+  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
+    check_args = fn
+      x when is_binary(x) -> [name: x]
+      x when is_integer(x) -> [id: x]
+      x -> {:bad_args, x}
+    end
+
+    import Repo, only: [get_by: 2, preload: 2]
+
+    with opts when is_list(opts) <- check_args.(id_or_name),
+         %Schema{} = found <- get_by(Schema, opts) do
+      found |> preload([:device])
+    else
+      x when is_tuple(x) -> x
+      x when is_nil(x) -> nil
+      x -> {:error, x}
+    end
+  end
 
   def position(name, opts \\ [])
 
@@ -74,7 +92,7 @@ defmodule Switch.Alias do
     if is_nil(sa), do: {:not_found, name}, else: position(sa, opts)
   end
 
-  def position(%Alias{pio: pio, device: %Device{} = sd} = sa, opts)
+  def position(%Schema{pio: pio, device: %Device{} = sd} = sa, opts)
       when is_list(opts) do
     lazy = Keyword.get(opts, :lazy, true)
     position = Keyword.get(opts, :position, nil)
@@ -117,25 +135,7 @@ defmodule Switch.Alias do
     |> Command.ack_immediate_if_needed(opts)
   end
 
-  def preload(sa, opts \\ [preload: true])
-
-  def preload(%Alias{} = sa, opts) when is_list(opts) do
-    if Keyword.get(opts, :preload, false),
-      do: Repo.preload(sa, [:device]),
-      else: sa
-  end
-
-  def preload(anything, _opts), do: anything
-
-  def rename(name, opts) when is_binary(name) and is_list(opts) do
-    sa = find(name, opts)
-
-    if is_nil(sa),
-      do: {:not_found, name},
-      else: rename(sa, opts)
-  end
-
-  def rename(%Alias{log_opts: log_opts} = x, opts) when is_list(opts) do
+  def rename(%Schema{} = x, opts) when is_list(opts) do
     name = Keyword.get(opts, :name)
 
     changes =
@@ -143,19 +143,9 @@ defmodule Switch.Alias do
         :name,
         :description,
         :ttl_ms,
-        :invert_state,
-        :log_opts
+        :invert_state
       ])
       |> Enum.into(%{})
-
-    changes =
-      if Map.has_key?(changes, :log_opts) do
-        x = Map.get(changes, :log_opts) |> Enum.into(%{})
-        new_log_opts = Map.merge(Map.from_struct(log_opts), x)
-        %{changes | log_opts: new_log_opts}
-      else
-        changes
-      end
 
     with {:args, true} <- {:args, is_binary(name)},
          cs <- changeset(x, changes),
@@ -169,18 +159,26 @@ defmodule Switch.Alias do
     end
   end
 
-  def update(name, opts) when is_binary(name) and is_list(opts) do
-    sa = find(name, opts)
+  def rename(name_or_id, opts) when is_list(opts) do
+    with %Schema{} = x <- find(name_or_id) do
+      rename(x, opts)
+    else
+      _not_found -> {:not_found, name_or_id}
+    end
+  end
 
-    if is_nil(sa),
-      do: {:not_found, name},
-      else: rename(sa, [name: name] ++ opts)
+  def update(name_or_id, opts) when is_list(opts) do
+    with %Schema{name: name} = x <- find(name_or_id) do
+      rename(x, [name: name] ++ opts)
+    else
+      _not_found -> {:not_found, name_or_id}
+    end
   end
 
   # upsert/1 confirms the minimum keys required and if the device to alias
   # exists
   def upsert(%{name: _, device_id: _, pio: _} = m) do
-    upsert(%Alias{}, Map.put(m, :device_checked, true))
+    upsert(%Schema{}, Map.put(m, :device_checked, true))
   end
 
   def upsert(catchall) do
@@ -188,9 +186,9 @@ defmodule Switch.Alias do
     {:bad_args, catchall}
   end
 
-  # Alias.upsert/2 will update (or insert) an %Alias{} using the map passed in
+  # Alias.upsert/2 will update (or insert) an %Schema{} using the map passed in
   def upsert(
-        %Alias{} = x,
+        %Schema{} = x,
         %{device_checked: true, name: _, device_id: _, pio: _pio} = params
       ) do
     cs = changeset(x, Map.take(params, possible_changes()))
@@ -207,7 +205,7 @@ defmodule Switch.Alias do
     with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
          # the keys on_conflict: and conflict_target: indicate the insert
          # is an "upsert"
-         {:ok, %Alias{id: _id} = x} <-
+         {:ok, %Schema{id: _id} = x} <-
            Repo.insert(cs,
              on_conflict: {:replace, replace_cols},
              returning: true,
@@ -228,7 +226,7 @@ defmodule Switch.Alias do
   end
 
   def upsert(
-        %Alias{},
+        %Schema{},
         %{
           device_checked: false,
           name: _,
@@ -252,12 +250,7 @@ defmodule Switch.Alias do
 
   defp changeset(x, params) when is_map(params) do
     x
-    |> ensure_log_opts()
     |> cast(params, cast_changes())
-    |> cast_embed(:log_opts,
-      with: &log_opts_changeset/2,
-      required: true
-    )
     |> validate_required(possible_changes())
     |> validate_format(:name, name_regex())
     |> validate_number(:pio,
@@ -272,7 +265,7 @@ defmodule Switch.Alias do
   defp check_result(res, x, env) do
     case res do
       # all is well, simply return the res
-      {:ok, %Alias{}} ->
+      {:ok, %Schema{}} ->
         true
 
       {:invalid_changes, cs} ->
@@ -304,19 +297,13 @@ defmodule Switch.Alias do
     res
   end
 
-  defp ensure_log_opts(%Alias{log_opts: rtm} = x) do
-    if is_nil(rtm),
-      do: Map.put(x, :log_opts, %Alias.LogOpts{}),
-      else: x
-  end
-
   #
   # Invert Position (if required)
 
   # handle the scenario of pure or paritial success
   defp invert_position_if_needed(
          {rc, position},
-         %Alias{
+         %Schema{
            invert_state: true
          }
        )
@@ -343,15 +330,6 @@ defmodule Switch.Alias do
   #
   # Changeset Functions
   #
-
-  defp log_opts_changeset(schema, params) when is_list(params) do
-    log_opts_changeset(schema, Enum.into(params, %{}))
-  end
-
-  defp log_opts_changeset(schema, params) when is_map(params) do
-    schema
-    |> cast(params, [:log, :external_update, :cmd_rt, :dev_latency])
-  end
 
   #
   # Changeset Lists

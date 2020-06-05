@@ -2,7 +2,6 @@ defmodule Thermostat.Control do
   @moduledoc false
 
   require Logger
-  use Switch
 
   alias Thermostat.Profile
 
@@ -10,7 +9,7 @@ defmodule Thermostat.Control do
     state_pos = state_to_position(t)
 
     {sw_rc, _pos_rc} =
-      pos_rc = sw_position(switch, position: state_pos, ensure: true)
+      pos_rc = Switch.position(switch, position: state_pos, ensure: true)
 
     if sw_rc in [:ok, :pending] do
       # switch position was good or is now set
@@ -111,7 +110,7 @@ defmodule Thermostat.Control do
       # handle no change in state
       {:ok, t}
     else
-      sw_position(Thermostat.switch(t),
+      Switch.position(Thermostat.switch(t),
         position: state_to_position(next_state),
         lazy: true
       )
@@ -121,7 +120,7 @@ defmodule Thermostat.Control do
   end
 
   def stop(%Thermostat{} = t) do
-    sw_position(Thermostat.switch(t),
+    Switch.position(Thermostat.switch(t),
       position: false,
       lazy: true,
       ack: false

@@ -1,4 +1,4 @@
-defmodule Switch.Command do
+defmodule Switch.DB.Command do
   @moduledoc false
 
   require Logger
@@ -8,9 +8,8 @@ defmodule Switch.Command do
 
   use Janitor
 
-  alias Switch.{Command, Device}
-
-  @timestamps_opts [type: :utc_datetime_usec]
+  alias Switch.DB.Command, as: Schema
+  alias Switch.DB.Device, as: Device
 
   schema "switch_command" do
     field(:sw_alias, :string)
@@ -21,18 +20,13 @@ defmodule Switch.Command do
     field(:sent_at, :utc_datetime_usec)
     field(:ack_at, :utc_datetime_usec)
 
-    embeds_one :log_opts, LogOpts do
-      field(:log, :boolean, default: false)
-      field(:cmd_rt, :boolean, default: false)
-    end
-
-    belongs_to(:device, Switch.Device,
+    belongs_to(:device, Device,
       source: :device_id,
       references: :id,
       foreign_key: :device_id
     )
 
-    timestamps()
+    timestamps(type: :utc_datetime_usec)
   end
 
   def acked?(refid) do
@@ -52,39 +46,24 @@ defmodule Switch.Command do
           refid: refid,
           msg_recv_dt: recv_dt,
           processed: {:ok, %Device{}}
-        } = r
+        } = msg
       ) do
     #
     # base list of changes
     changes = [acked: true, ack_at: utc_now()]
 
-    with {:cmd, %Command{sent_at: sent_at} = cmd} <- {:cmd, find_refid(refid)},
+    with {:cmd, %Schema{sent_at: sent_at} = cmd} <- {:cmd, find_refid(refid)},
          latency <- Timex.diff(recv_dt, sent_at, :microsecond),
          _ignore <- record_cmd_rt_metric(cmd, latency),
          changes <- [rt_latency_us: latency] ++ changes,
-         {:ok, %Command{} = cmd} <- update(cmd, changes) |> untrack() do
-      #
-      # simply log then return the reading unchanged
-      # all work performed within the with conditions
-      #
-      log?(cmd) &&
-        Logger.info(["ack_if_needed(): ", inspect(cmd, pretty: true)])
-
-      r
+         {:ok, %Schema{}} <- update(cmd, changes) |> untrack() do
+      msg
     else
       # handle the exception case when the refid wasn't found
       # NOTE:  this case should only occur when MQTT messages are
       #        processed from another environment during dev / test
-      {:cmd, nil} ->
-        r
-
-      error ->
-        Logger.warn([
-          "ack_if_needed() error: ",
-          inspect(error, pretty: true),
-          "reading: ",
-          inspect(r, pretty: true)
-        ])
+      {:cmd, nil} -> Map.put(msg, :switch_cmd_ack_fault, {:cmd, nil})
+      error -> Map.put(msg, :switch_cmd_ack_fault, error)
     end
   end
 
@@ -110,7 +89,7 @@ defmodule Switch.Command do
       cmd = Keyword.get(res, :refid) |> find_refid()
 
       if cmd do
-        %Command{device: sd, refid: refid} = cmd
+        %Schema{device: sd, refid: refid} = cmd
 
         %{
           cmdack: true,
@@ -140,45 +119,23 @@ defmodule Switch.Command do
   end
 
   def find_refid(refid) when is_binary(refid),
-    do: Repo.get_by(__MODULE__, refid: refid) |> Repo.preload([:device])
+    do: Repo.get_by(Schema, refid: refid) |> Repo.preload([:device])
 
   def find_refid(nil), do: nil
 
-  def log?(%Command{log_opts: %__MODULE__.LogOpts{log: log}}), do: log
-
-  def reload(%Command{id: id}), do: reload(id)
+  def reload(%Schema{id: id}), do: reload(id)
 
   def reload(id) when is_integer(id),
-    do: Repo.get_by(__MODULE__, id: id) |> Repo.preload([:device])
-
-  defp ensure_log_opts(%Command{log_opts: log_opts} = x) do
-    if is_nil(log_opts),
-      do: Map.put(x, :log_opts, %__MODULE__.LogOpts{}),
-      else: x
-  end
+    do: Repo.get_by(Schema, id: id) |> Repo.preload([:device])
 
   defp changeset(pwmc, params) when is_list(params),
     do: changeset(pwmc, Enum.into(params, %{}))
 
   defp changeset(pwmc, params) when is_map(params) do
     pwmc
-    |> ensure_log_opts()
     |> cast(params, cast_changes())
-    |> cast_embed(:log_opts,
-      with: &log_opts_changeset/2,
-      required: true
-    )
     |> validate_required([:sw_alias, :acked, :orphan, :sent_at])
     |> unique_constraint(:refid, name: :switch_command_refid_index)
-  end
-
-  defp log_opts_changeset(schema, params) when is_list(params) do
-    log_opts_changeset(schema, Enum.into(params, %{}))
-  end
-
-  defp log_opts_changeset(schema, params) when is_map(params) do
-    schema
-    |> cast(params, [:log, :external_update, :cmd_rt, :dev_latency])
   end
 
   def update(refid, opts) when is_binary(refid) and is_list(opts) do
@@ -187,7 +144,7 @@ defmodule Switch.Command do
     if is_nil(cmd), do: {:not_found, refid}, else: update(cmd, opts)
   end
 
-  def update(%Command{} = cmd, opts) when is_list(opts) do
+  def update(%Schema{} = cmd, opts) when is_list(opts) do
     set = Keyword.take(opts, possible_changes()) |> Enum.into(%{})
     cs = changeset(cmd, set)
 
@@ -196,7 +153,7 @@ defmodule Switch.Command do
       else: {:invalid_changes, cs}
   end
 
-  defp record_cmd_rt_metric(%Command{sw_alias: device}, latency) do
+  defp record_cmd_rt_metric(%Schema{sw_alias: device}, latency) do
     alias Fact.RunMetric
 
     RunMetric.record(
@@ -219,7 +176,6 @@ defmodule Switch.Command do
       :orphan,
       :rt_latency_us,
       :sent_at,
-      :ack_at,
-      :log_opts
+      :ack_at
     ]
 end

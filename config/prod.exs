@@ -79,7 +79,7 @@ config :helen, Repo,
   hostname: "** set in prod.secret.exs",
   pool_size: 20
 
-config :helen, Switch.Command,
+config :helen, Switch.DB.Command,
   # NOTE:  older_than lists are passed to Timex to create a
   #        shifted DateTime in UTC
   orphan: [

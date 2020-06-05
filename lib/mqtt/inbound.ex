@@ -359,9 +359,11 @@ defmodule Mqtt.Inbound do
   end
 
   defp msg_pipeline(%{async: async} = r) do
+    alias Switch.DB.Device, as: Device
+
     if async,
-      do: Task.start(Switch.Device, :upsert, [r]),
-      else: Switch.Device.upsert(r)
+      do: Task.start(Device, :upsert, [r]),
+      else: Device.upsert(r)
   end
 
   defp msg_pwm(%{async: async} = r) do
