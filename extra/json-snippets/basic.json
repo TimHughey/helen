@@ -4,47 +4,47 @@
   "cmd": {
     "activate": true,
     "basic": {
-      "repeat": true,
+      "repeat": false,
       "steps": [
         {
-          "duty": 2911,
-          "ms": 55
+          "duty": 1913,
+          "ms": 75
         },
         {
-          "duty": 7734,
-          "ms": 3
+          "duty": 7689,
+          "ms": 114
         },
         {
-          "duty": 1580,
-          "ms": 57
+          "duty": 263,
+          "ms": 18
         },
         {
-          "duty": 1068,
-          "ms": 100
+          "duty": 3653,
+          "ms": 61
         },
         {
-          "duty": 4157,
-          "ms": 117
+          "duty": 4459,
+          "ms": 119
         },
         {
-          "duty": 1713,
-          "ms": 35
+          "duty": 2027,
+          "ms": 96
         },
         {
-          "duty": 3154,
-          "ms": 66
+          "duty": 2205,
+          "ms": 105
         },
         {
-          "duty": 79,
-          "ms": 50
+          "duty": 4227,
+          "ms": 121
         },
         {
-          "duty": 4620,
-          "ms": 37
+          "duty": 1920,
+          "ms": 123
         },
         {
-          "duty": 2402,
-          "ms": 89
+          "duty": 985,
+          "ms": 61
         }
       ]
     },
@@ -54,5 +54,5 @@
   "device": "pwm/lab-ledge.pin:1",
   "host": "ruth.3c71bf14fdf0",
   "pwm_cmd": 17,
-  "refid": "f41e6160-acde-4432-a647-30aaf502c416"
+  "refid": "9be391f1-c8de-40cc-bbf2-b8f667e3bbac"
 }

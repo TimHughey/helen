@@ -20,7 +20,7 @@ defmodule PulseWidth.Payload.Random do
       refid: refid,
       host: host,
       ack: Keyword.get(opts, :ack, true),
-      cmd: cmd
+      cmd: Map.put(cmd, :type, "random")
     }
   end
 
@@ -34,7 +34,7 @@ defmodule PulseWidth.Payload.Random do
     cmd = %{
       name: "cool",
       type: "random",
-      run: true,
+      activate: true,
       random: %{
         min: 0,
         max: 8191,

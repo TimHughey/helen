@@ -465,6 +465,43 @@ defmodule PulseWidth do
     end
   end
 
+  @doc """
+    Send a random command to a PulseWidth found by name or actual struct
+
+    PulseWidth.basic(name, basic: %{})
+  """
+  @doc since: "0.0.22"
+  def random(name_id_pwm, cmd_map, opts \\ [])
+
+  def random(%PulseWidth{} = pwm, %{name: name} = cmd, opts)
+      when is_list(opts) do
+    import TimeSupport, only: [utc_now: 0]
+    import PulseWidth.Payload.Random, only: [send_cmd: 4]
+
+    # update the PulseWidth
+    with {:ok, %PulseWidth{} = pwm} <- update(pwm, running_cmd: name),
+         # add the command
+         {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
+         # get the PulseWidthCmd inserted
+         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
+         # send the command
+         pub_rc <- send_cmd(pwm, refid, cmd, opts) do
+      # assemble return value
+      [random: [name: name, pub_rc: pub_rc] ++ [opts]]
+    else
+      # just pass through any error encountered
+      error -> {:error, error}
+    end
+  end
+
+  def random(x, %{name: _, random: %{}} = cmd, opts) when is_list(opts) do
+    with %PulseWidth{} = pwm <- find(x) do
+      basic(pwm, cmd, opts)
+    else
+      nil -> {:not_found, x}
+    end
+  end
+
   def reload({:ok, %PulseWidth{id: id}}), do: reload(id)
 
   def reload(%PulseWidth{id: id}), do: reload(id)

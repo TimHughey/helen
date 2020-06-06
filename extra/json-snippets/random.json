@@ -2,6 +2,7 @@
 {
   "ack": true,
   "cmd": {
+    "activate": true,
     "name": "cool",
     "random": {
       "max": 8191,
@@ -11,11 +12,10 @@
       "step": 100,
       "step_ms": 75
     },
-    "run": true,
     "type": "random"
   },
   "device": "pwm/lab-ledge.pin:1",
   "host": "ruth.3c71bf14fdf0",
   "pwm_cmd": 18,
-  "refid": "b0fa7ce3-8dbd-43a7-9400-a28fd4299f7f"
+  "refid": "155cd435-ad04-4f3a-8a22-2a5724f5e9dd"
 }
