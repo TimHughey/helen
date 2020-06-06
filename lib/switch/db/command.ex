@@ -119,7 +119,7 @@ defmodule Switch.DB.Command do
   def reload(id) when is_integer(id),
     do: Repo.get_by(Schema, id: id) |> Repo.preload([:device])
 
-  defp changeset(x, params) when is_map(params) do
+  defp changeset(x, params) when is_map(params) or is_list(params) do
     import Ecto.Changeset,
       only: [cast: 3, validate_required: 2, unique_constraint: 3]
 
