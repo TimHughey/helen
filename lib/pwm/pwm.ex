@@ -114,7 +114,7 @@ defmodule PulseWidth do
 
   def basic(
         name_or_id,
-        %{name: name, basic: %{repeat: repeat, steps: steps} = cmd},
+        %{name: name, basic: %{repeat: repeat, steps: steps}} = cmd,
         opts
       )
       when is_binary(name) and is_boolean(repeat) and is_list(steps) and
