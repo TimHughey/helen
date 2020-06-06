@@ -110,37 +110,33 @@ defmodule PulseWidth do
     PulseWidth.basic(name, basic: %{})
   """
   @doc since: "0.0.22"
-  def basic(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    basic_map = Keyword.get(opts, :basic, nil)
-    # remove the basic opt, no need to pass it along now that we have
-    # the actual basic map
-    opts = Keyword.drop(opts, [:basic])
+  def basic(name_or_pwm, cmd_map, opts \\ [])
 
-    with %PulseWidth{} = pwm <- find(name),
-         {:basic_opt, true, pwm} <- {:basic_opt, is_map(basic_map), pwm} do
-      # call basic with the actual pwm, the basic cmd
-      basic(pwm, basic_map, opts)
+  def basic(name, %{name: name, repeat: repeat, steps: steps} = cmd, opts)
+      when is_binary(name) and is_boolean(repeat) and is_list(steps) and
+             is_list(opts) do
+    with %PulseWidth{} = pwm <- find(name) do
+      basic(pwm, cmd, opts)
     else
       nil -> {:not_found, name}
-      {:basic_opt, false, pwm} -> Map.get(pwm, :basic)
     end
   end
 
-  def basic(%PulseWidth{} = pwm, %{name: basic_name} = basic, opts)
+  def basic(%PulseWidth{} = pwm, %{name: name} = cmd, opts)
       when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]
     import PulseWidth.Payload.Basic, only: [send_cmd: 4]
 
     # update the PulseWidth
-    with {:ok, %PulseWidth{} = pwm} <- update(pwm, basic: basic_name),
+    with {:ok, %PulseWidth{} = pwm} <- update(pwm, running_cmd: name),
          # add the command
          {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
          # get the PulseWidthCmd inserted
          {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
          # send the command
-         pub_rc <- send_cmd(pwm, refid, basic, opts) do
+         pub_rc <- send_cmd(pwm, refid, cmd, opts) do
       # assemble return value
-      [basic_name: basic_name, pub_rc: pub_rc] ++ [opts]
+      [basic: [name: name, pub_rc: pub_rc] ++ [opts]]
     else
       # just pass through any error encountered
       error -> {:error, error}

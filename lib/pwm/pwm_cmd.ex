@@ -4,7 +4,6 @@ defmodule PulseWidthCmd do
     commands sent for a PulseWidth.
   """
 
-  require Logger
   use Timex
   use Ecto.Schema
 
@@ -24,62 +23,55 @@ defmodule PulseWidthCmd do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def acked?(refid) do
-    cmd = find_refid(refid)
+  alias PulseWidthCmd, as: Schema
 
-    if is_nil(cmd), do: false, else: cmd.acked
+  def acked?(refid) do
+    import Repo, only: [get_by: 2]
+
+    with %Schema{} <- get_by(Schema, refid: refid) do
+      true
+    else
+      nil -> false
+    end
   end
 
   # primary entry point when called from PulseWidth and an ack is needed
   # checks the return code from the update to the PulseWidth
   def ack_if_needed(
-        {:ok, %PulseWidth{log: log}},
-        %{cmdack: true, refid: refid} = m
+        {:ok, %PulseWidth{}},
+        %{cmdack: true, refid: refid, msg_recv_dt: recv}
       ) do
-    log &&
-      Logger.info(["attempting to ack refid: ", inspect(refid, pretty: true)])
+    import Repo, only: [get_by: 2]
 
-    find_refid(refid) |> ack_if_needed(m)
+    set_base_opts = [acked: true, ack_at: utc_now()]
+
+    with {:ok, %Schema{sent_at: sent_at} = cmd} <- get_by(Schema, refid: refid),
+         latency_us <- Timex.diff(recv, sent_at, :microsecond),
+         set_opts <- Keyword.put(set_base_opts, :rt_latency_us, latency_us),
+         {:ok, %Schema{} = cmd} <- update(cmd, set_opts) do
+      untrack(cmd)
+    else
+      nil -> {:not_found, refid}
+      {:invalid_changes, _cs} = rc -> rc
+      error -> {:error, error}
+    end
   end
 
-  # primary entry point when called from PulseWidth and an ack is not needed
+  # if the above didn't match then an ack is not needed
   def ack_if_needed({:ok, %PulseWidth{}} = rc, %{}), do: rc
 
-  # handles acking once the PulseWidthCmd has been retrieved
-  def ack_if_needed(
-        %PulseWidthCmd{sent_at: sent_at} = cmd,
-        %{msg_recv_dt: recv_dt}
-      ) do
-    set = [
-      rt_latency_us: Timex.diff(recv_dt, sent_at, :microsecond),
-      acked: true,
-      ack_at: utc_now()
-    ]
-
-    update(cmd, set)
-    |> untrack()
-  end
-
-  # error / unmatched function call handling
-  def ack_if_needed(nil, %{refid: refid}) do
-    Logger.warn(["ack_if_needed() could not find refid: ", inspect(refid)])
-    {:not_found, refid}
-  end
-
-  def ack_if_needed({:invalid_changes}, cs) do
-    Logger.warn(["invalid changes to PulseWidth: ", inspect(cs, pretty: false)])
-    {:error, cs}
-  end
-
-  def ack_if_needed(catchall) do
-    Logger.warn(["ack_if_needed() catchall: ", inspect(catchall, pretty: true)])
-    {:error, catchall}
-  end
-
   def ack_now(refid, opts \\ []) do
-    %{cmdack: true, refid: refid, msg_recv_dt: utc_now()}
-    |> Map.merge(Enum.into(opts, %{}))
-    |> ack_if_needed()
+    import Repo, only: [get_by: 2, preload: 2]
+
+    with {:ok, %Schema{} = cmd} <- get_by(Schema, refid: refid),
+         %Schema{} = cmd <- preload(cmd, [:pwm]),
+         ack_map <- %{cmdack: true, refid: refid, msg_recv_dt: utc_now()},
+         ack_map <- Map.merge(ack_map, Enum.into(opts, %{})) do
+      ack_if_needed(cmd, ack_map)
+    else
+      nil -> {:not_found, refid}
+      error -> {:error, error}
+    end
   end
 
   def add(%PulseWidth{} = pwm, %DateTime{} = dt) do
@@ -91,9 +83,6 @@ defmodule PulseWidthCmd do
     |> Repo.insert!(returning: true)
     |> track()
   end
-
-  def find_refid(refid),
-    do: Repo.get_by(__MODULE__, refid: refid) |> Repo.preload([:pwm])
 
   def reload(%PulseWidthCmd{id: id}), do: reload(id)
 
@@ -111,9 +100,13 @@ defmodule PulseWidthCmd do
   end
 
   def update(refid, opts) when is_binary(refid) and is_list(opts) do
-    pwmc = find_refid(refid)
+    import Repo, only: [get_by: 2]
 
-    if is_nil(pwmc), do: {:not_found, refid}, else: Repo.update(pwmc, opts)
+    with %Schema{} = cmd <- get_by(Schema, refid: refid) do
+      Repo.update(cmd, opts)
+    else
+      nil -> {:not_found, refid}
+    end
   end
 
   def update(%PulseWidthCmd{} = pwmc, opts) when is_list(opts) do
@@ -121,7 +114,7 @@ defmodule PulseWidthCmd do
     cs = changeset(pwmc, set)
 
     if cs.valid?,
-      do: {:ok, Repo.update!(cs) |> reload()},
+      do: {:ok, Repo.update!(cs, returning: true) |> Repo.preload([:pwm])},
       else: {:invalid_changes, cs}
   end
 

@@ -6,7 +6,7 @@ defmodule PulseWidth.Payload.Basic do
   def create_cmd(
         %PulseWidth{device: device, host: host},
         refid,
-        %{name: _cmd_name} = cmd,
+        %{name: _cmd_name, repeat: _, steps: _} = cmd,
         opts
       )
       when is_list(opts) and is_binary(refid) do
@@ -18,7 +18,7 @@ defmodule PulseWidth.Payload.Basic do
       refid: refid,
       host: host,
       ack: Keyword.get(opts, :ack, true),
-      cmd: cmd
+      cmd: Map.put(cmd, :type, "basic")
     }
   end
 
@@ -30,16 +30,12 @@ defmodule PulseWidth.Payload.Basic do
     alias Ecto.UUID
 
     cmd = %{
-      name: "basic_sequence",
-      type: "basic",
-      run: true,
-      basic: %{
-        repeat: true,
-        steps:
-          for _i <- 1..10 do
-            %{duty: :rand.uniform(8191), ms: :rand.uniform(125)}
-          end
-      }
+      name: "basic_random",
+      repeat: true,
+      steps:
+        for _i <- 1..10 do
+          %{duty: :rand.uniform(8191), ms: :rand.uniform(125)}
+        end
     }
 
     create_cmd(pwm_dev, UUID.generate(), cmd, [])
@@ -48,7 +44,7 @@ defmodule PulseWidth.Payload.Basic do
   def send_cmd(
         %PulseWidth{device: device} = pwm,
         refid,
-        %{name: _cmd_name} = cmd,
+        %{name: _cmd_name, repeat: _, steps: _} = cmd,
         opts \\ []
       )
       when is_binary(refid) do
