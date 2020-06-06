@@ -496,7 +496,7 @@ defmodule PulseWidth do
 
   def random(x, %{name: _, random: %{}} = cmd, opts) when is_list(opts) do
     with %PulseWidth{} = pwm <- find(x) do
-      basic(pwm, cmd, opts)
+      random(pwm, cmd, opts)
     else
       nil -> {:not_found, x}
     end
