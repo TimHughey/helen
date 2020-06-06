@@ -19,6 +19,16 @@ defmodule PulseWidth.Payload.Duty do
     }
   end
 
+  @doc """
+    Generate an example PulseWidth Duty Payload
+  """
+  @doc since: "0.0.22"
+  def example(%PulseWidth{} = pwm_dev) do
+    alias Ecto.UUID
+
+    create_cmd(pwm_dev, UUID.generate(), duty: :rand.uniform(8191))
+  end
+
   def send_cmd(
         %PulseWidth{device: device} = pwm,
         refid,

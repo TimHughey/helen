@@ -1,0 +1,9 @@
+
+{
+  "ack": true,
+  "device": "pwm/lab-ledge.pin:1",
+  "duty": 8017,
+  "host": "ruth.3c71bf14fdf0",
+  "pwm_cmd": 16,
+  "refid": "a920c425-dcbf-4f20-8668-8e83a3e3c970"
+}

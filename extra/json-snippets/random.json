@@ -1,0 +1,21 @@
+
+{
+  "ack": true,
+  "cmd": {
+    "name": "cool",
+    "random": {
+      "max": 8191,
+      "min": 0,
+      "primes": 10,
+      "priority": 14,
+      "step": 100,
+      "step_ms": 75
+    },
+    "run": true,
+    "type": "random"
+  },
+  "device": "pwm/lab-ledge.pin:1",
+  "host": "ruth.3c71bf14fdf0",
+  "pwm_cmd": 18,
+  "refid": "b0fa7ce3-8dbd-43a7-9400-a28fd4299f7f"
+}

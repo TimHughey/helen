@@ -13,7 +13,7 @@ defmodule PulseWidth do
     field(:device, :string)
     field(:host, :string)
     field(:duty, :integer, default: 0)
-    field(:sequence, :string, default: "none")
+    field(:running_cmd, :string, default: "none")
     field(:duty_max, :integer, default: 8191)
     field(:duty_min, :integer, default: 0)
     field(:dev_latency_us, :integer, default: 0)
@@ -104,6 +104,164 @@ defmodule PulseWidth do
       else: {rc, pwm}
   end
 
+  @doc """
+    Send a basic sequence to a PulseWidth found by name or actual struct
+
+    PulseWidth.basic(name, basic: %{})
+  """
+  @doc since: "0.0.22"
+  def basic(name, opts \\ []) when is_binary(name) and is_list(opts) do
+    basic_map = Keyword.get(opts, :basic, nil)
+    # remove the basic opt, no need to pass it along now that we have
+    # the actual basic map
+    opts = Keyword.drop(opts, [:basic])
+
+    with %PulseWidth{} = pwm <- find(name),
+         {:basic_opt, true, pwm} <- {:basic_opt, is_map(basic_map), pwm} do
+      # call basic with the actual pwm, the basic cmd
+      basic(pwm, basic_map, opts)
+    else
+      nil -> {:not_found, name}
+      {:basic_opt, false, pwm} -> Map.get(pwm, :basic)
+    end
+  end
+
+  def basic(%PulseWidth{} = pwm, %{name: basic_name} = basic, opts)
+      when is_list(opts) do
+    import TimeSupport, only: [utc_now: 0]
+    import PulseWidth.Payload.Basic, only: [send_cmd: 4]
+
+    # update the PulseWidth
+    with {:ok, %PulseWidth{} = pwm} <- update(pwm, basic: basic_name),
+         # add the command
+         {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
+         # get the PulseWidthCmd inserted
+         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
+         # send the command
+         pub_rc <- send_cmd(pwm, refid, basic, opts) do
+      # assemble return value
+      [basic_name: basic_name, pub_rc: pub_rc] ++ [opts]
+    else
+      # just pass through any error encountered
+      error -> {:error, error}
+    end
+  end
+
+  @doc """
+  Generate an example cmd payload using the first PulseWidth
+  known to the system (sorted in ascending order).
+
+  This function embeds documentation in the live system.
+
+    ### Examples
+      iex> PulseWidth.cmd_example(type, encode: true)
+      Minimized JSON encoded Elixir native representation
+
+      iex> PulseWidth.cmd_example(type, binary: true)
+      Minimized JSON encoded binary representation
+
+      iex> PulseWidth.cmd_example(type, bytes: true)
+      Byte count of minimized JSON
+
+      iex> PulseWidth.cmd_example(type, pack: true)
+      Byte count of MsgPack encoding
+
+      iex> PulseWidth.cmd_example(type, write: true)
+      Appends pretty version of JSON encoded Sequence to
+       ${HOME}/devel/helen/extra/json-snippets/basic.json
+
+    ### Supported Types
+      [:basic, :duty, :random]
+  """
+
+  @doc since: "0.0.14"
+  def cmd_example(type \\ :random, opts \\ [])
+      when is_atom(type) and is_list(opts) do
+    name = names() |> hd()
+
+    with %PulseWidth{name: _} = pwm <- find(name),
+         cmd <- cmd_example_cmd(type, pwm) do
+      cmd |> cmd_example_opts(opts)
+    else
+      error -> {:error, error}
+    end
+  end
+
+  @doc """
+    Creates the PulseWidth Command Example using %PulseWidth{} based on type
+
+    NOTE:  This function is exposed publicly although, for a quick example,
+           use cmd_example/2
+
+      ### Supported Types
+        [:duty, :basic, :random]
+
+      ### Examples
+        iex> PulseWidth.cmd_example_cmd(:random, %PulseWidth{})
+  """
+
+  @doc since: "0.0.22"
+  def cmd_example_cmd(type, %PulseWidth{} = pwm) when is_atom(type) do
+    alias PulseWidth.Payload.{Basic, Duty, Random}
+
+    case type do
+      :random -> Random.example(pwm)
+      :basic -> Basic.example(pwm)
+      :duty -> Duty.example(pwm)
+      true -> %{}
+    end
+  end
+
+  def cmd_example_file(%{pwm_cmd: cmd}) do
+    cond do
+      cmd == 0x10 -> "duty.json"
+      cmd == 0x11 -> "basic.json"
+      cmd == 0x12 -> "random.json"
+      true -> "undefined.json"
+    end
+  end
+
+  def cmd_example_opts(%{} = cmd, opts) do
+    import Jason, only: [encode!: 2, encode_to_iodata!: 2]
+    import Msgpax, only: [pack!: 1]
+
+    cond do
+      Keyword.has_key?(opts, :encode) ->
+        Jason.encode!(cmd)
+
+      Keyword.has_key?(opts, :binary) ->
+        Jason.encode!(cmd, []) |> IO.puts()
+
+      Keyword.has_key?(opts, :bytes) ->
+        encode!(cmd, []) |> IO.puts() |> String.length()
+
+      Keyword.has_key?(opts, :pack) ->
+        [pack!(cmd)] |> IO.iodata_length()
+
+      Keyword.has_key?(opts, :write) ->
+        out = ["\n", encode_to_iodata!(cmd, pretty: true), "\n"]
+        home = System.get_env("HOME")
+
+        name = cmd_example_file(cmd)
+
+        file =
+          [
+            home,
+            "devel",
+            "helen",
+            "extra",
+            "json-snippets",
+            name
+          ]
+          |> Path.join()
+
+        File.write(file, out, [:append])
+
+      true ->
+        cmd
+    end
+  end
+
   def delete_all(:dangerous) do
     import Ecto.Query, only: [from: 2]
 
@@ -178,47 +336,6 @@ defmodule PulseWidth do
 
       duty ->
         duty
-    end
-  end
-
-  @doc """
-  Generate an example Sequence payload using the first PulseWidth
-  known to the system (sorted in ascending order).
-
-  This function embeds documentation in the live system.
-
-    ### Examples
-    iex> PulseWidth.duty_example(encode: true)
-    Minimized JSON encoded Elixir native representation
-
-    iex> PulseWidth.duty_example(binary: true)
-    Minimized JSON encoded binary representation
-
-    iex> PulseWidth.duty_example(bytes: true)
-    Byte count of minimized JSON
-
-    iex> PulseWidth.duty_example(pack: true)
-    Byte count of MsgPack encoding
-
-    iex> PulseWidth.duty_example(write: true)
-    Appends pretty version of JSON encoded Sequence to
-     ${HOME}/devel/helen/extra/json-snippets/duty.json
-  """
-
-  @doc since: "0.0.14"
-  def duty_example(opts \\ []) do
-    import Ecto.UUID, only: [generate: 0]
-    import PulseWidth.Payload.Duty, only: [create_cmd: 3]
-
-    name = names() |> hd()
-
-    with %PulseWidth{name: _, duty: duty} = pwm <- find(name),
-         refid <- generate(),
-         cmd_opts <- [duty: duty],
-         cmd <- create_cmd(pwm, refid, cmd_opts) do
-      cmd |> payload_example_opts(opts)
-    else
-      error -> {:error, error}
     end
   end
 
@@ -364,101 +481,6 @@ defmodule PulseWidth do
     {:error, catchall}
   end
 
-  # retrieves the PulseWidth by name, extracts the sequence map from opts
-  # then calls sequence with the pwm, map and opts
-  def sequence(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    seq_map = Keyword.get(opts, :sequence, nil)
-    # remove the sequence opt, no need to pass it along now that we have
-    # the actual sequence map
-    opts = Keyword.drop(opts, [:sequence])
-
-    with %PulseWidth{} = pwm <- find(name),
-         {:seq_opt, true, pwm} <- {:seq_opt, is_map(seq_map), pwm} do
-      # call sequence with the actual pwm, the sequence
-      sequence(pwm, seq_map, opts)
-    else
-      nil -> {:not_found, name}
-      {:seq_opt, false, pwm} -> Map.get(pwm, :sequence)
-    end
-  end
-
-  def sequence(%PulseWidth{} = pwm, %{name: seq_name} = seq, opts)
-      when is_list(opts) do
-    import TimeSupport, only: [utc_now: 0]
-    import PulseWidth.Payload.Sequence, only: [send_cmd: 4]
-
-    # update the PulseWidth
-    with {:ok, %PulseWidth{} = pwm} <- update(pwm, sequence: seq_name),
-         # add the command
-         {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
-         # get the PulseWidthCmd inserted
-         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
-         # send the command
-         pub_rc <- send_cmd(pwm, refid, seq, opts) do
-      # assemble return value
-      [sequence_name: seq_name, pub_rc: pub_rc] ++ [opts]
-    else
-      # just pass through any error encountered
-      error -> {:error, error}
-    end
-  end
-
-  @doc """
-  Generate an example Sequence payload using the first PulseWidth
-  known to the system (sorted in ascending order).
-
-  This function embeds documentation in the live system.
-
-    ### Examples
-    iex> PulseWidth.sequence_example(encode: true)
-    Minimized JSON encoded Elixir native representation
-
-    iex> PulseWidth.sequence_example(binary: true)
-    Minimized JSON encoded binary representation
-
-    iex> PulseWidth.sequence_example(bytes: true)
-    Byte count of minimized JSON
-
-    iex> PulseWidth.sequence_example(pack: true)
-    Byte count of MsgPack encoding
-
-    iex> PulseWidth.sequence_example(write: true)
-    Appends pretty version of JSON encoded Sequence to
-     ${HOME}/devel/helen/extra/json-snippets/sequence.json
-  """
-
-  @doc since: "0.0.14"
-  def sequence_example(opts \\ []) do
-    import Ecto.UUID, only: [generate: 0]
-    import PulseWidth.Payload.Sequence, only: [create_cmd: 4]
-
-    name = names() |> hd()
-
-    seq = %{
-      name: "flash",
-      steps: [
-        %{duty: 8191, ms: 750},
-        %{duty: 0, ms: 1500},
-        %{duty: 4096, ms: 750},
-        %{duty: 0, ms: 1500},
-        %{duty: 2048, ms: 750},
-        %{duty: 0, ms: 1500},
-        %{duty: 1024, ms: 750},
-        %{duty: 0, ms: 1500}
-      ],
-      repeat: false,
-      activate: true
-    }
-
-    with %PulseWidth{name: _} = pwm <- find(name),
-         refid <- generate(),
-         cmd <- create_cmd(pwm, refid, seq, []) do
-      cmd |> payload_example_opts(opts)
-    else
-      error -> {:error, error}
-    end
-  end
-
   def update(name, opts) when is_binary(name) and is_list(opts) do
     pwm = find(name)
 
@@ -525,55 +547,6 @@ defmodule PulseWidth do
   end
 
   defp last_seen_at(%PulseWidth{last_seen_at: x}), do: x
-
-  defp payload_example_opts(%{pwm_cmd: _payload} = payload, opts) do
-    import Jason, only: [encode!: 2, encode_to_iodata!: 2]
-    import Msgpax, only: [pack!: 1]
-
-    cond do
-      Keyword.has_key?(opts, :encode) ->
-        Jason.encode!(payload)
-
-      Keyword.has_key?(opts, :binary) ->
-        Jason.encode!(payload, []) |> IO.puts()
-
-      Keyword.has_key?(opts, :bytes) ->
-        encode!(payload, []) |> IO.puts() |> String.length()
-
-      Keyword.has_key?(opts, :pack) ->
-        [pack!(payload)] |> IO.iodata_length()
-
-      Keyword.has_key?(opts, :write) ->
-        out = ["\n", encode_to_iodata!(payload, pretty: true), "\n"]
-        home = System.get_env("HOME")
-
-        name = payload_example_file(payload)
-
-        file =
-          [
-            home,
-            "devel",
-            "helen",
-            "extra",
-            "json-snippets",
-            name
-          ]
-          |> Path.join()
-
-        File.write(file, out, [:append])
-
-      true ->
-        payload
-    end
-  end
-
-  defp payload_example_file(%{pwm_cmd: cmd}) do
-    cond do
-      cmd == 0x10 -> "duty.json"
-      cmd == 0x20 -> "sequence.json"
-      true -> "undefined.json"
-    end
-  end
 
   defp record_cmd(%PulseWidth{} = pwm, opts) when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]

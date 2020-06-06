@@ -1,0 +1,58 @@
+
+{
+  "ack": true,
+  "cmd": {
+    "basic": {
+      "repeat": true,
+      "steps": [
+        {
+          "duty": 1385,
+          "ms": 53
+        },
+        {
+          "duty": 6421,
+          "ms": 67
+        },
+        {
+          "duty": 7944,
+          "ms": 82
+        },
+        {
+          "duty": 3014,
+          "ms": 56
+        },
+        {
+          "duty": 4106,
+          "ms": 50
+        },
+        {
+          "duty": 4299,
+          "ms": 3
+        },
+        {
+          "duty": 3471,
+          "ms": 35
+        },
+        {
+          "duty": 3698,
+          "ms": 57
+        },
+        {
+          "duty": 678,
+          "ms": 75
+        },
+        {
+          "duty": 5617,
+          "ms": 60
+        }
+      ]
+    },
+    "name": "basic_sequence",
+    "run": true,
+    "type": "basic"
+  },
+  "device": "pwm/lab-ledge.pin:1",
+  "host": "ruth.3c71bf14fdf0",
+  "pwm_cmd": 17,
+  "refid": "e6f78a73-7876-4ac1-98bc-a5479f31d744"
+}
