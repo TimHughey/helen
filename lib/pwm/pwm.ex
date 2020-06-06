@@ -112,20 +112,6 @@ defmodule PulseWidth do
   @doc since: "0.0.22"
   def basic(name_id_pwm, cmd_map, opts \\ [])
 
-  def basic(
-        name_or_id,
-        %{name: name, basic: %{repeat: repeat, steps: steps}} = cmd,
-        opts
-      )
-      when is_binary(name) and is_boolean(repeat) and is_list(steps) and
-             is_list(opts) do
-    with %PulseWidth{} = pwm <- find(name_or_id) do
-      basic(pwm, cmd, opts)
-    else
-      nil -> {:not_found, name}
-    end
-  end
-
   def basic(%PulseWidth{} = pwm, %{name: name} = cmd, opts)
       when is_list(opts) do
     import TimeSupport, only: [utc_now: 0]
@@ -144,6 +130,15 @@ defmodule PulseWidth do
     else
       # just pass through any error encountered
       error -> {:error, error}
+    end
+  end
+
+  def basic(pwm, %{name: name, basic: %{repeat: _, steps: _}} = cmd, opts)
+      when is_list(opts) do
+    with %PulseWidth{} = pwm <- find(pwm) do
+      basic(pwm, cmd, opts)
+    else
+      nil -> {:not_found, name}
     end
   end
 
