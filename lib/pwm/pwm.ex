@@ -110,12 +110,16 @@ defmodule PulseWidth do
     PulseWidth.basic(name, basic: %{})
   """
   @doc since: "0.0.22"
-  def basic(name_or_pwm, cmd_map, opts \\ [])
+  def basic(name_id_pwm, cmd_map, opts \\ [])
 
-  def basic(name, %{name: name, repeat: repeat, steps: steps} = cmd, opts)
+  def basic(
+        name_or_id,
+        %{name: name, basic: %{repeat: repeat, steps: steps} = cmd},
+        opts
+      )
       when is_binary(name) and is_boolean(repeat) and is_list(steps) and
              is_list(opts) do
-    with %PulseWidth{} = pwm <- find(name) do
+    with %PulseWidth{} = pwm <- find(name_or_id) do
       basic(pwm, cmd, opts)
     else
       nil -> {:not_found, name}
