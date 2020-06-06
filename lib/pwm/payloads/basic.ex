@@ -6,27 +6,17 @@ defmodule PulseWidth.Payload.Basic do
   def create_cmd(
         %PulseWidth{device: device, host: host},
         refid,
-        %{name: name, repeat: _, steps: _} = cmd,
-        opts
+        %{name: _} = cmd,
+        opts \\ []
       )
       when is_list(opts) and is_binary(refid) do
-    cmd = %{
-      type: "basic",
-      name: name,
-      # activate if not specified
-      activate: Map.get(cmd, :activate, true),
-      # take the two components of the basic command and store them in a
-      # key == type so the Remote can directly get to the details
-      basic: Map.take(cmd, [:repeat, :steps])
-    }
-
     %{
       pwm_cmd: 0x11,
       device: device,
       refid: refid,
       host: host,
       ack: Keyword.get(opts, :ack, true),
-      cmd: cmd
+      cmd: Map.put(cmd, :type, "basic")
     }
   end
 
@@ -39,11 +29,14 @@ defmodule PulseWidth.Payload.Basic do
 
     cmd = %{
       name: "basic_random",
-      repeat: true,
-      steps:
-        for _i <- 1..10 do
-          %{duty: :rand.uniform(8191), ms: :rand.uniform(125)}
-        end
+      activate: true,
+      basic: %{
+        repeat: false,
+        steps:
+          for _i <- 1..10 do
+            %{duty: :rand.uniform(8191), ms: :rand.uniform(125)}
+          end
+      }
     }
 
     create_cmd(pwm_dev, UUID.generate(), cmd, [])
@@ -52,7 +45,7 @@ defmodule PulseWidth.Payload.Basic do
   def send_cmd(
         %PulseWidth{device: device} = pwm,
         refid,
-        %{name: _cmd_name, repeat: _, steps: _} = cmd,
+        %{} = cmd,
         opts \\ []
       )
       when is_binary(refid) do

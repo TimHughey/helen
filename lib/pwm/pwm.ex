@@ -133,12 +133,12 @@ defmodule PulseWidth do
     end
   end
 
-  def basic(pwm, %{name: name, basic: %{repeat: _, steps: _}} = cmd, opts)
+  def basic(x, %{name: _, basic: %{repeat: _, steps: _}} = cmd, opts)
       when is_list(opts) do
-    with %PulseWidth{} = pwm <- find(pwm) do
+    with %PulseWidth{} = pwm <- find(x) do
       basic(pwm, cmd, opts)
     else
-      nil -> {:not_found, name}
+      nil -> {:not_found, x}
     end
   end
 
