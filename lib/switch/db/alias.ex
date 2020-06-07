@@ -112,6 +112,20 @@ defmodule Switch.DB.Alias do
     |> Repo.all()
   end
 
+  @doc """
+    Switch the device PIO for the Alias to true
+  """
+  @doc since: "0.0.22"
+  def on(name_or_id, opts \\ []) when is_list(opts),
+    do: position(name_or_id, [position: true] ++ opts)
+
+  @doc """
+    Switch the device PIO for the Alias to false
+  """
+  @doc since: "0.0.22"
+  def off(name_or_id, opts \\ []) when is_list(opts),
+    do: position(name_or_id, [position: false] ++ opts)
+
   def position(name, opts \\ [])
 
   def position(name, opts) when is_binary(name) and is_list(opts) do
@@ -190,6 +204,19 @@ defmodule Switch.DB.Alias do
       rename(x, opts)
     else
       _not_found -> {:not_found, name_or_id}
+    end
+  end
+
+  @doc """
+  Toggle the device PIO for the alias on <-> off
+  """
+  @doc since: "0.0.22"
+  def toggle(name_or_id, opts \\ []) do
+    with {:ok, true} <- position(name_or_id) do
+      position(name_or_id, [position: false] ++ opts)
+    else
+      {:ok, false} -> position(name_or_id, [position: true] ++ opts)
+      error -> error
     end
   end
 
