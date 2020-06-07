@@ -14,6 +14,7 @@ defmodule Mqtt.Inbound do
     GenServer.call(__MODULE__, {:additional_message_flags, opts})
   end
 
+  @impl true
   def init(s)
       when is_map(s) do
     Logger.debug(["init()"])
@@ -21,15 +22,6 @@ defmodule Mqtt.Inbound do
     s =
       Map.put_new(s, :log_reading, config(:log_reading, false))
       |> Map.put_new(:messages_dispatched, 0)
-      # |> Map.put_new(
-      #   :periodic_log,
-      #   config(
-      #     :periodic_log,
-      #     enable: true,
-      #     first: {:secs, 1},
-      #     repeat: {:mins, 15}
-      #   )
-      # )
       |> Map.put_new(
         :additional_message_flags,
         config(:additional_message_flags,
@@ -38,14 +30,6 @@ defmodule Mqtt.Inbound do
         )
         |> Enum.into(%{})
       )
-
-    # if Map.get(s, :autostart, false) do
-    #   import Process, only: [send_after: 3]
-    #   import TimeSupport, only: [ms: 1]
-    #
-    #   first = s.periodic_log |> Keyword.get(:first)
-    #   send_after(Mqtt.Inbound, {:periodic, :first}, ms(first))
-    # end
 
     {:ok, s}
   end
@@ -78,6 +62,7 @@ defmodule Mqtt.Inbound do
   end
 
   # GenServer callbacks
+  @impl true
   def handle_call({:additional_message_flags, opts}, _from, s) do
     set_flags = Keyword.get(opts, :set, nil)
     merge_flags = Keyword.get(opts, :merge, nil)
@@ -102,50 +87,29 @@ defmodule Mqtt.Inbound do
     end
   end
 
+  @impl true
   def handle_call({:incoming_msg, msg, opts}, _from, s) when is_map(msg) do
     {:reply, :ok, incoming_msg(msg, s, opts)}
   end
 
+  @impl true
   def handle_call(catch_all, _from, s) do
     Logger.warn(["unknown handle_call(", inspect(catch_all, pretty: true), ")"])
     {:reply, {:bad_msg}, s}
   end
 
+  @impl true
   def handle_cast({:incoming_msg, msg, opts}, s) when is_map(msg) do
     {:noreply, incoming_msg(msg, s, opts)}
   end
 
+  @impl true
   def handle_cast(catch_all, s) do
     Logger.warn(["unknown handle_cast(", inspect(catch_all, pretty: true), ")"])
     {:noreply, s}
   end
 
-  # def handle_info({:periodic, flag}, s)
-  #     when is_map(s) do
-  #   import TimeSupport, only: [ms: 1]
-  #   import Process, only: [send_after: 3]
-  #
-  #   log = Kernel.get_in(s, [:periodic_log, :enable])
-  #   repeat = Kernel.get_in(s, [:periodic_log, :repeat])
-  #
-  #   msg_text = fn flag, x, repeat ->
-  #     a = if x == 0, do: ["no "], else: ["#{x} "]
-  #
-  #     b =
-  #       if flag == :first,
-  #         do: [" (future reports every ", "#{repeat})"],
-  #         else: []
-  #
-  #     [a, "messages dispatched", b]
-  #   end
-  #
-  #   log && Logger.info(msg_text.(flag, s.messages_dispatched, repeat))
-  #
-  #   send_after(self(), {:periodic, :none}, ms(repeat))
-  #
-  #   {:noreply, s}
-  # end
-
+  @impl true
   def handle_info(catch_all, s) do
     Logger.warn(["unknown handle_info(", inspect(catch_all, pretty: true), ")"])
     {:noreply, s}
@@ -322,12 +286,6 @@ defmodule Mqtt.Inbound do
     r = Map.put(r, :async, async)
 
     case type do
-      # NOTE
-      # msg_pipeline is a new approach for processing messages by
-      # sending the message to all modules that can handle incoming
-      # messages.
-
-      # as of now, only the Switch module is capable of pipeline processing
       type when type in ["switch"] ->
         msg_switch(r)
 
@@ -408,26 +366,14 @@ defmodule Mqtt.Inbound do
     # simply get the remote log message and log it locally
     name = Map.get(r, :name, "<no name>")
     text = Map.get(r, :text)
-    log = Map.get(r, :log, true)
 
-    with true <- log,
-         # if the text message is binary (which is should always be)
-         # don't inspect it to avoid escaping quotes
-         {:binary, true, text} <- {:binary, is_binary(text), text} do
-      ["rlog ", inspect(name), " ", text] |> Logger.info()
-    else
-      # if log is false, do nothing
-      false ->
-        :ok
-
-      # if the text isn't binary then inspect it (e.g. text is missing)
-      {:binary, false, text} ->
-        ["rlog ", inspect(name), " ", inspect(text, pretty: true)]
-        |> Logger.info()
-
-      _anything ->
-        :ok
+    # we only inspect values that aren't binary to avoid quoting
+    ensure_binary = fn
+      x when is_binary(x) -> x
+      x -> inspect(x, pretty: true)
     end
+
+    [ensure_binary.(name), " ", ensure_binary.(text)] |> Logger.info()
 
     # always return :ok
     :ok
@@ -465,62 +411,10 @@ defmodule Mqtt.Inbound do
     Map.put(s, :seen_topics, topics)
   end
 
-  #
-  # Message Decoding and Metadata Check
-  # def check_metadata(%{} = r), do: metadata(r)
-
-  @doc ~S"""
-  Parse a JSON
+  @doc """
+  Does the message have the base metadata?
   """
 
-  # @doc since: "0.0.14"
-  # def decode(<<123::utf8, _rest::binary>> = json) do
-  #   import Jason, only: [decode: 2]
-  #   import TimeSupport, only: [utc_now: 0]
-  #
-  #   case decode(json, keys: :atoms) do
-  #     {:ok, r} ->
-  #       r =
-  #         Map.put(r, :json, json)
-  #         |> Map.put(:msg_recv_dt, utc_now())
-  #         |> check_metadata()
-  #
-  #       {:ok, r}
-  #
-  #     {:error, %Jason.DecodeError{data: data} = _e} ->
-  #       opts = [binaries: :as_strings, pretty: true, limit: :infinity]
-  #       {:error, "inbound msg parse failed:\n#{inspect(data, opts)}"}
-  #   end
-  # end
-  #
-  # @doc ~S"""
-  # Parse a MsgPack
-  # """
-  #
-  # @doc since: "0.0.14"
-  # def decode(msg) do
-  #   import Msgpax, only: [unpack: 1]
-  #   import TimeSupport, only: [utc_now: 0]
-  #
-  #   case unpack(msg) do
-  #     {:ok, r} ->
-  #       # NOTE: Msgpax.unpack() returns maps with binaries as keys so let's
-  #       #       convert them to atoms
-  #
-  #       {:ok,
-  #        atomize_keys(r)
-  #        |> Map.merge(%{msgpack: msg, msg_recv_dt: utc_now()})
-  #        |> check_metadata()}
-  #
-  #     {:error, error} ->
-  #       {:error, error}
-  #   end
-  # end
-  #
-  # @doc ~S"""
-  # Does the message have the base metadata?
-  # """
-  #
   @doc since: "0.0.14"
   def metadata(
         %{mtime: mtime, type: type, host: <<"ruth.", _rest::binary>>} = r
@@ -546,7 +440,6 @@ defmodule Mqtt.Inbound do
   @doc """
   Is the message current?
   """
-
   @doc since: "0.0.14"
   def mtime_good?(%{} = r) do
     mtime = Map.get(r, :mtime, 0)

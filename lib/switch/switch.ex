@@ -67,6 +67,18 @@ defmodule Switch do
   defdelegate alias_find(name_or_id), to: Alias, as: :find
 
   @doc """
+    Retrieve a list of alias names
+  """
+  @doc since: "0.0.22"
+  defdelegate alias_names, to: Alias, as: :names
+
+  @doc """
+    Retrieve a list of alias names that begin with a pattern
+  """
+  @doc since: "0.0.22"
+  defdelegate alias_names_begin_with(patten), to: Alias, as: :names_begin_with
+
+  @doc """
     Find a Switch Device by device or id
   """
   @doc since: "0.0.21"

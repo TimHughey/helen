@@ -26,7 +26,6 @@ defmodule Switch.DB.Alias do
     field(:device_id, :integer)
     field(:description, :string, default: "<none>")
     field(:pio, :integer)
-    field(:invert_state, :boolean, default: false)
     field(:ttl_ms, :integer, default: 60_000)
 
     belongs_to(:device, Device,
@@ -45,7 +44,7 @@ defmodule Switch.DB.Alias do
     # grab keys of interest for the schema (if they exist) and populate the
     # required parameters from the function call
     #
-    Keyword.take(opts, [:description, :invert_state, :ttl_ms])
+    Keyword.take(opts, [:description, :ttl_ms])
     |> Enum.into(%{})
     |> Map.merge(%{device_id: id, name: name, pio: pio, device_checked: true})
     |> upsert()
@@ -82,6 +81,35 @@ defmodule Switch.DB.Alias do
       x when is_nil(x) -> nil
       x -> {:error, x}
     end
+  end
+
+  @doc """
+    Retrieve Switch Alias names
+  """
+
+  @doc since: "0.0.22"
+  def names do
+    import Ecto.Query, only: [from: 2]
+
+    from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+  end
+
+  @doc """
+    Retrieve switch aliases names that begin with a pattern
+  """
+
+  @doc since: "0.0.22"
+  def names_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+
+    from(x in Schema,
+      where: like(x.name, ^like_string),
+      order_by: x.name,
+      select: x.name
+    )
+    |> Repo.all()
   end
 
   def position(name, opts \\ [])
@@ -131,7 +159,6 @@ defmodule Switch.DB.Alias do
       catchall ->
         catchall
     end
-    |> invert_position_if_needed(sa)
     |> Command.ack_immediate_if_needed(opts)
   end
 
@@ -142,8 +169,7 @@ defmodule Switch.DB.Alias do
       Keyword.take(opts, [
         :name,
         :description,
-        :ttl_ms,
-        :invert_state
+        :ttl_ms
       ])
       |> Enum.into(%{})
 
@@ -186,7 +212,7 @@ defmodule Switch.DB.Alias do
     {:bad_args, catchall}
   end
 
-  # Alias.upsert/2 will update (or insert) an %Schema{} using the map passed in
+  # Alias.upsert/2 will update (or insert) a %Schema{} using the map passed
   def upsert(
         %Schema{} = x,
         %{device_checked: true, name: _, device_id: _, pio: _pio} = params
@@ -197,7 +223,6 @@ defmodule Switch.DB.Alias do
       :description,
       :device_id,
       :pio,
-      :invert_state,
       :ttl_ms,
       :updated_at
     ]
@@ -298,36 +323,6 @@ defmodule Switch.DB.Alias do
   end
 
   #
-  # Invert Position (if required)
-
-  # handle the scenario of pure or paritial success
-  defp invert_position_if_needed(
-         {rc, position},
-         %Schema{
-           invert_state: true
-         }
-       )
-       when rc in [:ok, :ttl_expired],
-       do: not position
-
-  # handle error or unsuccesful position results by simply passing
-  # through the result
-  defp invert_position_if_needed(result, _sa),
-    do: result
-
-  # defp invert_position_if_needed(position, %SwitchState{
-  #        invert_state: true
-  #      })
-  #      when is_boolean(position),
-  #      do: not position
-  #
-  # defp invert_position_if_needed(position, %SwitchState{
-  #        invert_state: false
-  #      })
-  #      when is_boolean(position),
-  #      do: position
-
-  #
   # Changeset Functions
   #
 
@@ -341,7 +336,6 @@ defmodule Switch.DB.Alias do
       :description,
       :device_id,
       :pio,
-      :invert_state,
       :ttl_ms
     ]
 
@@ -351,7 +345,6 @@ defmodule Switch.DB.Alias do
       :description,
       :device_id,
       :pio,
-      :invert_state,
       :ttl_ms
     ]
 end
