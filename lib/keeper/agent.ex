@@ -10,6 +10,8 @@ defmodule Keeper do
     Agent.start_link(fn -> Enum.into(args, %{}) end, name: __MODULE__)
   end
 
+  def get_all, do: Agent.get(__MODULE__, fn x -> x end)
+
   def get_key(key) when is_atom(key) do
     Agent.get(__MODULE__, fn
       %{} = s -> Map.get(s, key)
@@ -22,7 +24,7 @@ defmodule Keeper do
       %{} = s ->
         existing = Map.get(s, key, %{})
         updated = Map.merge(existing, map)
-        s = Map.put(s, key, update)
+        s = Map.put(s, key, updated)
         {updated, s}
 
       s ->

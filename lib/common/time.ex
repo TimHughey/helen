@@ -22,8 +22,13 @@ defmodule TimeSupport do
     duration(opts) |> Duration.invert()
   end
 
-  def duration_ms(opts) when is_list(opts),
-    do: duration(opts) |> Duration.to_milliseconds(truncate: true)
+  def duration_ms(opts) when is_struct(opts) or is_list(opts) do
+    case opts do
+      opts when is_list(opts) -> duration(opts)
+      opts -> opts
+    end
+    |> Duration.to_milliseconds(truncate: true)
+  end
 
   def from_unix(mtime) do
     {:ok, dt} = DateTime.from_unix(mtime)
