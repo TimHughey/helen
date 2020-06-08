@@ -11,7 +11,7 @@ defmodule Sensor.DB.DataPoint do
     field(:temp_f, :float)
     field(:temp_c, :float)
     field(:relhum, :float)
-    field(:moisture, :float)
+    field(:capacitance, :float)
     field(:reading_at, :utc_datetime_usec)
 
     belongs_to(:device, Device)
@@ -26,7 +26,7 @@ defmodule Sensor.DB.DataPoint do
   @doc since: "0.9.19"
   def avg_of(datapoints, column)
       when is_list(datapoints) and
-             column in [:temp_f, :temp_c, :relhum, :moisture] do
+             column in [:temp_f, :temp_c, :relhum, :capacitance] do
     vals =
       Enum.into(datapoints, [], fn
         %DataPoint{} = dp -> Map.get(dp, column)
@@ -79,15 +79,33 @@ defmodule Sensor.DB.DataPoint do
     #        the critical pieces of information for potentially saving
     #        a sensor datapoint
 
+    ### START TEMPORARY LEGACY SUPPORT
+
+    # NOTE:
+    #   for short-term backward compatibility with older remote firmware
+    #   we look for data using the old key names and the new key names
+    #
+    #   to do this we:
+    #     1. manually map the old keys into params
+    #     2. use Map.take/2 with the new key names
+    #     3. then merge the two maps
+
     # NOTE
     #  temporarily map the msg keys to schema keys
-    params = %{
+    params_legacy = %{
       temp_f: Map.get(msg, :tf),
       temp_c: Map.get(msg, :tc),
       relhum: Map.get(msg, :rh),
-      moisture: Map.get(msg, :soil),
+      capacitance: Map.get(msg, :cap),
       reading_at: reading_at
     }
+
+    params_new =
+      Map.take(msg, [:temp_f, :temp_c, :relhum, :capacitance, :reading_at])
+
+    params = Map.merge(params_legacy, params_new)
+
+    ### END TEMPORARY LEGACY SUPPORT
 
     Map.put(msg, :sensor_datapoint, insert(dev, msg, params))
   end
