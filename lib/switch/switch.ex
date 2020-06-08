@@ -149,8 +149,9 @@ defmodule Switch do
   # pipeline
   def handle_message(%{} = msg_in), do: msg_in
 
-  defdelegate on(name_or_id, opts \\ []), to: Alias, as: :on
-  defdelegate off(name_or_id, opts \\ []), to: Alias, as: :off
+  def on(name_or_id, opts \\ []), do: Alias.on(name_or_id, opts)
+
+  def off(name_or_id, opts \\ []), do: Alias.off(name_or_id, opts)
 
   @doc """
     Set the position (state) of a Switch PIO using it's Alias
@@ -200,5 +201,5 @@ defmodule Switch do
     end
   end
 
-  defdelegate toggle(name_or_id, opts \\ []), to: Alias, as: :toggle
+  def toggle(name_or_id, opts \\ []), do: Alias.toggle(name_or_id, opts)
 end
