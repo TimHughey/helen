@@ -80,7 +80,8 @@ defmodule Sensor.DB.DataPoint do
     #        a sensor datapoint
 
     params =
-      Map.take(msg, [:temp_f, :temp_c, :relhum, :capacitance, :reading_at])
+      Map.take(msg, [:temp_f, :temp_c, :relhum, :capacitance])
+      |> Map.put(:reading_at, reading_at)
 
     Map.put(msg, :sensor_datapoint, insert(dev, msg, params))
   end

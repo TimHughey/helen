@@ -263,6 +263,7 @@ defmodule Helen.Mixfile do
       {:sup_tree,
        [
          {Repo, []},
+         {Keeper, []},
          {Janitor.Supervisor, []},
          :core_supervisors,
          # TODO: once the Supervisors below are implemented remove the following
@@ -275,7 +276,7 @@ defmodule Helen.Mixfile do
       {:core_supervisors,
        [
          # TODO: implement the Supervisors below to create a 'proper'
-         #       supervisom tree that does not restart servers uncessary
+         #       supervisom tree that does not restart servers uncessarily
          # {Protocols.Supervisor, []},
          # {Support.Supervisor, []},
          # {Workers.Supervisor, []},
