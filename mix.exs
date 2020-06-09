@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.22",
+      version: "0.0.23",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -296,6 +296,7 @@ defmodule Helen.Mixfile do
        ]},
       {:misc_workers,
        [
+         {Task.Supervisor, name: Helen.TaskSupervisor},
          {Helen.Scheduler, []}
        ]}
     ]
