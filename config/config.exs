@@ -6,7 +6,8 @@ config :helen, ecto_repos: [Repo]
 
 # Configures Elixir's Logger
 config :logger,
-  console: [metadata: [:module], format: "$time $metadata$message\n"],
+  # console: [metadata: [:module], format: "$time $metadata$message\n"],
+  console: [format: "$time $message\n"],
   backends: [:console],
   level: :info,
   compile_time_purge_matching: [
