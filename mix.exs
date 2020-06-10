@@ -63,7 +63,7 @@ defmodule Helen.Mixfile do
         :httpoison,
         :agnus
       ],
-      env: base_env()
+      env: []
     ]
   end
 
@@ -254,51 +254,6 @@ defmodule Helen.Mixfile do
           &sym_link_to_tar/1
         ]
       ]
-    ]
-  end
-
-  defp base_env do
-    [
-      # Supervision Tree and Initial Opts (listed in startup order)
-      {:sup_tree,
-       [
-         {Repo, []},
-         {Keeper, []},
-         {Janitor.Supervisor, []},
-         :core_supervisors,
-         # TODO: once the Supervisors below are implemented remove the following
-         #       specific list of supervisors
-         :protocol_supervisors,
-         :support_workers,
-         :worker_supervisors,
-         :misc_workers
-       ]},
-      {:core_supervisors,
-       [
-         # TODO: implement the Supervisors below to create a 'proper'
-         #       supervisom tree that does not restart servers uncessarily
-         # {Protocols.Supervisor, []},
-         # {Support.Supervisor, []},
-         # {Workers.Supervisor, []},
-         # {Misc.Supervisors, []}
-       ]},
-      {:protocol_supervisors,
-       [
-         {Fact.Supervisor, [log: [init: false, init_args: false]]},
-         {Mqtt.Supervisor, []}
-       ]},
-      {:support_workers, []},
-      {:worker_supervisors,
-       [
-         # DynamicSupervisors
-         {Dutycycle.Supervisor, [start_workers: true]},
-         {Thermostat.Supervisor, [start_workers: true]}
-       ]},
-      {:misc_workers,
-       [
-         {Task.Supervisor, name: Helen.TaskSupervisor},
-         {Helen.Scheduler, []}
-       ]}
     ]
   end
 end

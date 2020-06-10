@@ -61,7 +61,8 @@ defmodule Thermostat.Supervisor do
 
   def server_name_atom(_), do: :no_server
 
-  def start_link(args) when is_list(args) do
+  def start_link(args \\ [start_workers: false, log: [init: false]])
+      when is_list(args) do
     Supervisor.start_link(__MODULE__, Enum.into(args, %{}), name: __MODULE__)
   end
 

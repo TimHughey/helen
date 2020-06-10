@@ -18,7 +18,7 @@ pushd -q lib
 extra_mods=(*/*.ex)
 
 for f in ${extra_mods}; do
-  cp --verbose $f /usr/local/helen/extra-mods
+  cp --verbose $f /usr/local/helen/extra-mods/always
 done
 
 print "\n"

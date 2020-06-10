@@ -8,14 +8,6 @@ config :helen,
     rpt: {"prod/r/#", 0}
   ]
 
-config :helen,
-  # overrides from config.exs
-  worker_supervisors: [
-    # DynamicSupervisors
-    {Dutycycle.Supervisor, [start_workers: false]},
-    {Thermostat.Supervisor, [start_workers: false]}
-  ]
-
 config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
 
 config :helen, Janitor,

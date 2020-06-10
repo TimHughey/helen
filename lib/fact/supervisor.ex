@@ -7,19 +7,15 @@ defmodule Fact.Supervisor do
   alias Fact.Influx
 
   @impl true
-  def init(args) do
-    Logger.debug(["init() args: ", inspect(args, pretty: true)])
-
-    # List all child processes to be supervised
-    children = [
-      Influx.child_spec()
-    ]
-
-    opts = [strategy: :rest_for_one, name: Fact.Supervisor]
-    Supervisor.init(children, opts)
+  def init(_args) do
+    Supervisor.init([Influx.child_spec()],
+      strategy: :rest_for_one,
+      name: Fact.Supervisor
+    )
   end
 
-  def start_link(args) when is_list(args) do
+  def start_link(args \\ [log: [init: false, init_args: false]])
+      when is_list(args) do
     Supervisor.start_link(__MODULE__, Enum.into(args, %{}), name: __MODULE__)
   end
 end

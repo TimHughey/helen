@@ -131,4 +131,6 @@ config :helen, Helen.Scheduler,
     # {"@daily",         {Backup, :backup, []}}
   ]
 
+config :helen, Thermostat.Server, initial_args: [start_workers: true]
+
 import_config "prod.secret.exs"
