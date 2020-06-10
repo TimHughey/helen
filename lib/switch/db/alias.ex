@@ -121,10 +121,49 @@ defmodule Switch.DB.Alias do
 
   @doc """
     Switch the device PIO for the Alias to false
+
+    extra options:
+      :wait_for_pid      -> PID of process that is expected to terminate
+      :check_interval_ms -> interval between checks if PID is alive
+      :timeout_ms        -> max milliseconds to wait for PID to terminate
   """
   @doc since: "0.0.22"
-  def off(name_or_id, opts \\ []) when is_list(opts),
-    do: position(name_or_id, [position: false] ++ opts)
+  def off(name_or_id, opts \\ []) when is_list(opts) do
+    pid = Keyword.get(opts, :wait_for_pid)
+    check_interval_ms = Keyword.get(opts, :check_interval_ms, 10)
+    max_checks = Keyword.get(opts, :timeout_ms, 1000) / check_interval_ms
+
+    # if :pid_check_out isn't in the opts default to zero so the with
+    # match is passed on the first check
+    checks = Keyword.get(opts, :pid_check_count, 0)
+
+    with {:pid_is_nil, false} <- {:pid_is_nil, is_nil(pid)},
+         {:alive, true} <- {:alive, Process.alive?(pid)},
+         {:checks, count} when count < max_checks <- {:checks, checks} do
+      Process.sleep(check_interval_ms)
+
+      # add (or increment) :pid_check_count and recurse
+      opts = Keyword.update(opts, :pid_check_count, 1, fn x -> x + 1 end)
+      off(name_or_id, opts)
+    else
+      {:checks, count} when count >= max_checks ->
+        {:timeout, name_or_id}
+
+      _anything ->
+        # pid not in opts or pid already terminated
+
+        # ensure we don't pass along any opts related to the pid check
+        opts =
+          Keyword.drop(opts, [
+            :wait_for_pid,
+            :check_interval_ms,
+            :timeout_ms,
+            :pid_check_count
+          ])
+
+        position(name_or_id, [position: false] ++ opts)
+    end
+  end
 
   def position(name, opts \\ [])
 
