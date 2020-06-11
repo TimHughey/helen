@@ -149,7 +149,7 @@ defmodule ExtraMod do
     with %{pid: p, ref: r} = t when is_pid(p) <- task_by(mod, key, s),
          # if the process is alive then exit it with :extramod_abort
          {:alive?, true} <- {:alive?, Process.alive?(p)},
-         :ok <- Process.exit(p, :extramod_abort),
+         _anything <- Process.exit(p, :extramod_abort),
          # flag that the task has been aborted
          # NOTE: remainder of task map updates done upon receipt of :EXIT msg
          task <- Map.put(t, :abort, true),
