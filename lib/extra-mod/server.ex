@@ -353,6 +353,8 @@ defmodule ExtraMod do
         # for tracking purposes
         {mod, _bytecode} = Code.compile_file(f_actual) |> hd()
 
+        if function_exported?(mod, :init, 1), do: apply(mod, :init, [])
+
         # delete the files, if requested
         if Keyword.get(opts, :rm, false), do: _rc = rm(f_actual)
 

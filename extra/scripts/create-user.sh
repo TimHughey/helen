@@ -8,5 +8,3 @@ sudo useradd -u 5001 -g 5001 -d /home/helen -s /bin/zsh -c "Helen" -m helen
 sudo usermod -G helen thughey
 
 sudo rsync --chown helen:helen -av .zshrc .zshenv /home/helen
-
-popd -q

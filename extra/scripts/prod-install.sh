@@ -71,7 +71,4 @@ print -n "starting latest release of helen..."
 
 ./bin/helen daemon
 
-# back to where we started
-popd -q +2
-
 print " done."
