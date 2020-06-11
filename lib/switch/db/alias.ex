@@ -128,7 +128,13 @@ defmodule Switch.DB.Alias do
       :timeout_ms        -> max milliseconds to wait for PID to terminate
   """
   @doc since: "0.0.22"
-  def off(name_or_id, opts \\ []) when is_list(opts) do
+  def off(name_id_or_list, opts \\ [])
+
+  def off(name_list, opts) when is_list(name_list) and is_list(opts) do
+    for s <- name_list, do: off(s, opts)
+  end
+
+  def off(name_or_id, opts) when is_list(opts) do
     pid = Keyword.get(opts, :wait_for_pid)
     check_interval_ms = Keyword.get(opts, :check_interval_ms, 10)
     max_checks = Keyword.get(opts, :timeout_ms, 1000) / check_interval_ms

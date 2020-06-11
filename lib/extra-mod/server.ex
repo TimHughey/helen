@@ -13,13 +13,12 @@ defmodule ExtraMod do
         iex> Helen.Application.hot_load("hot-stage", :rm)
 
         Options:
-          directory to load (default: "hot-stage")
-          :rm  = delete files after loading (default)
-          :no_rm = keep files after loading
-
+          directory to load (default: "hot")
+          rm: true   -> remove files after loading
+          rm: false  -> keep files after loading (default)
   """
   @doc since: "0.0.15"
-  def hot_load(dir, opts \\ [rm: true, base: "extra-mods"])
+  def hot_load(dir \\ "hot", opts \\ [rm: false])
       when is_binary(dir) and is_list(opts) do
     GenServer.call(__MODULE__, {:hot_load, dir, opts})
   end
@@ -63,6 +62,15 @@ defmodule ExtraMod do
   end
 
   @doc """
+  Retrieve the latest status for a task identified by Module and Key
+  """
+  @doc since: "0.0.23"
+  def task_status({mod, key}, opts \\ [])
+      when is_atom(mod) and is_atom(key) and is_list(opts) do
+    task_get_by({mod, key}, opts) |> Map.get(:status, "none")
+  end
+
+  @doc """
   Store the return code of a task identified by Module and Key
   """
   @doc since: "0.0.23"
@@ -77,6 +85,16 @@ defmodule ExtraMod do
   @doc since: "0.0.23"
   def task_store_status({mod, key, status}, opts \\ [])
       when is_atom(mod) and is_atom(key) and is_list(opts) do
+    GenServer.call(__MODULE__, {:task_store_status, mod, key, status, opts})
+  end
+
+  @doc """
+  Store the status (represented as iodata) of a task identified by Module and Key
+  """
+  @doc since: "0.0.23"
+  def task_store_msg(iodata, {mod, key}, opts \\ [])
+      when is_atom(mod) and is_atom(key) and is_list(iodata) and is_list(opts) do
+    status = IO.iodata_to_binary(iodata)
     GenServer.call(__MODULE__, {:task_store_status, mod, key, status, opts})
   end
 
@@ -110,10 +128,11 @@ defmodule ExtraMod do
   def handle_call(
         {:hot_load, dir, opts},
         _from,
-        %{loaded_modules: loaded, opts: %{load_opts: opts}} = s
+        %{loaded_modules: loaded, opts: %{load_opts: load_opts}} = s
       ) do
     # ensure that :base always exists
-    opts = Keyword.put_new(opts, :base, "extra-mods")
+    base = Keyword.get(load_opts, :base)
+    opts = Keyword.put_new(opts, :base, base)
 
     mods = mod_load(dir, opts)
     loaded = loaded ++ [mods]
@@ -130,7 +149,7 @@ defmodule ExtraMod do
     with %{pid: p, ref: r} = t when is_pid(p) <- task_by(mod, key, s),
          # if the process is alive then exit it with :extramod_abort
          {:alive?, true} <- {:alive?, Process.alive?(p)},
-         true <- Process.exit(p, :extramod_abort),
+         :ok <- Process.exit(p, :extramod_abort),
          # flag that the task has been aborted
          # NOTE: remainder of task map updates done upon receipt of :EXIT msg
          task <- Map.put(t, :abort, true),
@@ -229,7 +248,7 @@ defmodule ExtraMod do
 
   @impl true
   def handle_call(msg, _from, %{} = s) do
-    {:reply, {:extra_mod_handle_call_no_match, msg}, s}
+    {:reply, {:extra_mod_handle_call_no_match, {:msg, msg}, {:state, s}}, s}
   end
 
   @impl true

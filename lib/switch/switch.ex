@@ -151,7 +151,7 @@ defmodule Switch do
 
   def on(name_or_id, opts \\ []), do: Alias.on(name_or_id, opts)
 
-  def off(name_or_id, opts \\ []), do: Alias.off(name_or_id, opts)
+  def off(name_id_or_list, opts \\ []), do: Alias.off(name_id_or_list, opts)
 
   @doc """
     Set the position (state) of a Switch PIO using it's Alias
