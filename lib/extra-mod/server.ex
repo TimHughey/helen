@@ -52,6 +52,36 @@ defmodule ExtraMod do
   end
 
   @doc """
+  Put the state of a task identified by Module and Key
+
+  This function allows the internal state of the the task to be retrieved by
+  other interested tasks.
+  """
+  @doc since: "0.0.23"
+  def task_put_state({mod, key, state}, opts \\ [])
+      when is_atom(mod) and is_atom(key) and is_list(opts) do
+    GenServer.call(
+      __MODULE__,
+      {:task_put_key_in_task, mod, key, :state, state, opts}
+    )
+  end
+
+  @doc """
+  Put the state of a task identified by Module and Key
+
+  This function allows the internal state of the the task to be retrieved by
+  other interested tasks.
+  """
+  @doc since: "0.0.23"
+  def task_get_state({mod, key}, opts \\ [])
+      when is_atom(mod) and is_atom(key) and is_list(opts) do
+    GenServer.call(
+      __MODULE__,
+      {:task_get_key_in_task, mod, key, :state, opts}
+    )
+  end
+
+  @doc """
   Start a new task identified by Module and Key
   """
   @doc since: "0.0.23"
@@ -179,6 +209,43 @@ defmodule ExtraMod do
 
   @doc false
   @impl true
+  def handle_call({:task_get_key_in_task, mod, key, task_key, _opts}, _from, s) do
+    with %{mod: m, task_keys: tk} when is_atom(m) <- task_by(mod, key, s) do
+      val = Map.get(tk, task_key, %{})
+      {:reply, val, s}
+    else
+      %{mod: nil} -> {:reply, {:not_found, {mod, key}}, s}
+      error -> {:reply, {:error, error}, s}
+    end
+  end
+
+  @doc false
+  @impl true
+  def handle_call(
+        {:task_put_key_in_task, mod, key, task_key, val, _opts},
+        _from,
+        s
+      ) do
+    with %{pid: p, ref: r, task_keys: tk} = t when is_pid(p) <-
+           task_by(mod, key, s),
+         # stuff the value into task_keys using the specified task_key
+         task_keys <- Map.put(tk, task_key, val),
+         # update the task with the new task keys
+         task <- Map.put(t, :task_keys, task_keys),
+         # get the tasks map from the state and put the updated task
+         %{tasks: tasks} <- s,
+         tasks <- Map.put(tasks, r, task),
+         # update the state
+         state <- Map.put(s, :tasks, tasks) do
+      {:reply, {:ok}, state}
+    else
+      %{pid: nil, ref: _r} -> {:reply, {:not_found, {mod, key}}, s}
+      error -> {:reply, {:error, error}, s}
+    end
+  end
+
+  @doc false
+  @impl true
   def handle_call({:task_start, mod, key, func, task_opts, _opts}, _from, s) do
     # create the base task map.  we'll add pid and ref to it once the
     # task is started.
@@ -191,6 +258,7 @@ defmodule ExtraMod do
          # establish a reference for this task mod, key
          new_ref <- make_ref(),
          # build the task map
+         base_map <- Map.merge(task_default_map(), base_map),
          task_map <- Map.merge(base_map, %{pid: pid, ref: new_ref}),
          # store the task map in the tasks map
          %{tasks: tasks} <- s,
@@ -424,5 +492,12 @@ defmodule ExtraMod do
   end
 
   defp task_default_map,
-    do: %{pid: nil, ref: nil, mod: nil, func: nil, task_opts: nil}
+    do: %{
+      pid: nil,
+      ref: nil,
+      mod: nil,
+      func: nil,
+      task_opts: nil,
+      task_keys: %{}
+    }
 end
