@@ -1,4 +1,4 @@
-defmodule Fact.Remote do
+defmodule Remote.Fact do
   @moduledoc """
     Specific processing for Remote messages
   """

@@ -1,4 +1,4 @@
-defmodule Fact.Sensor do
+defmodule Sensor.Fact do
   @moduledoc """
     Specific processing for Sensor messages
   """

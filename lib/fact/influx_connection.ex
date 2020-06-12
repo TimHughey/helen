@@ -20,13 +20,13 @@ defmodule Fact.Influx do
   @doc since: "0.0.16"
   def handle_message(%{sensor_datapoint: datapoint, msg_recv_dt: _} = msg) do
     alias Sensor.DB.DataPoint, as: Schema
-    alias Fact.Sensor
+    alias Sensor.Fact
 
     # begin by confirming the datapoint was saved
     with {:ok, %Schema{} = dp} <- datapoint,
          # add the write_rc key so downstream modules can pattern match
          msg <- Map.put(msg, :write_rc, nil),
-         write_rc <- Sensor.write_specific_metric(dp, msg) do
+         write_rc <- Fact.write_specific_metric(dp, msg) do
       Map.put(msg, :write_rc, write_rc)
     else
       error ->
@@ -50,13 +50,13 @@ defmodule Fact.Influx do
   @doc since: "0.0.16"
   def handle_message(%{remote_host: remote_host, msg_recv_dt: _} = msg) do
     alias Remote.DB.Remote, as: Schema
-    alias Fact.Remote
+    alias Remote.Fact
 
     # begin by confirming the datapoint was saved
     with {:ok, %Schema{} = rem} <- remote_host,
          # add the write_rc key so downstream modules can pattern match
          msg <- Map.put(msg, :write_rc, nil),
-         write_rc <- Remote.write_specific_metric(rem, msg) do
+         write_rc <- Fact.write_specific_metric(rem, msg) do
       Map.put(msg, :write_rc, write_rc)
     else
       error ->
