@@ -95,6 +95,8 @@ config :helen, Switch.DB.Command,
     log: true
   ]
 
+config :helen, Thermostat.Supervisor, initial_args: [start_workers: true]
+
 run_strategy = {Quantum.RunStrategy.All, [:"prod@helen.live.wisslanding.com"]}
 
 config :helen, Helen.Scheduler,
