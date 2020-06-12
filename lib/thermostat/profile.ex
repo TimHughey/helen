@@ -82,7 +82,7 @@ defmodule Thermostat.Profile do
     if is_nil(profile.ref_sensor) do
       profile.fixed_setpt
     else
-      Sensor.fahrenheit(name: profile.ref_sensor, since_secs: 90)
+      Sensor.fahrenheit(profile.ref_sensor, since_secs: 90)
     end
   end
 
