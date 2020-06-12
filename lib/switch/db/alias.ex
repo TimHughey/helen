@@ -51,6 +51,24 @@ defmodule Switch.DB.Alias do
   end
 
   @doc """
+    Delete a Switch Alias
+
+      ## Examples
+        iex> Switch.DB.Alias.delete("sample switch")
+
+  """
+
+  @doc since: "0.0.23"
+  def delete(name_or_id) do
+    with %Schema{} = x <- find(name_or_id),
+         {:ok, %Schema{name: n}} <- Repo.delete(x) do
+      {:ok, n}
+    else
+      error -> error
+    end
+  end
+
+  @doc """
     Get a %Switch.DB.Alias{} by id or name
 
     Same return values as Repo.get_by/2
@@ -64,7 +82,7 @@ defmodule Switch.DB.Alias do
   """
 
   @doc since: "0.0.21"
-  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
+  def find(id_or_name) do
     check_args = fn
       x when is_binary(x) -> [name: x]
       x when is_integer(x) -> [id: x]
@@ -244,11 +262,21 @@ defmodule Switch.DB.Alias do
     end
   end
 
-  def rename(name_or_id, opts) when is_list(opts) do
-    with %Schema{} = x <- find(name_or_id) do
-      rename(x, opts)
+  @doc """
+  Rename a switch alias
+
+  Optional opts:
+  description: <binary>   -- new description
+  ttl_ms:      <integer>  -- new ttl_ms
+  """
+  @doc since: "0.0.23"
+  def rename(name_or_id, name, opts \\ []) when is_list(opts) do
+    # no need to guard name_or_id, find/1 handles it
+    with %Schema{} = x <- find(name_or_id),
+         {:ok, %Schema{name: n}} <- rename(x, name: name) do
+      {:ok, n}
     else
-      _not_found -> {:not_found, name_or_id}
+      error -> error
     end
   end
 

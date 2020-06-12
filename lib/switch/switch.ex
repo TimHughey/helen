@@ -42,7 +42,7 @@ defmodule Switch do
   end
 
   @doc """
-    Public API for creating a Sensor Alias
+    Public API for creating a Switch Alias
   """
   @doc since: "0.0.21"
   def alias_create(device_or_id, name, pio, opts \\ []) do
@@ -58,6 +58,12 @@ defmodule Switch do
   end
 
   @doc """
+    Public API for deleting a Switch Alias
+  """
+  @doc since: "0.0.21"
+  defdelegate delete(name_or_id), to: Alias, as: :delete
+
+  @doc """
   Finds a Switch Alias by name or id
 
   opts are passed as-is to Repo.preload/2
@@ -70,13 +76,38 @@ defmodule Switch do
     Retrieve a list of alias names
   """
   @doc since: "0.0.22"
-  defdelegate alias_names, to: Alias, as: :names
+  defdelegate names, to: Alias, as: :names
 
   @doc """
     Retrieve a list of alias names that begin with a pattern
   """
   @doc since: "0.0.22"
-  defdelegate alias_names_begin_with(patten), to: Alias, as: :names_begin_with
+  defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
+
+  @doc """
+  Rename a switch alias and/or update description and ttl_ms
+
+      Optional opts:
+      description: <binary>   -- new description
+      ttl_ms:      <integer>  -- new ttl_ms
+  """
+  @doc since: "0.0.23"
+  def alias_rename(name_or_id, new_name, opts \\ []) do
+    Alias.rename(name_or_id, new_name, opts)
+  end
+
+  @doc """
+  Rename a switch alias and/or update description and ttl_ms
+    (alias for Switch.alias_rename)
+
+      Optional opts:
+      description: <binary>   -- new description
+      ttl_ms:      <integer>  -- new ttl_ms
+  """
+  @doc since: "0.0.23"
+  def rename(name_or_id, new_name, opts \\ []) do
+    Alias.rename(name_or_id, new_name, opts)
+  end
 
   @doc """
     Find a Switch Device by device or id
