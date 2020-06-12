@@ -1,6 +1,6 @@
-defmodule PulseWidthCmd do
+defmodule PulseWidth.DB.Command do
   @moduledoc """
-    The PulseWidthCmd module provides the database schema for tracking
+    The PulseWidth.DB.Command module provides the database schema for tracking
     commands sent for a PulseWidth.
   """
 
@@ -23,7 +23,7 @@ defmodule PulseWidthCmd do
     timestamps(type: :utc_datetime_usec)
   end
 
-  alias PulseWidthCmd, as: Schema
+  alias PulseWidth.DB.Command, as: Schema
 
   def acked?(refid) do
     import Repo, only: [get_by: 2]
@@ -39,7 +39,7 @@ defmodule PulseWidthCmd do
   # checks the return code from the update to the PulseWidth
   def ack_if_needed(
         {:ok, %PulseWidth{}},
-        %{cmdack: true, refid: refid, msg_recv_dt: recv}
+        %{cmdack: true, refid: refid, msg_recv_dt: recv} = msg
       ) do
     import Repo, only: [get_by: 2]
 
@@ -48,8 +48,8 @@ defmodule PulseWidthCmd do
     with {:ok, %Schema{sent_at: sent_at} = cmd} <- get_by(Schema, refid: refid),
          latency_us <- Timex.diff(recv, sent_at, :microsecond),
          set_opts <- Keyword.put(set_base_opts, :rt_latency_us, latency_us),
-         {:ok, %Schema{} = cmd} <- update(cmd, set_opts) do
-      untrack(cmd)
+         {:ok, %Schema{}} <- update(cmd, set_opts) |> untrack() do
+      msg
     else
       nil -> {:not_found, refid}
       {:invalid_changes, _cs} = rc -> rc
@@ -84,7 +84,7 @@ defmodule PulseWidthCmd do
     |> track()
   end
 
-  def reload(%PulseWidthCmd{id: id}), do: reload(id)
+  def reload(%Schema{id: id}), do: reload(id)
 
   def reload(id) when is_integer(id),
     do: Repo.get_by(__MODULE__, id: id) |> Repo.preload([:pwm])
@@ -109,7 +109,7 @@ defmodule PulseWidthCmd do
     end
   end
 
-  def update(%PulseWidthCmd{} = pwmc, opts) when is_list(opts) do
+  def update(%Schema{} = pwmc, opts) when is_list(opts) do
     set = Keyword.take(opts, possible_changes()) |> Enum.into(%{})
     cs = changeset(pwmc, set)
 

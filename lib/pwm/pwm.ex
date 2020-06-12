@@ -7,6 +7,8 @@ defmodule PulseWidth do
   use Timex
   use Ecto.Schema
 
+  alias PulseWidth.DB.Command, as: Command
+
   schema "pwm" do
     field(:name, :string)
     field(:description, :string)
@@ -24,7 +26,7 @@ defmodule PulseWidth do
     field(:discovered_at, :utc_datetime_usec)
     field(:last_cmd_at, :utc_datetime_usec)
 
-    has_many(:cmds, PulseWidthCmd, foreign_key: :pwm_id)
+    has_many(:cmds, Command, foreign_key: :pwm_id)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -93,11 +95,11 @@ defmodule PulseWidth do
   def add_cmd(%PulseWidth{} = pwm, %DateTime{} = dt) do
     import Ecto.Query, only: [from: 2]
 
-    cmd = PulseWidthCmd.add(pwm, dt)
+    cmd = Command.add(pwm, dt)
 
     {rc, pwm} = update(pwm, last_cmd_at: dt)
 
-    cmd_query = from(c in PulseWidthCmd, where: c.refid == ^cmd.refid)
+    cmd_query = from(c in Command, where: c.refid == ^cmd.refid)
 
     if rc == :ok,
       do: {:ok, Repo.preload(pwm, cmds: cmd_query)},
@@ -121,8 +123,8 @@ defmodule PulseWidth do
     with {:ok, %PulseWidth{} = pwm} <- update(pwm, running_cmd: name),
          # add the command
          {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
-         # get the PulseWidthCmd inserted
-         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
+         # get the Command inserted
+         {:cmd, %Command{refid: refid}} <- {:cmd, hd(pwm.cmds)},
          # send the command
          pub_rc <- send_cmd(pwm, refid, cmd, opts) do
       # assemble return value
@@ -368,7 +370,7 @@ defmodule PulseWidth do
       Enum.into(Map.take(r, keys(:create)), []) ++
         [last_seen_at: msg_recv_at, reading_at: from_unix(mtime)]
 
-    update(pwm, set) |> PulseWidthCmd.ack_if_needed(r)
+    update(pwm, set) |> Command.ack_if_needed(r)
   end
 
   # when processing an external update and pulse_width is nil this is a
@@ -482,8 +484,8 @@ defmodule PulseWidth do
     with {:ok, %PulseWidth{} = pwm} <- update(pwm, running_cmd: name),
          # add the command
          {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
-         # get the PulseWidthCmd inserted
-         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
+         # get the Command inserted
+         {:cmd, %Command{refid: refid}} <- {:cmd, hd(pwm.cmds)},
          # send the command
          pub_rc <- send_cmd(pwm, refid, cmd, opts) do
       # assemble return value
@@ -585,7 +587,7 @@ defmodule PulseWidth do
     import PulseWidth.Payload.Duty, only: [send_cmd: 3]
 
     with {:ok, %PulseWidth{} = pwm} <- add_cmd(pwm, utc_now()),
-         {:cmd, %PulseWidthCmd{refid: refid}} <- {:cmd, hd(pwm.cmds)},
+         {:cmd, %Command{refid: refid}} <- {:cmd, hd(pwm.cmds)},
          cmd_opts <- Keyword.take(opts, [:duty, :ack]),
          pub_rc <- send_cmd(pwm, refid, cmd_opts) do
       [pwm: pwm, pub_rc: pub_rc] ++ opts
