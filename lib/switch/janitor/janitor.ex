@@ -9,8 +9,6 @@ defmodule Janitor do
   import Process, only: [send_after: 3]
   import TimeSupport, only: [duration_ms: 1]
 
-  alias Fact.RunMetric
-
   defmacro __using__(_opts) do
     quote do
       require Logger
@@ -480,14 +478,23 @@ defmodule Janitor do
         {:metrics, metric, msg_opts_vsn},
         %{opts_vsn: opts_vsn, counts: counts} = s
       ) do
+    import Fact.Influx, only: [write: 2]
+    import TimeSupport, only: [unix_now: 1]
+
     if msg_opts_vsn == opts_vsn do
       count_key = count_key(metric)
 
-      RunMetric.record(
-        module: "#{__MODULE__}",
-        metric: count_key,
-        val: Keyword.get(counts, count_key, 0)
-      )
+      %{
+        points: [
+          %{
+            measurement: "switch",
+            fields: Map.put(%{}, count_key, Keyword.get(counts, count_key, 0)),
+            tags: %{mod: Atom.to_string(__MODULE__)},
+            timestamp: unix_now(:nanosecond)
+          }
+        ]
+      }
+      |> write(precision: :nanosecond)
     end
 
     s = schedule_metrics(s, metric)

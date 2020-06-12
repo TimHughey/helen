@@ -46,15 +46,17 @@ defmodule Switch.DB.Command do
           switch_device: {:ok, %Device{}}
         } = msg
       ) do
+    import Switch.Fact.Command, only: [write_specific_metric: 2]
     #
     # base list of changes
     changes = [acked: true, ack_at: utc_now()]
 
     with {:cmd, %Schema{sent_at: sent_at} = cmd} <- {:cmd, find_refid(refid)},
          latency <- Timex.diff(recv_dt, sent_at, :microsecond),
-         _ignore <- record_cmd_rt_metric(cmd, latency),
          changes <- [rt_latency_us: latency] ++ changes,
-         {:ok, %Schema{}} <- update(cmd, changes) |> untrack() do
+         _ignore <- write_specific_metric(cmd, msg),
+         {:ok, %Schema{}} <- update(cmd, changes) |> untrack(),
+         _ignore <- write_specific_metric(cmd, msg) do
       msg
     else
       # handle the exception case when the refid wasn't found
@@ -141,17 +143,6 @@ defmodule Switch.DB.Command do
     if cs.valid?,
       do: {:ok, Repo.update!(cs, returning: true)},
       else: {:invalid_changes, cs}
-  end
-
-  defp record_cmd_rt_metric(%Schema{sw_alias: device}, latency) do
-    alias Fact.RunMetric
-
-    RunMetric.record(
-      module: "#{__MODULE__}",
-      metric: "sw_cmd_rt_latency_us",
-      device: device,
-      val: latency
-    )
   end
 
   #
