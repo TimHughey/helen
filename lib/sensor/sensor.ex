@@ -32,7 +32,7 @@ defmodule Sensor do
     Public API for retrieving a list of Sensor Alias names
   """
   @doc since: "0.0.19"
-  def alias_names do
+  def names do
     Sensor.DB.Alias.names()
   end
 
@@ -40,25 +40,16 @@ defmodule Sensor do
     Public API for retrieving Sensor Alias names that begin with a patteen
   """
   @doc since: "0.0.19"
-  def alias_names_begin_with(pattern) when is_binary(pattern) do
+  def names_begin_with(pattern) when is_binary(pattern) do
     Alias.names_begin_with(pattern)
   end
 
   @doc """
     Public API for renaming a Sensor Alias
   """
-  @doc since: "0.0.19"
-  def alias_rename(name_or_id, new_name) do
-    # first, find the alias to update
-    with %Alias{name: name_before} = sa <- Alias.find(name_or_id),
-         # update the Alias with the new name
-         {:ok, %Alias{name: name_after}} <-
-           Alias.update(sa, %{name: new_name}, []) do
-      [renamed: [before: name_before, after: name_after]]
-    else
-      nil -> {:not_found, name_or_id}
-      error -> error
-    end
+  @doc since: "0.0.23"
+  def rename(name_or_id, new_name, opts \\ []) do
+    Alias.rename(name_or_id, new_name, opts)
   end
 
   @doc """

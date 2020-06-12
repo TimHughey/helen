@@ -180,6 +180,48 @@ defmodule Sensor.DB.Alias do
     end
   end
 
+  @doc false
+  def rename(%Schema{} = x, opts) when is_list(opts) do
+    name = Keyword.get(opts, :name)
+
+    changes =
+      Keyword.take(opts, [
+        :name,
+        :description,
+        :ttl_ms
+      ])
+      |> Enum.into(%{})
+
+    with {:args, true} <- {:args, is_binary(name)},
+         cs <- changeset(x, changes),
+         {cs, true} <- {cs, cs.valid?},
+         {:ok, sa} <- Repo.update(cs, returning: true) do
+      {:ok, sa}
+    else
+      {:args, false} -> {:bad_args, opts}
+      {%Ecto.Changeset{} = cs, false} -> {:invalid_changes, cs}
+      error -> error
+    end
+  end
+
+  @doc """
+  Rename a Sensor alias
+
+      Optional opts:
+      description: <binary>   -- new description
+      ttl_ms:      <integer>  -- new ttl_ms
+  """
+  @doc since: "0.0.23"
+  def rename(name_or_id, name, opts \\ []) when is_list(opts) do
+    # no need to guard name_or_id, find/1 handles it
+    with %Schema{} = x <- find(name_or_id),
+         {:ok, %Schema{name: n}} <- rename(x, name: name) do
+      {:ok, n}
+    else
+      error -> error
+    end
+  end
+
   def update(%Schema{} = x, params, opts)
       when is_map(params) or is_list(params) do
     # make certain the params are a map passed to changeset
