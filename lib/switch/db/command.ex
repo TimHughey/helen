@@ -55,8 +55,8 @@ defmodule Switch.DB.Command do
          latency <- Timex.diff(recv_dt, sent_at, :microsecond),
          changes <- [rt_latency_us: latency] ++ changes,
          _ignore <- write_specific_metric(cmd, msg),
-         {:ok, %Schema{}} <- update(cmd, changes) |> untrack(),
-         _ignore <- write_specific_metric(cmd, msg) do
+         {:ok, %Schema{}} = cmd_rc <- update(cmd, changes) |> untrack(),
+         _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else
       # handle the exception case when the refid wasn't found
