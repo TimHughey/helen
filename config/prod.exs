@@ -58,7 +58,7 @@ config :helen, Fact.Influx,
   scheme: "http",
   writer: Instream.Writer.Line
 
-config :helen, PulseWidthCmd,
+config :helen, PulseWidth.CB.Command,
   orphan: [
     at_startup: true,
     sent_before: [seconds: 1],
