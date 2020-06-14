@@ -200,7 +200,7 @@ defmodule Broom do
       tasks: [],
       tracker: %{},
       timers: [],
-      counts: [],
+      counts: [orphaned: 0, tracked: 0, released: 0, errors: 0],
       opts_vsn: 0
     }
 
