@@ -149,10 +149,16 @@ defmodule PulseWidth do
   end
 
   @doc """
-    Return a keyword list of the Switch command tracked counts
+    Return a keyword list of the PulseWidth command counts
   """
   @doc since: "0.0.24"
   defdelegate cmd_counts, to: Command
+
+  @doc """
+    Reset the counts maintained by Command (Broom)
+  """
+  @doc since: "0.0.24"
+  defdelegate cmd_counts_reset(opts), to: Command
 
   @doc """
   Generate an example cmd payload using the first PulseWidth
@@ -270,7 +276,7 @@ defmodule PulseWidth do
   end
 
   @doc """
-    Return a list of the Switch commands tracked
+    Return a list of the PulseWidth commands tracked
   """
   @doc since: "0.0.24"
   defdelegate cmds_tracked, to: Command

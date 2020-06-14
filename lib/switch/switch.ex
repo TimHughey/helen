@@ -63,10 +63,16 @@ defmodule Switch do
   end
 
   @doc """
-    Return a keyword list of the Switch command tracked counts
+    Return a keyword list of the Switch command counts
   """
   @doc since: "0.0.24"
   defdelegate cmd_counts, to: Command
+
+  @doc """
+    Reset the counts maintained by Command (Broom)
+  """
+  @doc since: "0.0.24"
+  defdelegate cmd_counts_reset(opts), to: Command
 
   @doc """
     Return a list of the Switch commands tracked

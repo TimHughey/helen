@@ -69,7 +69,7 @@ config :helen, Switch.DB.Command,
   ],
   purge: [
     at_startup: true,
-    schedule: {:extended, "33 */3 * * *"},
+    interval: [minutes: 1],
     older_than: [days: 1]
   ],
   metrics: [minutes: 1]

@@ -21,6 +21,7 @@ defmodule Broom do
   @callback broom :: term
   @callback child_spec(term) :: term
   @callback cmd_counts :: Keyword.t()
+  @callback cmd_counts_reset(Keyword.t()) :: :ok
   @callback cmds_tracked :: [cmd]
   @callback default_opts :: Keyword.t()
   @callback find_refid(term) :: {:ok, term} | {term, term}
@@ -97,6 +98,12 @@ defmodule Broom do
       end
 
       defoverridable child_spec: 1
+
+      def cmd_counts_reset(opts \\ [:orphaned, :errors]) when is_list(opts) do
+        Broom.counts_reset(broom(), opts)
+      end
+
+      defoverridable cmd_counts_reset: 1
 
       def cmd_counts, do: Broom.tracked_counts(broom())
       defoverridable cmd_counts: 0
@@ -250,6 +257,14 @@ defmodule Broom do
     Repo.get_by!(schema, id: id) |> Repo.preload(preloads)
   end
 
+  @doc """
+  Reset the orphan count
+  """
+  @doc since: "0.0.24"
+  def counts_reset(server, opts \\ [:orphaned, :errors]) when is_list(opts) do
+    GenServer.call(server, {:count_reset, opts})
+  end
+
   def track(server, %{cmd: {:ok, cmd}} = msg) when is_struct(cmd) do
     rc = GenServer.cast(server, {:track, msg})
 
@@ -268,6 +283,16 @@ defmodule Broom do
   ##
   ## GenServer handle_* implementation
   ##
+
+  @doc false
+  def handle_call({:count_reset, opts}, _from, %{counts: counts} = s) do
+    new_counts =
+      for(x <- opts, do: Keyword.new() |> Keyword.put(x, 0)) |> List.flatten()
+
+    counts = Keyword.merge(counts, new_counts)
+
+    {:reply, :ok, %{s | counts: counts}}
+  end
 
   @doc false
   def handle_cast({:release, %{cmd: _cmd_rc}}, %{tracker: _track} = s) do
@@ -354,7 +379,7 @@ defmodule Broom do
     %{s | tracker: Map.drop(t, [ref])}
   end
 
-  defp report_metrics(%{counts: counts} = state) do
+  defp report_metrics(%{counts: counts, opts: opts} = state) do
     import Fact.Influx, only: [write: 2]
     import TimeSupport, only: [unix_now: 1]
 
@@ -363,7 +388,7 @@ defmodule Broom do
         %{
           measurement: "switch",
           fields: Enum.into(counts, %{}),
-          tags: %{mod: Atom.to_string(__MODULE__)},
+          tags: %{mod: Atom.to_string(opts[:module])},
           timestamp: unix_now(:nanosecond)
         }
       ]
