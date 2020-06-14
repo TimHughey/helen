@@ -8,12 +8,6 @@ config :helen,
     rpt: {"prod/r/#", 0}
   ]
 
-config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
-
-config :helen, Janitor,
-  log: [dryrun: false, init: false, init_args: false],
-  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
-
 config :helen, Mqtt.Client,
   log_dropped_msg: true,
   runtime_metrics: true,
@@ -47,16 +41,15 @@ config :helen, Fact.Influx,
 
 config :helen, PulseWidth.DB.Command,
   orphan: [
-    at_startup: true,
-    sent_before: [seconds: 1],
-    log: true
+    startup_check: true,
+    sent_before: [seconds: 1]
   ],
   purge: [
     at_startup: false,
     interval: [minutes: 2],
-    older_than: [days: 30],
-    log: true
-  ]
+    older_than: [days: 30]
+  ],
+  metrics: [minutes: 1]
 
 config :helen, Repo,
   username: "helen_dev",
@@ -69,19 +62,17 @@ config :helen, Repo,
   adapter: Ecto.Adapters.Postgres
 
 config :helen, Switch.DB.Command,
-  log: [dryrun: false],
   # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [
     at_startup: true,
-    sent_before: [seconds: 1],
-    log: false
+    sent_before: [seconds: 1]
   ],
   purge: [
     at_startup: true,
     schedule: {:extended, "33 */3 * * *"},
-    older_than: [days: 1],
-    log: true
-  ]
+    older_than: [days: 1]
+  ],
+  metrics: [minutes: 1]
 
 config :helen, Helen.Scheduler,
   global: true,

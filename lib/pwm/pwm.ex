@@ -31,6 +31,10 @@ defmodule PulseWidth do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def test do
+    PulseWidth.names() |> hd() |> PulseWidth.duty(duty: :rand.uniform(8191))
+  end
+
   def add(%{device: device, host: _host, mtime: mtime} = r) do
     import TimeSupport, only: [from_unix: 1]
 
@@ -92,18 +96,18 @@ defmodule PulseWidth do
 
   def add(catchall), do: {:bad_args, catchall}
 
-  def add_cmd(%PulseWidth{} = pwm, %DateTime{} = dt) do
+  def add_cmd(%PulseWidth{} = x, %DateTime{} = dt) do
     import Ecto.Query, only: [from: 2]
 
-    cmd = Command.add(pwm, dt)
+    %{cmd: {:ok, %Command{refid: refid}}} = Command.add(x, dt)
 
-    {rc, pwm} = update(pwm, last_cmd_at: dt)
+    {rc, x} = update(x, last_cmd_at: dt)
 
-    cmd_query = from(c in Command, where: c.refid == ^cmd.refid)
+    cmd_query = from(x in Command, where: x.refid == ^refid)
 
     if rc == :ok,
-      do: {:ok, Repo.preload(pwm, cmds: cmd_query)},
-      else: {rc, pwm}
+      do: {:ok, Repo.preload(x, cmds: cmd_query)},
+      else: {rc, x}
   end
 
   @doc """
@@ -143,6 +147,12 @@ defmodule PulseWidth do
       nil -> {:not_found, x}
     end
   end
+
+  @doc """
+    Return a keyword list of the Switch command tracked counts
+  """
+  @doc since: "0.0.24"
+  defdelegate cmd_counts, to: Command
 
   @doc """
   Generate an example cmd payload using the first PulseWidth
@@ -258,6 +268,12 @@ defmodule PulseWidth do
         cmd
     end
   end
+
+  @doc """
+    Return a list of the Switch commands tracked
+  """
+  @doc since: "0.0.24"
+  defdelegate cmds_tracked, to: Command
 
   def delete_all(:dangerous) do
     import Ecto.Query, only: [from: 2]

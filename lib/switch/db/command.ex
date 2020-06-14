@@ -4,7 +4,7 @@ defmodule Switch.DB.Command do
   """
 
   use Ecto.Schema
-  use Janitor
+  use Broom
 
   alias Switch.DB.Command, as: Schema
   alias Switch.DB.Device, as: Device
@@ -46,24 +46,26 @@ defmodule Switch.DB.Command do
           switch_device: {:ok, %Device{}}
         } = msg
       ) do
+    import Broom, only: [release: 2]
     import Switch.Fact.Command, only: [write_specific_metric: 2]
+    import TimeSupport, only: [utc_now: 0]
     #
     # base list of changes
     changes = [acked: true, ack_at: utc_now()]
 
-    with {:cmd, %Schema{sent_at: sent_at} = cmd} <- {:cmd, find_refid(refid)},
+    with %Schema{sent_at: sent_at} = cmd <- find_refid(refid),
          latency <- Timex.diff(recv_dt, sent_at, :microsecond),
          changes <- [rt_latency_us: latency] ++ changes,
-         _ignore <- write_specific_metric(cmd, msg),
-         {:ok, %Schema{}} = cmd_rc <- update(cmd, changes) |> untrack(),
+         {:ok, %Schema{}} = cmd_rc <- update(cmd, changes),
+         msg <- release(broom(), %{cmd: cmd_rc}),
          _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else
       # handle the exception case when the refid wasn't found
       # NOTE:  this case should only occur when MQTT messages are
       #        processed from another environment during dev / test
-      {:cmd, nil} -> Map.put(msg, :switch_cmd_ack_fault, {:cmd, nil})
-      error -> Map.put(msg, :switch_cmd_ack_fault, error)
+      nil -> Map.put(msg, :cmd_ack_fault, {:cmd, nil})
+      error -> Map.put(msg, :cmd_ack_fault, error)
     end
   end
 
@@ -75,11 +77,13 @@ defmodule Switch.DB.Command do
 
   def ack_immediate_if_needed({:pending, res} = rc, opts)
       when is_list(res) and is_list(opts) do
+    import TimeSupport, only: [utc_now: 0]
+
     #
     # if ack: false (host expected to ack) then immediately ack
     #
     unless Keyword.get(opts, :ack, true) do
-      cmd = Keyword.get(res, :refid) |> find_refid()
+      cmd = find_refid(res[:refid])
 
       if cmd do
         %Schema{device: sd, refid: refid} = cmd
@@ -100,35 +104,41 @@ defmodule Switch.DB.Command do
 
   def ack_immediate_if_needed(rc, _opts), do: rc
 
-  def add(%Device{} = sd, sw_alias, %DateTime{} = dt)
-      when is_binary(sw_alias) do
-    Ecto.build_assoc(
-      sd,
-      :cmds
-    )
-    |> changeset(sent_at: dt, sw_alias: sw_alias, acked: false, orphan: false)
-    |> Repo.insert!(returning: true)
-    |> track()
+  def add(%Device{} = x, sw_name, %DateTime{} = dt) when is_binary(sw_name) do
+    cmd = Ecto.build_assoc(x, :cmds)
+    cs = changeset(cmd, sw_alias: sw_name, sent_at: dt)
+
+    insert_and_track(cs)
   end
 
-  def find_refid(refid) when is_binary(refid),
-    do: Repo.get_by(Schema, refid: refid) |> Repo.preload([:device])
-
-  def find_refid(nil), do: nil
-
-  def reload(%Schema{id: id}), do: reload(id)
-
-  def reload(id) when is_integer(id),
-    do: Repo.get_by(Schema, id: id) |> Repo.preload([:device])
+  # def reload(%Schema{id: id}), do: reload(id)
+  #
+  # def reload(id) when is_integer(id),
+  #   do: Repo.get_by(Schema, id: id) |> Repo.preload([:device])
 
   defp changeset(x, params) when is_map(params) or is_list(params) do
     import Ecto.Changeset,
       only: [cast: 3, validate_required: 2, unique_constraint: 3]
 
     cast(x, Enum.into(params, %{}), cast_changes())
-    |> validate_required([:sw_alias, :acked, :orphan, :sent_at])
+    |> validate_required([:sw_alias, :sent_at])
     |> unique_constraint(:refid, name: :switch_command_refid_index)
   end
+
+  def default_opt(),
+    do: [
+      orphan: [
+        startup_check: true,
+        sent_before: [seconds: 12],
+        older_than: [minutes: 1]
+      ],
+      purge: [
+        at_startup: true,
+        interval: [minutes: 2],
+        older_than: [days: 30]
+      ],
+      metrics: [minutes: 5]
+    ]
 
   def update(refid, opts) when is_binary(refid) and is_list(opts) do
     cmd = find_refid(refid)

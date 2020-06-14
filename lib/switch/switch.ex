@@ -9,10 +9,15 @@ defmodule Switch do
 
   alias Switch.DB.Alias, as: Alias
   alias Switch.DB.Device, as: Device
+  alias Switch.DB.Command, as: Command
 
   #
   ## Public API
   #
+
+  def test do
+    names() |> hd() |> on()
+  end
 
   def aliases(mode \\ :print) do
     import Ecto.Query, only: [from: 2]
@@ -56,6 +61,18 @@ defmodule Switch do
       error -> error
     end
   end
+
+  @doc """
+    Return a keyword list of the Switch command tracked counts
+  """
+  @doc since: "0.0.24"
+  defdelegate cmd_counts, to: Command
+
+  @doc """
+    Return a list of the Switch commands tracked
+  """
+  @doc since: "0.0.24"
+  defdelegate cmds_tracked, to: Command
 
   @doc """
     Public API for deleting a Switch Alias

@@ -38,21 +38,21 @@ defmodule Switch.DB.Device do
     end
   end
 
-  def add_cmd(%Device{} = sd, sw_alias, %DateTime{} = dt)
+  def add_cmd(%Device{} = x, sw_alias, %DateTime{} = dt)
       when is_binary(sw_alias) do
     import Ecto.Query, only: [from: 2]
     import Repo, only: [preload: 2]
 
-    sd = reload(sd)
-    %Command{refid: refid} = Command.add(sd, sw_alias, dt)
+    x = reload(x)
+    %{cmd: {:ok, %Command{refid: refid}}} = Command.add(x, sw_alias, dt)
 
-    {rc, sd} = upsert(sd, last_cmd_at: dt)
+    {rc, x} = upsert(x, last_cmd_at: dt)
 
     cmd_query = from(c in Command, where: c.refid == ^refid)
 
     if rc == :ok,
-      do: {:ok, reload(sd) |> preload(cmds: cmd_query)},
-      else: {rc, sd}
+      do: {:ok, reload(x) |> preload(cmds: cmd_query)},
+      else: {rc, x}
   end
 
   def alias_from_legacy(

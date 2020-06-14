@@ -13,12 +13,6 @@ config :helen,
     rpt: {"prod/r/#", 0}
   ]
 
-config :helen, Janitor.Supervisor, log: [init: false, init_args: false]
-
-config :helen, Janitor,
-  log: [init: false, init_args: false],
-  metrics_frequency: [orphan: [minutes: 5], switch_cmd: [minutes: 5]]
-
 config :helen, Mqtt.Client,
   log_dropped_msgs: true,
   tort_opts: [
@@ -60,17 +54,16 @@ config :helen, Fact.Influx,
 
 config :helen, PulseWidth.DB.Command,
   orphan: [
-    at_startup: true,
+    startup_check: true,
     sent_before: [seconds: 1],
-    older_than: [minutes: 1],
-    log: true
+    older_than: [minutes: 1]
   ],
   purge: [
     at_startup: true,
     interval: [minutes: 2],
-    older_than: [days: 30],
-    log: true
-  ]
+    older_than: [days: 30]
+  ],
+  metrics: [minutes: 5]
 
 config :helen, Repo,
   database: "helen_prod",
@@ -83,17 +76,16 @@ config :helen, Switch.DB.Command,
   # NOTE:  older_than lists are passed to Timex to create a
   #        shifted DateTime in UTC
   orphan: [
-    at_startup: true,
+    startup_check: true,
     sent_before: [seconds: 12],
-    older_than: [minutes: 1],
-    log: true
+    older_than: [minutes: 1]
   ],
   purge: [
     at_startup: true,
     interval: [minutes: 2],
-    older_than: [days: 30],
-    log: true
-  ]
+    older_than: [days: 30]
+  ],
+  metrics: [minutes: 5]
 
 config :helen, Thermostat.Supervisor, initial_args: [start_workers: true]
 

@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.23",
+      version: "0.0.24",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),
@@ -31,10 +31,9 @@ defmodule Helen.Mixfile do
         extras: ["CHANGELOG.md"],
         groups_for_modules: [
           Devices: [PulseWidth, Remote, Sensor, Switch],
-          Servers: [Dutycycle, Thermostat]
+          Servers: [Thermostat]
         ],
         nest_modules_by_prefix: [
-          Dutycycle,
           Fact,
           Helen,
           Mqtt,
@@ -61,6 +60,7 @@ defmodule Helen.Mixfile do
         :runtime_tools,
         :parse_trans,
         :httpoison,
+        :observer,
         :agnus
       ],
       env: []

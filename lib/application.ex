@@ -55,9 +55,10 @@ defmodule Helen.Application do
     for mod <- [
           Repo,
           Keeper,
-          Janitor.Supervisor,
           Fact.Supervisor,
           Mqtt.Supervisor,
+          Switch.Supervisor,
+          PulseWidth.Supervisor,
           Helen.Scheduler,
           Thermostat.Supervisor,
           ExtraMod.Supervisor,
