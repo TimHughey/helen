@@ -237,10 +237,15 @@ defmodule Broom do
     end
   end
 
-  def release(server, %{cmd: {:ok, cmd}} = msg)
-      when is_struct(cmd) do
-    rc = GenServer.cast(server, {:release, msg})
-    Map.put(msg, :broom_untrack, rc)
+  def release(server, %{cmd: {rc, _cmd} = cmd_rc} = msg) do
+    case rc do
+      :ok ->
+        rc = GenServer.cast(server, {:release, msg})
+        Map.put(msg, :broom_release, rc)
+
+      _ ->
+        Map.put(msg, :broom_release, cmd_rc)
+    end
   end
 
   @doc """
@@ -295,8 +300,11 @@ defmodule Broom do
   end
 
   @doc false
-  def handle_cast({:release, %{cmd: _cmd_rc}}, %{tracker: _track} = s) do
-    {:noreply, s}
+  def handle_cast({:release, %{cmd: {_rc, %{refid: r}}}}, %{tracker: t} = s) do
+    tracker = Map.drop(t, [r])
+    state = Map.put(s, :tracker, tracker)
+
+    {:noreply, increment_count(state, :released)}
   end
 
   @doc false
