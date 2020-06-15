@@ -56,7 +56,7 @@ defmodule Switch.DB.Command do
          latency <- Timex.diff(recv_dt, sent_at, :microsecond),
          changes <- [rt_latency_us: latency] ++ changes,
          {:ok, %Schema{}} = cmd_rc <- update(cmd, changes),
-         msg <- release(%{cmd: cmd_rc}),
+         msg <- Map.put(msg, :cmd, cmd_rc) |> release(),
          _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else

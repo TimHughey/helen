@@ -57,7 +57,7 @@ defmodule PulseWidth.DB.Command do
          latency_us <- Timex.diff(recv, sent_at, :microsecond),
          set_opts <- Keyword.put(set_base_opts, :rt_latency_us, latency_us),
          {:ok, %Schema{}} = cmd_rc <- update(cmd, set_opts),
-         msg <- release(%{cmd: cmd_rc}),
+         msg <- Map.put(msg, :cmd, cmd_rc) |> release(),
          _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else
