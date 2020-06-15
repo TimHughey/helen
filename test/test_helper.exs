@@ -3,7 +3,6 @@
 #
 [
   Thermostat,
-  Dutycycle,
   Switch.Alias,
   Switch.Device,
   PulseWidth,

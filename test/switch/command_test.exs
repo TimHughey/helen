@@ -128,13 +128,6 @@ defmodule SwitchCommandTest do
     assert is_list(list)
   end
 
-  test "can get Janitor opts specific to Switch.Command" do
-    opts = Command.janitor_opts()
-
-    assert is_list(opts)
-    assert Keyword.has_key?(opts, :orphan)
-  end
-
   test "can call purge with the dryrun option" do
     {rc, res} = Command.purge(dryrun: true)
 
