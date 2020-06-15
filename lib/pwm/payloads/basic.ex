@@ -1,10 +1,10 @@
 defmodule PulseWidth.Payload.Basic do
   @moduledoc false
 
-  require Logger
+  alias PulseWidth.DB.Device, as: Device
 
   def create_cmd(
-        %PulseWidth{device: device, host: host},
+        %Device{device: device, host: host},
         refid,
         %{name: _} = cmd,
         opts \\ []
@@ -24,7 +24,7 @@ defmodule PulseWidth.Payload.Basic do
     Generate an example PulseWidth Random Sequence Payload
   """
   @doc since: "0.0.22"
-  def example(%PulseWidth{} = pwm_dev) do
+  def example(%Device{} = pwm_dev) do
     alias Ecto.UUID
 
     cmd = %{
@@ -43,7 +43,7 @@ defmodule PulseWidth.Payload.Basic do
   end
 
   def send_cmd(
-        %PulseWidth{device: device} = pwm,
+        %Device{device: device} = pwm,
         refid,
         %{} = cmd,
         opts \\ []

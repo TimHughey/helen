@@ -4,17 +4,6 @@ defmodule Switch.DB.Alias do
   require Logger
   use Ecto.Schema
 
-  import Ecto.Changeset,
-    only: [
-      cast: 3,
-      validate_required: 2,
-      validate_format: 3,
-      validate_number: 3,
-      unique_constraint: 3
-    ]
-
-  import Common.DB, only: [name_regex: 0]
-
   alias Switch.DB.Alias, as: Schema
   alias Switch.DB.Command, as: Command
   alias Switch.DB.Device, as: Device
@@ -38,6 +27,10 @@ defmodule Switch.DB.Alias do
     timestamps()
   end
 
+  @doc """
+    Create a Switch alias to a device and specific pio
+  """
+  @doc since: "0.0.25"
   def create(%Device{id: id}, name, pio, opts \\ [])
       when is_binary(name) and is_integer(pio) and pio >= 0 and is_list(opts) do
     #
@@ -82,7 +75,7 @@ defmodule Switch.DB.Alias do
   """
 
   @doc since: "0.0.21"
-  def find(id_or_name) do
+  def find(name_or_id) do
     check_args = fn
       x when is_binary(x) -> [name: x]
       x when is_integer(x) -> [id: x]
@@ -91,7 +84,7 @@ defmodule Switch.DB.Alias do
 
     import Repo, only: [get_by: 2, preload: 2]
 
-    with opts when is_list(opts) <- check_args.(id_or_name),
+    with opts when is_list(opts) <- check_args.(name_or_id),
          %Schema{} = found <- get_by(Schema, opts) do
       found |> preload([:device])
     else
@@ -104,7 +97,6 @@ defmodule Switch.DB.Alias do
   @doc """
     Retrieve Switch Alias names
   """
-
   @doc since: "0.0.22"
   def names do
     import Ecto.Query, only: [from: 2]
@@ -199,8 +191,8 @@ defmodule Switch.DB.Alias do
 
   def position(%Schema{pio: pio, device: %Device{} = sd} = sa, opts)
       when is_list(opts) do
-    lazy = Keyword.get(opts, :lazy, true)
-    position = Keyword.get(opts, :position, nil)
+    lazy = opts[:lazy] || true
+    position = opts[:position]
     cmd_map = %{pio: pio, state: position, initial_opts: opts}
 
     with {:ok, curr_position} <- Device.pio_state(sd, pio),
@@ -265,9 +257,9 @@ defmodule Switch.DB.Alias do
   @doc """
   Rename a switch alias
 
-  Optional opts:
-  description: <binary>   -- new description
-  ttl_ms:      <integer>  -- new ttl_ms
+    Optional opts:
+      description: <binary>   -- new description
+      ttl_ms:      <integer>  -- new ttl_ms
   """
   @doc since: "0.0.23"
   def rename(name_or_id, name, opts \\ []) when is_list(opts) do
@@ -374,8 +366,18 @@ defmodule Switch.DB.Alias do
   end
 
   defp changeset(x, params) when is_map(params) do
-    x
-    |> cast(params, cast_changes())
+    import Ecto.Changeset,
+      only: [
+        cast: 3,
+        validate_required: 2,
+        validate_format: 3,
+        validate_number: 3,
+        unique_constraint: 3
+      ]
+
+    import Common.DB, only: [name_regex: 0]
+
+    cast(x, params, cast_changes())
     |> validate_required(possible_changes())
     |> validate_format(:name, name_regex())
     |> validate_number(:pio,

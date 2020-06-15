@@ -336,10 +336,24 @@ defmodule Mqtt.Inbound do
     end
   end
 
-  defp msg_pwm(%{async: async} = r) do
-    if async,
-      do: Task.start(PulseWidth, :external_update, [r]),
-      else: PulseWidth.external_update(r)
+  defp msg_pwm(%{async: async} = msg) do
+    process = fn ->
+      # the "happy path" of this with is to check for errors
+      with %{pwm_fault: error} = msg <- PulseWidth.handle_message(msg) do
+        ["pwm message failed: ", inspect(error, pretty: true)]
+        |> Logger.error()
+
+        {:failed, msg}
+      else
+        _all_is_well -> :ok
+      end
+    end
+
+    if async do
+      Task.start(process)
+    else
+      process.()
+    end
   end
 
   defp msg_remote(%{async: async} = msg) do

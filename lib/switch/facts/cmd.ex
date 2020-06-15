@@ -7,7 +7,7 @@ defmodule Switch.Fact.Command do
   def write_specific_metric(
         {:ok, %Command{sw_alias: n} = cmd},
         %{
-          switch_device: {:ok, %Device{device: d, host: h}},
+          device: {:ok, %Device{device: d, host: h}},
           msg_recv_dt: recv_dt
         } = _msg
       ) do

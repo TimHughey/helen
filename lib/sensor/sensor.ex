@@ -112,7 +112,7 @@ defmodule Sensor do
     alias Fact.Influx
 
     # the with begins with processing the message through Device.DB.upsert/1
-    with %{sensor_device: sensor_device} = msg <- Device.upsert(msg_in),
+    with %{device: sensor_device} = msg <- Device.upsert(msg_in),
          # was the upset a success?
          {:ok, %Device{} = dev} <- sensor_device,
          # now process the datapoint

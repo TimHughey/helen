@@ -2,12 +2,12 @@ defmodule PulseWidth.Fact.Command do
   use Timex
 
   alias PulseWidth.DB.Command, as: Command
-  alias PulseWidth, as: Device
+  alias PulseWidth.DB.Device, as: Device
 
   def write_specific_metric(
         {:ok, %Command{} = cmd},
         %{
-          pwm_device: {:ok, %Device{device: d, host: h, name: n}},
+          device: {:ok, %Device{device: d, host: h, _alias_: %_{name: n}}},
           msg_recv_dt: recv_dt
         } = _msg
       ) do
@@ -31,7 +31,7 @@ defmodule PulseWidth.Fact.Command do
      %{
        points: [
          %{
-           measurement: "switch",
+           measurement: "pwm",
            fields: fields,
            tags: %{device: d, host: h, name: n, cmd: "yes"},
            timestamp: DateTime.to_unix(recv_dt, :nanosecond)

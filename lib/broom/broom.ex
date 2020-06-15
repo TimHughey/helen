@@ -33,6 +33,7 @@ defmodule Broom do
 
   @callback orphan_list(term) :: [term]
   @callback reload(cmd) :: Ecto.Schema.t({} | nil)
+  @callback release(msg) :: msg
   @callback start_link(list) :: term
   @callback update(cmd, opts) :: {:ok, cmd} | {term, term}
 
@@ -162,6 +163,9 @@ defmodule Broom do
       end
 
       defoverridable orphan_list: 1
+
+      def release(msg), do: Broom.release(broom(), msg)
+      defoverridable release: 1
 
       def reload(%{id: id}) do
         Repo.get_by(__MODULE__, id)

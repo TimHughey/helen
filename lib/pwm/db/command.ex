@@ -11,6 +11,9 @@ defmodule PulseWidth.DB.Command do
 
   use Broom
 
+  alias PulseWidth.DB.Command, as: Schema
+  alias PulseWidth.DB.Device, as: Device
+
   schema "pwm_cmd" do
     field(:refid, Ecto.UUID, autogenerate: true)
     field(:acked, :boolean)
@@ -18,13 +21,10 @@ defmodule PulseWidth.DB.Command do
     field(:rt_latency_us, :integer)
     field(:sent_at, :utc_datetime_usec)
     field(:ack_at, :utc_datetime_usec)
-    belongs_to(:device, PulseWidth, foreign_key: :pwm_id)
+    belongs_to(:device, Device, foreign_key: :pwm_id)
 
     timestamps(type: :utc_datetime_usec)
   end
-
-  alias PulseWidth.DB.Command, as: Schema
-  alias PulseWidth, as: Device
 
   def acked?(refid) do
     import Repo, only: [get_by: 2]
@@ -39,11 +39,15 @@ defmodule PulseWidth.DB.Command do
   # primary entry point when called from PulseWidth and an ack is needed
   # checks the return code from the update to the PulseWidth
   def ack_if_needed(
-        {:ok, %PulseWidth{}},
-        %{cmdack: true, refid: refid, msg_recv_dt: recv} = msg
+        %{
+          cmdack: true,
+          refid: refid,
+          msg_recv_dt: recv,
+          # NOTE:  the %_{} match is any struct
+          device: {:ok, %_{}}
+        } = msg
       ) do
     import Repo, only: [get_by: 2]
-    import Broom, only: [release: 2]
     import PulseWidth.Fact.Command, only: [write_specific_metric: 2]
     import TimeSupport, only: [utc_now: 0]
 
@@ -53,7 +57,7 @@ defmodule PulseWidth.DB.Command do
          latency_us <- Timex.diff(recv, sent_at, :microsecond),
          set_opts <- Keyword.put(set_base_opts, :rt_latency_us, latency_us),
          {:ok, %Schema{}} = cmd_rc <- update(cmd, set_opts),
-         msg <- release(broom(), %{cmd: cmd_rc}),
+         msg <- release(%{cmd: cmd_rc}),
          _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else
@@ -63,22 +67,36 @@ defmodule PulseWidth.DB.Command do
   end
 
   # if the above didn't match then an ack is not needed
-  def ack_if_needed({:ok, %PulseWidth{}} = rc, %{}), do: rc
+  def ack_if_needed(%{device: {:ok, %_{}}} = msg), do: msg
 
-  def ack_now(refid, opts \\ []) do
+  # no match, just pass through
+  def ack_if_needed(msg), do: msg
+
+  def ack_immediate_if_needed({:pending, res} = rc, opts) do
     import Repo, only: [get_by: 2, preload: 2]
     import TimeSupport, only: [utc_now: 0]
 
-    with {:ok, %Schema{} = cmd} <- get_by(Schema, refid: refid),
-         %Schema{} = cmd <- preload(cmd, [:device]),
-         ack_map <- %{cmdack: true, refid: refid, msg_recv_dt: utc_now()},
-         ack_map <- Map.merge(ack_map, Enum.into(opts, %{})) do
-      ack_if_needed(cmd, ack_map)
-    else
-      nil -> {:not_found, refid}
-      error -> {:error, error}
+    unless opts[:ack] do
+      cmd = find_refid(res[:refid])
+
+      if cmd do
+        %Schema{device: dev, refid: refid} = cmd
+
+        %{
+          cmdack: true,
+          refid: refid,
+          msg_recv_dt: utc_now(),
+          processed: {:ok, dev}
+        }
+        |> Map.merge(Enum.into(opts, %{}))
+        |> ack_if_needed()
+      end
     end
+
+    rc
   end
+
+  def ack_immediate_if_needed(rc, _opts), do: rc
 
   def add(%Device{} = x, %DateTime{} = dt) do
     cmd = Ecto.build_assoc(x, :cmds)

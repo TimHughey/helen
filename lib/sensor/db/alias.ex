@@ -251,7 +251,7 @@ defmodule Sensor.DB.Alias do
     opts = [
       on_conflict: {:replace, keys(:replace)},
       returning: true,
-      conflict_target: :name
+      conflict_target: [:name]
     ]
 
     cs = changeset(x, params)

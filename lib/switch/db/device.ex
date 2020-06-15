@@ -7,7 +7,6 @@ defmodule Switch.DB.Device do
 
   alias Switch.DB.Alias, as: Alias
   alias Switch.DB.Command, as: Command
-  alias Switch.DB.Device, as: Device
   alias Switch.DB.Device, as: Schema
 
   schema "switch_device" do
@@ -33,15 +32,14 @@ defmodule Switch.DB.Device do
   end
 
   def add(list) when is_list(list) do
-    for %Device{} = x <- list do
+    for %Schema{} = x <- list do
       upsert(x, x)
     end
   end
 
-  def add_cmd(%Device{} = x, sw_alias, %DateTime{} = dt)
+  def add_cmd(%Schema{} = x, sw_alias, %DateTime{} = dt)
       when is_binary(sw_alias) do
     import Ecto.Query, only: [from: 2]
-    import Repo, only: [preload: 2]
 
     x = reload(x)
     %{cmd: {:ok, %Command{refid: refid}}} = Command.add(x, sw_alias, dt)
@@ -51,7 +49,7 @@ defmodule Switch.DB.Device do
     cmd_query = from(c in Command, where: c.refid == ^refid)
 
     if rc == :ok,
-      do: {:ok, reload(x) |> preload(cmds: cmd_query)},
+      do: {:ok, reload(x) |> Repo.preload(cmds: cmd_query)},
       else: {rc, x}
   end
 
@@ -66,7 +64,7 @@ defmodule Switch.DB.Device do
     dev_alias(device, opts)
   end
 
-  def changeset(x, p) when is_map(p) or is_list(p) do
+  def changeset(x, p) do
     import Ecto.Changeset,
       only: [
         cast: 3,
@@ -117,17 +115,17 @@ defmodule Switch.DB.Device do
   end
 
   def dev_alias(device_or_id, opts) when is_list(opts) do
-    with %Device{} = x <- find(device_or_id) do
+    with %Schema{} = x <- find(device_or_id) do
       dev_alias(x, opts)
     else
       _not_found -> {:not_found, device_or_id}
     end
   end
 
-  def dev_alias(%Device{} = sd, opts) when is_list(opts) do
-    create = Keyword.get(opts, :create, false)
-    alias_name = Keyword.get(opts, :name)
-    pio = Keyword.get(opts, :pio)
+  def dev_alias(%Schema{} = sd, opts) when is_list(opts) do
+    create = opts[:create]
+    alias_name = opts[:name]
+    pio = opts[:pio]
     {exists_rc, sa} = find_alias_by_pio(sd, pio)
 
     check_args =
@@ -156,33 +154,30 @@ defmodule Switch.DB.Device do
   end
 
   @doc """
-    Get a Switch Device id or name
+    Get a Switch Device id or device
 
     Same return values as Repo.get_by/2
 
       1. nil if not found
-      2. %Sensor.Schemas.Alias{}
+      2. %Device{}
 
       ## Examples
-        iex> Sensor.DB.Alias.find("default")
-        %Sensor.Schemas.Alias{}
+        iex> Switch.DB.Device.find("default")
+        %Device{}
   """
 
   @doc since: "0.0.21"
-  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
+  def find(id_or_device) do
     check_args = fn
       x when is_binary(x) -> [device: x]
       x when is_integer(x) -> [id: x]
       x -> {:bad_args, x}
     end
 
-    import Repo, only: [get_by: 2, preload: 2]
+    import Repo, only: [get_by: 2]
 
-    with opts when is_list(opts) <- check_args.(id_or_name),
-         %Schema{} = found <-
-           get_by(Schema, opts)
-           |> preload_unacked_cmds()
-           |> Repo.preload(:aliases) do
+    with opts when is_list(opts) <- check_args.(id_or_device),
+         %Schema{} = found <- get_by(Schema, opts) |> preload() do
       found
     else
       x when is_tuple(x) -> x
@@ -192,7 +187,7 @@ defmodule Switch.DB.Device do
   end
 
   def find_alias(
-        %Device{aliases: aliases},
+        %Schema{aliases: aliases},
         alias_name,
         alias_pio,
         _opts \\ []
@@ -208,25 +203,29 @@ defmodule Switch.DB.Device do
       else: {:ok, hd(found)}
   end
 
-  def keys(:all),
-    do:
-      Map.from_struct(%Device{})
-      |> Map.drop([:__meta__, :id])
-      |> Map.keys()
+  def keys(:all) do
+    alias Schema, as: S
+
+    drop =
+      [:__meta__, S.__schema__(:associations), S.__schema__(:embeds)]
       |> List.flatten()
 
-  def keys(:cast),
-    do: keys_drop(:all, [:aliases, :cmds, :states])
+    Map.from_struct(%Schema{})
+    |> Map.drop(drop)
+    |> Map.keys()
+    |> List.flatten()
+  end
 
-  def keys(:replace),
-    do:
-      keys_drop(:all, [:cmds, :aliases, :device, :discovered_at, :inserted_at])
+  def keys(:cast), do: keys(:all)
 
   def keys(:required),
-    do: keys_drop(:all, [:aliases, :cmds, :inserted_at, :updated_at])
+    do: keys_drop(:all, [:inserted_at, :updated_at])
+
+  def keys(:replace),
+    do: keys_drop(:all, [:device, :discovered_at, :inserted_at])
 
   def find_alias_by_pio(
-        %Device{aliases: aliases},
+        %Schema{aliases: aliases},
         alias_pio,
         _opts \\ []
       )
@@ -241,7 +240,7 @@ defmodule Switch.DB.Device do
       else: {:ok, hd(found)}
   end
 
-  def pio_count(%Device{states: states}), do: Enum.count(states)
+  def pio_count(%Schema{states: states}), do: Enum.count(states)
 
   def pio_count(device) when is_binary(device) do
     sd = find(device)
@@ -264,14 +263,17 @@ defmodule Switch.DB.Device do
     if is_nil(sd), do: {:not_found, device}, else: pio_state(sd, pio, opts)
   end
 
-  def pio_state(%Device{} = sd, pio, opts)
+  def pio_state(%Schema{} = sd, pio, opts)
       when is_integer(pio) and
              pio >= 0 and
              is_list(opts) do
     actual_pio_state(sd, pio, opts)
   end
 
-  def record_cmd(%Device{} = sd, %Alias{name: sw_alias}, opts)
+  # NOTE: the %_{} assignment match is any struct
+  def preload(%_{} = x), do: preload_unacked_cmds(x) |> Repo.preload([:aliases])
+
+  def record_cmd(%Schema{} = sd, %Alias{name: sw_alias}, opts)
       when is_list(opts) do
     import Mqtt.SetSwitch, only: [send_cmd: 4]
     import TimeSupport, only: [utc_now: 0]
@@ -283,7 +285,7 @@ defmodule Switch.DB.Device do
 
     with %{state: state, pio: pio} <- cmd_map,
          # add the command and pass initial_opts which may contain ack: false
-         {:ok, %Device{} = sd} <- add_cmd(sd, sw_alias, utc_now()),
+         {:ok, %Schema{} = sd} <- add_cmd(sd, sw_alias, utc_now()),
          # NOTE: add_cmd/3 returns the Device with the new Command preloaded
          {:cmd, %Command{refid: refid} = cmd} <- {:cmd, hd(sd.cmds)},
          {:refid, true} <- {:refid, is_binary(refid)},
@@ -301,29 +303,17 @@ defmodule Switch.DB.Device do
 
   @doc since: "0.0.21"
   def reload(args) do
-    import Repo, only: [get!: 2, preload: 2]
+    import Repo, only: [get!: 2]
 
     case args do
       # results of a Repo function
-      {:ok, %Schema{id: id}} ->
-        get!(Schema, id)
-        |> preload_unacked_cmds()
-        |> Repo.preload(:aliases)
-
+      {:ok, %Schema{id: id}} -> get!(Schema, id) |> preload()
       # an existing struct
-      %Schema{id: id} ->
-        get!(Schema, id)
-        |> preload_unacked_cmds()
-        |> Repo.preload(:aliases)
-
+      %Schema{id: id} -> get!(Schema, id) |> preload()
+      # by id
+      id when is_integer(id) -> get!(Schema, id) |> preload()
       # something we can't handle
-      id when is_integer(id) ->
-        get!(Schema, id)
-        |> preload_unacked_cmds()
-        |> Repo.preload(:aliases)
-
-      args ->
-        {:error, args}
+      args -> {:error, {:bad_args, args}}
     end
   end
 
@@ -362,14 +352,12 @@ defmodule Switch.DB.Device do
 
     # assemble the return message with the results of upsert/2
     # and send it through Command.ack_if_needed/1
-    Map.put(msg, :switch_device, upsert(%Device{}, params))
+    Map.put(msg, :switch_device, upsert(%Schema{}, params))
     |> Command.ack_if_needed()
   end
 
   # Device.upsert/2 will insert or update a %Device{} using the map passed in
-  def upsert(%Device{} = x, params) when is_map(params) or is_list(params) do
-    import Repo, only: [preload: 2]
-
+  def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
     # make certain the params are a map
     params = Enum.into(params, %{})
 
@@ -379,7 +367,7 @@ defmodule Switch.DB.Device do
     opts = [
       on_conflict: {:replace, keys(:replace)},
       returning: true,
-      conflict_target: :device
+      conflict_target: [:device]
     ]
 
     cs = changeset(x, params)
@@ -387,8 +375,8 @@ defmodule Switch.DB.Device do
     with {cs, true} <- {cs, cs.valid?()},
          # the keys on_conflict: and conflict_target: indicate the insert
          # is an "upsert"
-         {:ok, %Device{id: _id} = x} <- Repo.insert(cs, opts) do
-      {:ok, x |> preload(:aliases)}
+         {:ok, %Schema{id: _id} = x} <- Repo.insert(cs, opts) do
+      {:ok, preload(x)}
     else
       {cs, false} ->
         {:invalid_changes, cs}
@@ -401,14 +389,14 @@ defmodule Switch.DB.Device do
     end
   end
 
-  defp actual_pio_state(%Device{device: device} = sd, pio, opts) do
+  defp actual_pio_state(%Schema{device: device} = sd, pio, opts) do
     import TimeSupport, only: [ttl_check: 4]
 
     alias Switch.DB.Device.State, as: State
 
     find_fn = fn %State{pio: p} -> p == pio end
 
-    with %Device{states: states, last_seen_at: seen_at, ttl_ms: ttl_ms} <- sd,
+    with %Schema{states: states, last_seen_at: seen_at, ttl_ms: ttl_ms} <- sd,
          %State{state: state} <- Enum.find(states, find_fn) do
       ttl_check(seen_at, state, ttl_ms, opts)
     else
@@ -417,16 +405,14 @@ defmodule Switch.DB.Device do
     end
   end
 
-  defp preload_unacked_cmds(sd, limit \\ 1)
-       when is_integer(limit) and limit >= 1 do
+  defp preload_unacked_cmds(x, limit \\ 1) do
     import Ecto.Query, only: [from: 2]
-    import Repo, only: [preload: 2]
 
-    preload(sd,
+    Repo.preload(x,
       cmds:
-        from(sc in Command,
-          where: sc.acked == false,
-          order_by: [desc: sc.inserted_at],
+        from(d in Command,
+          where: d.acked == false,
+          order_by: [desc: d.inserted_at],
           limit: ^limit
         )
     )

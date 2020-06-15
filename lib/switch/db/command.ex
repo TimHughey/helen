@@ -43,10 +43,9 @@ defmodule Switch.DB.Command do
           cmdack: true,
           refid: refid,
           msg_recv_dt: recv_dt,
-          switch_device: {:ok, %Device{}}
+          device: {:ok, %Device{}}
         } = msg
       ) do
-    import Broom, only: [release: 2]
     import Switch.Fact.Command, only: [write_specific_metric: 2]
     import TimeSupport, only: [utc_now: 0]
     #
@@ -57,7 +56,7 @@ defmodule Switch.DB.Command do
          latency <- Timex.diff(recv_dt, sent_at, :microsecond),
          changes <- [rt_latency_us: latency] ++ changes,
          {:ok, %Schema{}} = cmd_rc <- update(cmd, changes),
-         msg <- release(broom(), %{cmd: cmd_rc}),
+         msg <- release(%{cmd: cmd_rc}),
          _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else
@@ -70,7 +69,7 @@ defmodule Switch.DB.Command do
   end
 
   # primary entry point when called from Switch and an ack is not needed
-  def ack_if_needed(%{switch_device: {:ok, %Device{}}} = msg), do: msg
+  def ack_if_needed(%{device: {:ok, %Device{}}} = msg), do: msg
 
   # no match, just pass through
   def ack_if_needed(msg), do: msg
@@ -82,17 +81,17 @@ defmodule Switch.DB.Command do
     #
     # if ack: false (host expected to ack) then immediately ack
     #
-    unless Keyword.get(opts, :ack, true) do
+    unless opts[:ack] do
       cmd = find_refid(res[:refid])
 
       if cmd do
-        %Schema{device: sd, refid: refid} = cmd
+        %Schema{device: dev, refid: refid} = cmd
 
         %{
           cmdack: true,
           refid: refid,
           msg_recv_dt: utc_now(),
-          processed: {:ok, sd}
+          processed: {:ok, dev}
         }
         |> Map.merge(Enum.into(opts, %{}))
         |> ack_if_needed()

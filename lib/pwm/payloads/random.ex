@@ -3,10 +3,12 @@ defmodule PulseWidth.Payload.Random do
     Creates the payload for a Random command to a Remote
   """
 
+  alias PulseWidth.DB.Device, as: Device
+
   require Logger
 
   def create_cmd(
-        %PulseWidth{device: device, host: host},
+        %Device{device: device, host: host},
         refid,
         %{name: _cmd_name} = cmd,
         opts
@@ -28,7 +30,7 @@ defmodule PulseWidth.Payload.Random do
     Generate an example PulseWidth Random Sequence Payload
   """
   @doc since: "0.0.22"
-  def example(%PulseWidth{} = pwm_dev) do
+  def example(%Device{} = pwm_dev) do
     alias Ecto.UUID
 
     cmd = %{
@@ -49,7 +51,7 @@ defmodule PulseWidth.Payload.Random do
   end
 
   def send_cmd(
-        %PulseWidth{device: device} = pwm,
+        %Device{device: device} = pwm,
         refid,
         %{name: _cmd_name} = cmd,
         opts \\ []

@@ -63,49 +63,13 @@ defmodule Switch do
   end
 
   @doc """
-    Return a keyword list of the Switch command counts
-  """
-  @doc since: "0.0.24"
-  defdelegate cmd_counts, to: Command
-
-  @doc """
-    Reset the counts maintained by Command (Broom)
-  """
-  @doc since: "0.0.24"
-  defdelegate cmd_counts_reset(opts), to: Command
-
-  @doc """
-    Return a list of the Switch commands tracked
-  """
-  @doc since: "0.0.24"
-  defdelegate cmds_tracked, to: Command
-
-  @doc """
-    Public API for deleting a Switch Alias
-  """
-  @doc since: "0.0.21"
-  defdelegate delete(name_or_id), to: Alias, as: :delete
-
-  @doc """
   Finds a Switch Alias by name or id
 
-  opts are passed as-is to Repo.preload/2
+    opts are passed as-is to Repo.preload/2
   """
 
   @doc since: "0.0.21"
   defdelegate alias_find(name_or_id), to: Alias, as: :find
-
-  @doc """
-    Retrieve a list of alias names
-  """
-  @doc since: "0.0.22"
-  defdelegate names, to: Alias, as: :names
-
-  @doc """
-    Retrieve a list of alias names that begin with a pattern
-  """
-  @doc since: "0.0.22"
-  defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
   @doc """
   Rename a switch alias and/or update description and ttl_ms
@@ -133,6 +97,42 @@ defmodule Switch do
   end
 
   @doc """
+    Return a keyword list of the Switch command counts
+  """
+  @doc since: "0.0.24"
+  defdelegate cmd_counts, to: Command
+
+  @doc """
+    Reset the counts maintained by Command (Broom)
+  """
+  @doc since: "0.0.24"
+  defdelegate cmd_counts_reset(opts), to: Command
+
+  @doc """
+    Return a list of the Switch commands tracked
+  """
+  @doc since: "0.0.24"
+  defdelegate cmds_tracked, to: Command
+
+  @doc """
+    Public API for deleting a Switch Alias
+  """
+  @doc since: "0.0.21"
+  defdelegate delete(name_or_id), to: Alias, as: :delete
+
+  @doc """
+    Retrieve a list of alias names
+  """
+  @doc since: "0.0.22"
+  defdelegate names, to: Alias, as: :names
+
+  @doc """
+    Retrieve a list of alias names that begin with a pattern
+  """
+  @doc since: "0.0.22"
+  defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
+
+  @doc """
     Find a Switch Device by device or id
   """
   @doc since: "0.0.21"
@@ -151,7 +151,7 @@ defmodule Switch do
   end
 
   @doc """
-    Retrieve a list of devices that begin with a pattern
+    Retrieve a list of Switch devices that begin with a pattern
   """
   @doc since: "0.0.21"
   def devices_begin_with(pattern) when is_binary(pattern) do
@@ -175,7 +175,7 @@ defmodule Switch do
   @doc since: "0.0.21"
   def handle_message(%{processed: false, type: "switch"} = msg_in) do
     # the with begins with processing the message through DB.Device.upsert/1
-    with %{switch_device: switch_device} = msg <- Device.upsert(msg_in),
+    with %{device: switch_device} = msg <- Device.upsert(msg_in),
          # was the upset a success?
          {:ok, %Device{}} <- switch_device,
          # technically the message has been processed at this point

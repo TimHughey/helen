@@ -179,7 +179,7 @@ defmodule Sensor.DB.Device do
        %{device: string, host: string, dev_latency_us: integer, mtime: integer}
 
   returns input message populated with:
-   a. sensor_device: the results of upsert/2
+   a. device: the results of upsert/2
      * {:ok, %Sensor.Schemas.Device{}}
      * {:invalid_changes, %Changeset{}}
      * {:error, actual error results from upsert/2}
@@ -223,7 +223,7 @@ defmodule Sensor.DB.Device do
     opts = [
       on_conflict: {:replace, keys(:replace)},
       returning: true,
-      conflict_target: :device
+      conflict_target: [:device]
     ]
 
     cs = changeset(x, params)

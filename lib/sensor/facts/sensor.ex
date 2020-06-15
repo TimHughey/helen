@@ -15,7 +15,7 @@ defmodule Sensor.Fact do
         %DataPoint{} = dp,
         %{
           write_rc: nil,
-          sensor_device:
+          device:
             {:ok, %Device{device: d, host: h, _alias_: %Alias{name: n}}},
           msg_recv_dt: recv_dt
         } = _msg
@@ -49,7 +49,7 @@ defmodule Sensor.Fact do
         %DataPoint{},
         %{
           write_rc: nil,
-          sensor_device: {:ok, %Device{_alias_: sa}}
+          device: {:ok, %Device{_alias_: sa}}
         } = _msg
       )
       when is_nil(sa) do
