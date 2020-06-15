@@ -205,11 +205,11 @@ defmodule Sensor.DB.Device do
     params = Map.merge(params_default, Map.take(msg, params))
 
     # assemble the return message with the results of upsert/2
-    Map.put(msg, :sensor_device, upsert(%Schema{}, params))
+    Map.put(msg, :device, upsert(%Schema{}, params))
   end
 
   def upsert(msg) when is_map(msg),
-    do: Map.put(msg, :sensor_device, {:error, :badmsg})
+    do: Map.put(msg, :device, {:error, :badmsg})
 
   def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
     import Repo, only: [preload: 2]

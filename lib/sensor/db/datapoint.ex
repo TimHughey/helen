@@ -87,7 +87,7 @@ defmodule Sensor.DB.DataPoint do
   end
 
   def save(msg) when is_map(msg),
-    do: Map.put(msg, :sensor_device, {:error, :badmsg})
+    do: Map.put(msg, :device, {:error, :badmsg})
 
   defp insert(
          %Device{id: _id} = device,

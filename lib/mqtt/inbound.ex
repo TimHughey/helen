@@ -319,7 +319,7 @@ defmodule Mqtt.Inbound do
   defp msg_switch(%{async: async} = msg) do
     process = fn ->
       # the "happy path" of this with is to check for errors
-      with %{switch_device_fault: error} = msg <- Switch.handle_message(msg) do
+      with %{fault: error} = msg <- Switch.handle_message(msg) do
         ["switch message failed: ", inspect(error, pretty: true)]
         |> Logger.error()
 
@@ -339,7 +339,7 @@ defmodule Mqtt.Inbound do
   defp msg_pwm(%{async: async} = msg) do
     process = fn ->
       # the "happy path" of this with is to check for errors
-      with %{pwm_fault: error} = msg <- PulseWidth.handle_message(msg) do
+      with %{fault: error} = msg <- PulseWidth.handle_message(msg) do
         ["pwm message failed: ", inspect(error, pretty: true)]
         |> Logger.error()
 
@@ -359,7 +359,7 @@ defmodule Mqtt.Inbound do
   defp msg_remote(%{async: async} = msg) do
     process = fn ->
       # the "happy path" of this with is to check for errors
-      with %{remote_host_fault: error} = msg <- Remote.handle_message(msg) do
+      with %{fault: error} = msg <- Remote.handle_message(msg) do
         ["remote host message failed: ", inspect(error, pretty: true)]
         |> Logger.error()
 
@@ -396,7 +396,7 @@ defmodule Mqtt.Inbound do
   defp msg_sensor(%{async: async} = msg) do
     process = fn ->
       # the "happy path" of this with is to check for errors
-      with %{sensor_fault: error} = msg <- Sensor.handle_message(msg) do
+      with %{fault: error} = msg <- Sensor.handle_message(msg) do
         ["sensor datapoint failed: ", inspect(error, pretty: true)]
         |> Logger.error()
 

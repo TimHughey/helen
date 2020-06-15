@@ -352,7 +352,7 @@ defmodule Switch.DB.Device do
 
     # assemble the return message with the results of upsert/2
     # and send it through Command.ack_if_needed/1
-    Map.put(msg, :switch_device, upsert(%Schema{}, params))
+    Map.put(msg, :device, upsert(%Schema{}, params))
     |> Command.ack_if_needed()
   end
 
