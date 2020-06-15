@@ -296,6 +296,18 @@ defmodule PulseWidth do
   @doc since: "0.0.25"
   defdelegate names_begin_with(pattern), to: Alias
 
+  @doc """
+    Set a PulseWidth Alias to minimum duty
+  """
+  @doc since: "0.0.25"
+  defdelegate off(name_or_id), to: Alias
+
+  @doc """
+    Set a PulseWidth Alias to maximum duty
+  """
+  @doc since: "0.0.25"
+  defdelegate on(name_or_id), to: Alias
+
   # @doc """
   #   Send a random command to a PulseWidth found by name or actual struct
   #
