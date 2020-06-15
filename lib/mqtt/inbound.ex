@@ -319,14 +319,7 @@ defmodule Mqtt.Inbound do
   defp msg_switch(%{async: async} = msg) do
     process = fn ->
       # the "happy path" of this with is to check for errors
-      with %{fault: error} = msg <- Switch.handle_message(msg) do
-        ["switch message failed: ", inspect(error, pretty: true)]
-        |> Logger.error()
-
-        {:failed, msg}
-      else
-        _all_is_well -> :ok
-      end
+      Switch.handle_message(msg) |> check_msg_fault()
     end
 
     if async do
@@ -338,15 +331,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_pwm(%{async: async} = msg) do
     process = fn ->
-      # the "happy path" of this with is to check for errors
-      with %{fault: error} = msg <- PulseWidth.handle_message(msg) do
-        ["pwm message failed: ", inspect(error, pretty: true)]
-        |> Logger.error()
-
-        {:failed, msg}
-      else
-        _all_is_well -> :ok
-      end
+      PulseWidth.handle_message(msg) |> check_msg_fault()
     end
 
     if async do
@@ -358,15 +343,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_remote(%{async: async} = msg) do
     process = fn ->
-      # the "happy path" of this with is to check for errors
-      with %{fault: error} = msg <- Remote.handle_message(msg) do
-        ["remote host message failed: ", inspect(error, pretty: true)]
-        |> Logger.error()
-
-        {:failed, msg}
-      else
-        _all_is_well -> :ok
-      end
+      Remote.handle_message(msg) |> check_msg_fault()
     end
 
     if async do
@@ -395,15 +372,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_sensor(%{async: async} = msg) do
     process = fn ->
-      # the "happy path" of this with is to check for errors
-      with %{fault: error} = msg <- Sensor.handle_message(msg) do
-        ["sensor datapoint failed: ", inspect(error, pretty: true)]
-        |> Logger.error()
-
-        {:failed, msg}
-      else
-        _all_is_well -> :ok
-      end
+      Sensor.handle_message(msg) |> check_msg_fault()
     end
 
     if async do
@@ -412,6 +381,17 @@ defmodule Mqtt.Inbound do
       process.()
     end
   end
+
+  defp check_msg_fault(%{fault: fault} = msg) do
+    error = msg[fault]
+
+    ["msg \"", Atom.to_string(fault), "\" ", inspect(error, pretty: true)]
+    |> Logger.warn()
+
+    {:failed, msg}
+  end
+
+  defp check_msg_fault(msg), do: {:ok, msg}
 
   defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),
     do: %{s | messages_dispatched: dispatched + 1}
