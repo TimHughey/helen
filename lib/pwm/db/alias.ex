@@ -63,7 +63,7 @@ defmodule PulseWidth.DB.Alias do
     duty = opts[:duty]
 
     # if the duty opt was passed then an update is requested
-    with %Schema{device: %Device{} = d} = a <- Schema.find(name_or_id),
+    with %Schema{device: %Device{} = d} = a <- find(name_or_id),
          # lazy_check does all the heavy lifting
          {:cmd_needed?, true, cmd_map} <- lazy_check(a, lazy, duty),
          cmd_map = Map.put(cmd_map, :initial_opts, opts) do
@@ -161,7 +161,7 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def off(name) when is_binary(name) do
-    with %Device{duty_min: min} <- Device.find(name) do
+    with %Device{duty_min: min} <- find(name) do
       duty(name, duty: min)
     else
       _catchall -> {:not_found, name}
@@ -169,7 +169,7 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def on(name) when is_binary(name) do
-    with %Device{duty_max: max} <- Device.find(name) do
+    with %Device{duty_max: max} <- find(name) do
       duty(name, duty: max)
     else
       _catchall -> {:not_found, name}
