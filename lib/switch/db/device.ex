@@ -219,7 +219,7 @@ defmodule Switch.DB.Device do
   def keys(:cast), do: keys(:all)
 
   def keys(:required),
-    do: keys_drop(:all, [:inserted_at, :updated_at])
+    do: keys_drop(:all, [:id, :inserted_at, :updated_at])
 
   def keys(:replace),
     do: keys_drop(:all, [:device, :discovered_at, :inserted_at])
