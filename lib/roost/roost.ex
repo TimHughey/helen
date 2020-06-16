@@ -54,7 +54,7 @@ defmodule Roost do
   ## Roost Public API
   ##
 
-  def closing(opts \\ []) do
+  def closing(opts \\ [minutes: 5]) do
     GenServer.call(__MODULE__, {:closing, opts})
   end
 
