@@ -26,14 +26,22 @@ defmodule PulseWidth.DB.Alias do
   end
 
   @doc """
+  Set all PulseWidth aliased devices to off
+  """
+  @doc since: "0.0.25"
+  def all_off do
+    names_begin_with("") |> off()
+  end
+
+  @doc """
     Create a PulseWidth alias to a device
   """
   @doc since: "0.0.25"
   def create(%Device{id: id}, name, opts \\ [])
       when is_binary(name) and is_list(opts) do
     #
-    # grab keys of interest for the schema (if they exist) and populate the
-    # required parameters from the function call
+    # grab keys of interest for upsert (if they exist) and populate the
+    # required parameters
     #
     Keyword.take(opts, [:description, :capability, :ttl_ms])
     |> Enum.into(%{})
@@ -161,7 +169,7 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def off(name) when is_binary(name) do
-    with %Device{duty_min: min} <- find(name) do
+    with %Schema{device: %Device{duty_min: min}} <- find(name) do
       duty(name, duty: min)
     else
       _catchall -> {:not_found, name}
@@ -169,7 +177,7 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def on(name) when is_binary(name) do
-    with %Device{duty_max: max} <- find(name) do
+    with %Schema{device: %Device{duty_max: max}} <- find(name) do
       duty(name, duty: max)
     else
       _catchall -> {:not_found, name}

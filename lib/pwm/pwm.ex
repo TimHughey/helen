@@ -77,6 +77,12 @@ defmodule PulseWidth do
   # end
 
   @doc """
+  Set all PulseWidth aliased devices to off
+  """
+  @doc since: "0.0.25"
+  defdelegate all_off, to: Alias
+
+  @doc """
     Return a keyword list of the PulseWidth command counts
   """
   @doc since: "0.0.24"
