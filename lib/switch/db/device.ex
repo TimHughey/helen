@@ -221,8 +221,9 @@ defmodule Switch.DB.Device do
   def keys(:required),
     do: keys_drop(:all, [:id, :inserted_at, :updated_at])
 
-  def keys(:replace),
-    do: keys_drop(:all, [:device, :discovered_at, :inserted_at])
+  def keys(:replace) do
+    keys_drop(:all, [:device, :discovered_at, :inserted_at]) ++ [:states]
+  end
 
   def find_alias_by_pio(
         %Schema{aliases: aliases},
