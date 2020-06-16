@@ -61,8 +61,7 @@ defmodule Helen.Application do
           PulseWidth.Supervisor,
           Helen.Scheduler,
           Thermostat.Supervisor,
-          ExtraMod.Supervisor,
-          ExtraMod
+          ExtraMod.Supervisor
         ] do
       make_tuple.(mod, get_env(:helen, mod))
     end

@@ -1,5 +1,6 @@
 defmodule ExtraMod do
   use GenServer
+  use Timex
 
   ##
   ## Public API
@@ -21,6 +22,44 @@ defmodule ExtraMod do
   def hot_load(dir \\ "hot", opts \\ [rm: false])
       when is_binary(dir) and is_list(opts) do
     GenServer.call(__MODULE__, {:hot_load, dir, opts})
+  end
+
+  def sleep(ms, opts_or_state \\ [])
+
+  def sleep(ms, opts) when is_list(opts) do
+    sleep(ms, %{opts: opts})
+  end
+
+  def sleep(ms, state) when is_map(state) do
+    import Timex.Duration, only: [elapsed: 2, now: 0, to_milliseconds: 1]
+
+    state = Map.put_new(state, :remaining_ms, ms)
+    start = Duration.now()
+
+    handler = state[:opts][:handler]
+
+    if ms > 0 do
+      receive do
+        :abort -> handler.(:abort)
+        msg -> msg
+      after
+        trunc(ms) -> nil
+      end
+
+      elapsed_ms = elapsed(now(), start) |> to_milliseconds()
+
+      state =
+        Map.update(state, :remaining_ms, ms - elapsed_ms, fn
+          x when x > 0 -> trunc(x - elapsed_ms)
+          x -> trunc(x)
+        end)
+
+      state = Map.update(state, :loops, 1, &(&1 + 1))
+
+      sleep(state[:remaining_ms], state)
+    else
+      state
+    end
   end
 
   @doc """
