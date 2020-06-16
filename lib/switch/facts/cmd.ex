@@ -5,9 +5,9 @@ defmodule Switch.Fact.Command do
   alias Switch.DB.Device, as: Device
 
   def write_specific_metric(
-        {:ok, %Command{sw_alias: n} = cmd},
+        {:ok, %Command{} = cmd},
         %{
-          device: {:ok, %Device{device: d, host: h}},
+          device: {:ok, %Device{device: d, host: h, aliases: [%_{name: n}]}},
           msg_recv_dt: recv_dt
         } = _msg
       ) do

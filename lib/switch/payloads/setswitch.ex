@@ -1,4 +1,4 @@
-defmodule Mqtt.SetSwitch do
+defmodule Switch.Payload.Position do
   @moduledoc false
 
   require Logger

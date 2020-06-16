@@ -29,6 +29,12 @@ defmodule Mqtt.Handler do
     {:ok, state}
   end
 
+  def connection(:terminated, state) do
+    Client.terminated()
+
+    {:ok, state}
+  end
+
   def handle_message([_env, "r", src_host] = topic, payload, state) do
     import TimeSupport, only: [utc_now: 0]
 

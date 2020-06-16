@@ -23,12 +23,10 @@ defmodule Mqtt.Client do
 
   @feed_prefix get_env(:helen, :feeds, []) |> Keyword.get(:prefix, "dev")
 
-  def start_link(s) when is_map(s) do
-    GenServer.start_link(__MODULE__, s, name: __MODULE__)
-  end
-
   ## Callbacks
 
+  ##
+  ## Connection State API (for Handler)
   def connected do
     GenServer.cast(__MODULE__, {:connected})
   end
@@ -37,6 +35,15 @@ defmodule Mqtt.Client do
     GenServer.cast(__MODULE__, {:disconnected})
   end
 
+  def terminated do
+    GenServer.cast(__MODULE__, {:terminated})
+  end
+
+  ##
+  ## GenServer Start and Initialization
+  ##
+
+  @impl true
   def init(s) when is_map(s) do
     #
     ## HACK: clean up opts
@@ -82,6 +89,10 @@ defmodule Mqtt.Client do
     # potentially a connection to MQTT
   end
 
+  def start_link(s) when is_map(s) do
+    GenServer.start_link(__MODULE__, s, name: __MODULE__)
+  end
+
   @doc """
     Publishes the passed map to the host specific MQTT feed
 
@@ -114,6 +125,7 @@ defmodule Mqtt.Client do
     GenServer.call(__MODULE__, {:runtime_metrics, flag})
   end
 
+  @impl true
   def handle_call(
         {:publish, feed, payload, pub_opts},
         _from,
@@ -129,6 +141,7 @@ defmodule Mqtt.Client do
      Map.put(s, :last_pub_rc, elapsed_us: elapsed_us, rc: pub_rc)}
   end
 
+  @impl true
   def handle_call(
         {:publish, feed, payload, pub_opts},
         _from,
@@ -139,9 +152,11 @@ defmodule Mqtt.Client do
     {:reply, :not_started, s}
   end
 
+  @impl true
   def handle_call({:runtime_metrics}, _from, %{runtime_metrics: flag} = s),
     do: {:reply, flag, s}
 
+  @impl true
   def handle_call({:runtime_metrics, flag}, _from, %{runtime_metrics: was} = s)
       when is_boolean(flag) or flag == :toggle do
     new_flag =
@@ -156,11 +171,13 @@ defmodule Mqtt.Client do
     {:reply, %{was: was, is: s.runtime_metrics}, s}
   end
 
+  @impl true
   def handle_call(unhandled_msg, _from, s) do
     log_unhandled("call", unhandled_msg)
     {:reply, :ok, s}
   end
 
+  @impl true
   def handle_cast({:connected}, s) do
     s = Map.put(s, :connected, true)
     Logger.debug(["mqtt endpoint connected"])
@@ -176,17 +193,28 @@ defmodule Mqtt.Client do
     {:noreply, s}
   end
 
+  @impl true
   def handle_cast({:disconnected}, s) do
     Logger.warn(["mqtt endpoint disconnected"])
     s = Map.put(s, :connected, false)
     {:noreply, s}
   end
 
+  @impl true
+
+  def handle_cast({:terminated}, s) do
+    Logger.warn(["mqtt endpoint terminated"])
+    s = Map.put(s, :connected, false)
+    {:noreply, s}
+  end
+
+  @impl true
   def handle_cast(unhandled_msg, s) do
     log_unhandled("cast", unhandled_msg)
     {:noreply, s}
   end
 
+  @impl true
   def handle_info({{Tortoise, _client_id}, ref, res}, s) do
     log = Map.get(s, :log_subscriptions, false)
 
@@ -201,6 +229,7 @@ defmodule Mqtt.Client do
     {:noreply, s}
   end
 
+  @impl true
   def handle_info(
         {ref, result} = msg,
         %{timesync: %{task: %{ref: timesync_ref}}} = s
@@ -218,6 +247,7 @@ defmodule Mqtt.Client do
     {:noreply, s}
   end
 
+  @impl true
   def handle_info(
         {:DOWN, ref, :process, pid, reason} = msg,
         %{timesync: %{task: %{ref: timesync_ref}}} = s
@@ -243,7 +273,8 @@ defmodule Mqtt.Client do
     {:noreply, s}
   end
 
-  def handle_info(unhandled_msg, _from, s) do
+  @impl true
+  def handle_info(unhandled_msg, s) do
     log_unhandled("info", unhandled_msg)
     {:noreply, s}
   end

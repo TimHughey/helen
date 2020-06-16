@@ -276,7 +276,7 @@ defmodule Switch.DB.Device do
 
   def record_cmd(%Schema{} = sd, %Alias{name: sw_alias}, opts)
       when is_list(opts) do
-    import Mqtt.SetSwitch, only: [send_cmd: 4]
+    import Switch.Payload.Position, only: [send_cmd: 4]
     import TimeSupport, only: [utc_now: 0]
 
     sd = reload(sd)

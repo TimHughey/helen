@@ -16,12 +16,12 @@ defmodule PulseWidth.DB.Command do
 
   schema "pwm_cmd" do
     field(:refid, Ecto.UUID, autogenerate: true)
-    field(:acked, :boolean)
-    field(:orphan, :boolean)
+    field(:acked, :boolean, default: false)
+    field(:orphan, :boolean, default: false)
     field(:rt_latency_us, :integer)
     field(:sent_at, :utc_datetime_usec)
     field(:ack_at, :utc_datetime_usec)
-    belongs_to(:device, Device, foreign_key: :pwm_id)
+    belongs_to(:device, Device, foreign_key: :device_id)
 
     timestamps(type: :utc_datetime_usec)
   end

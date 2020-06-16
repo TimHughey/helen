@@ -22,7 +22,7 @@ defmodule PulseWidth.DB.Device do
     field(:discovered_at, :utc_datetime_usec)
     field(:last_cmd_at, :utc_datetime_usec)
 
-    has_many(:cmds, Command, foreign_key: :pwm_id)
+    has_many(:cmds, Command, foreign_key: :device_id)
     has_one(:_alias_, Alias, references: :id, foreign_key: :device_id)
 
     timestamps(type: :utc_datetime_usec)

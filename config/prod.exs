@@ -101,19 +101,19 @@ config :helen, Helen.Scheduler,
        schedule: {:cron, "* * * * *"},
        task: {Jobs, :touch_file, ["/tmp/helen-prod.touch"]},
        run_strategy: run_strategy
-     ]},
-    {:seedlings_day,
-     [
-       schedule: {:cron, "* 06-20 * * *"},
-       task: {Jobs.Seedlings, :lights, [:day]},
-       run_strategy: run_strategy
-     ]},
-    {:seedlings_night,
-     [
-       schedule: {:cron, "* 00-05,21-23 * * *"},
-       task: {Jobs.Seedlings, :lights, [:night]},
-       run_strategy: run_strategy
      ]}
+    # {:seedlings_day,
+    #  [
+    #    schedule: {:cron, "* 06-20 * * *"},
+    #    task: {Jobs.Seedlings, :lights, [:day]},
+    #    run_strategy: run_strategy
+    #  ]},
+    # {:seedlings_night,
+    #  [
+    #    schedule: {:cron, "* 00-05,21-23 * * *"},
+    #    task: {Jobs.Seedlings, :lights, [:night]},
+    #    run_strategy: run_strategy
+    #  ]}
 
     # EXAMPLES:
     #
