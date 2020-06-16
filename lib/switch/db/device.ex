@@ -37,12 +37,11 @@ defmodule Switch.DB.Device do
     end
   end
 
-  def add_cmd(%Schema{} = x, sw_alias, %DateTime{} = dt)
-      when is_binary(sw_alias) do
+  def add_cmd(%Schema{} = x, %DateTime{} = dt) do
     import Ecto.Query, only: [from: 2]
 
     x = reload(x)
-    %{cmd: {:ok, %Command{refid: refid}}} = Command.add(x, sw_alias, dt)
+    %{cmd: {:ok, %Command{refid: refid}}} = Command.add(x, dt)
 
     {rc, x} = upsert(x, last_cmd_at: dt)
 
@@ -274,7 +273,7 @@ defmodule Switch.DB.Device do
   # NOTE: the %_{} assignment match is any struct
   def preload(%_{} = x), do: preload_unacked_cmds(x) |> Repo.preload([:aliases])
 
-  def record_cmd(%Schema{} = sd, %Alias{name: sw_alias}, opts)
+  def record_cmd(%Schema{} = sd, %Alias{}, opts)
       when is_list(opts) do
     import Switch.Payload.Position, only: [send_cmd: 4]
     import TimeSupport, only: [utc_now: 0]
@@ -286,7 +285,7 @@ defmodule Switch.DB.Device do
 
     with %{state: state, pio: pio} <- cmd_map,
          # add the command and pass initial_opts which may contain ack: false
-         {:ok, %Schema{} = sd} <- add_cmd(sd, sw_alias, utc_now()),
+         {:ok, %Schema{} = sd} <- add_cmd(sd, utc_now()),
          # NOTE: add_cmd/3 returns the Device with the new Command preloaded
          {:cmd, %Command{refid: refid} = cmd} <- {:cmd, hd(sd.cmds)},
          {:refid, true} <- {:refid, is_binary(refid)},

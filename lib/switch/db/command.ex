@@ -102,7 +102,7 @@ defmodule Switch.DB.Command do
 
   def ack_immediate_if_needed(rc, _opts), do: rc
 
-  def add(%Device{} = x, sw_name, %DateTime{} = dt) when is_binary(sw_name) do
+  def add(%Device{} = x, %DateTime{} = dt) do
     cmd = Ecto.build_assoc(x, :cmds)
     cs = changeset(cmd, sent_at: dt)
 
@@ -119,7 +119,7 @@ defmodule Switch.DB.Command do
       only: [cast: 3, validate_required: 2, unique_constraint: 3]
 
     cast(x, Enum.into(params, %{}), cast_cols())
-    |> validate_required([:sw_alias, :sent_at])
+    |> validate_required([:sent_at])
     |> unique_constraint(:refid, name: :switch_command_refid_index)
   end
 
@@ -157,7 +157,7 @@ defmodule Switch.DB.Command do
   ## Changeset Helpers
   #
   defp cast_cols,
-    do: [:sw_alias, :acked, :orphan, :refid, :rt_latency_us, :sent_at, :ack_at]
+    do: [:acked, :orphan, :refid, :rt_latency_us, :sent_at, :ack_at]
 
   defp possible_cols,
     do: [
