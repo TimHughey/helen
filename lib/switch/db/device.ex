@@ -204,10 +204,8 @@ defmodule Switch.DB.Device do
   end
 
   def keys(:all) do
-    alias Schema, as: S
-
     drop =
-      [:__meta__, S.__schema__(:associations), S.__schema__(:embeds)]
+      [:__meta__, :id, __schema__(:associations)]
       |> List.flatten()
 
     Map.from_struct(%Schema{})
@@ -216,13 +214,15 @@ defmodule Switch.DB.Device do
     |> List.flatten()
   end
 
-  def keys(:cast), do: keys(:all)
+  def keys(:cast) do
+    keys_drop(:all, [__schema__(:embeds)])
+  end
 
   def keys(:required),
-    do: keys_drop(:all, [:id, :inserted_at, :updated_at])
+    do: keys_drop(:all, [:inserted_at, :updated_at])
 
   def keys(:replace) do
-    keys_drop(:all, [:device, :discovered_at, :inserted_at]) ++ [:states]
+    keys_drop(:all, [:device, :discovered_at, :inserted_at])
   end
 
   def find_alias_by_pio(
@@ -423,8 +423,10 @@ defmodule Switch.DB.Device do
   # Changeset Lists
   #
 
-  defp keys_drop(base_keys, drop),
-    do:
-      MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
-      |> MapSet.to_list()
+  defp keys_drop(base_keys, drop) do
+    drop = List.flatten(drop)
+
+    MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
+    |> MapSet.to_list()
+  end
 end

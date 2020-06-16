@@ -117,12 +117,17 @@ defmodule Remote.DB.Remote do
     end
   end
 
-  def keys(:all),
-    do:
-      Map.from_struct(%Schema{})
-      |> Map.drop([:__meta__, :id])
-      |> Map.keys()
+  def keys(:all) do
+    drop =
+      [:__meta__, __schema__(:associations), __schema__(:primary_key)]
       |> List.flatten()
+
+    %Schema{}
+    |> Map.from_struct()
+    |> Map.drop(drop)
+    |> Map.keys()
+    |> List.flatten()
+  end
 
   def keys(:cast), do: keys(:all)
 

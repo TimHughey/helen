@@ -232,13 +232,17 @@ defmodule PulseWidth.DB.Device do
   end
 
   # Keys For Updating, Creating a PulseWidth
-  def keys(:all),
-    do:
-      %Schema{}
-      |> Map.from_struct()
-      |> Map.drop([:__meta__] ++ Schema.__schema__(:associations))
-      |> Map.keys()
+  def keys(:all) do
+    drop =
+      [:__meta__, __schema__(:associations), __schema__(:primary_key)]
       |> List.flatten()
+
+    %Schema{}
+    |> Map.from_struct()
+    |> Map.drop(drop)
+    |> Map.keys()
+    |> List.flatten()
+  end
 
   def keys(:cast), do: keys(:all)
 

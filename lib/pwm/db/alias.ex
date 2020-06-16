@@ -316,10 +316,8 @@ defmodule PulseWidth.DB.Alias do
 
   # Keys For Updating, Creating a PulseWidth
   defp keys(:all) do
-    alias Schema, as: S
-
     drop =
-      [:__meta__, S.__schema__(:associations), S.__schema__(:primary_key)]
+      [:__meta__, __schema__(:associations), __schema__(:primary_key)]
       |> List.flatten()
 
     %Schema{}
