@@ -1,11 +1,6 @@
 defmodule TimeSupport do
   @moduledoc false
-  require Logger
   use Timex
-
-  def before_time(:utc_now, x) do
-    utc_now() |> Timex.shift(milliseconds: ms(x) * -1)
-  end
 
   def duration(opts) when is_list(opts) do
     # after hours of searching and not finding an existing capabiility
@@ -47,18 +42,12 @@ defmodule TimeSupport do
     Formatter.format(Duration.zero(), :humanized)
   end
 
-  def ms({:ms, x}) when is_number(x), do: x |> round()
-  def ms({:secs, x}) when is_number(x), do: (x * 1000) |> round()
-  def ms({:mins, x}) when is_number(x), do: ms({:secs, x * 60}) |> round()
-  def ms({:hrs, x}) when is_number(x), do: ms({:mins, x * 60}) |> round()
-  def ms({:days, x}) when is_number(x), do: ms({:hrs, x * 24}) |> round()
-  def ms({:weeks, x}) when is_number(x), do: ms({:days, x * 7}) |> round()
-  def ms({:months, x}) when is_number(x), do: ms({:weeks, x * 4}) |> round()
-
-  def ms(unsupported) do
-    Logger.warn(["ms(", inspect(unsupported), ") is not supported"])
-    nil
-  end
+  @doc """
+    Converts a Timex standard opts list (e.g. [minutes: 1, seconds: 2])
+    to a Timex Duration then to truncated milliseconds
+  """
+  @doc since: "0.0.26"
+  def opts_as_ms(opts), do: duration_ms(opts)
 
   def ttl_check(at, val, ttl_ms, opts) do
     # ttl_ms in opts overrides passed in ttl_ms

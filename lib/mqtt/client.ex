@@ -8,11 +8,7 @@ defmodule Mqtt.Client do
 
   import Application, only: [get_env: 2, get_env: 3]
 
-  # alias Mqtt.Timesync
-
   #  def child_spec(opts) do
-  #
-  #
   #      id: Mqtt.Client,
   #      start: {Mqtt.Client, :start_link, [opts]},
   #      restart: :permanent,
@@ -188,8 +184,6 @@ defmodule Mqtt.Client do
 
     s = Map.put(s, :rpt_feed_subscribed, res)
 
-    # s = start_timesync_task(s)
-
     {:noreply, s}
   end
 
@@ -229,49 +223,49 @@ defmodule Mqtt.Client do
     {:noreply, s}
   end
 
-  @impl true
-  def handle_info(
-        {ref, result} = msg,
-        %{timesync: %{task: %{ref: timesync_ref}}} = s
-      )
-      when is_reference(ref) and ref == timesync_ref do
-    Logger.debug([
-      "handle_info(",
-      inspect(msg, pretty: true),
-      ", ",
-      inspect(s, pretty: true)
-    ])
+  # @impl true
+  # def handle_info(
+  #       {ref, result} = msg,
+  #       %{timesync: %{task: %{ref: timesync_ref}}} = s
+  #     )
+  #     when is_reference(ref) and ref == timesync_ref do
+  #   Logger.debug([
+  #     "handle_info(",
+  #     inspect(msg, pretty: true),
+  #     ", ",
+  #     inspect(s, pretty: true)
+  #   ])
+  #
+  #   s = Map.put(s, :timesync, Map.put(s.timesync, :result, result))
+  #
+  #   {:noreply, s}
+  # end
 
-    s = Map.put(s, :timesync, Map.put(s.timesync, :result, result))
-
-    {:noreply, s}
-  end
-
-  @impl true
-  def handle_info(
-        {:DOWN, ref, :process, pid, reason} = msg,
-        %{timesync: %{task: %{ref: timesync_ref}}} = s
-      )
-      when is_reference(ref) and is_pid(pid) do
-    Logger.debug([
-      "handle_info(",
-      inspect(msg, pretty: true),
-      ", ",
-      inspect(s, pretty: true)
-    ])
-
-    s =
-      if ref == timesync_ref do
-        track =
-          Map.put(s.timesync, :exit, reason)
-          |> Map.put(:task, nil)
-          |> Map.put(:status, :finished)
-
-        Map.put(s, :timesync, track)
-      end
-
-    {:noreply, s}
-  end
+  # @impl true
+  # def handle_info(
+  #       {:DOWN, ref, :process, pid, reason} = msg,
+  #       %{timesync: %{task: %{ref: timesync_ref}}} = s
+  #     )
+  #     when is_reference(ref) and is_pid(pid) do
+  #   Logger.debug([
+  #     "handle_info(",
+  #     inspect(msg, pretty: true),
+  #     ", ",
+  #     inspect(s, pretty: true)
+  #   ])
+  #
+  #   s =
+  #     if ref == timesync_ref do
+  #       track =
+  #         Map.put(s.timesync, :exit, reason)
+  #         |> Map.put(:task, nil)
+  #         |> Map.put(:status, :finished)
+  #
+  #       Map.put(s, :timesync, track)
+  #     end
+  #
+  #   {:noreply, s}
+  # end
 
   @impl true
   def handle_info(unhandled_msg, s) do
@@ -330,17 +324,4 @@ defmodule Mqtt.Client do
         {:error, catchall}
     end
   end
-
-  # defp start_timesync_task(%{mqtt_env: mqtt_env, client_id: client_id} = s) do
-  #   opts = Map.merge(timesync_opts(), %{feed: mqtt_env, client_id: client_id})
-  #   task = Task.async(Timesync, :run, [opts])
-  #
-  #   Map.put(s, :timesync, %{task: task, status: :started})
-  # end
-
-  # defp timesync_opts do
-  #   get_env(:helen, Mqtt.Client, [])
-  #   |> Keyword.get(:timesync, [])
-  #   |> Enum.into(%{})
-  # end
 end

@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.25",
+      version: "0.0.26",
       elixir: "~> 1.10",
       deps: deps(),
       releases: releases(),

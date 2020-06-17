@@ -27,7 +27,11 @@ defmodule Roost do
 
   @impl true
   def init(args) do
-    state = %{opts: args}
+    import Helen.Module.Config, only: [eval_opts: 2]
+
+    config_opts = eval_opts(__MODULE__, Enum.into(args, []))
+
+    state = %{opts: config_opts}
 
     {:ok, state}
   end
@@ -39,10 +43,6 @@ defmodule Roost do
   ##
   ## Public API for GenServer related functions
   ##
-
-  def kickstart do
-    Supervisor.start_child(ExtraMod.Supervisor, Roost)
-  end
 
   def restart, do: Supervisor.restart_child(ExtraMod.Supervisor, Roost)
 
@@ -65,6 +65,8 @@ defmodule Roost do
   def open do
     GenServer.call(__MODULE__, {:open})
   end
+
+  def opts, do: Map.get(state(), :opts)
 
   @impl true
   def handle_call({:open}, _from, s) do

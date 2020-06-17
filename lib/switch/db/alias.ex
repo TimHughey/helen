@@ -8,8 +8,6 @@ defmodule Switch.DB.Alias do
   alias Switch.DB.Command, as: Command
   alias Switch.DB.Device, as: Device
 
-  @timestamps_opts [type: :utc_datetime_usec]
-
   schema "switch_alias" do
     field(:name, :string)
     field(:device_id, :integer)
@@ -24,7 +22,7 @@ defmodule Switch.DB.Alias do
       define_field: false
     )
 
-    timestamps()
+    timestamps(type: :utc_datetime_usec)
   end
 
   @doc """
