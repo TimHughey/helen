@@ -34,15 +34,13 @@ defmodule Helen.DB.Module.Config do
   @doc since: "0.0.26"
   def create_or_update(mod, opts \\ [], description \\ "<none>")
       when is_atom(mod) do
-    defaults = [autostart: true, loop_timeout: [minutes: 1]]
-
     # turn the opts list into a binary to store in the db
-    opts = Keyword.merge(defaults, Enum.into(opts, [])) |> inspect()
+    opts_binary = Enum.into(opts, []) |> inspect()
 
     upsert_opts = [
       module: mod_as_binary(mod),
       description: description,
-      opts: opts
+      opts: opts_binary
     ]
 
     with {:ok, %Schema{module: mod}} <- upsert(%Schema{}, upsert_opts) do
@@ -108,6 +106,50 @@ defmodule Helen.DB.Module.Config do
       x when is_tuple(x) -> x
       x when is_nil(x) -> nil
       x -> {:error, x}
+    end
+  end
+
+  @doc """
+    Get the opts of a Module Config
+  """
+  @doc since: "0.0.26"
+  def opts(module_or_id) do
+    with %Schema{opts: opts} <- find(module_or_id),
+         {val, _} <- Code.eval_string(opts) do
+      val
+    else
+      rc -> rc
+    end
+  end
+
+  @doc """
+    Merge the opts of a Module Config
+  """
+  @doc since: "0.0.26"
+  def opts_merge(module_or_id, opts) when is_list(opts) do
+    with %Schema{opts: prev_opts_binary} = x <- find(module_or_id),
+         {prev_opts, _} <- Code.eval_string(prev_opts_binary),
+         opts_binary <- Keyword.merge(prev_opts, opts) |> inspect(),
+         {:ok, %Schema{opts: new_opts_binary}} <- upsert(x, opts: opts_binary),
+         {val, _} <- Code.eval_string(new_opts_binary) do
+      {:ok, val}
+    else
+      rc -> rc
+    end
+  end
+
+  @doc """
+    Put the opts of a Module Config
+  """
+  @doc since: "0.0.26"
+  def opts_put(module_or_id, opts) when is_list(opts) do
+    with %Schema{} = x <- find(module_or_id),
+         opts_binary <- inspect(opts),
+         {:ok, %Schema{opts: opts}} <- upsert(x, opts: opts_binary),
+         {val, _} <- Code.eval_string(opts) do
+      {:ok, val}
+    else
+      rc -> rc
     end
   end
 

@@ -1,13 +1,12 @@
-defmodule Switch.Server do
+defmodule Sensor.Server do
   @moduledoc """
-    Switch GenServer Implementation
+    Sensor GenServer Implementation
   """
 
   use Timex
   use GenServer, shutdown: 7000
 
-  alias Switch.DB.Device, as: Device
-  alias Switch.DB.Alias, as: Alias
+  alias Sensor.DB.{Alias, Device}
 
   ##
   ## GenServer Start and Initialization
@@ -56,9 +55,8 @@ defmodule Switch.Server do
   end
 
   def notify_as_needed(msg) do
-    with {:ok, %Device{aliases: aliases}} <- msg[:device],
-         true <- is_list(aliases) and aliases != [] do
-      GenServer.cast(__MODULE__, {:notify, aliases})
+    with {:ok, %Device{_alias_: %Alias{} = x}} <- msg[:device] do
+      GenServer.cast(__MODULE__, {:notify, x})
       msg
     else
       _no_match -> msg
@@ -163,7 +161,7 @@ defmodule Switch.Server do
         cond do
           alive? and should_notify? ->
             # the pid is alive and the notify interval has elapsed
-            send(pid_key, {:notify, :switch, item})
+            send(pid_key, {:notify, :sensor, item})
 
             new_pid_map =
               Map.put(r_pid_map, pid_key, %{opts: o, last: utc_now()})

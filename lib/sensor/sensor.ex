@@ -45,6 +45,13 @@ defmodule Sensor do
   end
 
   @doc """
+  Register the caller's pid to receive notifications when the named sensor
+  is updated by handle_message
+  """
+  @doc since: "0.0.26"
+  defdelegate notify_register(name), to: Sensor.Server
+
+  @doc """
     Public API for renaming a Sensor Alias
   """
   @doc since: "0.0.23"
@@ -76,7 +83,7 @@ defmodule Sensor do
   Returns the fahrenheit temperature for a Sensor by alias
   """
   @doc since: "0.0.19"
-  def fahrenheit(sensor_alias, opts \\ [])
+  def fahrenheit(sensor_alias, opts \\ [since: [seconds: 30]])
       when is_binary(sensor_alias) and is_list(opts) do
     with %Alias{device: dev} <- Alias.find(sensor_alias),
          %Device{datapoints: dp} <- Device.load_datapoints(dev, opts),
@@ -91,7 +98,7 @@ defmodule Sensor do
   Returns the relative humidity for a Sensor by alias
   """
   @doc since: "0.0.19"
-  def relhum(sensor_alias, opts \\ [])
+  def relhum(sensor_alias, opts \\ [since: [seconds: 30]])
       when is_binary(sensor_alias) and is_list(opts) do
     with %Alias{device: dev} <- Alias.find(sensor_alias),
          %Device{datapoints: dp} <- Device.load_datapoints(dev, opts),
@@ -110,6 +117,7 @@ defmodule Sensor do
   @doc since: "0.0.16"
   def handle_message(%{processed: false, type: "sensor"} = msg_in) do
     alias Fact.Influx
+    alias Sensor.Server, as: Server
 
     # the with begins with processing the message through Device.DB.upsert/1
     with %{device: sensor_device} = msg <- Device.upsert(msg_in),
@@ -119,6 +127,8 @@ defmodule Sensor do
          %{sensor_datapoint: {:ok, _dp}} = msg <- DataPoint.save(dev, msg),
          # technically the message has been processed at this point
          msg <- Map.put(msg, :processed, true),
+         # send any notifications requested
+         msg <- Server.notify_as_needed(msg),
          # now send the augmented message to the timeseries database
          msg <- Influx.handle_message(msg),
          write_rc <- Map.get(msg, :write_rc),

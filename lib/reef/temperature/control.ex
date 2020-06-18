@@ -4,7 +4,9 @@ defmodule Reef.Temp.Control do
   Sensor to control a Switch
   """
 
-  use GenServer, restart: :transient, shutdown: 10_000
+  use GenServer, restart: :transient, shutdown: 7000
+  alias Sensor.DB.Alias, as: SensorAlias
+  alias Switch.DB.Alias, as: SwitchAlias
 
   ##
   ## GenServer Start and Initialization
@@ -13,17 +15,17 @@ defmodule Reef.Temp.Control do
   @doc false
   @impl true
   def init(opts) do
-    defaults = [timeout: [minutes: 1]]
+    import Helen.Module.Config, only: [eval_opts: 2]
+    import TimeSupport, only: [epoch: 0]
 
-    run_opts = Keyword.merge(defaults, opts)
+    state = %{
+      last_timeout: epoch(),
+      timeouts: 0,
+      opts: eval_opts(__MODULE__, opts),
+      devices: %{}
+    }
 
-    state = %{opts: run_opts}
-
-    if opts[:autostart] || true do
-      {:ok, state, {:continue, :bootstrap}}
-    else
-      {:ok, state}
-    end
+    {:ok, state, {:continue, :bootstrap}}
   end
 
   @doc false
@@ -35,41 +37,180 @@ defmodule Reef.Temp.Control do
   ## Public API
   ##
 
-  def ensure_started(opts) do
-    GenServer.call(self(), {:ensure_started, opts})
+  def last_timeout do
+    import TimeSupport, only: [epoch: 0, utc_now: 0]
+
+    with last <- state(:last_timeout),
+         d when d > 0 <- Timex.diff(last, epoch()) do
+      Timex.to_datetime(last, "America/New_York")
+    else
+      _epoch -> epoch()
+    end
   end
 
-  def state, do: :sys.get_state(__MODULE__)
+  def loops, do: state(:loops)
+
+  def opts(x) when is_atom(x) do
+    import Helen.Module.Config, only: [eval_opts: 2]
+
+    case x do
+      :current -> state(:opts)
+      :config -> eval_opts(__MODULE__, [])
+      _x -> {:bad_arg, usage: [:current, :config]}
+    end
+  end
+
+  def opts_merge(opts) when is_list(opts) do
+    Helen.Module.Config.opts_merge(__MODULE__, opts)
+  end
+
+  def temperature, do: GenServer.call(__MODULE__, :temperature)
+
+  def timeouts, do: state() |> Map.get(:timeouts)
+
+  def state(keys \\ []) do
+    keys = [keys] |> List.flatten()
+    state = GenServer.call(__MODULE__, :state)
+
+    case keys do
+      [] -> state
+      [x] -> Map.get(state, x)
+      x -> Map.take(state, [x])
+    end
+  end
+
+  ##
+  ## GenServer handle_* callbacks
+  ##
+
+  @doc false
+  @impl true
+  def handle_call(:temperature, _from, s) do
+    {temperature, state} = sensor_temperature(s)
+
+    reply(temperature, state)
+  end
+
+  @doc false
+  @impl true
+  def handle_call(:state, _from, s), do: reply(s, s)
 
   @doc false
   @impl true
   def handle_continue(:bootstrap, s) do
-    import TimeSupport, only: [opts_as_ms: 1]
+    Switch.notify_register(s[:opts][:switch])
+    Sensor.notify_register(s[:opts][:sensor])
 
-    ms = s[:opts][:timeout] |> opts_as_ms()
-
-    state = Map.put(s, :timeout_ms, ms)
-
-    {:noreply, state, ms}
+    noreply(s)
   end
 
   @doc false
   @impl true
-  def handle_call({:ensure_started, opts}, _from, s) do
-    if s[:started] do
-      {:reply, :already_started, s}
-    else
-      new_opts = Keyword.merge(s[:opts], opts)
-      state = Map.put(s, :opts, new_opts)
-      {:reply, :starting_now, state, :continue, :bootstrap}
+  def handle_info(
+        {:notify, :sensor, %SensorAlias{name: n} = obj},
+        %{opts: opts, devices: devices} = s
+      ) do
+    cond do
+      n == opts[:sensor][:name] ->
+        import TimeSupport, only: [utc_now: 0]
+        import Sensor, only: [fahrenheit: 2]
+
+        entry = %{
+          obj: obj,
+          seen: utc_now(),
+          temperature: fahrenheit(n, sensor_opts(opts))
+        }
+
+        %{s | devices: Map.put(devices, n, entry)} |> noreply()
+
+      true ->
+        noreply(s)
     end
   end
 
   @doc false
   @impl true
-  def handle_info(:timeout, s) do
-    state = Map.update(s, :loops, 1, &(&1 + 1))
+  def handle_info(
+        {:notify, :switch, %SwitchAlias{name: n} = obj},
+        %{opts: opts, devices: devices} = s
+      ) do
+    cond do
+      n == opts[:switch][:name] ->
+        import TimeSupport, only: [utc_now: 0]
+        import Switch, only: [position: 1]
 
-    {:noreply, state, s[:timeout_ms]}
+        entry = %{
+          obj: obj,
+          seen: utc_now(),
+          position: position(n)
+        }
+
+        %{s | devices: Map.put(devices, n, entry)} |> noreply()
+
+      true ->
+        noreply(s)
+    end
   end
+
+  @doc false
+  @impl true
+  def handle_info(:timeout, state) do
+    import TimeSupport, only: [utc_now: 0]
+
+    state
+    |> update_last_timeout()
+    |> timeout_hook()
+  end
+
+  ##
+  ## PRIVATE
+  ##
+
+  defp sensor_opts(x) do
+    # handle if passed an opts keyword list or the state
+    # if not found in either then default to 30 seconds
+    x[:sensor] || x[:opts][:sensor] || [since: [seconds: 30]]
+  end
+
+  defp sensor_temperature(%{opts: opts} = s) do
+    import Sensor, only: [fahrenheit: 2]
+
+    # if there is any issue with getting the Sensor value store the
+    # issue in the state under key :sensor_fault so other functions can
+    # take action as needed
+    with {:name, n} when is_binary(n) <- {:name, opts[:sensor][:name]},
+         temp when is_number(temp) <- fahrenheit(n, sensor_opts(opts)) do
+      {temp, Map.drop(s, [:sensor_fault])}
+    else
+      {:name, n} -> {:failed, Map.put(s, :sensor_fault, {:name_not_binary, n})}
+      rc -> {rc, Map.put(s, :sensor_fault, rc)}
+    end
+  end
+
+  defp timeout_hook(%{} = s) do
+    noreply(s)
+  end
+
+  ##
+  ## State Helpers
+  ##
+
+  defp loop_timeout(%{}), do: 5 * 60 * 1000
+
+  defp update_last_timeout(s) do
+    import TimeSupport, only: [utc_now: 0]
+
+    %{
+      s
+      | last_timeout: utc_now(),
+        timeouts: Map.update(s, :timeouts, 1, &(&1 + 1))
+    }
+  end
+
+  ##
+  ## handle_* return helpers
+  ##
+
+  defp noreply(s), do: {:noreply, s, loop_timeout(s)}
+  defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
 end

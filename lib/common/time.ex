@@ -2,20 +2,81 @@ defmodule TimeSupport do
   @moduledoc false
   use Timex
 
+  def elapsed(%Duration{} = d) do
+    alias Timex.Duration, as: D
+
+    D.elapsed(D.now(), d) |> D.abs()
+  end
+
+  @doc """
+    Returns a boolean indicating if reference DateTime, shifted by opts
+    is before now.
+
+    This is the inverse of expired?/3.
+
+    Useful to determining if a DateTime is stale, deteriming if caching/ttl
+    are expired.
+  """
+  @doc since: "0.0.26"
+  def current?(ref, key \\ :interval, opts \\ [interval: [minutes: 1]]) do
+    shift_opts = Keyword.get(opts, key, minutes: 1)
+
+    ref_shifted = Timex.shift(ref, shift_opts)
+
+    Timex.before?(ref_shifted, utc_now())
+  end
+
+  @doc """
+    Returns a boolean indicating if reference DateTime, shifted by opts
+    is after now.
+
+    This is the inverse of current?/3.
+
+    Useful to determining if a DateTime is stale, deteriming if caching/ttl
+    are expired.
+  """
+  @doc since: "0.0.26"
+  def expired?(ref, key \\ :interval, opts \\ [interval: [minutes: 1]]) do
+    shift_opts = Keyword.get(opts, key, minutes: 1)
+
+    ref_shifted = Timex.shift(ref, shift_opts)
+
+    Timex.after?(utc_now(), ref_shifted)
+  end
+
   def duration(opts) when is_list(opts) do
+    # grab only the opts that are valid for Timex.shift
+
+    {opts, _} =
+      Keyword.split(opts, [
+        :microseconds,
+        :seconds,
+        :minutes,
+        :hours,
+        :days,
+        :weeks,
+        :months,
+        :years
+      ])
+
     # after hours of searching and not finding an existing capabiility
     # in Timex we'll roll our own consisting of multiple Timex functions.
+
     ~U[0000-01-01 00:00:00Z]
-    |> Timex.shift(Keyword.take(opts, valid_duration_opts()))
+    |> Timex.shift(opts)
     |> Timex.to_gregorian_microseconds()
     |> Duration.from_microseconds()
   end
 
   def duration(_anything), do: 0
 
+  defdelegate duration_from_list(opts), to: TimeSupport, as: :duration
+
   def duration_invert(opts) when is_list(opts) do
     duration(opts) |> Duration.invert()
   end
+
+  defdelegate ms_from_list(opts), to: TimeSupport, as: :duration_ms
 
   def duration_ms(opts) when is_struct(opts) or is_list(opts) do
     case opts do
@@ -23,6 +84,22 @@ defmodule TimeSupport do
       opts -> opts
     end
     |> Duration.to_milliseconds(truncate: true)
+  end
+
+  def duration_secs(opts) when is_struct(opts) or is_list(opts) do
+    case opts do
+      opts when is_list(opts) -> duration(opts)
+      opts -> opts
+    end
+    |> Duration.to_seconds(truncate: true)
+  end
+
+  @doc """
+    Return epoch as a DateTime
+  """
+  @doc since: "0.0.26"
+  def epoch do
+    Timex.epoch() |> Timex.to_datetime()
   end
 
   def from_unix(mtime) do
@@ -43,11 +120,46 @@ defmodule TimeSupport do
   end
 
   @doc """
+  Has the interval defined by the key from the opts elapsed relative to the
+  reference Duration?
+  """
+  @doc since: "0.0.26"
+  def interval_elapsed?(ref, opts, key) do
+    interval = interval_from_opts(opts, key)
+
+    Timex.after?(elapsed(ref), interval)
+  end
+
+  @doc """
+  Returns a Timex Duration from the opts list using the key passed
+  """
+  @doc since: "0.0.26"
+  def interval_from_opts(opts, key) when is_list(opts) and is_atom(key) do
+    interval_opts = Keyword.get(opts, key, minutes: 1)
+    duration(interval_opts)
+  end
+
+  defdelegate now, to: Timex.Duration
+
+  @doc """
     Converts a Timex standard opts list (e.g. [minutes: 1, seconds: 2])
     to a Timex Duration then to truncated milliseconds
   """
   @doc since: "0.0.26"
   def opts_as_ms(opts), do: duration_ms(opts)
+
+  @doc """
+    Returns the remaining milliseconds using a reference Duration and
+    the time elapsed between now and the reference
+  """
+  @doc since: "0.0.26"
+  def remaining_ms(ref, max) do
+    alias Timex.Duration, as: D
+
+    D.diff(elapsed(ref), duration(max))
+    |> D.abs()
+    |> D.to_milliseconds(truncate: true)
+  end
 
   def ttl_check(at, val, ttl_ms, opts) do
     # ttl_ms in opts overrides passed in ttl_ms
@@ -86,15 +198,5 @@ defmodule TimeSupport do
   def utc_shift_past(opts) when is_list(opts),
     do: utc_now() |> Timex.shift(duration: duration_invert(opts))
 
-  defp valid_duration_opts,
-    do: [
-      :microseconds,
-      :seconds,
-      :minutes,
-      :hours,
-      :days,
-      :weeks,
-      :months,
-      :years
-    ]
+  def zero, do: Duration.zero()
 end

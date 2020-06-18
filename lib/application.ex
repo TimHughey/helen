@@ -59,6 +59,7 @@ defmodule Helen.Application do
           Mqtt.Supervisor,
           Switch.Supervisor,
           PulseWidth.Supervisor,
+          Sensor.Supervisor,
           Helen.Scheduler,
           Thermostat.Supervisor,
           ExtraMod.Supervisor,

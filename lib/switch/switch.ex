@@ -133,6 +133,13 @@ defmodule Switch do
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
   @doc """
+  Register the caller's pid to receive notifications when the named switch
+  is updated by handle_message
+  """
+  @doc since: "0.0.26"
+  defdelegate notify_register(name), to: Switch.Server
+
+  @doc """
     Find a Switch Device by device or id
   """
   @doc since: "0.0.21"
@@ -174,12 +181,16 @@ defmodule Switch do
   """
   @doc since: "0.0.21"
   def handle_message(%{processed: false, type: "switch"} = msg_in) do
+    alias Switch.Server, as: Server
+
     # the with begins with processing the message through DB.Device.upsert/1
     with %{device: switch_device} = msg <- Device.upsert(msg_in),
          # was the upset a success?
          {:ok, %Device{}} <- switch_device,
          # technically the message has been processed at this point
          msg <- Map.put(msg, :processed, true),
+         # send any notifications requested
+         msg <- Server.notify_as_needed(msg),
          # Switch does not write any data to the timeseries database
          # (unlike Sensor, Remote) so simulate the write_rc success
          # now send the augmented message to the timeseries database

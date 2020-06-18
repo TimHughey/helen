@@ -1,4 +1,4 @@
-defmodule Switch.Supervisor do
+defmodule Sensor.Supervisor do
   use Supervisor
 
   def start_link(args) do
@@ -7,10 +7,9 @@ defmodule Switch.Supervisor do
 
   @impl true
   def init(_args) do
-    alias Switch.DB.Command, as: Command
-    alias Switch.Server, as: Server
+    alias Sensor.Server, as: Server
 
-    Supervisor.init([Server, Command],
+    Supervisor.init([Server],
       strategy: :one_for_one,
       name: __MODULE__
     )

@@ -137,11 +137,11 @@ defmodule Sensor.DB.Device do
   def load_datapoints(%Schema{} = dev, opts \\ []) do
     import Ecto.Query, only: [from: 2]
     import Repo, only: [preload: 2]
-    import TimeSupport, only: [utc_now: 0]
+    import TimeSupport, only: [duration_secs: 1, utc_now: 0]
 
-    since_secs = Keyword.get(opts, :since_secs, 30) * -1
+    secs = opts[:since_secs] || duration_secs(opts[:since])
 
-    dt = Timex.shift(utc_now(), seconds: since_secs)
+    dt = Timex.shift(utc_now(), seconds: secs * -1)
 
     q =
       from(dp in DataPoint,
