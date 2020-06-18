@@ -133,29 +133,38 @@ ALTER SEQUENCE public.dutycycle_state_id_seq OWNED BY public.dutycycle_state.id;
 
 
 --
--- Name: pwm; Type: TABLE; Schema: public; Owner: -
+-- Name: pwm_alias; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.pwm (
+CREATE TABLE public.pwm_alias (
     id bigint NOT NULL,
     name character varying(255) NOT NULL,
-    description character varying(255) DEFAULT ''::character varying NOT NULL,
-    device character varying(255) NOT NULL,
-    host character varying(255) NOT NULL,
-    duty integer DEFAULT 0 NOT NULL,
-    duty_max integer DEFAULT 4095 NOT NULL,
-    duty_min integer DEFAULT 0 NOT NULL,
-    dev_latency_us integer DEFAULT 0,
-    log boolean DEFAULT false NOT NULL,
-    ttl_ms integer DEFAULT 60000,
-    reading_at timestamp without time zone,
-    last_seen_at timestamp without time zone,
-    discovered_at timestamp without time zone,
-    last_cmd_at timestamp without time zone,
-    inserted_at timestamp(0) without time zone NOT NULL,
-    updated_at timestamp(0) without time zone NOT NULL,
-    running_cmd character varying(255) DEFAULT 'none'::character varying
+    device_id bigint,
+    description character varying(50) DEFAULT '<none>'::character varying,
+    capability character varying(20) DEFAULT 'pwm'::character varying NOT NULL,
+    ttl_ms integer DEFAULT 60000 NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
+
+
+--
+-- Name: pwm_alias_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pwm_alias_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: pwm_alias_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.pwm_alias_id_seq OWNED BY public.pwm_alias.id;
 
 
 --
@@ -164,7 +173,7 @@ CREATE TABLE public.pwm (
 
 CREATE TABLE public.pwm_cmd (
     id bigint NOT NULL,
-    pwm_id bigint,
+    device_id bigint,
     refid uuid,
     acked boolean DEFAULT false NOT NULL,
     orphan boolean DEFAULT false NOT NULL,
@@ -196,6 +205,26 @@ ALTER SEQUENCE public.pwm_cmd_id_seq OWNED BY public.pwm_cmd.id;
 
 
 --
+-- Name: pwm_device; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pwm_device (
+    id bigint NOT NULL,
+    device character varying(255) NOT NULL,
+    host character varying(255) NOT NULL,
+    duty integer DEFAULT 0 NOT NULL,
+    duty_max integer DEFAULT 4095 NOT NULL,
+    duty_min integer DEFAULT 0 NOT NULL,
+    dev_latency_us integer DEFAULT 0,
+    last_seen_at timestamp without time zone,
+    discovered_at timestamp without time zone,
+    last_cmd_at timestamp without time zone,
+    inserted_at timestamp(0) without time zone NOT NULL,
+    updated_at timestamp(0) without time zone NOT NULL
+);
+
+
+--
 -- Name: pwm_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -211,7 +240,7 @@ CREATE SEQUENCE public.pwm_id_seq
 -- Name: pwm_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.pwm_id_seq OWNED BY public.pwm.id;
+ALTER SEQUENCE public.pwm_id_seq OWNED BY public.pwm_device.id;
 
 
 --
@@ -492,7 +521,6 @@ ALTER SEQUENCE public.switch_alias_id_seq OWNED BY public.switch_alias.id;
 CREATE TABLE public.switch_command (
     id bigint NOT NULL,
     device_id bigint,
-    sw_alias character varying(255) NOT NULL,
     refid uuid NOT NULL,
     acked boolean DEFAULT false NOT NULL,
     orphan boolean DEFAULT false NOT NULL,
@@ -660,10 +688,10 @@ ALTER TABLE ONLY public.dutycycle_state ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
--- Name: pwm id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: pwm_alias id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.pwm ALTER COLUMN id SET DEFAULT nextval('public.pwm_id_seq'::regclass);
+ALTER TABLE ONLY public.pwm_alias ALTER COLUMN id SET DEFAULT nextval('public.pwm_alias_id_seq'::regclass);
 
 
 --
@@ -671,6 +699,13 @@ ALTER TABLE ONLY public.pwm ALTER COLUMN id SET DEFAULT nextval('public.pwm_id_s
 --
 
 ALTER TABLE ONLY public.pwm_cmd ALTER COLUMN id SET DEFAULT nextval('public.pwm_cmd_id_seq'::regclass);
+
+
+--
+-- Name: pwm_device id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pwm_device ALTER COLUMN id SET DEFAULT nextval('public.pwm_id_seq'::regclass);
 
 
 --
@@ -768,6 +803,14 @@ ALTER TABLE ONLY public.dutycycle_state
 
 
 --
+-- Name: pwm_alias pwm_alias_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pwm_alias
+    ADD CONSTRAINT pwm_alias_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: pwm_cmd pwm_cmd_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -776,10 +819,10 @@ ALTER TABLE ONLY public.pwm_cmd
 
 
 --
--- Name: pwm pwm_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: pwm_device pwm_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.pwm
+ALTER TABLE ONLY public.pwm_device
     ADD CONSTRAINT pwm_pkey PRIMARY KEY (id);
 
 
@@ -893,6 +936,13 @@ CREATE INDEX dutycycle_state_dutycycle_id_index ON public.dutycycle_state USING 
 
 
 --
+-- Name: pwm_alias_name_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX pwm_alias_name_index ON public.pwm_alias USING btree (name);
+
+
+--
 -- Name: pwm_cmd_acked_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -907,38 +957,10 @@ CREATE UNIQUE INDEX pwm_cmd_refid_index ON public.pwm_cmd USING btree (refid);
 
 
 --
--- Name: pwm_device_index; Type: INDEX; Schema: public; Owner: -
+-- Name: pwm_device_unique_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX pwm_device_index ON public.pwm USING btree (device);
-
-
---
--- Name: pwm_host_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX pwm_host_index ON public.pwm USING btree (host);
-
-
---
--- Name: pwm_last_cmd_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX pwm_last_cmd_at_index ON public.pwm USING btree (last_cmd_at);
-
-
---
--- Name: pwm_last_seen_at_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX pwm_last_seen_at_index ON public.pwm USING btree (last_seen_at);
-
-
---
--- Name: pwm_name_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX pwm_name_index ON public.pwm USING btree (name);
+CREATE UNIQUE INDEX pwm_device_unique_index ON public.pwm_device USING btree (device);
 
 
 --
@@ -1033,13 +1055,6 @@ CREATE UNIQUE INDEX switch_command_refid_index ON public.switch_command USING bt
 
 
 --
--- Name: switch_device_device_hash_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX switch_device_device_hash_index ON public.switch_device USING hash (device);
-
-
---
 -- Name: switch_device_device_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1077,11 +1092,19 @@ ALTER TABLE ONLY public.dutycycle_state
 
 
 --
+-- Name: pwm_alias pwm_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pwm_alias
+    ADD CONSTRAINT pwm_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.pwm_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: pwm_cmd pwm_cmd_pwm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.pwm_cmd
-    ADD CONSTRAINT pwm_cmd_pwm_id_fkey FOREIGN KEY (pwm_id) REFERENCES public.pwm(id) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT pwm_cmd_pwm_id_fkey FOREIGN KEY (device_id) REFERENCES public.pwm_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1128,5 +1151,5 @@ ALTER TABLE ONLY public.thermostat_profile
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652), (20200602194456), (20200603171602), (20200603180219), (20200605101957), (20200606154209), (20200607232505), (20200608133620);
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652), (20200602194456), (20200603171602), (20200603180219), (20200605101957), (20200606154209), (20200607232505), (20200608133620), (20200614233621), (20200615131244), (20200615183810), (20200616131408);
 
