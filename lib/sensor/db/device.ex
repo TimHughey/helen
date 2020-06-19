@@ -172,6 +172,31 @@ defmodule Sensor.DB.Device do
   end
 
   @doc """
+  Return a list of Devices that are not aliased (no Sensor Alias)
+  """
+  @doc since: "0.0.27"
+  def unaliased do
+    import Repo, only: [all: 1, preload: 2]
+    import Ecto.Query, only: [from: 2]
+
+    q =
+      from(x in Schema,
+        order_by: [desc: x.inserted_at]
+      )
+
+    # need to wrap the Repo.all/1 in a list in case the limit is 1
+    for dev <- all(q) do
+      with %Schema{_alias_: nil, device: d, inserted_at: at} <-
+             preload(dev, [:_alias_]) do
+        [{d, at}]
+      else
+        _no_alias -> []
+      end
+    end
+    |> List.flatten()
+  end
+
+  @doc """
   Upsert (insert or update) a Sensor.Schemas.Device
 
   input:

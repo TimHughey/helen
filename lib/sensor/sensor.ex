@@ -29,6 +29,31 @@ defmodule Sensor do
   end
 
   @doc """
+  Alias the most recently inserted device
+  """
+  @doc since: "0.0.27"
+  def alias_most_recent(name) do
+    with {device, _inserted_at} <- unaliased_recent() |> hd() do
+      alias_create(device, name)
+    else
+      [] -> {:no_unaliased_devices}
+      rc -> rc
+    end
+  end
+
+  @doc """
+  See unaliased/0
+  """
+  @doc since: "0.0.27"
+  def available, do: unaliased()
+
+  @doc """
+  See unaliased_recent
+  """
+  @doc since: "0.0.27"
+  def available_recent, do: unaliased_recent()
+
+  @doc """
     Public API for retrieving a list of Sensor Alias names
   """
   @doc since: "0.0.19"
@@ -57,6 +82,27 @@ defmodule Sensor do
   @doc since: "0.0.23"
   def rename(name_or_id, new_name, opts \\ []) do
     Alias.rename(name_or_id, new_name, opts)
+  end
+
+  @doc """
+    Public API for assigning a Sensor Alias to a different Device
+  """
+  @doc since: "0.0.27"
+  def replace(name_or_id, new_dev_name_or_id) do
+    Alias.replace(name_or_id, new_dev_name_or_id)
+  end
+
+  @doc """
+  Replace the existing Alias with the most recently inserted device
+  """
+  @doc since: "0.0.27"
+  def replace_with_most_recent(name) do
+    with {device, _inserted_at} <- unaliased_recent() |> hd() do
+      replace(name, device)
+    else
+      [] -> {:no_unaliased_devices}
+      rc -> rc
+    end
   end
 
   @doc """
@@ -107,6 +153,20 @@ defmodule Sensor do
     else
       _error -> nil
     end
+  end
+
+  @doc """
+  Return a list of devices that are not aliased ordered by inserted at desc
+  """
+  @doc since: "0.0.27"
+  defdelegate unaliased, to: Device
+
+  @doc """
+  Return the first five devices that are not aliased order by inserted at desc
+  """
+  @doc since: "0.0.27"
+  def unaliased_recent do
+    unaliased() |> Enum.take(5)
   end
 
   @doc """

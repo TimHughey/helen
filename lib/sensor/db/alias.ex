@@ -91,6 +91,7 @@ defmodule Sensor.DB.Alias do
     end
   end
 
+  @doc false
   def keys(:all),
     do:
       Map.from_struct(%Schema{})
@@ -98,16 +99,14 @@ defmodule Sensor.DB.Alias do
       |> Map.keys()
       |> List.flatten()
 
+  @doc false
   def keys(:cast), do: keys(:all)
 
-  # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
-
+  @doc false
   def keys(:replace),
     do: keys_drop(:all, [:name, :inserted_at])
 
-  def keys(:update),
-    do: keys_drop(:all, [:inserted_at])
-
+  @doc false
   def keys(:required),
     do:
       keys_drop(:cast, [
@@ -118,6 +117,7 @@ defmodule Sensor.DB.Alias do
         :inserted_at
       ])
 
+  @doc false
   defp keys_drop(base_keys, drop),
     do:
       MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
@@ -219,6 +219,22 @@ defmodule Sensor.DB.Alias do
       {:ok, n}
     else
       error -> error
+    end
+  end
+
+  @doc """
+  Replace a Sensor by assigning the existing Alias to a different Device.
+  """
+  @doc since: "0.0.27"
+  def replace(name_or_id, dev_name_or_id) do
+    with {:alias, %Schema{} = a} <- {:alias, find(name_or_id)},
+         {:dev, %Device{id: dev_id}} <- {:dev, Device.find(dev_name_or_id)},
+         {:ok, %Schema{}} <- update(a, [device_id: dev_id], []) do
+      {:ok, dev_name_or_id}
+    else
+      {:alias, rc} -> {:alias_error, rc}
+      {:dev, rc} -> {:device_error, rc}
+      rc -> rc
     end
   end
 
