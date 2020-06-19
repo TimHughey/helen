@@ -14,7 +14,7 @@ defmodule Reef.Salt.Fill do
 
     task_term_rc = ExtraMod.task_abort({MOD, :fill})
 
-    with {:ok, %{pid: pid}} <- task_term_rc do
+    with %{pid: pid} <- task_term_rc do
       ["fill aborting ", inspect(task_term_rc)]
       |> ExtraMod.task_store_msg({MOD, :fill})
 
@@ -27,7 +27,7 @@ defmodule Reef.Salt.Fill do
 
   def default_opts do
     [
-      valve: "mixtank_rodi",
+      valve: "mixtank rodi",
       fill_time: [hours: 8],
       topoff_time: [hours: 1],
       valve_open: [minutes: 2, seconds: 48],

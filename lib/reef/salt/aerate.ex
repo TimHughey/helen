@@ -12,7 +12,7 @@ defmodule Reef.Salt.Aerate do
     for subsystem <- [:air, :pump] do
       task_term_rc = ExtraMod.task_abort({MOD, subsystem})
 
-      with %{pid: pid, task_opts: %{switch: sw_name}} <- task_term_rc do
+      with %{pid: pid, task_keys: %{state: %{switch: sw_name}}} <- task_term_rc do
         [
           "aerate aborting ",
           inspect(subsystem),
@@ -31,8 +31,8 @@ defmodule Reef.Salt.Aerate do
 
   def default_opts do
     [
-      switch_air: "mixtank_air",
-      switch_pump: "mixtank_pump",
+      switch_air: "mixtank air",
+      switch_pump: "mixtank pump",
       aerate_time: [hours: 12],
       air_on: [minutes: 15],
       air_off: [minutes: 5],
@@ -76,7 +76,8 @@ defmodule Reef.Salt.Aerate do
 
     opts_map = Keyword.merge(default_opts(), opts) |> Enum.into(%{})
 
-    with %{aerate_duration: _, subsystem: sub} = cm <- make_control_map(opts_map) do
+    with %{aerate_duration: _, subsystem: sub} = cm <-
+           make_control_map(opts_map) do
       rc = run_subsystem(cm)
 
       ExtraMod.task_store_rc({MOD, sub, rc})
@@ -96,7 +97,8 @@ defmodule Reef.Salt.Aerate do
     alias Reef.Salt.Aerate, as: MOD
 
     for sub <- [:air, :pump] do
-      [Atom.to_string(sub), " ", ExtraMod.task_status({MOD, sub}, opts)] |> IO.iodata_to_binary()
+      [Atom.to_string(sub), " ", ExtraMod.task_status({MOD, sub}, opts)]
+      |> IO.iodata_to_binary()
     end
     |> Enum.join("\n")
     |> IO.puts()
@@ -185,14 +187,29 @@ defmodule Reef.Salt.Aerate do
     # convert the :aerate time, :pump and :air keyword lists to Duration
     for {key, val} <- control_map, into: %{} do
       cond do
-        key == :aerate_time -> {:aerate_duration, TimeSupport.duration(val)}
-        subsystem == :air and key == :air_on -> {:on, TimeSupport.duration(val)}
-        subsystem == :air and key == :air_off -> {:off, TimeSupport.duration(val)}
-        subsystem == :air and key == :switch_air -> {:switch, val}
-        subsystem == :pump and key == :pump_on -> {:on, TimeSupport.duration(val)}
-        subsystem == :pump and key == :pump_off -> {:off, TimeSupport.duration(val)}
-        subsystem == :pump and key == :switch_pump -> {:switch, val}
-        true -> {key, val}
+        key == :aerate_time ->
+          {:aerate_duration, TimeSupport.duration(val)}
+
+        subsystem == :air and key == :air_on ->
+          {:on, TimeSupport.duration(val)}
+
+        subsystem == :air and key == :air_off ->
+          {:off, TimeSupport.duration(val)}
+
+        subsystem == :air and key == :switch_air ->
+          {:switch, val}
+
+        subsystem == :pump and key == :pump_on ->
+          {:on, TimeSupport.duration(val)}
+
+        subsystem == :pump and key == :pump_off ->
+          {:off, TimeSupport.duration(val)}
+
+        subsystem == :pump and key == :switch_pump ->
+          {:switch, val}
+
+        true ->
+          {key, val}
       end
     end
     |> validate.()

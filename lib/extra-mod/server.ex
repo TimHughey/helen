@@ -227,7 +227,7 @@ defmodule ExtraMod do
          tasks <- Map.put(tasks, r, task),
          # update the state
          state <- Map.put(s, :tasks, tasks) do
-      {:reply, {:ok}, state}
+      {:reply, task, state}
     else
       %{pid: nil} -> {:reply, {:not_found, {mod, key}}, s}
       {:alive?, false} -> {:reply, {:not_running, {mod, key}}, s}

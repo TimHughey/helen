@@ -3,11 +3,6 @@ defmodule Reef do
   Reef System Maintenance Command Line Interface
   """
 
-  @compile {:no_warn_undefined, Thermostat.Server}
-  @compile {:no_warn_undefined, Sensor}
-
-  # import IO.ANSI
-
   def init(opts \\ []) when is_list(opts) do
     alias Thermostat.Server, as: T
     switches_all_off()
@@ -34,8 +29,21 @@ defmodule Reef do
   def aerate_status(opts \\ []), do: Reef.Salt.Aerate.status(opts)
   def aerate_state(opts \\ []), do: Reef.Salt.Aerate.state(opts)
 
+  def air_toggle do
+    Switch.toggle("mixtank air")
+  end
+
+  def all_stop do
+    abort_all()
+
+    Process.sleep(5000)
+
+    switches_all_off()
+  end
+
   def clean(mode \\ :toggle, sw_name \\ "display tank ato")
-      when is_atom(mode) and mode in [:engage, :disengage, :toggle, :help, :usage] and
+      when is_atom(mode) and
+             mode in [:engage, :disengage, :toggle, :help, :usage] and
              is_binary(sw_name) do
     {:ok, pos} = Switch.position(sw_name)
 
@@ -111,7 +119,7 @@ defmodule Reef do
   def mix_status(opts \\ []), do: Reef.Salt.Mix.status(opts)
 
   def pump_toggle do
-    Switch.toggle("mix pump")
+    Switch.toggle("mixtank pump")
   end
 
   def switches_all_off(opts \\ ["mixtank"]) when is_list(opts) do
@@ -158,8 +166,8 @@ defmodule Reef do
 
   def test_opts_aerate do
     [
-      switch_air: "mixtank_air",
-      switch_pump: "mixtank_pump",
+      switch_air: "mixtank air",
+      switch_pump: "mixtank pump",
       aerate_time: [seconds: 10],
       air_on: [seconds: 1],
       air_off: [seconds: 1],
@@ -179,8 +187,8 @@ defmodule Reef do
 
   def test_opts_keep_fresh do
     [
-      switch_air: "mixtank_air",
-      switch_pump: "mixtank_pump",
+      switch_air: "mixtank air",
+      switch_pump: "mixtank pump",
       keep_fresh_time: [seconds: 10],
       air_on: [seconds: 1],
       air_off: [seconds: 1],
@@ -191,8 +199,8 @@ defmodule Reef do
 
   def test_opts_mix do
     [
-      switch_air: "mixtank_air",
-      switch_pump: "mixtank_pump",
+      switch_air: "mixtank air",
+      switch_pump: "mixtank pump",
       mix_time: [seconds: 10],
       air_on: [seconds: 1],
       air_off: [seconds: 1],
