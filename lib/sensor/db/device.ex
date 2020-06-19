@@ -74,7 +74,10 @@ defmodule Sensor.DB.Device do
   defp delete(x) do
     for %Schema{id: id, device: dev_name} = dev when is_integer(id) <-
           [x] |> List.flatten() do
-      {Repo.delete(dev), dev_name}
+      case Repo.delete(dev) do
+        {:ok, %Schema{device: deleted_name}} -> {:ok, deleted_name}
+        rc -> {:failed, dev_name, rc}
+      end
     end
   end
 
