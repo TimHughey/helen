@@ -54,6 +54,20 @@ defmodule Sensor do
   def available_recent, do: unaliased_recent()
 
   @doc """
+  Deletes devices that were last updated before UTC now shifted backward by opts.
+
+  Returns a list of the deleted devices.
+
+  ## Examples
+
+      iex> Sensor.delete_unavailable([days: 7])
+      ["dead_device1", "dead_device2"]
+
+  """
+  @doc since: "0.0.27"
+  defdelegate delete_unavailable(opts), to: Device
+
+  @doc """
     Public API for retrieving a list of Sensor Alias names
   """
   @doc since: "0.0.19"
@@ -225,4 +239,18 @@ defmodule Sensor do
   # since it wasn't for sensor and/or has already been processed in the
   # pipeline
   def handle_message(%{} = msg_in), do: msg_in
+
+  @doc """
+  Selects devices that were last updated before UTC now shifted backward by opts.
+
+  Returns a list of devices.
+
+  ## Examples
+
+      iex> Sensor.unavailable([days: 7])
+      ["dead_device1", "dead_device2"]
+
+  """
+  @doc since: "0.0.27"
+  def unavailable(opts), do: Device.unavailable(opts)
 end

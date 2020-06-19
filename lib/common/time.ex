@@ -44,51 +44,65 @@ defmodule TimeSupport do
     Timex.after?(utc_now(), ref_shifted)
   end
 
-  def duration(opts) when is_list(opts) do
+  @doc """
+    Returns a Timex Duration based on the opts
+
+    If there isn't at least one valid duration option then an arbitrarily
+    large Duration of 12 weeks is returned
+  """
+
+  def duration_from_list(opts) do
     # grab only the opts that are valid for Timex.shift
 
-    {opts, _} =
-      Keyword.split(opts, [
-        :microseconds,
-        :seconds,
-        :minutes,
-        :hours,
-        :days,
-        :weeks,
-        :months,
-        :years
-      ])
+    case valid_duration_opts?(opts) do
+      true ->
+        # after hours of searching and not finding an existing capabiility
+        # in Timex we'll roll our own consisting of multiple Timex functions.
 
-    # after hours of searching and not finding an existing capabiility
-    # in Timex we'll roll our own consisting of multiple Timex functions.
+        ~U[0000-01-01 00:00:00Z]
+        |> Timex.shift(duration_opts(opts))
+        |> Timex.to_gregorian_microseconds()
+        |> Duration.from_microseconds()
 
-    ~U[0000-01-01 00:00:00Z]
-    |> Timex.shift(opts)
-    |> Timex.to_gregorian_microseconds()
-    |> Duration.from_microseconds()
+      false ->
+        # return an arbitrarily large duration when passed invalid opts
+        duration_from_list(weeks: 12)
+    end
   end
 
-  def duration(_anything), do: 0
-
-  defdelegate duration_from_list(opts), to: TimeSupport, as: :duration
+  @doc deprecated: "Use duration_from_list/1 instead"
+  defdelegate duration(opts), to: TimeSupport, as: :duration_from_list
 
   def duration_invert(opts) when is_list(opts) do
-    duration(opts) |> Duration.invert()
+    duration_from_list(opts) |> Duration.invert()
   end
 
   defdelegate ms_from_list(opts), to: TimeSupport, as: :duration_ms
 
   def duration_ms(opts) when is_struct(opts) or is_list(opts) do
     case opts do
-      opts when is_list(opts) -> duration(opts)
+      opts when is_list(opts) -> duration_from_list(opts)
       opts -> opts
     end
     |> Duration.to_milliseconds(truncate: true)
   end
 
+  def duration_opts(opts) when is_list(opts) do
+    Keyword.take(opts, [
+      :microseconds,
+      :seconds,
+      :minutes,
+      :hours,
+      :days,
+      :weeks,
+      :months,
+      :years
+    ])
+  end
+
   def duration_secs(opts) when is_struct(opts) or is_list(opts) do
     case opts do
-      opts when is_list(opts) -> duration(opts)
+      opts when is_list(opts) -> duration_from_list(opts)
       opts -> opts
     end
     |> Duration.to_seconds(truncate: true)
@@ -136,7 +150,7 @@ defmodule TimeSupport do
   @doc since: "0.0.26"
   def interval_from_opts(opts, key) when is_list(opts) and is_atom(key) do
     interval_opts = Keyword.get(opts, key, minutes: 1)
-    duration(interval_opts)
+    duration_from_list(interval_opts)
   end
 
   defdelegate now, to: Timex.Duration
@@ -156,7 +170,7 @@ defmodule TimeSupport do
   def remaining_ms(ref, max) do
     alias Timex.Duration, as: D
 
-    D.diff(elapsed(ref), duration(max))
+    D.diff(elapsed(ref), duration_from_list(max))
     |> D.abs()
     |> D.to_milliseconds(truncate: true)
   end
@@ -197,6 +211,30 @@ defmodule TimeSupport do
 
   def utc_shift_past(opts) when is_list(opts),
     do: utc_now() |> Timex.shift(duration: duration_invert(opts))
+
+  @doc """
+  Checks that a list has at least one valid duration opt
+
+  Returns a boolean.
+
+  ## Examples
+
+      iex> TimeSupport.valid_duration_opts?([days: 7])
+      true
+
+      iex> TimeSupport.valid_duration_opts?([hello: "doctor"])
+      false
+  """
+  @doc since: "0.0.27"
+  def valid_duration_opts?(opts) do
+    # attempt to handle whatever is passed us by wrapping in a list and flattening
+    opts = [opts] |> List.flatten()
+
+    case duration_opts(opts) do
+      [] -> false
+      _x -> true
+    end
+  end
 
   def zero, do: Duration.zero()
 end

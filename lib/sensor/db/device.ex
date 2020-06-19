@@ -42,6 +42,43 @@ defmodule Sensor.DB.Device do
   end
 
   @doc """
+  Deletes devices that were last updated before UTC now shifted backward by opts.
+
+  Returns a list of the deleted devices.
+
+  ## Examples
+
+      iex> Sensor.DB.Device.delete_unavailable([days: 7])
+      ["dead_device1", "dead_device2"]
+
+  """
+  @doc since: "0.0.27"
+  def delete_unavailable(opts) when is_list(opts) do
+    import TimeSupport, only: [utc_shift_past: 1, valid_duration_opts?: 1]
+    import Ecto.Query, only: [from: 2]
+    import Repo, only: [all: 1]
+
+    case valid_duration_opts?(opts) do
+      true ->
+        before = utc_shift_past(opts)
+
+        from(x in Schema, where: x.updated_at < ^before)
+        |> all()
+        |> delete()
+
+      false ->
+        {:bad_args, opts}
+    end
+  end
+
+  defp delete(x) do
+    for %Schema{id: id, device: dev_name} = dev when is_integer(id) <-
+          [x] |> List.flatten() do
+      {Repo.delete(dev), dev_name}
+    end
+  end
+
+  @doc """
     Retrieve sensor device names
   """
 
@@ -194,6 +231,37 @@ defmodule Sensor.DB.Device do
       end
     end
     |> List.flatten()
+  end
+
+  @doc """
+  Selects devices that were last updated before UTC now shifted backward by opts.
+
+  Returns a list of the devices.
+
+  ## Examples
+
+      iex> Sensor.DB.Device.unavailable([days: 7])
+      ["dead_device1", "dead_device2"]
+
+  """
+  @doc since: "0.0.27"
+  def unavailable(opts) when is_list(opts) do
+    import TimeSupport, only: [utc_shift_past: 1, valid_duration_opts?: 1]
+    import Ecto.Query, only: [from: 2]
+    import Repo, only: [all: 1]
+
+    case valid_duration_opts?(opts) do
+      true ->
+        before = utc_shift_past(opts)
+        query = from(x in Schema, where: x.updated_at < ^before)
+
+        for %Schema{device: device, updated_at: last_update} <- all(query) do
+          {device, last_update}
+        end
+
+      false ->
+        {:bad_args, opts}
+    end
   end
 
   @doc """
