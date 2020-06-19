@@ -1,11 +1,11 @@
-defmodule Helen.DB.Module.Config do
+defmodule Helen.Module.DB.Config do
   @moduledoc """
     Helen Module Config database implementation and functionality
   """
   use Timex
   use Ecto.Schema
 
-  alias Helen.DB.Module.Config, as: Schema
+  alias Helen.Module.DB.Config, as: Schema
 
   schema "helen_mod_config" do
     field(:module, :string)
@@ -16,24 +16,12 @@ defmodule Helen.DB.Module.Config do
     timestamps(type: :utc_datetime_usec)
   end
 
-  @doc """
-  Create a configuration entry for a specific mod
+  ##
+  ## Public API
+  ##
 
-  Returns {:ok, "mod_as_string"} | {failed, term}
-
-  ## Examples
-
-    iex> Helen.DB.Module.Config.create_or_update(__MODULE__, [key: "value"], "description")
-    {:ok, "Helen.DB.Module.Config"}
-
-  Defaults for the opts (second parameter):
-    [autostart: true, loop_timeout: [minutes: 1]]
-
-  The second parameter is always merged into the default options.
-  """
-  @doc since: "0.0.26"
-  def create_or_update(mod, opts \\ [], description \\ "<none>")
-      when is_atom(mod) do
+  @doc false
+  def create_or_update(mod, opts, description) do
     # turn the opts list into a binary to store in the db
     opts_binary = Enum.into(opts, []) |> inspect()
 
@@ -50,19 +38,8 @@ defmodule Helen.DB.Module.Config do
     end
   end
 
-  @doc """
-  Return the evaluated opts for a Helen Module Configuration applying any
-  passed overrides
-
-  Returns Keyword.t() | [not_found: Atomt.t()]
-
-  ## Examples
-
-    iex> Helen.DB.Module.Config.eval_opts(__MODULE__, [autostart: false])
-    [autostart: false, loop_timeout: [minutes: 1], config_available: true]
-  """
-  @doc since: "0.0.26"
-  def eval_opts(mod, overrides \\ [])
+  @doc false
+  def eval_opts(mod, overrides)
       when is_atom(mod) and is_list(overrides) do
     with %Schema{opts: opts, version: vsn} <- find(mod),
          # NOTE: accepting risk of evaling string because it is coming
@@ -76,20 +53,7 @@ defmodule Helen.DB.Module.Config do
     end
   end
 
-  @doc """
-    Get a %Helen.DB.Module.Config{} by module or id
-
-    Same return values as Repo.get_by/2
-
-      1. nil if not found
-      2. %Helen.DB.Module.Config{}
-
-      ## Examples
-        iex> Helen.DB.Module.Config.find(__MODULE__)
-        %Config.DB.Config{}
-  """
-
-  @doc since: "0.0.26"
+  @doc false
   def find(module_or_id) do
     check_args = fn
       x when is_atom(x) -> [module: mod_as_binary(module_or_id)]
@@ -113,20 +77,15 @@ defmodule Helen.DB.Module.Config do
     Get the opts of a Module Config
   """
   @doc since: "0.0.26"
-  def opts(module_or_id) do
-    with %Schema{opts: opts} <- find(module_or_id),
-         {val, _} <- Code.eval_string(opts) do
-      val
-    else
-      rc -> rc
-    end
+  def opts(module_or_id, overrides) do
+    eval_opts(module_or_id, overrides)
   end
 
   @doc """
     Merge the opts of a Module Config
   """
   @doc since: "0.0.26"
-  def opts_merge(module_or_id, opts) when is_list(opts) do
+  def merge(module_or_id, opts) when is_list(opts) do
     with %Schema{opts: prev_opts_binary} = x <- find(module_or_id),
          {prev_opts, _} <- Code.eval_string(prev_opts_binary),
          opts_binary <- Keyword.merge(prev_opts, opts) |> inspect(),
@@ -134,6 +93,7 @@ defmodule Helen.DB.Module.Config do
          {val, _} <- Code.eval_string(new_opts_binary) do
       {:ok, val}
     else
+      nil -> create_or_update(module_or_id, opts, "auto generated")
       rc -> rc
     end
   end
@@ -142,16 +102,21 @@ defmodule Helen.DB.Module.Config do
     Put the opts of a Module Config
   """
   @doc since: "0.0.26"
-  def opts_put(module_or_id, opts) when is_list(opts) do
+  def put(module_or_id, opts) when is_list(opts) do
     with %Schema{} = x <- find(module_or_id),
          opts_binary <- inspect(opts),
          {:ok, %Schema{opts: opts}} <- upsert(x, opts: opts_binary),
          {val, _} <- Code.eval_string(opts) do
       {:ok, val}
     else
+      nil -> create_or_update(module_or_id, opts, "auto generated")
       rc -> rc
     end
   end
+
+  ##
+  ## PRIVATE
+  ##
 
   defp upsert(%Schema{} = x, params) do
     {p, _} = Keyword.split(params, [:module, :opts, :description])

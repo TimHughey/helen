@@ -18,6 +18,6 @@
 # )
 
 # create the default Remote Profile
-# Remote.Profile.Schema.create("default")
+Remote.Profile.Schema.create("default")
 
 ExUnit.start()

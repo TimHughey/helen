@@ -6,6 +6,8 @@ defmodule Sensor.Server do
   use Timex
   use GenServer, shutdown: 7000
 
+  use Helen.Module.Config
+
   alias Sensor.DB.{Alias, Device}
 
   ##
@@ -14,15 +16,11 @@ defmodule Sensor.Server do
 
   @doc false
   @impl true
-  def init(opts) do
-    import Helen.Module.Config, only: [eval_opts: 2]
+  def init(args) do
     import TimeSupport, only: [now: 0]
 
-    # loop_timeout: is an essential option, ensure it's there
-    opts = Keyword.put_new(opts, :loop_timeout, minutes: 1)
-
     state =
-      %{last_timeout: now(), opts: eval_opts(__MODULE__, opts), notify_map: %{}}
+      %{last_timeout: now(), opts: config_opts(args), notify_map: %{}}
       |> loop_put_timeout()
 
     {:ok, state, 100}

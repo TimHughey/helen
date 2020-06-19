@@ -7,6 +7,7 @@ defmodule Roost do
   use Timex
 
   use GenServer, restart: :transient, shutdown: 5000
+  use Helen.Module.Config
 
   def abort(_) do
     message = """
@@ -27,9 +28,7 @@ defmodule Roost do
 
   @impl true
   def init(args) do
-    import Helen.Module.Config, only: [eval_opts: 2]
-
-    config_opts = eval_opts(__MODULE__, Enum.into(args, []))
+    config_opts = config_opts(args)
 
     state = %{opts: config_opts}
 

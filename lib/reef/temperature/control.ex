@@ -5,6 +5,9 @@ defmodule Reef.Temp.Control do
   """
 
   use GenServer, restart: :transient, shutdown: 7000
+
+  use Helen.Module.Config
+
   alias Sensor.DB.Alias, as: SensorAlias
   alias Switch.DB.Alias, as: SwitchAlias
 
@@ -14,18 +17,19 @@ defmodule Reef.Temp.Control do
 
   @doc false
   @impl true
-  def init(opts) do
-    import Helen.Module.Config, only: [eval_opts: 2]
+  def init(args) do
     import TimeSupport, only: [epoch: 0]
 
     state = %{
       last_timeout: epoch(),
       timeouts: 0,
-      opts: eval_opts(__MODULE__, opts),
+      opts: config_opts(args),
       devices: %{}
     }
 
-    {:ok, state, {:continue, :bootstrap}}
+    if is_nil(state[:opts][:sensor]) or is_nil(state[:opts][:switch]),
+      do: :ignore,
+      else: {:ok, state, {:continue, :bootstrap}}
   end
 
   @doc false
@@ -46,22 +50,6 @@ defmodule Reef.Temp.Control do
     else
       _epoch -> epoch()
     end
-  end
-
-  def loops, do: state(:loops)
-
-  def opts(x) when is_atom(x) do
-    import Helen.Module.Config, only: [eval_opts: 2]
-
-    case x do
-      :current -> state(:opts)
-      :config -> eval_opts(__MODULE__, [])
-      _x -> {:bad_arg, usage: [:current, :config]}
-    end
-  end
-
-  def opts_merge(opts) when is_list(opts) do
-    Helen.Module.Config.opts_merge(__MODULE__, opts)
   end
 
   def temperature, do: GenServer.call(__MODULE__, :temperature)

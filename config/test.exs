@@ -17,15 +17,17 @@ config :helen, Mqtt.Client,
     password: "mqtt",
     server:
       {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
-    keep_alive: 15
+    keep_alive: 36
   ],
   timesync: [frequency: {:secs, 5}, loops: 5, forever: false, log: false]
 
 config :helen, Mqtt.Inbound,
   log: [
     engine_metrics: false
-  ],
-  periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
+  ]
+
+# ],
+# periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
 config :helen, Fact.Influx,
   database: "helen_test",

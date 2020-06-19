@@ -21,103 +21,25 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: dutycycle; Type: TABLE; Schema: public; Owner: -
+-- Name: helen_mod_config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dutycycle (
+CREATE TABLE public.helen_mod_config (
     id bigint NOT NULL,
-    name character varying(50) NOT NULL,
-    comment text,
-    device character varying(25) NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    log boolean DEFAULT false,
-    active boolean DEFAULT true,
-    scheduled_work_ms integer DEFAULT 750,
-    startup_delay_ms integer DEFAULT 10000
-);
-
-
---
--- Name: dutycycle_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.dutycycle_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: dutycycle_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.dutycycle_id_seq OWNED BY public.dutycycle.id;
-
-
---
--- Name: dutycycle_profile; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.dutycycle_profile (
-    id bigint NOT NULL,
-    dutycycle_id bigint,
-    name character varying(25) NOT NULL,
-    active boolean DEFAULT false NOT NULL,
-    run_ms integer DEFAULT 600000 NOT NULL,
-    idle_ms integer DEFAULT 600000 NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    device_check_ms integer DEFAULT 60000
-);
-
-
---
--- Name: dutycycle_profile_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.dutycycle_profile_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: dutycycle_profile_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.dutycycle_profile_id_seq OWNED BY public.dutycycle_profile.id;
-
-
---
--- Name: dutycycle_state; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.dutycycle_state (
-    id bigint NOT NULL,
-    dutycycle_id bigint,
-    state character varying(15) DEFAULT 'stopped'::character varying NOT NULL,
-    dev_state boolean DEFAULT false NOT NULL,
-    run_at timestamp without time zone,
-    run_end_at timestamp without time zone,
-    idle_at timestamp without time zone,
-    idle_end_at timestamp without time zone,
-    started_at timestamp without time zone,
-    state_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    module character varying(255) NOT NULL,
+    description character varying(255) DEFAULT '<none>'::character varying,
+    opts text DEFAULT '[]'::text NOT NULL,
+    version uuid NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
 
 
 --
--- Name: dutycycle_state_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: helen_mod_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.dutycycle_state_id_seq
+CREATE SEQUENCE public.helen_mod_config_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -126,10 +48,10 @@ CREATE SEQUENCE public.dutycycle_state_id_seq
 
 
 --
--- Name: dutycycle_state_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: helen_mod_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.dutycycle_state_id_seq OWNED BY public.dutycycle_state.id;
+ALTER SEQUENCE public.helen_mod_config_id_seq OWNED BY public.helen_mod_config.id;
 
 
 --
@@ -667,24 +589,10 @@ ALTER SEQUENCE public.thermostat_profile_id_seq OWNED BY public.thermostat_profi
 
 
 --
--- Name: dutycycle id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: helen_mod_config id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dutycycle ALTER COLUMN id SET DEFAULT nextval('public.dutycycle_id_seq'::regclass);
-
-
---
--- Name: dutycycle_profile id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dutycycle_profile ALTER COLUMN id SET DEFAULT nextval('public.dutycycle_profile_id_seq'::regclass);
-
-
---
--- Name: dutycycle_state id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dutycycle_state ALTER COLUMN id SET DEFAULT nextval('public.dutycycle_state_id_seq'::regclass);
+ALTER TABLE ONLY public.helen_mod_config ALTER COLUMN id SET DEFAULT nextval('public.helen_mod_config_id_seq'::regclass);
 
 
 --
@@ -779,27 +687,11 @@ ALTER TABLE ONLY public.thermostat_profile ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: dutycycle dutycycle_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: helen_mod_config helen_mod_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dutycycle
-    ADD CONSTRAINT dutycycle_pkey PRIMARY KEY (id);
-
-
---
--- Name: dutycycle_profile dutycycle_profile_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dutycycle_profile
-    ADD CONSTRAINT dutycycle_profile_pkey PRIMARY KEY (id);
-
-
---
--- Name: dutycycle_state dutycycle_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dutycycle_state
-    ADD CONSTRAINT dutycycle_state_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.helen_mod_config
+    ADD CONSTRAINT helen_mod_config_pkey PRIMARY KEY (id);
 
 
 --
@@ -915,24 +807,10 @@ ALTER TABLE ONLY public.thermostat_profile
 
 
 --
--- Name: dutycycle_name_index; Type: INDEX; Schema: public; Owner: -
+-- Name: helen_mod_config_module_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX dutycycle_name_index ON public.dutycycle USING btree (name);
-
-
---
--- Name: dutycycle_profile_name_dutycycle_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX dutycycle_profile_name_dutycycle_id_index ON public.dutycycle_profile USING btree (name, dutycycle_id);
-
-
---
--- Name: dutycycle_state_dutycycle_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX dutycycle_state_dutycycle_id_index ON public.dutycycle_state USING btree (dutycycle_id);
+CREATE UNIQUE INDEX helen_mod_config_module_index ON public.helen_mod_config USING btree (module);
 
 
 --
@@ -1083,22 +961,6 @@ CREATE UNIQUE INDEX thermostat_profile_id_name_index ON public.thermostat_profil
 
 
 --
--- Name: dutycycle_profile dutycycle_profile_dutycycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dutycycle_profile
-    ADD CONSTRAINT dutycycle_profile_dutycycle_id_fkey FOREIGN KEY (dutycycle_id) REFERENCES public.dutycycle(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: dutycycle_state dutycycle_state_dutycycle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dutycycle_state
-    ADD CONSTRAINT dutycycle_state_dutycycle_id_fkey FOREIGN KEY (dutycycle_id) REFERENCES public.dutycycle(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
 -- Name: pwm_alias pwm_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1158,5 +1020,5 @@ ALTER TABLE ONLY public.thermostat_profile
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652), (20200602194456), (20200603171602), (20200603180219), (20200605101957), (20200606154209), (20200607232505), (20200608133620), (20200614233621), (20200615131244), (20200615183810), (20200616131408);
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652), (20200602194456), (20200603171602), (20200603180219), (20200605101957), (20200606154209), (20200607232505), (20200608133620), (20200614233621), (20200615131244), (20200615183810), (20200616131408), (20200617120412), (20200617172518);
 
