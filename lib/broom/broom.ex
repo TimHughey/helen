@@ -32,7 +32,7 @@ defmodule Broom do
               | {:acked, {:ok, Ecto.Schema.t()}}
 
   @callback orphan_list(term) :: [term]
-  @callback reload(cmd) :: Ecto.Schema.t({} | nil)
+  @callback reload(cmd) :: Ecto.Schema.t()
   @callback release(msg) :: msg
   @callback start_link(list) :: term
   @callback update(cmd, opts) :: {:ok, cmd} | {term, term}
@@ -313,10 +313,9 @@ defmodule Broom do
 
   @doc false
   def handle_cast({:track, %{cmd: {_rc, cmd}}}, %{opts: opts} = s) do
-    import TimeSupport, only: [duration: 1, duration_ms: 1]
+    import TimeSupport, only: [list_to_ms: 2]
 
-    timeout = opts[:orphan][:sent_before] |> duration()
-    ms = duration_ms(timeout)
+    ms = list_to_ms(opts[:orphan][:sent_before], seconds: 3)
 
     %{refid: refid, __struct__: schema} = cmd
     timer = Process.send_after(self(), {:possible_orphan, refid}, ms)
@@ -412,10 +411,9 @@ defmodule Broom do
   end
 
   defp schedule_metrics(%{opts_vsn: v, opts: opts} = state) do
-    import TimeSupport, only: [duration: 1, duration_ms: 1]
+    import TimeSupport, only: [list_to_ms: 2]
 
-    timeout = opts[:metrics] |> duration()
-    ms = duration_ms(timeout)
+    ms = list_to_ms(opts[:timeout], minutes: 5)
     Process.send_after(self(), {:report_metrics, v}, ms)
 
     state
