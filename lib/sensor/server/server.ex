@@ -63,6 +63,11 @@ defmodule Sensor.Server do
 
   def state, do: GenServer.call(__MODULE__, :state)
 
+  def restart do
+    Supervisor.terminate_child(Switch.Supervisor, __MODULE__)
+    Supervisor.restart_child(Switch.Supervisor, __MODULE__)
+  end
+
   ##
   ## GenServer handle_* callbacks
   ##
@@ -97,13 +102,7 @@ defmodule Sensor.Server do
     # put a new entry in the pid map for this registration
     new_pid_map = Map.put(pid_map, pid, %{opts: opts, last: epoch()})
 
-    # place the pid map into the notify match under the key x
-    new_notify_map = Map.put(s[:notify_map], x, new_pid_map)
-
-    # lastly, update the state and reply
-    state = Map.put(s, :notify_map, new_notify_map)
-
-    # ["notify register: ", inspect(state, pretty: true)] |> IO.puts()
+    state = put_in(s[:notify_map][x], new_pid_map)
 
     reply(:ok, state)
   end

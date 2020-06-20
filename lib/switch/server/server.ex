@@ -37,6 +37,22 @@ defmodule Switch.Server do
   ##
 
   @doc """
+  Sends notifications to registered pids using the message passed.
+
+  This is function is called by device's handle_message/1
+  """
+  @doc since: "0.0.26"
+  def notify_as_needed(msg) do
+    with {:ok, %Device{aliases: aliases}} <- msg[:device],
+         true <- is_list(aliases) and aliases != [] do
+      GenServer.cast(__MODULE__, {:notify, aliases})
+      msg
+    else
+      _no_match -> msg
+    end
+  end
+
+  @doc """
   Register the caller's pid to receive notifications when the named sensor
   is updated by handle_message
 
@@ -53,17 +69,28 @@ defmodule Switch.Server do
     end
   end
 
-  def notify_as_needed(msg) do
-    with {:ok, %Device{aliases: aliases}} <- msg[:device],
-         true <- is_list(aliases) and aliases != [] do
-      GenServer.cast(__MODULE__, {:notify, aliases})
-      msg
-    else
-      _no_match -> msg
-    end
+  @doc """
+  Retrieves the notification map for diagnostic use.
+  """
+  @doc since: "0.0.27"
+  def notify_map do
+    GenServer.call(__MODULE__, :state)[:notify_map]
   end
 
+  @doc """
+  Retrieves the current state of the GenServer for diagnostic use.
+  """
+  @doc since: "0.0.26"
   def state, do: GenServer.call(__MODULE__, :state)
+
+  @doc """
+  Restarts the server.
+  """
+  @doc since: "0.0.27"
+  def restart do
+    Supervisor.terminate_child(Switch.Supervisor, __MODULE__)
+    Supervisor.restart_child(Switch.Supervisor, __MODULE__)
+  end
 
   ##
   ## GenServer handle_* callbacks
@@ -93,19 +120,15 @@ defmodule Switch.Server do
     # create the opts that will be used for this device notification
     opts = [interval: interval]
 
-    # get the existing pid map for the name
-    pid_map = s[:notify_map][x][pid] || %{}
+    # NOTE: adding a new notification pid must be done in two steps
+    #       because the device may not exist in the notification map
 
-    # put a new entry in the pid map for this registration
-    new_pid_map = Map.put(pid_map, pid, %{opts: opts, last: epoch()})
-
-    # place the pid map into the notify match under the key x
-    new_notify_map = Map.put(s[:notify_map], x, new_pid_map)
-
-    # lastly, update the state and reply
+    # ensure there is a map for this device so we can use put_in to update
+    new_notify_map = Map.put_new(s[:notify_map], x, %{})
     state = Map.put(s, :notify_map, new_notify_map)
 
-    # ["notify register: ", inspect(state, pretty: true)] |> IO.puts()
+    # put the pid map into :notify_map -> device -> pid
+    state = put_in(state[:notify_map][x][pid], %{opts: opts, last: epoch()})
 
     reply(:ok, state)
   end

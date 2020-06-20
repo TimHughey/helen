@@ -45,64 +45,61 @@ defmodule TimeSupport do
   end
 
   @doc """
-    Returns a Timex Duration based on the opts
-
-    If there isn't at least one valid duration option then an arbitrarily
-    large Duration of 12 weeks is returned
+    Returns a Timex Duration based on the opts or the defaults if the
+    the opts are invalid.
   """
 
-  def duration_from_list(opts) do
+  def duration_from_list(opts, default) do
     # grab only the opts that are valid for Timex.shift
 
     case valid_duration_opts?(opts) do
-      true ->
-        # after hours of searching and not finding an existing capabiility
-        # in Timex we'll roll our own consisting of multiple Timex functions.
-
-        ~U[0000-01-01 00:00:00Z]
-        |> Timex.shift(duration_opts(opts))
-        |> Timex.to_gregorian_microseconds()
-        |> Duration.from_microseconds()
-
-      false ->
-        # return an arbitrarily large duration when passed invalid opts
-        duration_from_list(weeks: 12)
+      true -> p_duration(opts)
+      false -> p_duration(default)
     end
   end
 
   @doc deprecated: "Use duration_from_list/1 instead"
-  defdelegate duration(opts), to: TimeSupport, as: :duration_from_list
+  def duration(opts), do: duration_from_list(opts, [])
 
   def duration_invert(opts) when is_list(opts) do
-    duration_from_list(opts) |> Duration.invert()
+    duration_from_list(opts, []) |> Duration.invert()
   end
 
   defdelegate ms_from_list(opts), to: TimeSupport, as: :duration_ms
 
   def duration_ms(opts) when is_struct(opts) or is_list(opts) do
     case opts do
-      opts when is_list(opts) -> duration_from_list(opts)
+      opts when is_list(opts) -> duration_from_list(opts, [])
       opts -> opts
     end
     |> Duration.to_milliseconds(truncate: true)
   end
 
-  def duration_opts(opts) when is_list(opts) do
-    Keyword.take(opts, [
-      :microseconds,
-      :seconds,
-      :minutes,
-      :hours,
-      :days,
-      :weeks,
-      :months,
-      :years
-    ])
+  def duration_opts(opts) do
+    case opts do
+      [o] when is_nil(o) ->
+        []
+
+      o when is_list(o) ->
+        Keyword.take(o, [
+          :microseconds,
+          :seconds,
+          :minutes,
+          :hours,
+          :days,
+          :weeks,
+          :months,
+          :years
+        ])
+
+      _o ->
+        []
+    end
   end
 
   def duration_secs(opts) when is_struct(opts) or is_list(opts) do
     case opts do
-      opts when is_list(opts) -> duration_from_list(opts)
+      opts when is_list(opts) -> duration_from_list(opts, [])
       opts -> opts
     end
     |> Duration.to_seconds(truncate: true)
@@ -150,10 +147,28 @@ defmodule TimeSupport do
   @doc since: "0.0.26"
   def interval_from_opts(opts, key) when is_list(opts) and is_atom(key) do
     interval_opts = Keyword.get(opts, key, minutes: 1)
-    duration_from_list(interval_opts)
+    duration_from_list(interval_opts, [])
   end
 
   defdelegate now, to: Timex.Duration
+
+  def list_to_ms(opts, defaults) do
+    # after hours of searching and not finding an existing capabiility
+    # in Timex we'll roll our own consisting of multiple Timex functions.
+
+    actual_opts =
+      cond do
+        valid_duration_opts?(opts) -> opts
+        valid_duration_opts?(defaults) -> defaults
+        true -> [weeks: 12]
+      end
+
+    ~U[0000-01-01 00:00:00Z]
+    |> Timex.shift(duration_opts(actual_opts))
+    |> Timex.to_gregorian_microseconds()
+    |> Duration.from_microseconds()
+    |> Duration.to_milliseconds(truncate: true)
+  end
 
   @doc """
     Converts a Timex standard opts list (e.g. [minutes: 1, seconds: 2])
@@ -170,7 +185,7 @@ defmodule TimeSupport do
   def remaining_ms(ref, max) do
     alias Timex.Duration, as: D
 
-    D.diff(elapsed(ref), duration_from_list(max))
+    D.diff(elapsed(ref), duration_from_list(max, []))
     |> D.abs()
     |> D.to_milliseconds(truncate: true)
   end
@@ -231,10 +246,25 @@ defmodule TimeSupport do
     opts = [opts] |> List.flatten()
 
     case duration_opts(opts) do
-      [] -> false
+      [x] when is_nil(x) -> false
+      x when x == [] -> false
       _x -> true
     end
   end
 
   def zero, do: Duration.zero()
+
+  ##
+  ## PRIVATE
+  ##
+
+  defp p_duration(opts) do
+    # after hours of searching and not finding an existing capabiility
+    # in Timex we'll roll our own consisting of multiple Timex functions.
+
+    ~U[0000-01-01 00:00:00Z]
+    |> Timex.shift(duration_opts(opts))
+    |> Timex.to_gregorian_microseconds()
+    |> Duration.from_microseconds()
+  end
 end

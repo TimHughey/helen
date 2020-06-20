@@ -67,6 +67,11 @@ defmodule Reef.Temp.Control do
     end
   end
 
+  def restart do
+    Supervisor.terminate_child(Reef.Supervisor, __MODULE__)
+    Supervisor.restart_child(Reef.Supervisor, __MODULE__)
+  end
+
   ##
   ## GenServer handle_* callbacks
   ##
@@ -151,6 +156,14 @@ defmodule Reef.Temp.Control do
   end
 
   ##
+  ## GenServer Receive Loop Hooks
+  ##
+
+  defp timeout_hook(%{} = s) do
+    noreply(s)
+  end
+
+  ##
   ## PRIVATE
   ##
 
@@ -173,10 +186,6 @@ defmodule Reef.Temp.Control do
       {:name, n} -> {:failed, Map.put(s, :sensor_fault, {:name_not_binary, n})}
       rc -> {rc, Map.put(s, :sensor_fault, rc)}
     end
-  end
-
-  defp timeout_hook(%{} = s) do
-    noreply(s)
   end
 
   ##

@@ -95,7 +95,7 @@ defmodule Helen.Mixfile do
       {:tortoise, "~> 0.9"},
       {:uuid, "~> 1.1"},
       {:gettext, "~> 0.11"},
-      {:quantum, "~> 2.2"},
+      {:quantum, "~> 3.0.1"},
       {:scribe, "~> 0.10"},
       {:msgpax, "~> 2.0"},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
@@ -103,7 +103,8 @@ defmodule Helen.Mixfile do
       {:deep_merge, "~> 1.0"},
       {:crontab, "~> 1.1"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:agnus, "~> 0.0.2"}
+      {:agnus, "~> 0.0.3"}
+      # {:agnus, path: "../agnus"}
       # {:vera, path: "../vera"}
       # {:vera, git: "https://github.com/TimHughey/vera.git", tag: "0.0.3"}
       # {:phoenix, "~> 1.4.0"},

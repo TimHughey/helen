@@ -1,4 +1,4 @@
 defmodule Helen.Scheduler do
-  use Quantum.Scheduler,
+  use Quantum,
     otp_app: :helen
 end

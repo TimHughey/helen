@@ -179,6 +179,17 @@ defmodule Switch.DB.Alias do
     end
   end
 
+  @doc """
+    Switch off the device aliases that begin with a pattern.
+
+    See off/2 for available options that will be applied to all device aliases.
+  """
+  @doc since: "0.0.27"
+  def off_names_begin_with(pattern, opts \\ [])
+      when is_binary(pattern) and is_list(opts) do
+    names_begin_with(pattern) |> off(opts)
+  end
+
   def position(name, opts \\ [])
 
   def position(name, opts) when is_binary(name) and is_list(opts) do

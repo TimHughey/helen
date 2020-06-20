@@ -62,12 +62,7 @@ defmodule Switch do
     end
   end
 
-  @doc """
-  Finds a Switch Alias by name or id
-
-    opts are passed as-is to Repo.preload/2
-  """
-
+  @doc delegate_to: {Alias, :find, 1}
   @doc since: "0.0.21"
   defdelegate alias_find(name_or_id), to: Alias, as: :find
 
@@ -96,52 +91,43 @@ defmodule Switch do
     Alias.rename(name_or_id, new_name, opts)
   end
 
-  @doc """
-    Return a keyword list of the Switch command counts
-  """
+  @doc delegate_to: {Command, :cmds_count, 0}
   @doc since: "0.0.24"
   defdelegate cmd_counts, to: Command
 
-  @doc """
-    Reset the counts maintained by Command (Broom)
-  """
+  @doc delegate_to: {Command, :cmd_counts_reset, 1}
   @doc since: "0.0.24"
   defdelegate cmd_counts_reset(opts), to: Command
 
-  @doc """
-    Return a list of the Switch commands tracked
-  """
+  @doc delegate_to: {Command, :cmds_tracked, 0}
   @doc since: "0.0.24"
   defdelegate cmds_tracked, to: Command
 
-  @doc """
-    Public API for deleting a Switch Alias
-  """
+  @doc delegate_to: {Alias, :delete, 1}
   @doc since: "0.0.21"
   defdelegate delete(name_or_id), to: Alias, as: :delete
 
-  @doc """
-    Retrieve a list of alias names
-  """
+  @doc delegate_to: {Alias, :news, 1}
   @doc since: "0.0.22"
   defdelegate names, to: Alias, as: :names
 
-  @doc """
-    Retrieve a list of alias names that begin with a pattern
-  """
+  @doc delegate_to: {Alias, :names_begin_with, 1}
   @doc since: "0.0.22"
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
-  @doc """
-  Register the caller's pid to receive notifications when the named switch
-  is updated by handle_message
-  """
+  @doc delegate_to: {Switch.Server, :notify_as_needed, 1}
+  @doc since: "0.0.26"
+  defdelegate notify_as_needed(msg), to: Switch.Server
+
+  @doc delegate_to: {Server, :notify_register, 1}
   @doc since: "0.0.26"
   defdelegate notify_register(name), to: Switch.Server
 
-  @doc """
-    Find a Switch Device by device or id
-  """
+  @doc delegate_to: {Server, :notify_map, 0}
+  @doc since: "0.0.27"
+  defdelegate notify_map, to: Switch.Server
+
+  @doc delegate_to: {Device, :find, 1}
   @doc since: "0.0.21"
   defdelegate device_find(device_or_id), to: Device, as: :find
 
@@ -214,9 +200,23 @@ defmodule Switch do
   # pipeline
   def handle_message(%{} = msg_in), do: msg_in
 
-  def on(name_or_id, opts \\ []), do: Alias.on(name_or_id, opts)
+  @doc delegate_to: {Alias, :on, 1}
+  defdelegate on(name_or_id), to: Alias
 
-  def off(name_id_or_list, opts \\ []), do: Alias.off(name_id_or_list, opts)
+  @doc delegate_to: {Alias, :on, 2}
+  defdelegate on(name_or_id, opts), to: Alias
+
+  @doc delegate_to: {Alias, :off, 1}
+  defdelegate off(name_or_id), to: Alias
+
+  @doc delegate_to: {Alias, :off, 2}
+  defdelegate off(name_or_id, opts), to: Alias
+
+  @doc delegate_to: {Alias, :off_names_begin_with, 1}
+  defdelegate off_names_begin_with(pattern), to: Alias
+
+  @doc delegate_to: {Alias, :off_names_begin_with, 2}
+  defdelegate off_names_begin_with(pattern, opts), to: Alias
 
   @doc """
     Set the position (state) of a Switch PIO using it's Alias
@@ -266,5 +266,17 @@ defmodule Switch do
     end
   end
 
-  def toggle(name_or_id, opts \\ []), do: Alias.toggle(name_or_id, opts)
+  @doc delegate_to: {Switch.Server, :state, 0}
+  @doc since: "0.0.26"
+  defdelegate state, to: Switch.Server
+
+  @doc delegate_to: {Alias, :toggle, 1}
+  defdelegate toggle(name_or_id), to: Alias
+
+  @doc delegate_to: {Alias, :toggle, 2}
+  defdelegate toggle(name_or_id, opts), to: Alias
+
+  @doc delegate_to: {Switch.Server, :restart, 0}
+  @doc since: "0.0.27"
+  defdelegate restart, to: Switch.Server
 end
