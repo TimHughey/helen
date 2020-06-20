@@ -3,7 +3,7 @@ defmodule Helen.Module.Config do
     Helen Module Config database implementation and functionality
   """
 
-  @callback config_create([opts: [...]] | [], binary() | <<>>) ::
+  @callback config_create(keyword() | [], binary() | <<>>) ::
               {:ok, module()} | {:failed, term}
   @callback config_opts(keyword() | []) :: keyword() | [] | nil
   @callback config_merge(keyword()) :: {:ok, keyword()} | {:failed, term}
@@ -28,6 +28,10 @@ defmodule Helen.Module.Config do
         Config.create_or_update(__MODULE__, opts, description)
       end
 
+      defoverridable config_create: 0
+      defoverridable config_create: 1
+      defoverridable config_create: 2
+
       @doc """
       Returns the configuration opts for the Module.
 
@@ -51,9 +55,12 @@ defmodule Helen.Module.Config do
         with opts when is_list(opts) <- Config.opts(__MODULE__, overrides) do
           opts
         else
-          nil -> overrides
+          _no_config_opts -> overrides
         end
       end
+
+      defoverridable config_opts: 0
+      defoverridable config_opts: 1
 
       @doc """
       Top level merges the options keyword list into the existing configuration record.
@@ -68,6 +75,8 @@ defmodule Helen.Module.Config do
         Config.merge(__MODULE__, opts)
       end
 
+      defoverridable config_merge: 1
+
       @doc """
       Puts (replaces) the keyword list of options in the configuration record.
 
@@ -77,8 +86,10 @@ defmodule Helen.Module.Config do
       def config_put(opts) when is_list(opts) do
         alias Helen.Module.DB.Config
 
-        Config.merge(__MODULE__, opts)
+        Config.put(__MODULE__, opts)
       end
+
+      defoverridable config_put: 1
     end
   end
 end
