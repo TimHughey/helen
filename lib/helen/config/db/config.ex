@@ -21,6 +21,15 @@ defmodule Helen.Module.DB.Config do
   ##
 
   @doc false
+  def all do
+    for %Schema{module: m, opts: o} <- Repo.all(Schema), into: %{} do
+      {opts, _} = Code.eval_string(o)
+
+      {binary_to_mod(m), opts}
+    end
+  end
+
+  @doc false
   def create_or_update(mod, opts, description) do
     # turn the opts list into a binary to store in the db
     opts_binary = Enum.into(opts, []) |> inspect()
@@ -155,5 +164,9 @@ defmodule Helen.Module.DB.Config do
 
   defp mod_as_binary(mod) do
     Atom.to_string(mod) |> Module.split() |> Enum.join(".")
+  end
+
+  defp binary_to_mod(x) do
+    String.split(x, ".") |> Module.concat()
   end
 end

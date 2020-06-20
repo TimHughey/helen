@@ -92,4 +92,10 @@ defmodule Helen.Module.Config do
       defoverridable config_put: 1
     end
   end
+
+  @doc """
+  Show all Helen Module Config records
+  """
+  @doc since: "0.0.27"
+  defdelegate all, to: Helen.Module.DB.Config
 end
