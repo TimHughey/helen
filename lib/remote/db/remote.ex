@@ -233,9 +233,9 @@ defmodule Remote.DB.Remote do
 
   returns input message populated with:
    a. device: the results of upsert/2
-     * {:ok, %Sensor.Schemas.Device{}}
-     * {:invalid_changes, %Changeset{}}
-     * {:error, actual error results from upsert/2}
+      1. {:ok, %Sensor.Schemas.Device{}}
+      2. {:invalid_changes, %Changeset{}}
+      3. {:error, actual error results from upsert/2}
   """
 
   @doc since: "0.0.15"
