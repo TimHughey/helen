@@ -33,16 +33,16 @@ defmodule Irrigation do
 
   ## Examples
 
-      iex> Irrigation.front_porch_oneshot()
+      iex> Irrigation.fflower_boxes_oneshot()
       :ok
 
-      iex> Irrigation.front_porch_oneshot([seconds: 15])
+      iex> Irrigation.flower_boxes_oneshot([seconds: 15])
       :ok
 
   """
   @doc since: "0.0.27"
-  def front_porch_oneshot(opts \\ [seconds: 45]) do
-    Server.start_job(:garden_oneshot, :garden, :oneshot, opts)
+  def flower_boxes_oneshot(opts \\ [seconds: 45]) do
+    Server.start_job(:flower_boxes_oneshot, :flower_boxes, :oneshot, opts)
   end
 
   @doc """
