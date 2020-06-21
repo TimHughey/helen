@@ -294,13 +294,15 @@ defmodule PulseWidth.DB.Alias do
     case duty do
       # duty was not in the original opts
       nil -> nil
+      # handle simple duty values
+      d when is_integer(d) and d >= min and d <= max -> d
+      # bound limit duty requests
+      d when d > max -> max
+      d when d < min -> min
       # floats less than one are considered percentages
       d when is_float(d) and d <= 0.99 -> percent.(d)
       # floats greater than one are made integers
       d when is_float(d) and d > 0.99 -> round.(d)
-      # bound limit duty requests
-      d when d > max -> max
-      d when d < min -> min
       # it's just a simple duty > 1, less than max and greater than min
       duty -> duty
     end
@@ -342,13 +344,15 @@ defmodule PulseWidth.DB.Alias do
   defp lazy_check(%_{device: %_{duty: d} = device} = dev_alias, lazy, duty) do
     new_duty = duty_calculate(device, duty)
 
+    [inspect(device), " ", inspect(duty)] |> IO.puts()
+
     cond do
       # duty was not in the opts, this is a read
       is_nil(new_duty) -> {:cmd_needed?, false, dev_alias}
       # lazy requested and current duty == new duty
       lazy == true and d == new_duty -> {:cmd_needed?, false, dev_alias}
       # no match above means we need to send a cmd
-      true -> {:cmd_needed?, true, %{duty: duty}}
+      true -> {:cmd_needed?, true, %{duty: new_duty}}
     end
   end
 end
