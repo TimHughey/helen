@@ -344,8 +344,6 @@ defmodule PulseWidth.DB.Alias do
   defp lazy_check(%_{device: %_{duty: d} = device} = dev_alias, lazy, duty) do
     new_duty = duty_calculate(device, duty)
 
-    [inspect(device), " ", inspect(duty)] |> IO.puts()
-
     cond do
       # duty was not in the opts, this is a read
       is_nil(new_duty) -> {:cmd_needed?, false, dev_alias}
