@@ -2,33 +2,20 @@ defmodule Irrigation do
   @moduledoc """
     Irrigation Implementation for Wiss Landing
   """
-  # use Timex
-  # import Crontab.CronExpression
-  #
-  # def all_off do
-  #   Switch.names_begin_with("irrigation") |> Switch.off()
-  #
-  #   """
-  #   ensuring all switches are off
-  #   """
-  #   |> log()
-  #
-  #   Process.sleep(3000)
-  # end
-  #
-  #
-  #
-  # def init(opts \\ []) when is_list(opts) do
-  #   switches = (opts ++ ["irrigation"]) |> List.flatten()
-  #   for n <- switches, do: Switch.names_begin_with(n) |> Switch.off()
-  #
-  #
-  #
-  #   Keeper.put_key(:irrigate, "")
-  #   log("initialized")
-  #
-  #   :ok
-  # end
+
+  alias Irrigation.Server
+
+  @doc delegate_to: {Server, :start_job, 1}
+  defdelegate start_job(job_name, job_atom, tod_atom, duration_list),
+    to: Server
+
+  def garden_short(opts \\ [minutes: 11]) do
+    Server.start_job(:garden_short, :garden, :oneshot, opts)
+  end
+
+  @doc false
+  defdelegate state, to: Server
+
   #
   #
   # def status do

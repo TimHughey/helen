@@ -72,6 +72,8 @@ defmodule Helen.Module.Config do
       def config_merge(opts) when is_list(opts) do
         alias Helen.Module.DB.Config
 
+        opts = Keyword.drop(opts, [:__version__, :__available__])
+
         Config.merge(__MODULE__, opts)
       end
 
@@ -85,6 +87,8 @@ defmodule Helen.Module.Config do
       @doc since: "0.0.27"
       def config_put(opts) when is_list(opts) do
         alias Helen.Module.DB.Config
+
+        opts = Keyword.drop(opts, [:__version__, :__available__])
 
         Config.put(__MODULE__, opts)
       end
