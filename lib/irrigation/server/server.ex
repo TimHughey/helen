@@ -266,7 +266,7 @@ defmodule Irrigation.Server do
 
     power_up_delay_ms = list_to_ms(opts[:power][:power_up_delay], secondd: 0)
     sleep_ms = list_to_ms(duration, seconds: 0)
-    device = Keyword.get(opts, job) |> Keyword.get(:device)
+    device = Keyword.get(opts[:jobs], job) |> Keyword.get(:device)
 
     Process.sleep(power_up_delay_ms)
 
