@@ -39,19 +39,36 @@ defmodule Irrigation.Server do
   ## Public API
   ##
 
+  @doc false
   def last_timeout do
     import TimeSupport, only: [epoch: 0, utc_now: 0]
 
     with last <- state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
-      Timex.to_datetime(last, "America/New_York")
+      last
     else
       _epoch -> epoch()
     end
   end
 
+  @doc """
+  Return the number of GenServer timeouts.
+
+  Timeouts are expected and appropriate for Irrigation.Server.  An increasing
+  number of timeouts indicates the server is primarily waiting for either
+  a message to start a job or messages from jobs ending.
+  """
+  @doc since: "0.0.27"
   def timeouts, do: state() |> Map.get(:timeouts)
 
+  @doc """
+    Raw access to the start job functionality.  You have been warned.
+
+    iex> Irrigation.Server.start_job(job_name, job_atom, tod_atom, duration_list)
+    :ok
+
+  """
+  @doc since: "0.0.27"
   def start_job(job_name, job_atom, tod_atom, duration_list) do
     GenServer.cast(
       __MODULE__,
@@ -59,6 +76,10 @@ defmodule Irrigation.Server do
     )
   end
 
+  @doc """
+  Return the server state (for diagnostic purposes)
+  """
+  @doc since: "0.0.27"
   def state(keys \\ []) do
     keys = [keys] |> List.flatten()
     state = GenServer.call(__MODULE__, :state)
@@ -70,6 +91,10 @@ defmodule Irrigation.Server do
     end
   end
 
+  @doc """
+  Restart the server, reloading the configuration opts
+  """
+  @doc since: "0.0.27"
   def restart do
     Supervisor.terminate_child(Irrigation.Supervisor, __MODULE__)
     Supervisor.restart_child(Irrigation.Supervisor, __MODULE__)
@@ -222,7 +247,7 @@ defmodule Irrigation.Server do
     alias Quantum.Job
 
     # import Atom, only: [to_string: 1]
-    import TimeSupport, only: [utc_now: 0]
+    import TimeSupport, only: [now_local: 1]
 
     for {job_atom, job_details} <- opts[:jobs],
         {k, schedule} when k == :schedule <- job_details,
@@ -235,21 +260,22 @@ defmodule Irrigation.Server do
       Scheduler.new_job()
       |> Job.set_name(job_name)
       |> Job.set_schedule(make_crontab(tod))
+      |> Job.set_timezone(opts[:timezone])
       |> Job.set_task(fn ->
         Irrigation.start_job(job_name, job_atom, tod, duration_list)
       end)
       |> Scheduler.add_job()
     end
 
-    put_in(s[:last_scheduled], utc_now())
+    put_in(s[:last_scheduled], now_local(opts[:timezone]))
   end
 
-  defp schedule_jobs_if_needed(%{last_scheduled: last} = s) do
+  defp schedule_jobs_if_needed(%{last_scheduled: last, opts: opts} = s) do
     import Agnus, only: [current?: 0]
-    import TimeSupport, only: [utc_now: 0]
+    import TimeSupport, only: [now_local: 1]
     import Timex, only: [day: 1]
 
-    now = utc_now()
+    now = now_local(opts[:timezone])
 
     cond do
       # handles the startup case when Agnus does not yet have info for us

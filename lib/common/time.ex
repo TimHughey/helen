@@ -171,6 +171,16 @@ defmodule TimeSupport do
   end
 
   @doc """
+  Return the current time in the specified timezone
+
+  If is_nil(tz) UTC is used as the timexone
+  """
+  @doc since: "0.0.27"
+  def now_local(tz) do
+    if is_nil(tz), do: Timex.now("UTC"), else: Timex.now(tz)
+  end
+
+  @doc """
     Converts a Timex standard opts list (e.g. [minutes: 1, seconds: 2])
     to a Timex Duration then to truncated milliseconds
   """
