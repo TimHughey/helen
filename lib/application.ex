@@ -54,7 +54,6 @@ defmodule Helen.Application do
 
     for mod <- [
           Repo,
-          Keeper,
           Fact.Supervisor,
           Mqtt.Supervisor,
           Switch.Supervisor,
