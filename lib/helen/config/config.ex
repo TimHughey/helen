@@ -5,9 +5,10 @@ defmodule Helen.Module.Config do
 
   @callback config_create(keyword() | [], binary() | <<>>) ::
               {:ok, module()} | {:failed, term}
-  @callback config_opts(keyword() | []) :: keyword() | [] | nil
   @callback config_merge(keyword()) :: {:ok, keyword()} | {:failed, term}
+  @callback config_opts(keyword() | []) :: keyword() | [] | nil
   @callback config_put(keyword()) :: {:ok, keyword()} | {:failed, term}
+  @callback config_update((keyword() -> keyword())) :: keyword()
 
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
@@ -94,6 +95,27 @@ defmodule Helen.Module.Config do
       end
 
       defoverridable config_put: 1
+
+      @doc """
+      Executes the function passed and replaces the existing opts with the results.
+
+      The function to execute takes one paramter (the existing opts) and must
+      return a keyword list consisting of the updated opts.
+
+      Creates a configuration record if one does not exist.
+      """
+      @doc since: "0.0.27"
+      def config_update(func) when is_function(func) do
+        alias Helen.Module.DB.Config
+
+        opts =
+          config_opts([])
+          |> Keyword.drop([:__version__, :__available__])
+
+        Config.put(__MODULE__, func.(opts))
+      end
+
+      defoverridable config_update: 1
     end
   end
 
