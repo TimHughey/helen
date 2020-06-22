@@ -249,22 +249,27 @@ defmodule Irrigation.Server do
     # import Atom, only: [to_string: 1]
     import TimeSupport, only: [now_local: 1]
 
+    # iterate through the keyword list :jobs from the opts selecting only
+    # the key :schedule
     for {job_atom, job_details} <- opts[:jobs],
-        {k, schedule} when k == :schedule <- job_details,
-        {tod, duration_list} <- schedule do
-      job_name =
-        ["irrigation", to_string(job_atom), to_string(tod)]
-        |> Enum.join("_")
-        |> String.to_atom()
+        {k, schedule} when k == :schedule <- job_details do
+      # for this job, iterate through the key/value pairs of time-of-day and
+      # duration options to schedule each job
+      for {tod, duration_list} <- schedule do
+        job_name =
+          ["irrigation", to_string(job_atom), to_string(tod)]
+          |> Enum.join("_")
+          |> String.to_atom()
 
-      Scheduler.new_job()
-      |> Job.set_name(job_name)
-      |> Job.set_schedule(make_crontab(tod))
-      |> Job.set_timezone(opts[:timezone])
-      |> Job.set_task(fn ->
-        Irrigation.start_job(job_name, job_atom, tod, duration_list)
-      end)
-      |> Scheduler.add_job()
+        Scheduler.new_job()
+        |> Job.set_name(job_name)
+        |> Job.set_schedule(make_crontab(tod))
+        |> Job.set_timezone(opts[:timezone])
+        |> Job.set_task(fn ->
+          Irrigation.start_job(job_name, job_atom, tod, duration_list)
+        end)
+        |> Scheduler.add_job()
+      end
     end
 
     put_in(s[:last_scheduled], now_local(opts[:timezone]))
