@@ -41,7 +41,17 @@ defmodule Helen.Module.DB.Config do
     ]
 
     with {:ok, %Schema{module: mod}} <- upsert(%Schema{}, upsert_opts) do
-      {:ok, mod}
+      {:ok, binary_to_mod(mod)}
+    else
+      rc -> rc
+    end
+  end
+
+  @doc false
+  def delete(mod) do
+    with %Schema{} = x <- find(mod),
+         {:ok, %Schema{}} <- Repo.delete(x) do
+      :ok
     else
       rc -> rc
     end
@@ -88,23 +98,6 @@ defmodule Helen.Module.DB.Config do
   @doc since: "0.0.26"
   def opts(module_or_id, overrides) do
     eval_opts(module_or_id, overrides)
-  end
-
-  @doc """
-    Merge the opts of a Module Config
-  """
-  @doc since: "0.0.26"
-  def merge(module_or_id, opts) when is_list(opts) do
-    with %Schema{opts: prev_opts_binary} = x <- find(module_or_id),
-         {prev_opts, _} <- Code.eval_string(prev_opts_binary),
-         opts_binary <- Keyword.merge(prev_opts, opts) |> inspect(),
-         {:ok, %Schema{opts: new_opts_binary}} <- upsert(x, opts: opts_binary),
-         {val, _} <- Code.eval_string(new_opts_binary) do
-      {:ok, val}
-    else
-      nil -> create_or_update(module_or_id, opts, "auto generated")
-      rc -> rc
-    end
   end
 
   @doc """

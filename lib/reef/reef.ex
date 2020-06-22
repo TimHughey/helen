@@ -3,18 +3,18 @@ defmodule Reef do
   Reef System Maintenance Command Line Interface
   """
 
-  def init(opts \\ []) when is_list(opts) do
-    alias Thermostat.Server, as: T
-    switches_all_off()
+  # def init(opts \\ []) when is_list(opts) do
+  #   alias Thermostat.Server, as: T
+  #   switches_all_off()
+  #
+  #   T.standby("mix tank")
+  #   T.activate_profile("display tank", "75F")
+  # end
 
-    T.standby("mix tank")
-    T.activate_profile("display tank", "75F")
-  end
+  alias Reef.Temp
 
   def abort_all do
-    alias Thermostat.Server, as: T
-
-    T.standby("mix tank")
+    Temp.MixTank.mode(:standby)
 
     mods = [Reef.Salt.Aerate, Reef.Salt.Fill, Reef.Salt.KeepFresh]
 
@@ -91,13 +91,8 @@ defmodule Reef do
   def fill_status(opts \\ []), do: Reef.Salt.Fill.status(opts)
 
   def heat_all_off do
-    alias Thermostat.Server, as: T
-
-    heaters = ["mix tank", "display tank"]
-
-    for h <- heaters do
-      T.standby(h)
-    end
+    Temp.DisplayTank.mode(:standby)
+    # Temp.DisplayTank.mode(:standby)
   end
 
   def keep_fresh(opts \\ []), do: Reef.Salt.KeepFresh.kickstart(opts)
@@ -105,13 +100,7 @@ defmodule Reef do
   def keep_fresh_status(opts \\ []), do: Reef.Salt.KeepFresh.status(opts)
 
   def match_display_tank do
-    alias Thermostat.Server, as: T
-
-    [
-      thermostat: T.activate_profile("mix tank", "prep for change"),
-      ato: Switch.off("display tank ato"),
-      keep_fresh: keep_fresh()
-    ]
+    IO.puts(["not implemented!!"])
   end
 
   def mix(opts \\ []), do: Reef.Salt.Mix.kickstart(opts)
@@ -128,18 +117,6 @@ defmodule Reef do
     for s <- List.flatten(sw_names), do: Switch.off(s)
   end
 
-  def t_activate({n, p}) when is_binary(n) and is_binary(p) do
-    alias Thermostat.Server, as: T
-
-    T.activate_profile(n, p)
-  end
-
-  def t_standby(n) when is_binary(n) do
-    alias Thermostat.Server, as: T
-
-    T.standby(n)
-  end
-
   def temp_ok? do
     dt_temp = Sensor.fahrenheit("display_tank", since_secs: 30)
     mt_temp = Sensor.fahrenheit("mixtank", since_secs: 30)
@@ -150,105 +127,8 @@ defmodule Reef do
   end
 
   def water_change_complete do
-    alias Thermostat.Server, as: T
-
-    T.activate_profile("display tank", "75F")
+    Temp.DisplayTank.mode(:active)
   end
-
-  ##
-  ## Testing Purposes
-  ##
-
-  def test_aerate, do: test_opts_aerate() |> Reef.aerate()
-  def test_fill, do: test_opts_fill() |> Reef.fill()
-  def test_keep_fresh, do: test_opts_keep_fresh() |> Reef.keep_fresh()
-  def test_mix, do: test_opts_mix() |> Reef.mix()
-
-  def test_opts_aerate do
-    [
-      switch_air: "mixtank air",
-      switch_pump: "mixtank pump",
-      aerate_time: [seconds: 10],
-      air_on: [seconds: 1],
-      air_off: [seconds: 1],
-      pump_on: [seconds: 1],
-      pump_off: [seconds: 1]
-    ]
-  end
-
-  def test_opts_fill do
-    [
-      fill_time: [seconds: 1],
-      topoff_time: [seconds: 1],
-      valve_open: [seconds: 1],
-      valve_closed: [seconds: 1]
-    ]
-  end
-
-  def test_opts_keep_fresh do
-    [
-      switch_air: "mixtank air",
-      switch_pump: "mixtank pump",
-      keep_fresh_time: [seconds: 10],
-      air_on: [seconds: 1],
-      air_off: [seconds: 1],
-      pump_on: [seconds: 1],
-      pump_off: [seconds: 1]
-    ]
-  end
-
-  def test_opts_mix do
-    [
-      switch_air: "mixtank air",
-      switch_pump: "mixtank pump",
-      mix_time: [seconds: 10],
-      air_on: [seconds: 1],
-      air_off: [seconds: 1],
-      pump_on: [seconds: 1],
-      pump_off: [seconds: 1]
-    ]
-  end
-
-  def future_example do
-    [
-      group: :reef,
-      category: :keep_fresh,
-      actions: [
-        sub1: [repeat_for: [hours: 2], on: "switch", sleep: [minutes: 1]],
-        sub2: [
-          oneshot: true,
-          off: "switch2",
-          sleep: [seconds: 20],
-          on: "switch2",
-          sleep: [seconds: 56]
-        ],
-        sub3: [cycles: 200, sleep: [seconds: 45], on: "switch3"],
-        sub4: [
-          infinity: true,
-          sleep: [minutes: 5],
-          on: "switch3",
-          sleep: [minutes: 3, off: "switch3"]
-        ]
-      ]
-    ]
-  end
-
-  # def heat_standby do
-  #   [
-  #     {swmt(), swmt() |> ths_activate(standby())},
-  #     {dt(), dt() |> ths_activate(standby())}
-  #   ]
-  # end
-  #
-  #
-  # def heat(p) when is_binary(p), do: ths_activate(swmt(), p)
-  #
-  # def heat(_), do: print_usage("mix_heat", "profile")
-  #
-
-  # def resume_display_tank, do: ths_activate(dt(), "75F")
-
-  # def water_change_begin(opts \\ [check_diff: true, interactive: true])
 
   #
   # def water_change_begin(opts) when is_list(opts) do
@@ -284,8 +164,6 @@ defmodule Reef do
   #     rmp() |> halt()
   #     rma() |> halt()
   #     ato() |> halt()
-  #     swmt() |> ths_activate(standby())
-  #     display_tank() |> ths_activate(standby())
   #
   #     status()
   #     {:ok}
@@ -296,8 +174,6 @@ defmodule Reef do
   #   rmp() |> halt()
   #   rma() |> halt()
   #   ato() |> halt()
-  #   swmt() |> ths_activate(standby())
-  #   display_tank() |> ths_activate("75F")
   #
   #   status()
   # end
@@ -308,49 +184,4 @@ defmodule Reef do
   # def xfer_wst_to_sewer,
   #   do: dc_activate_profile(rmp(), "drain wst")
   #
-  # defp print_heading(text) when is_binary(text) do
-  #   IO.puts(" ")
-  #   IO.puts(light_yellow() <> underline() <> text <> reset())
-  #   IO.puts(" ")
-  # end
-  #
-
-  #
-  # defp sensor_status(name) do
-  #   temp_format = fn sensor ->
-  #     temp = Sensor.fahrenheit(name: sensor, since_secs: 30)
-  #
-  #     if is_nil(temp) do
-  #       temp
-  #     else
-  #       Float.round(temp, 1)
-  #     end
-  #   end
-  #
-  #   %{
-  #     subsystem: name,
-  #     status: temp_format.(name),
-  #     active: "-"
-  #   }
-  # end
-  #
-  # def th_status(name, _opts) do
-  #   with active_profile when is_struct(active_profile) <-
-  #          Thermostat.Server.profiles(name, active: true) do
-  #     %{
-  #       subsystem: name,
-  #       status: active_profile |> Map.get(:name),
-  #       active: "-"
-  #     }
-  #   else
-  #     error -> inspect(error, pretty: true) |> IO.puts()
-  #   end
-  # end
-  #
-  # # constants
-  # defp display_tank, do: "display tank"
-  # defp dt, do: display_tank()
-  # defp dt_sensor, do: "display_tank"
-  # defp swmt, do: "mix tank"
-  # defp swmt_sensor, do: "mixtank"
 end

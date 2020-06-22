@@ -11,11 +11,8 @@ defmodule Irrigation do
   @doc delegate_to: {Server, :config_opts, 1}
   defdelegate opts(overrides), to: Server, as: :config_opts
 
-  @doc delegate_to: {Server, :config_put, 1}
-  defdelegate config_put(opts), to: Server
-
-  @doc delegate_to: {Server, :config_merge, 1}
-  defdelegate config_merge(opts), to: Server
+  @doc delegate_to: {Server, :config_update, 1}
+  defdelegate config_update(function), to: Server
 
   @doc delegate_to: {Server, :start_job, 1}
   defdelegate start_job(job_name, job_atom, tod_atom, duration_list),

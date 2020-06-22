@@ -18,7 +18,11 @@ defmodule Reef.Temp.Server do
       def init(args) do
         import TimeSupport, only: [epoch: 0]
 
+        # just in case we were passed a map?!?
+        args = Enum.into(args, [])
+
         state = %{
+          mode: args[:mode] || :active,
           last_timeout: epoch(),
           timeouts: 0,
           opts: config_opts(args),
@@ -31,9 +35,17 @@ defmodule Reef.Temp.Server do
           seen: %{sensor: nil, switch: nil, valid: {:ok, :ok}}
         }
 
-        if is_nil(state[:opts][:sensor]) or is_nil(state[:opts][:switch]),
-          do: :ignore,
-          else: {:ok, state, {:continue, :bootstrap}}
+        opts = state[:opts]
+
+        # should the server start?
+        cond do
+          is_nil(opts[:sensor]) -> :ignore
+          is_nil(opts[:switch]) -> :ignore
+          is_nil(opts[:setpoint]) -> :ignore
+          is_nil(opts[:offsets]) -> :ignore
+          state[:mode] == :standby -> :ignore
+          true -> {:ok, state, {:continue, :bootstrap}}
+        end
       end
 
       @doc false
@@ -45,6 +57,25 @@ defmodule Reef.Temp.Server do
       ## Public API
       ##
 
+      @doc """
+      Is the server active?
+
+      Returns a boolean.
+
+      ## Examples
+
+          iex> Reef.Temp.Control.active?
+          true
+
+      """
+      @doc since: "0.0.27"
+      def active? do
+        case state(:mode) do
+          :active -> true
+          :standby -> false
+        end
+      end
+
       def last_timeout do
         import TimeSupport, only: [epoch: 0, utc_now: 0]
 
@@ -54,6 +85,32 @@ defmodule Reef.Temp.Server do
         else
           _epoch -> epoch()
         end
+      end
+
+      @doc """
+      Set the mode of the server.
+
+      ## Modes
+      When set to `:active` (normal mode) the server will actively control
+      the temperature based on the readings of the configured sensor by
+      turning on and off the switch.
+
+      If set to `:standby` the server will:
+        1. Ensure the switch if off
+        2. Continue to receive updates from sensors and switches
+        3. Will *not* attempt to control the temperature.
+
+      Returns {:ok, new_mode}
+
+      ## Examples
+
+          iex> Reef.Temp.Control.mode(:standby)
+          {:ok, :standby}
+
+      """
+      @doc since: "0.0.27"
+      def mode(atom) when atom in [:active, :standby] do
+        GenServer.call(__MODULE__, {:mode, atom})
       end
 
       @doc """
@@ -93,7 +150,7 @@ defmodule Reef.Temp.Server do
         case keys do
           [] -> state
           [x] -> Map.get(state, x)
-          x -> Map.take(state, [x])
+          x -> Map.take(state, [x] |> List.flatten())
         end
       end
 
@@ -118,13 +175,33 @@ defmodule Reef.Temp.Server do
 
       @doc false
       @impl true
-      def handle_call(:state, _from, s), do: reply(s, s)
+      def handle_call({:mode, mode}, _from, %{opts: opts} = s) do
+        import Switch, only: [off: 1]
+
+        case mode do
+          # when switching to :standby ensure the switch is off
+          :standby ->
+            Switch.off(opts[:switch][:name])
+
+          # no action when switching to :active, the server will take control
+          true ->
+            nil
+        end
+
+        state = put_in(s, [:mode], mode)
+
+        reply({:ok, mode}, state)
+      end
 
       @doc false
       @impl true
       def handle_call(:position, _from, %{current: %{switch: pos}} = s) do
         reply(pos, s)
       end
+
+      @doc false
+      @impl true
+      def handle_call(:state, _from, s), do: reply(s, s)
 
       @doc false
       @impl true
@@ -216,9 +293,15 @@ defmodule Reef.Temp.Server do
            when switch_msgs <= 1 or sensor_msgs <= 1,
            do: s
 
+      # standby mode
+      # the server continues to receive updates from sensors and switches
+      # but takes no action relative to controlling the temperature
+      defp control_temperature(%{mode: :standby} = s), do: s
+
       # happy and normal path, both devices have been seen recently
       defp control_temperature(
              %{
+               mode: :active,
                opts: opts,
                devices: _devices,
                current: current,
@@ -263,6 +346,7 @@ defmodule Reef.Temp.Server do
       # unhappy path, one or both devices are missing
       defp control_temperature(
              %{
+               mode: :active,
                opts: opts,
                devices: _devices,
                current: _current,
@@ -275,7 +359,7 @@ defmodule Reef.Temp.Server do
         # grab opts into local variables
         switch_name = opts[:switch][:name]
 
-        record_missing = fn ->
+        flag_missing = fn ->
           cond do
             # for safety, attempt to switch off the device if sensor or switch haven't been seen
             sensor != :ok ->
@@ -306,7 +390,7 @@ defmodule Reef.Temp.Server do
           end
         end
 
-        Map.merge(s, record_missing.())
+        Map.merge(s, flag_missing.())
       end
 
       defp sensor_opts(x) do

@@ -5,9 +5,7 @@ defmodule Helen.Module.Config do
 
   @callback config_create(keyword() | [], binary() | <<>>) ::
               {:ok, module()} | {:failed, term}
-  @callback config_merge(keyword()) :: {:ok, keyword()} | {:failed, term}
   @callback config_opts(keyword() | []) :: keyword() | [] | nil
-  @callback config_put(keyword()) :: {:ok, keyword()} | {:failed, term}
   @callback config_update((keyword() -> keyword())) :: keyword()
 
   defmacro __using__(use_opts) do
@@ -64,39 +62,6 @@ defmodule Helen.Module.Config do
       defoverridable config_opts: 1
 
       @doc """
-      Top level merges the options keyword list into the existing configuration record.
-
-      If a configuration record does not exist one is created using the specified
-      options.
-      """
-      @doc since: "0.0.27"
-      def config_merge(opts) when is_list(opts) do
-        alias Helen.Module.DB.Config
-
-        opts = Keyword.drop(opts, [:__version__, :__available__])
-
-        Config.merge(__MODULE__, opts)
-      end
-
-      defoverridable config_merge: 1
-
-      @doc """
-      Puts (replaces) the keyword list of options in the configuration record.
-
-      Creates a configuration record if one does not exist.
-      """
-      @doc since: "0.0.27"
-      def config_put(opts) when is_list(opts) do
-        alias Helen.Module.DB.Config
-
-        opts = Keyword.drop(opts, [:__version__, :__available__])
-
-        Config.put(__MODULE__, opts)
-      end
-
-      defoverridable config_put: 1
-
-      @doc """
       Executes the function passed and replaces the existing opts with the results.
 
       The function to execute takes one paramter (the existing opts) and must
@@ -124,4 +89,35 @@ defmodule Helen.Module.Config do
   """
   @doc since: "0.0.27"
   defdelegate all, to: Helen.Module.DB.Config
+
+  @doc """
+  Copies an existing module config applying an optional function to the copy
+
+  ## Examples
+
+      iex> Helen.Module.Config.copy(Reef.Temp.DisplayTank, Reef.Temp.MixTank)
+
+  """
+  @doc since: "0.0.27"
+  def copy(from, to, func \\ & &1)
+      when is_atom(from) and is_atom(to) and is_function(func) do
+    alias Helen.Module.DB.Config
+
+    opts =
+      Config.opts(from, [])
+      |> Keyword.drop([:__version__, :__available__])
+
+    Config.put(to, func.(opts))
+  end
+
+  @doc """
+  Delete a module config
+
+  ## Examples
+
+      iex> Helen.Module.Config.delete( Reef.Temp.MixTank)
+      :ok
+  """
+  @doc since: "0.0.27"
+  defdelegate delete(mod), to: Helen.Module.DB.Config
 end
