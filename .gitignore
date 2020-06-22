@@ -47,4 +47,8 @@ assets/node_modules
 /var/log/
 ttb_last_config
 
+# Ignore legacy and outdated
+*-legacy
+*-outdated
+
 .DS_Store

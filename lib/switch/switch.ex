@@ -200,6 +200,16 @@ defmodule Switch do
   # pipeline
   def handle_message(%{} = msg_in), do: msg_in
 
+  @doc """
+  Convenience wrapper of Switch.position/1
+
+  Takes a switch name or id.
+
+  Returns a binary on success.  Tuple on failure.
+  """
+  @doc since: "0.0.27"
+  def now(name_or_id), do: Switch.position(name_or_id)
+
   @doc delegate_to: {Alias, :on, 1}
   defdelegate on(name_or_id), to: Alias
 

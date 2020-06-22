@@ -60,7 +60,6 @@ defmodule Helen.Application do
           PulseWidth.Supervisor,
           Sensor.Supervisor,
           Helen.Scheduler,
-          Thermostat.Supervisor,
           ExtraMod.Supervisor,
           Reef.Supervisor,
           Irrigation.Supervisor

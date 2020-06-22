@@ -5,7 +5,7 @@ defmodule Reef.Supervisor do
 
   @impl true
   def init(opts) do
-    Supervisor.init([{Reef.Temp.Control, opts}],
+    Supervisor.init([{Reef.Temp.DisplayTank, opts}],
       strategy: :one_for_one
     )
   end
