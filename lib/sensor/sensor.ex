@@ -88,7 +88,7 @@ defmodule Sensor do
   is updated by handle_message
   """
   @doc since: "0.0.26"
-  defdelegate notify_register(name), to: Sensor.Server
+  defdelegate notify_register(name), to: Sensor.Notify.Server
 
   @doc """
     Public API for renaming a Sensor Alias
@@ -191,7 +191,7 @@ defmodule Sensor do
   @doc since: "0.0.16"
   def handle_message(%{processed: false, type: "sensor"} = msg_in) do
     alias Fact.Influx
-    alias Sensor.Server, as: Server
+    alias Sensor.Notify.Server, as: Server
 
     # the with begins with processing the message through Device.DB.upsert/1
     with %{device: sensor_device} = msg <- Device.upsert(msg_in),

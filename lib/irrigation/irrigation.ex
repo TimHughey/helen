@@ -51,17 +51,43 @@ defmodule Irrigation do
 
   ## Examples
 
-      iex> Irrigation.garden()
+      iex> Irrigation.garden_oneshot()
       :ok
 
-      iex> Irrigation.garden([minutes: 30])
+      iex> Irrigation.garden_oneshot([minutes: 30])
       :ok
 
   """
   @doc since: "0.0.27"
-
   def garden_oneshot(opts \\ [minutes: 30]) do
     Server.start_job(:garden_oneshot, :garden, :oneshot, opts)
+  end
+
+  @doc """
+  Return a keyword list of the scheduled irrigation jobs scheduled.
+
+  ## Examples
+
+      iex> Irrigation.scheduled_jobs()
+      [irrigation_flower_boxes_am: ~e[27 5 23 6 * *]]
+
+  """
+  @doc since: "0.0.27"
+  def scheduled_jobs do
+    all_jobs = Helen.Scheduler.jobs()
+
+    for {name, details} <- all_jobs do
+      name_parts = Atom.to_string(name) |> String.split("_")
+
+      if String.contains?(hd(name_parts), "irrigation") do
+        %_{schedule: schedule} = details
+
+        {name, schedule}
+      else
+        []
+      end
+    end
+    |> List.flatten()
   end
 
   @doc delegate_to: {Server, :restart, 0}

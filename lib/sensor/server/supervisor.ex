@@ -7,7 +7,7 @@ defmodule Sensor.Supervisor do
 
   @impl true
   def init(_args) do
-    alias Sensor.Server, as: Server
+    alias Sensor.Notify.Server, as: Server
 
     Supervisor.init([Server],
       strategy: :one_for_one,

@@ -1,4 +1,4 @@
-defmodule Sensor.Server do
+defmodule Sensor.Notify.Server do
   @moduledoc """
     Sensor GenServer Implementation
   """

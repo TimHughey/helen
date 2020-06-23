@@ -1,4 +1,4 @@
-defmodule Switch.Server do
+defmodule Switch.Notify.Server do
   @moduledoc """
     Switch GenServer Implementation
   """

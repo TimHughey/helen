@@ -62,6 +62,30 @@ defmodule Irrigation.Server do
   def timeouts, do: state() |> Map.get(:timeouts)
 
   @doc """
+  Restarts the server via the Supervisor
+
+  ## Examples
+
+      iex> Irrigation.Server.restart([])
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def restart(opts \\ []) do
+    # the Supervisor is the first part of the module
+    [_elixir, sup_base | _remainder] = Module.split(__MODULE__)
+
+    sup_mod = Module.concat([sup_base, "Supervisor"])
+
+    if GenServer.whereis(__MODULE__) do
+      Supervisor.terminate_child(sup_mod, __MODULE__)
+    end
+
+    Supervisor.delete_child(sup_mod, __MODULE__)
+    Supervisor.start_child(sup_mod, {__MODULE__, opts})
+  end
+
+  @doc """
     Raw access to the start job functionality.  You have been warned.
 
     iex> Irrigation.Server.start_job(job_name, job_atom, tod_atom, duration_list)
@@ -89,15 +113,6 @@ defmodule Irrigation.Server do
       [x] -> Map.get(state, x)
       x -> Map.take(state, [x])
     end
-  end
-
-  @doc """
-  Restart the server, reloading the configuration opts
-  """
-  @doc since: "0.0.27"
-  def restart do
-    Supervisor.terminate_child(Irrigation.Supervisor, __MODULE__)
-    Supervisor.restart_child(Irrigation.Supervisor, __MODULE__)
   end
 
   ##
@@ -148,10 +163,6 @@ defmodule Irrigation.Server do
   @impl true
   def handle_cast({:job_ending, pid, job_name, last_rc}, %{jobs: jobs} = s) do
     alias Helen.Scheduler
-
-    # the job is done, remove it from the scheduler
-    # NOTE:  the next job will be scheduled during a timeout the next day
-    Scheduler.delete_job(job_name)
 
     # remove the job from the running map
     running = Map.drop(jobs[:running], [pid])
@@ -260,6 +271,8 @@ defmodule Irrigation.Server do
           ["irrigation", to_string(job_atom), to_string(tod)]
           |> Enum.join("_")
           |> String.to_atom()
+
+        Scheduler.delete_job(job_name)
 
         Scheduler.new_job()
         |> Job.set_name(job_name)

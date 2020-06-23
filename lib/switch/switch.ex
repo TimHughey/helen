@@ -115,17 +115,17 @@ defmodule Switch do
   @doc since: "0.0.22"
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
-  @doc delegate_to: {Switch.Server, :notify_as_needed, 1}
+  @doc delegate_to: {Switch.Notify.Server, :notify_as_needed, 1}
   @doc since: "0.0.26"
-  defdelegate notify_as_needed(msg), to: Switch.Server
+  defdelegate notify_as_needed(msg), to: Switch.Notify.Server
 
   @doc delegate_to: {Server, :notify_register, 1}
   @doc since: "0.0.26"
-  defdelegate notify_register(name), to: Switch.Server
+  defdelegate notify_register(name), to: Switch.Notify.Server
 
   @doc delegate_to: {Server, :notify_map, 0}
   @doc since: "0.0.27"
-  defdelegate notify_map, to: Switch.Server
+  defdelegate notify_map, to: Switch.Notify.Server
 
   @doc delegate_to: {Device, :find, 1}
   @doc since: "0.0.21"
@@ -167,7 +167,7 @@ defmodule Switch do
   """
   @doc since: "0.0.21"
   def handle_message(%{processed: false, type: "switch"} = msg_in) do
-    alias Switch.Server, as: Server
+    alias Switch.Notify.Server, as: Server
 
     # the with begins with processing the message through DB.Device.upsert/1
     with %{device: switch_device} = msg <- Device.upsert(msg_in),
@@ -276,9 +276,9 @@ defmodule Switch do
     end
   end
 
-  @doc delegate_to: {Switch.Server, :state, 0}
+  @doc delegate_to: {Switch.Notify.Server, :state, 0}
   @doc since: "0.0.26"
-  defdelegate state, to: Switch.Server
+  defdelegate state, to: Switch.Notify.Server
 
   @doc delegate_to: {Alias, :toggle, 1}
   defdelegate toggle(name_or_id), to: Alias
@@ -286,7 +286,7 @@ defmodule Switch do
   @doc delegate_to: {Alias, :toggle, 2}
   defdelegate toggle(name_or_id, opts), to: Alias
 
-  @doc delegate_to: {Switch.Server, :restart, 0}
+  @doc delegate_to: {Switch.Notify.Server, :restart, 0}
   @doc since: "0.0.27"
-  defdelegate restart, to: Switch.Server
+  defdelegate restart, to: Switch.Notify.Server
 end

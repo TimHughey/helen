@@ -8,7 +8,7 @@ defmodule Switch.Supervisor do
   @impl true
   def init(_args) do
     alias Switch.DB.Command, as: Command
-    alias Switch.Server, as: Server
+    alias Switch.Notify.Server, as: Server
 
     Supervisor.init([Server, Command],
       strategy: :one_for_one,

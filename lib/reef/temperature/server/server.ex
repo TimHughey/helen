@@ -133,14 +133,23 @@ defmodule Reef.Temp.Server do
 
       ## Examples
 
-          iex> Reef.Temp.Control.restart()
+          iex> Reef.Temp.Control.restart([])
           :ok
 
       """
       @doc since: "0.0.27"
-      def restart do
-        Supervisor.terminate_child(Reef.Supervisor, __MODULE__)
-        Supervisor.restart_child(Reef.Supervisor, __MODULE__)
+      def restart(opts \\ []) do
+        # the Supervisor is the first part of the module
+        [_elixir, sup_base | _tail] = Module.split(__MODULE__)
+
+        sup_mod = Module.concat([sup_base, "Supervisor"])
+
+        if GenServer.whereis(__MODULE__) do
+          Supervisor.terminate_child(sup_mod, __MODULE__)
+        end
+
+        Supervisor.delete_child(sup_mod, __MODULE__)
+        Supervisor.start_child(sup_mod, {__MODULE__, opts})
       end
 
       def state(keys \\ []) do
