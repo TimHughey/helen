@@ -35,6 +35,15 @@ defmodule Sensor.Notify.Server do
   ## Public API
   ##
 
+  def notify_as_needed(msg) do
+    with {:ok, %Device{_alias_: %Alias{} = x}} <- msg[:device] do
+      GenServer.cast(__MODULE__, {:notify, x})
+      msg
+    else
+      _no_match -> msg
+    end
+  end
+
   @doc """
   Register the caller's pid to receive notifications when the named sensor
   is updated by handle_message
@@ -52,17 +61,24 @@ defmodule Sensor.Notify.Server do
     end
   end
 
-  def notify_as_needed(msg) do
-    with {:ok, %Device{_alias_: %Alias{} = x}} <- msg[:device] do
-      GenServer.cast(__MODULE__, {:notify, x})
-      msg
-    else
-      _no_match -> msg
-    end
+  @doc """
+  Retrieves the notification map for diagnostic use.
+  """
+  @doc since: "0.0.27"
+  def notify_map do
+    GenServer.call(__MODULE__, :state)[:notify_map]
   end
 
+  @doc """
+  Retrieves the current state of the GenServer for diagnostic use.
+  """
+  @doc since: "0.0.26"
   def state, do: GenServer.call(__MODULE__, :state)
 
+  @doc """
+  Restarts the server.
+  """
+  @doc since: "0.0.27"
   def restart do
     Supervisor.terminate_child(Switch.Supervisor, __MODULE__)
     Supervisor.restart_child(Switch.Supervisor, __MODULE__)
@@ -158,7 +174,15 @@ defmodule Sensor.Notify.Server do
         cond do
           alive? and should_notify? ->
             # the pid is alive and the notify interval has elapsed
-            send(pid_key, {:notify, :sensor, item})
+
+            # create the category atom that is sent as part of the notify msg
+            # the category atom is the the current module's first level
+            # downcased
+            [base | _tail] = Module.split(__MODULE__)
+            category = String.downcase(base) |> String.to_atom()
+
+            # send the msg
+            send(pid_key, {:notify, category, item})
 
             new_pid_map =
               Map.put(r_pid_map, pid_key, %{opts: o, last: utc_now()})

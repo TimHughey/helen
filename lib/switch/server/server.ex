@@ -36,12 +36,6 @@ defmodule Switch.Notify.Server do
   ## Public API
   ##
 
-  @doc """
-  Sends notifications to registered pids using the message passed.
-
-  This is function is called by device's handle_message/1
-  """
-  @doc since: "0.0.26"
   def notify_as_needed(msg) do
     with {:ok, %Device{aliases: aliases}} <- msg[:device],
          true <- is_list(aliases) and aliases != [] do
@@ -120,15 +114,13 @@ defmodule Switch.Notify.Server do
     # create the opts that will be used for this device notification
     opts = [interval: interval]
 
-    # NOTE: adding a new notification pid must be done in two steps
-    #       because the device may not exist in the notification map
+    # get the existing pid map for the name
+    pid_map = s[:notify_map][x][pid] || %{}
 
-    # ensure there is a map for this device so we can use put_in to update
-    new_notify_map = Map.put_new(s[:notify_map], x, %{})
-    state = Map.put(s, :notify_map, new_notify_map)
+    # put a new entry in the pid map for this registration
+    new_pid_map = Map.put(pid_map, pid, %{opts: opts, last: epoch()})
 
-    # put the pid map into :notify_map -> device -> pid
-    state = put_in(state[:notify_map][x][pid], %{opts: opts, last: epoch()})
+    state = put_in(s[:notify_map][x], new_pid_map)
 
     reply(:ok, state)
   end
@@ -184,7 +176,15 @@ defmodule Switch.Notify.Server do
         cond do
           alive? and should_notify? ->
             # the pid is alive and the notify interval has elapsed
-            send(pid_key, {:notify, :switch, item})
+
+            # create the category atom that is sent as part of the notify msg
+            # the category atom is the the current module's first level
+            # downcased
+            [base | _tail] = Module.split(__MODULE__)
+            category = String.downcase(base) |> String.to_atom()
+
+            # send the msg
+            send(pid_key, {:notify, category, item})
 
             new_pid_map =
               Map.put(r_pid_map, pid_key, %{opts: o, last: utc_now()})

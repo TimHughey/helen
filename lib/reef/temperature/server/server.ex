@@ -139,8 +139,8 @@ defmodule Reef.Temp.Server do
       """
       @doc since: "0.0.27"
       def restart(opts \\ []) do
-        # the Supervisor is the first part of the module
-        [_elixir, sup_base | _tail] = Module.split(__MODULE__)
+        # the Supervisor is the base of the module name with Supervisor appended
+        [sup_base | _tail] = Module.split(__MODULE__)
 
         sup_mod = Module.concat([sup_base, "Supervisor"])
 
