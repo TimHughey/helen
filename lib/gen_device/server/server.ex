@@ -29,7 +29,6 @@ defmodule GenDevice do
           cached_value: nil,
           last_timeout: epoch(),
           timeouts: 0,
-          actions: %{running: %{}},
           opts: c_opts,
           token: 1,
           standby_reason: :none
