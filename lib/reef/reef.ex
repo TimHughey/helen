@@ -11,34 +11,36 @@ defmodule Reef do
   #   T.activate_profile("display tank", "75F")
   # end
 
-  alias Reef.Temp
+  alias Reef.DisplayTank
+  alias Reef.MixTank
 
-  def abort_all do
-    Temp.MixTank.mode(:standby)
+  # def abort_all do
+  #   MixTank.Temp.mode(:standby)
+  #
+  #   mods = [Reef.Salt.Aerate, Reef.Salt.Fill, Reef.Salt.KeepFresh]
+  #
+  #   for m <- mods do
+  #     apply(m, :abort, [])
+  #   end
+  # end
+  #
+  # def aerate(opts \\ []), do: Reef.Salt.Aerate.kickstart(opts)
+  # def aerate_abort(opts \\ []), do: Reef.Salt.Aerate.abort(opts)
+  # def aerate_elapsed(opts \\ []), do: Reef.Salt.Aerate.elapsed_as_binary(opts)
+  # def aerate_status(opts \\ []), do: Reef.Salt.Aerate.status(opts)
+  # def aerate_state(opts \\ []), do: Reef.Salt.Aerate.state(opts)
 
-    mods = [Reef.Salt.Aerate, Reef.Salt.Fill, Reef.Salt.KeepFresh]
-
-    for m <- mods do
-      apply(m, :abort, [])
-    end
-  end
-
-  def aerate(opts \\ []), do: Reef.Salt.Aerate.kickstart(opts)
-  def aerate_abort(opts \\ []), do: Reef.Salt.Aerate.abort(opts)
-  def aerate_elapsed(opts \\ []), do: Reef.Salt.Aerate.elapsed_as_binary(opts)
-  def aerate_status(opts \\ []), do: Reef.Salt.Aerate.status(opts)
-  def aerate_state(opts \\ []), do: Reef.Salt.Aerate.state(opts)
-
-  def air_toggle do
-    Switch.toggle("mixtank air")
-  end
+  defdelegate air_off, to: MixTank.Air, as: :off
+  defdelegate air_on, to: MixTank.Air, as: :on
+  defdelegate air_on_for(opts), to: MixTank.Air, as: :on_for
+  defdelegate air_toggle, to: MixTank.Air, as: :toggle
 
   def all_stop do
-    abort_all()
+    # abort_all()
+    #
+    # Process.sleep(5000)
 
-    Process.sleep(5000)
-
-    switches_all_off()
+    mixtank_standby()
   end
 
   def clean(mode \\ :toggle, sw_name \\ "display tank ato")
@@ -86,36 +88,47 @@ defmodule Reef do
     end
   end
 
-  def fill(opts \\ []), do: Reef.Salt.Fill.kickstart(opts)
-  def fill_abort(opts \\ []), do: Reef.Salt.Fill.abort(opts)
-  def fill_status(opts \\ []), do: Reef.Salt.Fill.status(opts)
+  # def fill(opts \\ []), do: Reef.Salt.Fill.kickstart(opts)
+  # def fill_abort(opts \\ []), do: Reef.Salt.Fill.abort(opts)
+  # def fill_status(opts \\ []), do: Reef.Salt.Fill.status(opts)
 
   def heat_all_off do
-    Temp.DisplayTank.mode(:standby)
-    # Temp.DisplayTank.mode(:standby)
+    DisplayTank.Temp.mode(:standby)
+    MixTank.Temp.mode(:standby)
   end
 
-  def keep_fresh(opts \\ []), do: Reef.Salt.KeepFresh.kickstart(opts)
-  def keep_fresh_abort(opts \\ []), do: Reef.Salt.KeepFresh.abort(opts)
-  def keep_fresh_status(opts \\ []), do: Reef.Salt.KeepFresh.status(opts)
+  # def keep_fresh(opts \\ []), do: Reef.Salt.KeepFresh.kickstart(opts)
+  # def keep_fresh_abort(opts \\ []), do: Reef.Salt.KeepFresh.abort(opts)
+  # def keep_fresh_status(opts \\ []), do: Reef.Salt.KeepFresh.status(opts)
+  #
+  # def match_display_tank do
+  #   IO.puts(["not implemented!!"])
+  # end
 
-  def match_display_tank do
-    IO.puts(["not implemented!!"])
+  # def mix(opts \\ []), do: Reef.Salt.Mix.kickstart(opts)
+  # def mix_abort(opts \\ []), do: Reef.Salt.Mix.abort(opts)
+  # def mix_status(opts \\ []), do: Reef.Salt.Mix.status(opts)
+
+  def mixtank_mode(mode) when mode in [:active, :standby] do
+    mods = [MixTank.Air, MixTank.Pump, MixTank.Rodi]
+
+    for mod <- mods, into: [] do
+      {mod, apply(mod, :mode, [mode])}
+    end
   end
 
-  def mix(opts \\ []), do: Reef.Salt.Mix.kickstart(opts)
-  def mix_abort(opts \\ []), do: Reef.Salt.Mix.abort(opts)
-  def mix_status(opts \\ []), do: Reef.Salt.Mix.status(opts)
+  def mixtank_online, do: mixtank_mode(:active)
+  def mixtank_standby, do: mixtank_mode(:standby)
 
-  def pump_toggle do
-    Switch.toggle("mixtank pump")
-  end
+  defdelegate pump_off, to: MixTank.Pump, as: :off
+  defdelegate pump_on, to: MixTank.Pump, as: :on
+  defdelegate pump_on_for(opts), to: MixTank.Pump, as: :on_for
+  defdelegate pump_toggle, to: MixTank.Pump, as: :toggle
 
-  def switches_all_off(opts \\ ["mixtank"]) when is_list(opts) do
-    sw_names = for x <- opts, do: Switch.names_begin_with(x)
-
-    for s <- List.flatten(sw_names), do: Switch.off(s)
-  end
+  defdelegate rodi_off, to: MixTank.Rodi, as: :off
+  defdelegate rodi_on, to: MixTank.Rodi, as: :on
+  defdelegate rodi_on_for(opts), to: MixTank.Rodi, as: :on_for
+  defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
 
   def temp_ok? do
     dt_temp = Sensor.fahrenheit("display_tank", since_secs: 30)
@@ -127,7 +140,7 @@ defmodule Reef do
   end
 
   def water_change_complete do
-    Temp.DisplayTank.mode(:active)
+    DisplayTank.Temp.mode(:active)
   end
 
   #

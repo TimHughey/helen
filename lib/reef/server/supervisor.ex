@@ -7,12 +7,12 @@ defmodule Reef.Supervisor do
   def init(opts) do
     Supervisor.init(
       [
+        {Reef.DisplayTank.Temp, []},
+        {Reef.DisplayTank.Ato, []},
+        {Reef.MixTank.Temp, [mode: :standby]},
         {Reef.MixTank.Pump, opts},
         {Reef.MixTank.Air, opts},
-        {Reef.MixTank.Rodi, opts},
-        {Reef.Temp.DisplayTank, []},
-        {Reef.Temp.MixTank, [mode: :standby]},
-        {Reef.MixTank.Fill, [mode: :standby]}
+        {Reef.MixTank.Rodi, opts}
       ],
       strategy: :one_for_one
     )

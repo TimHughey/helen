@@ -60,12 +60,36 @@ defmodule Switch.DB.Alias do
   end
 
   @doc """
+    Does the name or id exist?
+
+    Returns a boolean.
+
+      ## Examples
+        iex> Switch.DB.Alias.exists?("sample switch")
+        true
+  """
+  @doc since: "0.0.21"
+  def exists?(name_or_id) do
+    import Repo, only: [get_by: 2]
+
+    filter_fn = fn
+      x when is_binary(x) -> [name: name_or_id]
+      x when is_integer(x) -> [id: name_or_id]
+      _x -> nil
+    end
+
+    with filter when is_list(filter) <- filter_fn.(name_or_id),
+         %Schema{id: id} when is_integer(id) <- get_by(Schema, filter) do
+      true
+    else
+      _anything -> false
+    end
+  end
+
+  @doc """
     Get a %Switch.DB.Alias{} by id or name
 
-    Same return values as Repo.get_by/2
-
-      1. nil if not found
-      2. %Switch.DB.Alias{}
+    Same return values as `Repo.get_by/2`
 
       ## Examples
         iex> Switch.DB.Alias.find("sample switch")

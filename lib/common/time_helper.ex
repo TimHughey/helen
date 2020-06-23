@@ -44,6 +44,36 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+  Convert a list of time options to milliseconds
+
+  Returns an integer.
+
+  ## Examples
+
+      iex> Helen.Time.Helper.list_to_ms([seconds: 1])
+      60000
+
+  """
+  @doc since: "0.0.27"
+  def list_to_ms(opts, defaults) do
+    # after hours of searching and not finding an existing capabiility
+    # in Timex we'll roll our own consisting of multiple Timex functions.
+
+    actual_opts =
+      cond do
+        valid_duration_opts?(opts) -> opts
+        valid_duration_opts?(defaults) -> defaults
+        true -> [weeks: 12]
+      end
+
+    ~U[0000-01-01 00:00:00Z]
+    |> Timex.shift(duration_opts(actual_opts))
+    |> Timex.to_gregorian_microseconds()
+    |> Duration.from_microseconds()
+    |> Duration.to_milliseconds(truncate: true)
+  end
+
+  @doc """
   Checks that a list has at least one valid duration opt
 
   Returns a boolean.
@@ -115,6 +145,7 @@ defmodule Helen.Time.Helper do
       o when is_list(o) ->
         Keyword.take(o, [
           :microseconds,
+          :milliseconds,
           :seconds,
           :minutes,
           :hours,

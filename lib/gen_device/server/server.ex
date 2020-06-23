@@ -26,11 +26,13 @@ defmodule GenDevice do
         state = %{
           mode: args[:mode] || :active,
           device_name: c_opts[:device_name],
+          cached_value: nil,
           last_timeout: epoch(),
           timeouts: 0,
           actions: %{running: %{}},
           opts: c_opts,
-          token: 1
+          token: 1,
+          standby_reason: :none
         }
 
         opts = state[:opts]
@@ -109,6 +111,60 @@ defmodule GenDevice do
       end
 
       @doc """
+      Switch off the device managed by this server.
+
+      Returns :ok or an error tuple
+
+      ## Examples
+
+          iex> GenDevice.off()
+          :ok
+
+      """
+      @doc since: "0.0.27"
+      def off do
+        GenServer.call(__MODULE__, {:off})
+      end
+
+      @doc """
+      Switch on the device managed by this server.
+
+      Returns :ok or an error tuple
+
+      ## Examples
+
+          iex> GenDevice.on()
+          :ok
+
+      """
+      @doc since: "0.0.27"
+      def on do
+        GenServer.call(__MODULE__, {:on, []})
+      end
+
+      @doc """
+      Switch on the device managed by this server for the list duration.
+
+      Returns :ok or an error tuple
+
+      ## Options
+        [seconds: 10]
+
+      ## Examples
+
+          iex> GenServer.on_for([minutes: 1])
+          :ok
+
+      """
+      @doc since: "0.0.27"
+      def on_for(opts) when is_list(opts) do
+        GenServer.call(__MODULE__, {:on, [on_for: opts]})
+      end
+
+      @doc delegate_to: {__MODULE__, :value, 1}
+      defdelegate position, to: __MODULE__, as: :value
+
+      @doc """
       Restarts the server via the Supervisor
 
       ## Examples
@@ -133,6 +189,26 @@ defmodule GenDevice do
       end
 
       @doc """
+      Returns the reason the server is in standby mode
+
+      ## Examples
+
+          iex> GenDevice.standby_reason()
+          :active | :api_call | :device_does_not_exist
+
+      """
+      @doc since: "0.0.27"
+      def standby_reason do
+        s = state()
+
+        with %{mode: :standby, standby_reason: reason} <- s do
+          reason
+        else
+          %{mode: :active} -> :active
+        end
+      end
+
+      @doc """
       Returns the state for diagnostic purposes
 
 
@@ -142,7 +218,6 @@ defmodule GenDevice do
 
       """
       @doc since: "0.0.27"
-
       def state(keys \\ []) do
         keys = [keys] |> List.flatten()
         state = GenServer.call(__MODULE__, :state)
@@ -156,27 +231,62 @@ defmodule GenDevice do
 
       def timeouts, do: state() |> Map.get(:timeouts)
 
+      @doc """
+      Toggle the devices managed by this server.
+
+      Returns :ok or an error tuple
+
+      ## Examples
+
+          iex> GenServer.toggle()
+          :ok
+
+      """
+      @doc since: "0.0.27"
+      def toggle do
+        GenServer.call(__MODULE__, {:toggle})
+      end
+
+      @doc """
+      Return the current value (position) off the device managed by this server.
+
+      Returns a boolean or an error tuple
+
+      ## Examples
+
+          iex> GenServer.value()
+          true
+
+      """
+      @doc since: "0.0.27"
+      def value(opts \\ []) do
+        GenServer.call(__MODULE__, {:value, [opts] |> List.flatten()})
+      end
+
       ##
       ## GenServer handle_* callbacks
       ##
 
       @doc false
       @impl true
-      def handle_call({:mode, mode}, _from, %{opts: opts} = s) do
+      def handle_call(
+            {:mode, mode},
+            _from,
+            %{device_name: dev_name, opts: opts} = s
+          ) do
         import Switch, only: [off: 1]
 
-        case mode do
-          :standby ->
-            nil
+        update_state_fn = fn
+          x when x == :standby ->
+            sw_rc = Switch.off(dev_name)
+            changes = %{mode: x, standby_reason: :api_call}
+            put_in(s, [:mode], x) |> put_in([:standby_reason], :api_call)
 
-          # no action when switching to :active, the server will take control
-          true ->
-            nil
+          x when x == :active ->
+            put_in(s, [:mode], x) |> put_in([:standby_reason], :none)
         end
 
-        state = put_in(s, [:mode], mode)
-
-        reply({:ok, mode}, state)
+        reply({:ok, mode}, update_state_fn.(mode))
       end
 
       @doc false
@@ -185,55 +295,125 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_continue(:bootstrap, s) do
-        # sequence_begin(s)
-        noreply(s)
+      # prevent any actions aside from changing the mode and getting the
+      # state (matched above) when in standby
+      def handle_call(_msg, _from, %{mode: :standby} = s),
+        do: reply(:standby_mode, s)
+
+      @doc false
+      @impl true
+      def handle_call(
+            {:on, on_opts} = msg,
+            _from,
+            %{opts: opts, device_name: name} = s
+          ) do
+        pos_rc = Switch.on(name)
+
+        # update the state's cached value, last change and increment the token
+        # to invalidate any pending timers
+        state =
+          update_state(s, :switch_rc, pos_rc)
+          |> update_in([:token], fn x -> x + 1 end)
+
+        with true <- valid_on_opts?(on_opts),
+             {:pending, res} when is_list(res) <- pos_rc,
+             {:position, pos} when is_boolean(pos) <- hd(res) do
+          schedule_off_if_needed(state, msg)
+        else
+          false ->
+            reply({:bad_args, on_opts}, state)
+
+          {:ok, _pos} ->
+            schedule_off_if_needed(state, msg)
+
+          error ->
+            reply(error, state)
+        end
       end
 
-      # @doc false
-      # @impl true
-      # def handle_continue({:control_temperature}, s) do
-      #   validate_seen(s)
-      #   |> control_temperature()
-      #   |> noreply()
-      # end
+      @doc false
+      @impl true
+      def handle_call({:off}, _from, %{opts: opts, device_name: name} = s) do
+        pos_rc = Switch.off(name)
 
-      # @doc false
-      # @impl true
-      # def handle_info(
-      #       {:notify, dev_type, %_{name: n} = obj},
-      #       %{opts: opts} = s
-      #     )
-      #     when dev_type in [:sensor, :switch] do
-      #   # function to retrieve the current value of the device
-      #   current_fn = fn
-      #     :switch -> Switch.position(n)
-      #     :sensor -> Sensor.fahrenheit(n, sensor_opts(opts))
-      #   end
-      #
-      #   cond do
-      #     # the device name matches one from the configuration
-      #     n == get_in(opts, [dev_type, :name]) ->
-      #       import TimeSupport, only: [utc_now: 0]
-      #
-      #       # stuff the actual device struct into :devices
-      #       put_in(s, [:devices, dev_type], obj)
-      #       # stuff the current value of the device into the state
-      #       |> put_in([:current, dev_type], current_fn.(dev_type))
-      #       # note when this device was last seen
-      #       |> put_in([:seen, dev_type], utc_now())
-      #       # update the number of messages received for this dev type
-      #       |> update_in([:msg_counts, dev_type], &(&1 + 1))
-      #       # update the state and then continue with controlling the temperature
-      #       # NOTE: control_temperature/1 is, during normal operations, called
-      #       #       twice.  once for the sensor msg and again for the switch msg.
-      #       #       this behaviour is by design.
-      #       |> continue({:control_temperature})
-      #
-      #     true ->
-      #       noreply(s)
-      #   end
-      # end
+        # update the state's cached value, last change and increment the token
+        # to invalidate any pending timers
+        state =
+          update_state(s, :switch_rc, pos_rc)
+          |> update_in([:token], fn x -> x + 1 end)
+
+        with {:pending, res} when is_list(res) <- pos_rc,
+             [position: pos] when is_boolean(pos) <- res do
+          reply(:ok, state)
+        else
+          {:ok, _pos} ->
+            reply(:ok, state)
+
+          error ->
+            reply(error, state)
+        end
+      end
+
+      @doc false
+      @impl true
+      def handle_call({:value, opts}, _from, %{device_name: name} = s) do
+        with {:cached, false, true} <- {:cached, opts == [:cached], opts == []},
+             # when there are no opts get the current value of the state
+             {:ok, pos} = pos_rc <- Switch.position(name),
+             # and cache it
+             state <- update_state(s, :switch_rc, pos_rc) do
+          reply(pos, state)
+        else
+          # return the cached value when included in the opts
+          {:cached, true, false} ->
+            s[:cached_value] |> reply(s)
+
+          # unknown opts
+          {:cached, false, false} ->
+            reply({:bad_args, opts}, s)
+
+          # some error occured, cache and return it
+          error ->
+            state = update_state(s, :switch_rc, error)
+            reply(error, state)
+        end
+      end
+
+      @doc false
+      @impl true
+      def handle_continue(:bootstrap, %{device_name: dev_name} = s) do
+        import Switch, only: [exists?: 1]
+
+        # if the device does not exist immediately entry standby mode
+        # and note the reason
+        case exists?(dev_name) do
+          true ->
+            noreply(s)
+
+          false ->
+            map = %{mode: :standby, standby_reason: :device_does_not_exist}
+            noreply_merge_state(s, map)
+        end
+      end
+
+      @doc false
+      @impl true
+      # handle the case when the msg_token matches the current state.
+      def handle_info({:off_timer, msg_token}, %{token: token} = s)
+          when msg_token == token do
+        import Helen.Time.Helper, only: [utc_now: 0]
+
+        pos_rc = Switch.off(s[:device_name])
+
+        update_state(s, :switch_rc, pos_rc)
+        |> noreply()
+      end
+
+      # NOTE:  when the msg_token does not match the state token then
+      #        a change has occurred and this off message should be ignored
+      def handle_info({:off_timer, _msg_token} = msg, s) do
+        noreply(s)
+      end
 
       @doc false
       @impl true
@@ -256,6 +436,43 @@ defmodule GenDevice do
       ## PRIVATE
       ##
 
+      defp schedule_off_if_needed(
+             %{device_name: name, token: token} = s,
+             {_cmd, opts}
+           ) do
+        import Helen.Time.Helper, only: [list_to_ms: 2]
+
+        case opts do
+          [on_for: on_opts] when is_list(on_opts) ->
+            on_ms = list_to_ms(on_opts, milliseconds: 1)
+
+            Process.send_after(__MODULE__, {:off_timer, token}, on_ms)
+
+          _anything ->
+            nil
+        end
+
+        reply(:ok, s)
+      end
+
+      defp update_state(state, :switch_rc, sw_rc) do
+        import Helen.Time.Helper, only: [utc_now: 0]
+
+        state
+        |> Map.merge(%{cached_value: sw_rc, last_device_change: utc_now()})
+      end
+
+      defp valid_on_opts?(on_opts) do
+        import Helen.Time.Helper, only: [valid_duration_opts?: 1]
+
+        case on_opts do
+          # empty opts indicates to not scheduled off
+          x when x == [] -> true
+          # other wise ask the helper to validate the opts
+          x -> valid_duration_opts?(x[:on_for])
+        end
+      end
+
       ##
       ## State Helpers
       ##
@@ -263,7 +480,7 @@ defmodule GenDevice do
       defp loop_timeout(%{opts: opts}) do
         import TimeSupport, only: [list_to_ms: 2]
 
-        list_to_ms(opts[:timeout], minutes: 5)
+        list_to_ms(opts[:timeout], seconds: 30)
       end
 
       defp update_last_timeout(s) do
@@ -278,6 +495,7 @@ defmodule GenDevice do
       ##
 
       defp noreply(s), do: {:noreply, s, loop_timeout(s)}
+      defp noreply_merge_state(s, map), do: {:noreply, Map.merge(s, map)}
       defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
     end
   end

@@ -69,7 +69,7 @@ defmodule Reef.Salt.Mix do
 
       ExtraMod.task_store_rc({MOD, sub, rc})
 
-      Reef.keep_fresh(start_delay: [minutes: 1])
+      # Reef.keep_fresh(start_delay: [minutes: 1])
 
       ["salt mix ", Atom.to_string(sub), " complete"]
       |> ExtraMod.task_store_msg({MOD, :mix})

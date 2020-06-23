@@ -107,6 +107,10 @@ defmodule Switch do
   @doc since: "0.0.21"
   defdelegate delete(name_or_id), to: Alias, as: :delete
 
+  @doc delegate_to: {Alias, :exists?, 1}
+  @doc since: "0.0.27"
+  defdelegate exists?(name_or_id), to: Alias, as: :exists?
+
   @doc delegate_to: {Alias, :news, 1}
   @doc since: "0.0.22"
   defdelegate names, to: Alias, as: :names
