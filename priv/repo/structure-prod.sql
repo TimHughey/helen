@@ -103,7 +103,8 @@ CREATE TABLE public.pwm_cmd (
     sent_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    alias_id bigint
 );
 
 
@@ -342,8 +343,8 @@ CREATE TABLE public.sensor_datapoint (
     temp_c real,
     relhum real,
     capacitance real,
-    device_id bigint,
-    reading_at timestamp without time zone
+    reading_at timestamp without time zone,
+    device_id bigint
 );
 
 
@@ -450,7 +451,8 @@ CREATE TABLE public.switch_command (
     sent_at timestamp without time zone NOT NULL,
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    alias_id bigint
 );
 
 
@@ -509,83 +511,6 @@ CREATE SEQUENCE public.switch_device_id_seq
 --
 
 ALTER SEQUENCE public.switch_device_id_seq OWNED BY public.switch_device.id;
-
-
---
--- Name: thermostat; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.thermostat (
-    id bigint NOT NULL,
-    name character varying(50) NOT NULL,
-    description character varying(100),
-    switch character varying(50) NOT NULL,
-    active_profile character varying(255) DEFAULT 'standby'::character varying,
-    sensor character varying(40) NOT NULL,
-    state character varying(15) DEFAULT 'new'::character varying NOT NULL,
-    state_at timestamp without time zone,
-    log boolean DEFAULT false NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL,
-    switch_check_ms integer DEFAULT 900000
-);
-
-
---
--- Name: thermostat_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.thermostat_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: thermostat_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.thermostat_id_seq OWNED BY public.thermostat.id;
-
-
---
--- Name: thermostat_profile; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.thermostat_profile (
-    id bigint NOT NULL,
-    thermostat_id bigint,
-    name character varying(25) NOT NULL,
-    low_offset double precision DEFAULT '-0.2'::numeric NOT NULL,
-    high_offset double precision DEFAULT 0.0 NOT NULL,
-    check_ms integer DEFAULT 300 NOT NULL,
-    ref_sensor character varying(40),
-    ref_offset double precision,
-    fixed_setpt double precision,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: thermostat_profile_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.thermostat_profile_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: thermostat_profile_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.thermostat_profile_id_seq OWNED BY public.thermostat_profile.id;
 
 
 --
@@ -670,20 +595,6 @@ ALTER TABLE ONLY public.switch_command ALTER COLUMN id SET DEFAULT nextval('publ
 --
 
 ALTER TABLE ONLY public.switch_device ALTER COLUMN id SET DEFAULT nextval('public.switch_device_id_seq'::regclass);
-
-
---
--- Name: thermostat id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thermostat ALTER COLUMN id SET DEFAULT nextval('public.thermostat_id_seq'::regclass);
-
-
---
--- Name: thermostat_profile id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thermostat_profile ALTER COLUMN id SET DEFAULT nextval('public.thermostat_profile_id_seq'::regclass);
 
 
 --
@@ -791,26 +702,17 @@ ALTER TABLE ONLY public.switch_device
 
 
 --
--- Name: thermostat thermostat_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thermostat
-    ADD CONSTRAINT thermostat_pkey PRIMARY KEY (id);
-
-
---
--- Name: thermostat_profile thermostat_profile_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thermostat_profile
-    ADD CONSTRAINT thermostat_profile_pkey PRIMARY KEY (id);
-
-
---
 -- Name: helen_mod_config_module_index; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX helen_mod_config_module_index ON public.helen_mod_config USING btree (module);
+
+
+--
+-- Name: pwm_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_alias_device_id_index ON public.pwm_alias USING btree (device_id);
 
 
 --
@@ -828,10 +730,31 @@ CREATE INDEX pwm_cmd_acked_index ON public.pwm_cmd USING btree (acked);
 
 
 --
+-- Name: pwm_cmd_alias_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_alias_id_index ON public.pwm_cmd USING btree (alias_id);
+
+
+--
+-- Name: pwm_cmd_orphan_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_orphan_index ON public.pwm_cmd USING btree (orphan);
+
+
+--
 -- Name: pwm_cmd_refid_index; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX pwm_cmd_refid_index ON public.pwm_cmd USING btree (refid);
+
+
+--
+-- Name: pwm_cmd_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_sent_at_index ON public.pwm_cmd USING btree (sent_at);
 
 
 --
@@ -870,13 +793,6 @@ CREATE UNIQUE INDEX sensor_alias_name_index ON public.sensor_alias USING btree (
 
 
 --
--- Name: sensor_datapoint_device_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX sensor_datapoint_device_id_index ON public.sensor_datapoint USING btree (device_id);
-
-
---
 -- Name: sensor_datapoint_reading_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -898,6 +814,13 @@ CREATE UNIQUE INDEX sensor_device_unique_index ON public.sensor_device USING btr
 
 
 --
+-- Name: switch_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_alias_device_id_index ON public.switch_alias USING btree (device_id);
+
+
+--
 -- Name: switch_alias_name_hash_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -912,17 +835,24 @@ CREATE UNIQUE INDEX switch_alias_name_index ON public.switch_alias USING btree (
 
 
 --
--- Name: switch_command_ack_at_sent_at_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_command_acked_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_ack_at_sent_at_index ON public.switch_command USING btree (ack_at, sent_at);
+CREATE INDEX switch_command_acked_index ON public.switch_command USING btree (acked);
 
 
 --
--- Name: switch_command_acked_orphan_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_command_alias_id_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_acked_orphan_index ON public.switch_command USING btree (acked, orphan);
+CREATE INDEX switch_command_alias_id_index ON public.switch_command USING btree (alias_id);
+
+
+--
+-- Name: switch_command_orphan_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_command_orphan_index ON public.switch_command USING btree (orphan);
 
 
 --
@@ -933,24 +863,17 @@ CREATE UNIQUE INDEX switch_command_refid_index ON public.switch_command USING bt
 
 
 --
+-- Name: switch_command_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_command_sent_at_index ON public.switch_command USING btree (sent_at);
+
+
+--
 -- Name: switch_device_device_index; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX switch_device_device_index ON public.switch_device USING btree (device);
-
-
---
--- Name: thermostat_name_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX thermostat_name_index ON public.thermostat USING btree (name);
-
-
---
--- Name: thermostat_profile_id_name_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX thermostat_profile_id_name_index ON public.thermostat_profile USING btree (id, name);
 
 
 --
@@ -959,6 +882,14 @@ CREATE UNIQUE INDEX thermostat_profile_id_name_index ON public.thermostat_profil
 
 ALTER TABLE ONLY public.pwm_alias
     ADD CONSTRAINT pwm_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.pwm_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: pwm_cmd pwm_cmd_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pwm_cmd
+    ADD CONSTRAINT pwm_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.pwm_alias(id);
 
 
 --
@@ -982,7 +913,7 @@ ALTER TABLE ONLY public.sensor_alias
 --
 
 ALTER TABLE ONLY public.sensor_datapoint
-    ADD CONSTRAINT sensor_datapoint_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.sensor_device(id);
+    ADD CONSTRAINT sensor_datapoint_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.sensor_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -994,6 +925,14 @@ ALTER TABLE ONLY public.switch_alias
 
 
 --
+-- Name: switch_command switch_command_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.switch_command
+    ADD CONSTRAINT switch_command_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id);
+
+
+--
 -- Name: switch_command switch_command_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1002,16 +941,86 @@ ALTER TABLE ONLY public.switch_command
 
 
 --
--- Name: thermostat_profile thermostat_profile_thermostat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thermostat_profile
-    ADD CONSTRAINT thermostat_profile_thermostat_id_fkey FOREIGN KEY (thermostat_id) REFERENCES public.thermostat(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20171217150128), (20171224164529), (20171224225113), (20171228191703), (20171229001359), (20171231182344), (20180101153253), (20180102171624), (20180102175335), (20180217212153), (20180218021213), (20180222165118), (20180222184042), (20180305193804), (20180307143400), (20180517201719), (20180708221600), (20180709181021), (20190308124055), (20190316032007), (20190317155502), (20190320124824), (20190416130912), (20190417011910), (20191018110319), (20191022013914), (20200105131440), (20200115151705), (20200116024319), (20200127033742), (20200128032134), (20200210202655), (20200212175538), (20200212183409), (20200213192845), (20200215173921), (20200217154954), (20200302001850), (20200302155853), (20200309213120), (20200311130709), (20200313132136), (20200314125818), (20200314144615), (20200314152346), (20200314233840), (20200320022913), (20200325211220), (20200506182825), (20200511174457), (20200512174739), (20200512185326), (20200513205755), (20200522043654), (20200525210412), (20200526171324), (20200526172112), (20200527115635), (20200527161830), (20200529123232), (20200529190741), (20200602110652), (20200602194456), (20200603171602), (20200603180219), (20200605101957), (20200606154209), (20200607232505), (20200608133620), (20200614233621), (20200615131244), (20200615183810), (20200616131408), (20200617120412), (20200617172518);
-
+INSERT INTO public."schema_migrations" (version) VALUES (20171217150128);
+INSERT INTO public."schema_migrations" (version) VALUES (20171224164529);
+INSERT INTO public."schema_migrations" (version) VALUES (20171224225113);
+INSERT INTO public."schema_migrations" (version) VALUES (20171228191703);
+INSERT INTO public."schema_migrations" (version) VALUES (20171229001359);
+INSERT INTO public."schema_migrations" (version) VALUES (20171231182344);
+INSERT INTO public."schema_migrations" (version) VALUES (20180101153253);
+INSERT INTO public."schema_migrations" (version) VALUES (20180102171624);
+INSERT INTO public."schema_migrations" (version) VALUES (20180102175335);
+INSERT INTO public."schema_migrations" (version) VALUES (20180217212153);
+INSERT INTO public."schema_migrations" (version) VALUES (20180218021213);
+INSERT INTO public."schema_migrations" (version) VALUES (20180222165118);
+INSERT INTO public."schema_migrations" (version) VALUES (20180222184042);
+INSERT INTO public."schema_migrations" (version) VALUES (20180305193804);
+INSERT INTO public."schema_migrations" (version) VALUES (20180307143400);
+INSERT INTO public."schema_migrations" (version) VALUES (20180517201719);
+INSERT INTO public."schema_migrations" (version) VALUES (20180708221600);
+INSERT INTO public."schema_migrations" (version) VALUES (20180709181021);
+INSERT INTO public."schema_migrations" (version) VALUES (20190308124055);
+INSERT INTO public."schema_migrations" (version) VALUES (20190316032007);
+INSERT INTO public."schema_migrations" (version) VALUES (20190317155502);
+INSERT INTO public."schema_migrations" (version) VALUES (20190320124824);
+INSERT INTO public."schema_migrations" (version) VALUES (20190416130912);
+INSERT INTO public."schema_migrations" (version) VALUES (20190417011910);
+INSERT INTO public."schema_migrations" (version) VALUES (20191018110319);
+INSERT INTO public."schema_migrations" (version) VALUES (20191022013914);
+INSERT INTO public."schema_migrations" (version) VALUES (20200105131440);
+INSERT INTO public."schema_migrations" (version) VALUES (20200115151705);
+INSERT INTO public."schema_migrations" (version) VALUES (20200116024319);
+INSERT INTO public."schema_migrations" (version) VALUES (20200127033742);
+INSERT INTO public."schema_migrations" (version) VALUES (20200128032134);
+INSERT INTO public."schema_migrations" (version) VALUES (20200210202655);
+INSERT INTO public."schema_migrations" (version) VALUES (20200212175538);
+INSERT INTO public."schema_migrations" (version) VALUES (20200212183409);
+INSERT INTO public."schema_migrations" (version) VALUES (20200213192845);
+INSERT INTO public."schema_migrations" (version) VALUES (20200215173921);
+INSERT INTO public."schema_migrations" (version) VALUES (20200217154954);
+INSERT INTO public."schema_migrations" (version) VALUES (20200302001850);
+INSERT INTO public."schema_migrations" (version) VALUES (20200302155853);
+INSERT INTO public."schema_migrations" (version) VALUES (20200309213120);
+INSERT INTO public."schema_migrations" (version) VALUES (20200311130709);
+INSERT INTO public."schema_migrations" (version) VALUES (20200313132136);
+INSERT INTO public."schema_migrations" (version) VALUES (20200314125818);
+INSERT INTO public."schema_migrations" (version) VALUES (20200314144615);
+INSERT INTO public."schema_migrations" (version) VALUES (20200314152346);
+INSERT INTO public."schema_migrations" (version) VALUES (20200314233840);
+INSERT INTO public."schema_migrations" (version) VALUES (20200320022913);
+INSERT INTO public."schema_migrations" (version) VALUES (20200325211220);
+INSERT INTO public."schema_migrations" (version) VALUES (20200506182825);
+INSERT INTO public."schema_migrations" (version) VALUES (20200511174457);
+INSERT INTO public."schema_migrations" (version) VALUES (20200512174739);
+INSERT INTO public."schema_migrations" (version) VALUES (20200512185326);
+INSERT INTO public."schema_migrations" (version) VALUES (20200513205755);
+INSERT INTO public."schema_migrations" (version) VALUES (20200522043654);
+INSERT INTO public."schema_migrations" (version) VALUES (20200525210412);
+INSERT INTO public."schema_migrations" (version) VALUES (20200526171324);
+INSERT INTO public."schema_migrations" (version) VALUES (20200526172112);
+INSERT INTO public."schema_migrations" (version) VALUES (20200527115635);
+INSERT INTO public."schema_migrations" (version) VALUES (20200527161830);
+INSERT INTO public."schema_migrations" (version) VALUES (20200529123232);
+INSERT INTO public."schema_migrations" (version) VALUES (20200529190741);
+INSERT INTO public."schema_migrations" (version) VALUES (20200602110652);
+INSERT INTO public."schema_migrations" (version) VALUES (20200602194456);
+INSERT INTO public."schema_migrations" (version) VALUES (20200603171602);
+INSERT INTO public."schema_migrations" (version) VALUES (20200603180219);
+INSERT INTO public."schema_migrations" (version) VALUES (20200605101957);
+INSERT INTO public."schema_migrations" (version) VALUES (20200606154209);
+INSERT INTO public."schema_migrations" (version) VALUES (20200607232505);
+INSERT INTO public."schema_migrations" (version) VALUES (20200608133620);
+INSERT INTO public."schema_migrations" (version) VALUES (20200614233621);
+INSERT INTO public."schema_migrations" (version) VALUES (20200615131244);
+INSERT INTO public."schema_migrations" (version) VALUES (20200615183810);
+INSERT INTO public."schema_migrations" (version) VALUES (20200616131408);
+INSERT INTO public."schema_migrations" (version) VALUES (20200617120412);
+INSERT INTO public."schema_migrations" (version) VALUES (20200617172518);
+INSERT INTO public."schema_migrations" (version) VALUES (20200619202154);
+INSERT INTO public."schema_migrations" (version) VALUES (20200623215512);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624104559);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624152332);
