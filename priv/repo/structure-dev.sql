@@ -103,7 +103,8 @@ CREATE TABLE public.pwm_cmd (
     sent_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    alias_id bigint
 );
 
 
@@ -450,7 +451,8 @@ CREATE TABLE public.switch_command (
     sent_at timestamp without time zone NOT NULL,
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    alias_id bigint
 );
 
 
@@ -834,6 +836,14 @@ ALTER TABLE ONLY public.pwm_alias
 
 
 --
+-- Name: pwm_cmd pwm_cmd_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pwm_cmd
+    ADD CONSTRAINT pwm_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.pwm_alias(id);
+
+
+--
 -- Name: pwm_cmd pwm_cmd_pwm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -863,6 +873,14 @@ ALTER TABLE ONLY public.sensor_datapoint
 
 ALTER TABLE ONLY public.switch_alias
     ADD CONSTRAINT switch_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.switch_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: switch_command switch_command_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.switch_command
+    ADD CONSTRAINT switch_command_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id);
 
 
 --
@@ -954,3 +972,5 @@ INSERT INTO public."schema_migrations" (version) VALUES (20200617120412);
 INSERT INTO public."schema_migrations" (version) VALUES (20200617172518);
 INSERT INTO public."schema_migrations" (version) VALUES (20200619202154);
 INSERT INTO public."schema_migrations" (version) VALUES (20200623215512);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624104559);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);

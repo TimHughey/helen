@@ -22,6 +22,11 @@ defmodule Switch.DB.Alias do
       define_field: false
     )
 
+    has_many(:cmds, Command,
+      references: :id,
+      foreign_key: :alias_id
+    )
+
     timestamps(type: :utc_datetime_usec)
   end
 

@@ -28,6 +28,8 @@ defmodule GenDevice do
           device_name: c_opts[:device_name],
           cached_value: nil,
           last_timeout: epoch(),
+          lasts: %{timeout: nil, cmd: nil, pid: nil},
+          active_cmd: nil,
           timeouts: 0,
           opts: c_opts,
           token: 1,
@@ -485,7 +487,7 @@ defmodule GenDevice do
       defp update_last_timeout(s) do
         import TimeSupport, only: [utc_now: 0]
 
-        put_in(s[:last_timeout], utc_now())
+        put_in(s, [:lasts, :timeout], utc_now())
         |> Map.update(:timeouts, 1, &(&1 + 1))
       end
 

@@ -115,8 +115,10 @@ defmodule Broom do
       def default_opts, do: []
       defoverridable default_opts: 0
 
-      def find_refid(ref) when is_binary(ref),
-        do: Repo.get_by(__MODULE__, refid: ref) |> Repo.preload([:device])
+      def find_refid(ref) when is_binary(ref) do
+        preloads = __MODULE__.__schema__(:associations)
+        Repo.get_by(__MODULE__, refid: ref) |> Repo.preload(preloads)
+      end
 
       defoverridable find_refid: 1
 
@@ -167,10 +169,7 @@ defmodule Broom do
       def release(msg), do: Broom.release(broom(), msg)
       defoverridable release: 1
 
-      def reload(%{id: id}) do
-        Repo.get_by(__MODULE__, id)
-      end
-
+      defdelegate reload(cmd), to: Broom
       defoverridable reload: 1
 
       def start_link(opts) do
@@ -261,7 +260,7 @@ defmodule Broom do
   """
   @doc since: "0.0.24"
   def reload(%{__struct__: schema, id: id} = cmd) when is_struct(cmd) do
-    preloads = Map.take(cmd, [:device]) |> Map.keys()
+    preloads = schema.(:associations)
 
     Repo.get_by!(schema, id: id) |> Repo.preload(preloads)
   end

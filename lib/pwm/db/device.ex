@@ -93,14 +93,14 @@ defmodule PulseWidth.DB.Device do
   # NOTE: the %_{} assignment match is any struct
   def preload(%_{} = x), do: preload_unacked_cmds(x) |> Repo.preload([:_alias_])
 
-  def record_cmd(%Schema{} = d, %Alias{}, opts) when is_list(opts) do
+  def record_cmd(%Schema{} = d, %Alias{} = a, opts) when is_list(opts) do
     import PulseWidth.Payload.Duty, only: [send_cmd: 3]
     import TimeSupport, only: [utc_now: 0]
 
     {cmd_opts, record_opts} = Keyword.split(opts, [:ack])
     cmd_map = record_opts[:cmd_map] || {:bad_args, opts}
 
-    with %{cmd: {:ok, %Command{refid: refid}}} <- Command.add(d, utc_now()),
+    with %{cmd: {:ok, %Command{refid: refid}}} <- Command.add(d, a, utc_now()),
          # the command was inserted, now update the device last_cmd_at
          {:ok, device} <- update(d, last_cmd_at: utc_now()),
          %_{cmds: [%{refid: ref}]} = device <- preload_last_cmd(device, refid),
