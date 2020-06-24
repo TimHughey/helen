@@ -440,7 +440,6 @@ defmodule GenDevice do
             opt when opt == :notify <- at_opts do
           msg = {:gen_device, category, cmd, dev_name}
 
-          IO.puts(["sending ", inspect(reply_pid), " ", inspect(msg)])
           send(reply_pid, msg)
         end
       end
@@ -481,7 +480,7 @@ defmodule GenDevice do
       defp valid_on_off_opts?(opts) do
         import Helen.Time.Helper, only: [valid_duration_opts?: 1]
 
-        for opt <- opts do
+        valid? = fn opt ->
           case opt do
             {:for, x} -> valid_duration_opts?(x)
             {:at_start, [:notify]} -> true
@@ -489,7 +488,10 @@ defmodule GenDevice do
             _x -> false
           end
         end
-        |> Enum.all?(fn x -> x == true end)
+
+        for opt <- opts, reduce: true do
+          opts_good -> opts_good and valid?.(opt)
+        end
       end
 
       ##
