@@ -28,7 +28,7 @@ defmodule GenDevice do
           device_name: c_opts[:device_name],
           cached_value: nil,
           last_timeout: epoch(),
-          lasts: %{timeout: nil, cmd: nil, pid: nil},
+          lasts: %{cmd: nil, pid: nil},
           active_cmd: nil,
           timeouts: 0,
           opts: c_opts,
@@ -114,6 +114,8 @@ defmodule GenDevice do
       @doc """
       Switch off the device managed by this server.
 
+      See `GenDevice.on/1` for options.
+
       Returns :ok or an error tuple
 
       ## Examples
@@ -123,8 +125,8 @@ defmodule GenDevice do
 
       """
       @doc since: "0.0.27"
-      def off do
-        GenServer.call(__MODULE__, {:off})
+      def off(opts \\ []) when is_list(opts) do
+        GenServer.call(__MODULE__, {:off, opts})
       end
 
       @doc """
@@ -136,11 +138,11 @@ defmodule GenDevice do
         `for: [minutes: 1]`
           switch the device on for the specified duration
 
-        `at_start: [notify: true]`
+        `at_start: [:notify]`
           send the caller `{:gen_device, :at_start, "switch alias"}` when
           turning on the switch
 
-        `at_end: [notify: true]`
+        `at_finish: [:notify]`
           send the caller `{:gen_device, :at_start, "switch alias"}` when
           turning off the switch
 
@@ -297,28 +299,36 @@ defmodule GenDevice do
       @doc false
       @impl true
       def handle_call(
-            {:on, on_opts} = msg,
-            _from,
-            %{opts: opts, device_name: name} = s
+            {cmd, cmd_opts} = msg,
+            {pid, _ref},
+            %{opts: opts, lasts: lasts, device_name: dev_name} = s
           ) do
-        pos_rc = Switch.on(name)
+        pos_rc = adjust_switch(cmd, dev_name)
 
         # update the state's cached value, last change and increment the token
         # to invalidate any pending timers
+        lasts = Map.merge(lasts, %{cmd: cmd, pid: pid})
+
         state =
-          update_state(s, :switch_rc, pos_rc)
+          Map.merge(s, %{lasts: lasts, switch_rc: pos_rc, active_cmd: cmd})
           |> update_in([:token], fn x -> x + 1 end)
 
-        with true <- valid_on_off_opts?(on_opts),
+        send_at_timer_msg_if_needed(
+          {cmd, cmd_opts, pid},
+          :at_start,
+          dev_name
+        )
+
+        with true <- valid_on_off_opts?(cmd_opts),
              {:pending, res} when is_list(res) <- pos_rc,
              {:position, pos} when is_boolean(pos) <- hd(res) do
-          schedule_off_if_needed(state, msg)
+          schedule_timer_if_needed(state, pid, msg)
         else
           false ->
-            reply({:bad_args, on_opts}, state)
+            reply({:bad_args, cmd_opts}, state)
 
           {:ok, _pos} ->
-            schedule_off_if_needed(state, msg)
+            schedule_timer_if_needed(state, pid, msg)
 
           error ->
             reply(error, state)
@@ -327,33 +337,10 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_call({:off}, _from, %{opts: opts, device_name: name} = s) do
-        pos_rc = Switch.off(name)
-
-        # update the state's cached value, last change and increment the token
-        # to invalidate any pending timers
-        state =
-          update_state(s, :switch_rc, pos_rc)
-          |> update_in([:token], fn x -> x + 1 end)
-
-        with {:pending, res} when is_list(res) <- pos_rc,
-             [position: pos] when is_boolean(pos) <- res do
-          reply(:ok, state)
-        else
-          {:ok, _pos} ->
-            reply(:ok, state)
-
-          error ->
-            reply(error, state)
-        end
-      end
-
-      @doc false
-      @impl true
-      def handle_call({:value, opts}, _from, %{device_name: name} = s) do
+      def handle_call({:value, opts}, _from, %{device_name: dev_name} = s) do
         with {:cached, false, true} <- {:cached, opts == [:cached], opts == []},
              # when there are no opts get the current value of the state
-             {:ok, pos} = pos_rc <- Switch.position(name),
+             {:ok, pos} = pos_rc <- Switch.position(dev_name),
              # and cache it
              state <- update_state(s, :switch_rc, pos_rc) do
           reply(pos, state)
@@ -393,19 +380,24 @@ defmodule GenDevice do
       @doc false
       @impl true
       # handle the case when the msg_token matches the current state.
-      def handle_info({:off_timer, msg_token}, %{token: token} = s)
+      def handle_info(
+            {:timer, {cmd, cmd_opts, reply_pid} = msg, msg_token},
+            %{device_name: dev_name, token: token} = s
+          )
           when msg_token == token do
         import Helen.Time.Helper, only: [utc_now: 0]
 
-        pos_rc = Switch.off(s[:device_name])
+        pos_rc = adjust_switch(cmd, dev_name)
 
-        update_state(s, :switch_rc, pos_rc)
+        send_at_timer_msg_if_needed(msg, :at_finish, dev_name)
+
+        Map.merge(s, %{switch_rc: pos_rc, active_cmd: :none})
         |> noreply()
       end
 
       # NOTE:  when the msg_token does not match the state token then
       #        a change has occurred and this off message should be ignored
-      def handle_info({:off_timer, _msg_token} = msg, s) do
+      def handle_info({:timer, _msg, _msg_token}, s) do
         noreply(s)
       end
 
@@ -430,16 +422,47 @@ defmodule GenDevice do
       ## PRIVATE
       ##
 
-      defp schedule_off_if_needed(
-             %{device_name: name, token: token} = s,
-             {_cmd, opts}
+      def adjust_switch(cmd, name) do
+        case cmd do
+          :on -> Switch.on(name)
+          :off -> Switch.off(name)
+        end
+      end
+
+      def send_at_timer_msg_if_needed(
+            {cmd, cmd_opts, reply_pid} = _original_cmd_msg,
+            category,
+            dev_name
+          ) do
+        # if the matching ':at' option was specified
+        for {c, at_opts} when c == category <- cmd_opts,
+            # examine the at opts for :notify
+            opt when opt == :notify <- at_opts do
+          msg = {:gen_device, category, cmd, dev_name}
+
+          IO.puts(["sending ", inspect(reply_pid), " ", inspect(msg)])
+          send(reply_pid, msg)
+        end
+      end
+
+      defp schedule_timer_if_needed(
+             %{token: token} = s,
+             reply_pid,
+             {cmd, cmd_opts}
            ) do
         import Helen.Time.Helper, only: [list_to_ms: 2]
         import Process, only: [send_after: 3]
 
-        case opts[:for] do
-          nil -> nil
-          x -> send_after(self(), {:off_timer, token}, list_to_ms(x, []))
+        case cmd_opts[:for] do
+          nil ->
+            nil
+
+          x ->
+            send_after(
+              self(),
+              {:timer, {cmd, cmd_opts, reply_pid}, token},
+              list_to_ms(x, [])
+            )
         end
 
         reply(:ok, s)
@@ -460,12 +483,13 @@ defmodule GenDevice do
 
         for opt <- opts do
           case opt do
-            [for: x] -> valid_duration_opts?(x)
-            [at_start: [notify: x]] when is_boolean(x) -> true
-            [at_end: [notify: x]] when is_boolean(x) -> true
+            {:for, x} -> valid_duration_opts?(x)
+            {:at_start, [:notify]} -> true
+            {:at_finish, [:notify]} -> true
             _x -> false
           end
         end
+        |> Enum.all?(fn x -> x == true end)
       end
 
       ##
@@ -478,10 +502,12 @@ defmodule GenDevice do
         list_to_ms(opts[:timeout], seconds: 30)
       end
 
+      defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
+
       defp update_last_timeout(s) do
         import TimeSupport, only: [utc_now: 0]
 
-        put_in(s, [:lasts, :timeout], utc_now())
+        put_in(s, [:last_timeout], utc_now())
         |> Map.update(:timeouts, 1, &(&1 + 1))
       end
 
