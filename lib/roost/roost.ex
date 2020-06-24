@@ -74,6 +74,7 @@ defmodule Roost do
 
     PulseWidth.duty("roost el wire", duty: 4096)
     PulseWidth.duty("roost led forest", duty: 200)
+    PulseWidth.duty("roost disco ball", duty: 5200)
 
     # put the next messgage to send in the state and set the timeout
     # to allow the disco ball to spin up
