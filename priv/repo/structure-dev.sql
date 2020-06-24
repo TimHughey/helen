@@ -709,6 +709,13 @@ CREATE UNIQUE INDEX helen_mod_config_module_index ON public.helen_mod_config USI
 
 
 --
+-- Name: pwm_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_alias_device_id_index ON public.pwm_alias USING btree (device_id);
+
+
+--
 -- Name: pwm_alias_name_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -723,10 +730,31 @@ CREATE INDEX pwm_cmd_acked_index ON public.pwm_cmd USING btree (acked);
 
 
 --
+-- Name: pwm_cmd_alias_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_alias_id_index ON public.pwm_cmd USING btree (alias_id);
+
+
+--
+-- Name: pwm_cmd_orphan_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_orphan_index ON public.pwm_cmd USING btree (orphan);
+
+
+--
 -- Name: pwm_cmd_refid_index; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX pwm_cmd_refid_index ON public.pwm_cmd USING btree (refid);
+
+
+--
+-- Name: pwm_cmd_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_sent_at_index ON public.pwm_cmd USING btree (sent_at);
 
 
 --
@@ -786,6 +814,13 @@ CREATE UNIQUE INDEX sensor_device_unique_index ON public.sensor_device USING btr
 
 
 --
+-- Name: switch_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_alias_device_id_index ON public.switch_alias USING btree (device_id);
+
+
+--
 -- Name: switch_alias_name_hash_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -800,17 +835,24 @@ CREATE UNIQUE INDEX switch_alias_name_index ON public.switch_alias USING btree (
 
 
 --
--- Name: switch_command_ack_at_sent_at_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_command_acked_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_ack_at_sent_at_index ON public.switch_command USING btree (ack_at, sent_at);
+CREATE INDEX switch_command_acked_index ON public.switch_command USING btree (acked);
 
 
 --
--- Name: switch_command_acked_orphan_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_command_alias_id_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_acked_orphan_index ON public.switch_command USING btree (acked, orphan);
+CREATE INDEX switch_command_alias_id_index ON public.switch_command USING btree (alias_id);
+
+
+--
+-- Name: switch_command_orphan_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_command_orphan_index ON public.switch_command USING btree (orphan);
 
 
 --
@@ -818,6 +860,13 @@ CREATE INDEX switch_command_acked_orphan_index ON public.switch_command USING bt
 --
 
 CREATE UNIQUE INDEX switch_command_refid_index ON public.switch_command USING btree (refid);
+
+
+--
+-- Name: switch_command_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_command_sent_at_index ON public.switch_command USING btree (sent_at);
 
 
 --
@@ -974,3 +1023,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20200619202154);
 INSERT INTO public."schema_migrations" (version) VALUES (20200623215512);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624104559);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624152332);

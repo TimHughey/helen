@@ -6,8 +6,8 @@ SELECT
     sc.sent_at AS "Sent",
     sc.ack_at AS "Acked"
 FROM
-    switch_command sc,
-    switch_alias sa
+    pwm_cmd sc,
+    pwm_alias sa
 WHERE
     sc.sent_at >= (NOW() - INTERVAL '3 hour')
     AND sc.alias_id = sa.id
