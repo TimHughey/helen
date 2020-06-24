@@ -169,7 +169,21 @@ defmodule Broom do
       def release(msg), do: Broom.release(broom(), msg)
       defoverridable release: 1
 
-      defdelegate reload(cmd), to: Broom
+      @doc """
+        Reload a device command.
+
+        Automatically preloads the associations [:alias, :device], if part of schema
+
+        Raises if not found, otherwise returns the reloaded command
+      """
+      @doc since: "0.0.24"
+      def reload(%{id: id} = cmd) when is_struct(cmd) do
+        import Repo, only: [get_by!: 2, preload: 2]
+
+        get_by!(__MODULE__, id: id)
+        |> preload(__MODULE__.__schema__(:associations))
+      end
+
       defoverridable reload: 1
 
       def start_link(opts) do
@@ -219,8 +233,8 @@ defmodule Broom do
   ## Broom Public API
   ##
 
-  def acked?(%{} = c) when is_struct(c) do
-    %{acked: ack} = cmd = reload(c)
+  def acked?(%{__struct__: schema} = c) when is_struct(c) do
+    %{acked: ack} = cmd = apply(schema, :reload, [c])
 
     # return a tuple that can be pattern matched
     {:acked, ack, cmd}
@@ -249,20 +263,6 @@ defmodule Broom do
       _ ->
         Map.put(msg, :broom_release, cmd_rc)
     end
-  end
-
-  @doc """
-    Reload an %Ecto.Schemea.t that is a command.
-
-    Automatically preloads the association :device, if part of schema
-
-    Raises if not found, otherwise returns the reloaded
-  """
-  @doc since: "0.0.24"
-  def reload(%{__struct__: schema, id: id} = cmd) when is_struct(cmd) do
-    preloads = schema.(:associations)
-
-    Repo.get_by!(schema, id: id) |> Repo.preload(preloads)
   end
 
   @doc """
@@ -376,7 +376,7 @@ defmodule Broom do
   defp orphan(%{__struct__: schema} = cmd) do
     import TimeSupport, only: [utc_now: 0]
 
-    cmd = reload(cmd)
+    cmd = apply(schema, :reload, [cmd])
 
     {:orphan,
      apply(schema, :update, [

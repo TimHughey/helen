@@ -132,6 +132,18 @@ defmodule GenDevice do
 
       Returns :ok or an error tuple
 
+      ## Option Examples
+        `for: [minutes: 1]`
+          switch the device on for the specified duration
+
+        `at_start: [notify: true]`
+          send the caller `{:gen_device, :at_start, "switch alias"}` when
+          turning on the switch
+
+        `at_end: [notify: true]`
+          send the caller `{:gen_device, :at_start, "switch alias"}` when
+          turning off the switch
+
       ## Examples
 
           iex> GenDevice.on()
@@ -139,27 +151,8 @@ defmodule GenDevice do
 
       """
       @doc since: "0.0.27"
-      def on do
-        GenServer.call(__MODULE__, {:on, []})
-      end
-
-      @doc """
-      Switch on the device managed by this server for the list duration.
-
-      Returns :ok or an error tuple
-
-      ## Options
-        [seconds: 10]
-
-      ## Examples
-
-          iex> GenServer.on_for([minutes: 1])
-          :ok
-
-      """
-      @doc since: "0.0.27"
-      def on_for(opts) when is_list(opts) do
-        GenServer.call(__MODULE__, {:on, [on_for: opts]})
+      def on(opts \\ []) when is_list(opts) do
+        GenServer.call(__MODULE__, {:on, opts})
       end
 
       @doc delegate_to: {__MODULE__, :value, 1}
@@ -316,7 +309,7 @@ defmodule GenDevice do
           update_state(s, :switch_rc, pos_rc)
           |> update_in([:token], fn x -> x + 1 end)
 
-        with true <- valid_on_opts?(on_opts),
+        with true <- valid_on_off_opts?(on_opts),
              {:pending, res} when is_list(res) <- pos_rc,
              {:position, pos} when is_boolean(pos) <- hd(res) do
           schedule_off_if_needed(state, msg)
@@ -442,15 +435,11 @@ defmodule GenDevice do
              {_cmd, opts}
            ) do
         import Helen.Time.Helper, only: [list_to_ms: 2]
+        import Process, only: [send_after: 3]
 
-        case opts do
-          [on_for: on_opts] when is_list(on_opts) ->
-            on_ms = list_to_ms(on_opts, milliseconds: 1)
-
-            Process.send_after(__MODULE__, {:off_timer, token}, on_ms)
-
-          _anything ->
-            nil
+        case opts[:for] do
+          nil -> nil
+          x -> send_after(self(), {:off_timer, token}, list_to_ms(x, []))
         end
 
         reply(:ok, s)
@@ -463,14 +452,19 @@ defmodule GenDevice do
         |> Map.merge(%{cached_value: sw_rc, last_device_change: utc_now()})
       end
 
-      defp valid_on_opts?(on_opts) do
+      # empty opts list is always valid
+      defp valid_on_off_opts([]), do: true
+
+      defp valid_on_off_opts?(opts) do
         import Helen.Time.Helper, only: [valid_duration_opts?: 1]
 
-        case on_opts do
-          # empty opts indicates to not scheduled off
-          x when x == [] -> true
-          # other wise ask the helper to validate the opts
-          x -> valid_duration_opts?(x[:on_for])
+        for opt <- opts do
+          case opt do
+            [for: x] -> valid_duration_opts?(x)
+            [at_start: [notify: x]] when is_boolean(x) -> true
+            [at_end: [notify: x]] when is_boolean(x) -> true
+            _x -> false
+          end
         end
       end
 

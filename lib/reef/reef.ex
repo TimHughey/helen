@@ -31,8 +31,7 @@ defmodule Reef do
   # def aerate_state(opts \\ []), do: Reef.Salt.Aerate.state(opts)
 
   defdelegate air_off, to: MixTank.Air, as: :off
-  defdelegate air_on, to: MixTank.Air, as: :on
-  defdelegate air_on_for(opts), to: MixTank.Air, as: :on_for
+  defdelegate air_on(opts), to: MixTank.Air, as: :on
   defdelegate air_toggle, to: MixTank.Air, as: :toggle
 
   def all_stop do
@@ -121,13 +120,11 @@ defmodule Reef do
   def mixtank_standby, do: mixtank_mode(:standby)
 
   defdelegate pump_off, to: MixTank.Pump, as: :off
-  defdelegate pump_on, to: MixTank.Pump, as: :on
-  defdelegate pump_on_for(opts), to: MixTank.Pump, as: :on_for
+  defdelegate pump_on(opts), to: MixTank.Pump, as: :on
   defdelegate pump_toggle, to: MixTank.Pump, as: :toggle
 
   defdelegate rodi_off, to: MixTank.Rodi, as: :off
-  defdelegate rodi_on, to: MixTank.Rodi, as: :on
-  defdelegate rodi_on_for(opts), to: MixTank.Rodi, as: :on_for
+  defdelegate rodi_on(opts), to: MixTank.Rodi, as: :on
   defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
 
   def temp_ok? do
