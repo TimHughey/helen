@@ -9,66 +9,114 @@ defmodule Roost do
   use GenServer, restart: :transient, shutdown: 5000
   use Helen.Module.Config
 
-  def abort(_) do
-    message = """
-
-    ***
-    *** aborting #{inspect(self())}
-    ***
-
-    """
-
-    IO.puts(message)
-    Process.exit(self(), :normal)
-  end
-
   ##
   ## GenServer init and start
   ##
 
   @impl true
   def init(args) do
+    import Helen.Time.Helper, only: [epoch: 0]
     config_opts = config_opts(args)
 
-    state = %{opts: config_opts}
+    state = %{
+      dance: :init,
+      opts: config_opts,
+      last_timeout: epoch(),
+      timeouts: 0,
+      token: 1
+    }
 
     {:ok, state}
   end
 
   def start_link(args) do
-    GenServer.start_link(Roost, args, name: Roost)
+    GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   ##
   ## Public API for GenServer related functions
   ##
 
-  def restart, do: Supervisor.restart_child(ExtraMod.Supervisor, Roost)
+  @doc """
+  Is this server alive?
+  """
+  @doc since: "0.0.27"
+  def alive? do
+    case GenServer.whereis(__MODULE__) do
+      nil -> false
+      pid when is_pid(pid) -> true
+      _anything -> false
+    end
+  end
 
-  def state, do: :sys.get_state(Roost)
+  @doc """
+  Restarts the server via the Supervisor
 
-  def stop, do: Supervisor.terminate_child(ExtraMod.Supervisor, Roost)
+  ## Examples
+
+      iex> Reef.Temp.Control.restart([])
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def restart(opts \\ []) do
+    # the Supervisor is the base of the module name with Supervisor appended
+    [sup_base | _tail] = Module.split(__MODULE__)
+
+    sup_mod = Module.concat([sup_base, "Supervisor"])
+
+    if GenServer.whereis(__MODULE__) do
+      Supervisor.terminate_child(sup_mod, __MODULE__)
+    end
+
+    Supervisor.delete_child(sup_mod, __MODULE__)
+    Supervisor.start_child(sup_mod, {__MODULE__, opts})
+  end
+
+  def state(keys \\ []) do
+    keys = [keys] |> List.flatten()
+    state = GenServer.call(__MODULE__, :state)
+
+    case keys do
+      [] -> state
+      [x] -> Map.get(state, x)
+      x -> Map.take(state, [x] |> List.flatten())
+    end
+  end
+
+  def timeouts, do: state(:timeouts)
 
   ##
   ## Roost Public API
   ##
 
-  def closing(opts \\ [minutes: 5]) do
-    GenServer.call(__MODULE__, {:closing, opts})
+  def all_stop do
+    GenServer.call(__MODULE__, {:all_stop})
   end
 
-  def close_now do
-    Process.send(Roost, {:closed}, [])
+  def dance_with_me do
+    GenServer.call(__MODULE__, {:dance})
   end
 
-  def open do
-    GenServer.call(__MODULE__, {:open})
+  def leaving(opts \\ "PT10M0.0S") do
+    GenServer.call(__MODULE__, {:leaving, opts})
   end
 
   def opts, do: Map.get(state(), :opts)
 
+  @doc false
   @impl true
-  def handle_call({:open}, _from, s) do
+  def handle_call(:state, _from, s), do: reply(s, s)
+
+  @impl true
+  def handle_call({:all_stop}, _from, state) do
+    state
+    |> all_stop()
+    |> reply(:answering_all_stop)
+  end
+
+  @impl true
+  def handle_call({:dance}, _from, state) do
     PulseWidth.duty_names_begin_with("roost lights", duty: 8191)
     PulseWidth.duty_names_begin_with("roost el wire entry", duty: 8191)
 
@@ -76,13 +124,19 @@ defmodule Roost do
     PulseWidth.duty("roost led forest", duty: 200)
     PulseWidth.duty("roost disco ball", duty: 5200)
 
-    # put the next messgage to send in the state and set the timeout
-    # to allow the disco ball to spin up
-    {:reply, :spinning_up, Map.put(s, :next_msg, {:open_part2}), 5000}
+    state = change_token(state)
+
+    Process.send_after(self(), {:timer, :slow_discoball, state[:token]}, 5000)
+
+    state
+    |> put_in([:active_cmd], :spinning_up)
+    |> reply(:spinning_up)
   end
 
   @impl true
-  def handle_call({:closing, opts}, _from, s) do
+  def handle_call({:leaving, opts}, _from, state) do
+    import Helen.Time.Helper, only: [to_ms: 1]
+
     PulseWidth.duty_names_begin_with("roost lights", duty: 0)
     PulseWidth.off("roost el wire")
     PulseWidth.off("roost disco ball")
@@ -92,25 +146,53 @@ defmodule Roost do
 
     PulseWidth.duty_names_begin_with("front", duty: 0.03)
 
-    closing_ms = duration_ms(opts)
+    state = change_token(state)
 
-    {:reply, :closing_sequence_initiated, Map.put(s, :next_msg, {:closed}),
-     closing_ms}
+    Process.send_after(self(), {:timer, :all_stop, state[:token]}, to_ms(opts))
+
+    state
+    |> put_in([:active_cmd], :leaving)
+    |> reply(:goodbye)
   end
 
   @impl true
-  def handle_info(:timeout, s) do
-    {next_msg, state} = Map.pop(s, :next_msg, false)
+  def handle_info({:timer, cmd, msg_token}, %{token: token} = state)
+      when msg_token == token do
+    case cmd do
+      :slow_discoball ->
+        PulseWidth.duty("roost disco ball", duty: 4500)
 
-    if next_msg do
-      Process.send(self(), next_msg, [])
+        state
+        |> put_in([:active_cmd], :dancing)
+        |> put_in([:dance], :yes)
+        |> noreply()
+
+      :all_stop ->
+        all_stop(state)
     end
-
-    {:noreply, state}
   end
 
+  # NOTE:  when the msg_token does not match the state token then
+  #        a change has occurred and this message should be ignored
   @impl true
-  def handle_info({:closed}, s) do
+  def handle_info({:timer, _msg, msg_token}, %{token: token} = s)
+      when msg_token != token do
+    noreply(s)
+  end
+
+  @doc false
+  @impl true
+  def handle_info(:timeout, state) do
+    state
+    |> update_last_timeout()
+    |> timeout_hook()
+  end
+
+  ##
+  ## Private
+  ##
+
+  defp all_stop(state) do
     PulseWidth.off("roost disco ball")
     PulseWidth.duty_names_begin_with("roost lights", duty: 0)
     PulseWidth.duty_names_begin_with("roost el wire", duty: 0)
@@ -118,39 +200,52 @@ defmodule Roost do
     PulseWidth.duty("roost led forest", duty: 0.02)
     PulseWidth.duty_names_begin_with("front", duty: 0.03)
 
-    {:noreply, Map.merge(s, %{roost_open: false, next_msg: nil})}
+    state
+    |> change_token()
+    |> put_in([:dance], :no)
+    |> put_in([:active_cmd], :none)
   end
 
-  @impl true
-  def handle_info({:open_part2}, s) do
-    PulseWidth.duty("roost disco ball", duty: 4500)
+  ##
+  ## GenServer Receive Loop Hooks
+  ##
 
-    {:noreply, Map.put(s, :roost_open, true)}
+  defp timeout_hook(%{} = s) do
+    noreply(s)
   end
 
-  defp duration(opts) when is_list(opts) do
-    # after hours of searching and not finding an existing capabiility
-    # in Timex we'll roll our own consisting of multiple Timex functions.
-    ~U[0000-01-01 00:00:00Z]
-    |> Timex.shift(Keyword.take(opts, valid_duration_opts()))
-    |> Timex.to_gregorian_microseconds()
-    |> Duration.from_microseconds()
+  ##
+  ## State Helpers
+  ##
+
+  defp change_token(%{} = s), do: update_in(s, [:token], fn x -> x + 1 end)
+
+  defp loop_timeout(%{opts: opts}) do
+    import Helen.Time.Helper, only: [to_ms: 2]
+
+    to_ms(opts[:timeout], "PT30.0S")
   end
 
-  defp duration(_anything), do: 0
+  # defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
 
-  defp duration_ms(opts) when is_list(opts),
-    do: duration(opts) |> Duration.to_milliseconds(truncate: true)
+  defp update_last_timeout(s) do
+    import Helen.Time.Helper, only: [utc_now: 0]
 
-  defp valid_duration_opts,
-    do: [
-      :microseconds,
-      :seconds,
-      :minutes,
-      :hours,
-      :days,
-      :weeks,
-      :months,
-      :years
-    ]
+    put_in(s, [:last_timeout], utc_now())
+    |> Map.update(:timeouts, 1, &(&1 + 1))
+  end
+
+  ##
+  ## handle_* return helpers
+  ##
+
+  defp noreply(s), do: {:noreply, s, loop_timeout(s)}
+
+  # defp noreply_and_merge(s, map), do: {:noreply, Map.merge(s, map)}
+
+  defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
+  # defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
+
+  # defp reply_and_merge(s, m, val) when is_map(s) and is_map(m),
+  #   do: reply(Map.merge(s, m), val)
 end

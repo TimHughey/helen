@@ -335,10 +335,9 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_info(:timeout, s) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    update_last_timeout(s)
+  def handle_info(:timeout, state) do
+    state
+    |> update_last_timeout()
     |> timeout_hook()
   end
 
