@@ -44,6 +44,14 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+    Return epoch as a DateTime
+  """
+  @doc since: "0.0.26"
+  def epoch do
+    Timex.epoch() |> Timex.to_datetime()
+  end
+
+  @doc """
   Convert a list of time options to milliseconds
 
   Returns an integer.
@@ -71,6 +79,59 @@ defmodule Helen.Time.Helper do
     |> Timex.to_gregorian_microseconds()
     |> Duration.from_microseconds()
     |> Duration.to_milliseconds(truncate: true)
+  end
+
+  @doc """
+  Convert the argument to milliseconds.
+
+  Takes an ISO formatted duration binary and an optional default value.
+  The default value is used when the first argument is nil.  Useful for
+  situations where a configuration does not exist.
+
+  Raises if neither the first argument or the default can not be parse.  The
+  default is an empty binary when not supplied.
+
+  Returns an integer representing the milliseconds.
+
+  ## Examples
+
+      iex> Helen.Time.Helper.to_ms("PT1M")
+      60000
+
+  """
+  @doc since: "0.0.27"
+  def to_ms(args, default \\ "") do
+    alias Timex.Duration
+
+    case args do
+      nil -> Duration.parse!(default)
+      args -> Duration.parse!(args)
+    end
+    |> Duration.to_milliseconds(truncate: true)
+  end
+
+  @doc """
+  Validates the argument can be converted to an integer representation of
+  milliseconds.
+
+  Takes an ISO formatted duration binary.
+
+  Returns a boolean.
+
+  ## Examples
+
+      iex> Helen.Time.Helper.valid_ms?("PT1M")
+      true
+
+  """
+  @doc since: "0.0.27"
+  def valid_ms?(args) do
+    alias Timex.Duration
+
+    case Duration.parse(args) do
+      {:ok, _} -> true
+      _failed -> false
+    end
   end
 
   @doc """
@@ -112,13 +173,16 @@ defmodule Helen.Time.Helper do
     Timex.now()
   end
 
-  def utc_shift(opts) when is_list(opts) do
-    utc_now() |> Timex.shift(opts)
+  def utc_shift(args) do
+    now = utc_now()
+
+    case args do
+      args when is_list(args) -> now |> Timex.shift(args)
+      d = %Duration{} -> now |> Timex.shift(duration: d)
+      iso when is_binary(iso) -> Timex.add(now, Duration.parse!(iso))
+      _anything -> now
+    end
   end
-
-  def utc_shift(%Duration{} = d), do: utc_now() |> Timex.shift(duration: d)
-
-  def utc_shift(_anything), do: utc_now()
 
   def utc_shift_past(opts) when is_list(opts),
     do: utc_now() |> Timex.shift(duration: duration_invert(opts))

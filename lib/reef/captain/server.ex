@@ -16,7 +16,7 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
-    import TimeSupport, only: [epoch: 0]
+    import Helen.Time.Helper, only: [epoch: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
@@ -126,7 +126,7 @@ defmodule Reef.Captain.Server do
   end
 
   def last_timeout do
-    import TimeSupport, only: [epoch: 0, utc_now: 0]
+    import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
     with last <- state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
@@ -247,14 +247,14 @@ defmodule Reef.Captain.Server do
         _from,
         %{fill: _, opts: _opts} = s
       ) do
-    import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1, list_to_ms: 2]
+    import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1, to_ms: 1]
 
     start_with = final_opts[:start_with] || [:main]
     steps = Keyword.keys(final_opts[:fill])
 
     max_time_opts = get_in(final_opts, [:fill, start_with, :for])
 
-    run_ms = list_to_ms(max_time_opts, [])
+    run_ms = to_ms(max_time_opts)
 
     fill_map = %{
       steps: steps,
@@ -336,7 +336,7 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def handle_info(:timeout, s) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     update_last_timeout(s)
     |> timeout_hook()
@@ -374,15 +374,15 @@ defmodule Reef.Captain.Server do
   defp change_token(%{} = s), do: update_in(s, [:token], fn x -> x + 1 end)
 
   defp loop_timeout(%{opts: opts}) do
-    import TimeSupport, only: [list_to_ms: 2]
+    import Helen.Time.Helper, only: [to_ms: 2]
 
-    list_to_ms(opts[:timeout], seconds: 30)
+    to_ms(opts[:timeout], "PT30.0S")
   end
 
   # defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
 
   defp update_last_timeout(s) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     put_in(s, [:last_timeout], utc_now())
     |> Map.update(:timeouts, 1, &(&1 + 1))

@@ -25,11 +25,17 @@ defmodule GenDevice do
 
         state = %{
           mode: args[:mode] || :active,
-          device_name: c_opts[:device_name],
-          cached_value: nil,
-          last_timeout: epoch(),
-          lasts: %{cmd: nil, pid: nil},
           active_cmd: nil,
+          device_name: c_opts[:device_name],
+          cycles: 0,
+          last_timeout: epoch(),
+          lasts: %{
+            cmd: nil,
+            pid: nil,
+            cycle_at: epoch(),
+            device_rc: nil,
+            value_rc: nil
+          },
           timeouts: 0,
           opts: c_opts,
           token: 1,
@@ -130,7 +136,7 @@ defmodule GenDevice do
       end
 
       @doc """
-      Switch off the device managed by this server.
+      Set the device managed by this server to off.
 
       See `GenDevice.on/1` for options.
 
@@ -148,7 +154,7 @@ defmodule GenDevice do
       end
 
       @doc """
-      Switch on the device managed by this server.
+      Set the device managed by this server to on.
 
       Returns :ok or an error tuple
 
@@ -283,24 +289,20 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_call(
-            {:mode, mode},
-            _from,
-            %{device_name: dev_name, opts: opts} = s
-          ) do
-        import Switch, only: [off: 1]
+      def handle_call({:mode, mode}, _from, state) do
+        case mode do
+          # the GenDevice is being made ready for commands when set :active,
+          # don't adjust the device
+          :active ->
+            put_in(state, [:standby_reason], :none)
 
-        update_state_fn = fn
-          x when x == :standby ->
-            sw_rc = Switch.off(dev_name)
-            changes = %{mode: x, standby_reason: :api_call}
-            put_in(s, [:mode], x) |> put_in([:standby_reason], :api_call)
-
-          x when x == :active ->
-            put_in(s, [:mode], x) |> put_in([:standby_reason], :none)
+          # when going to :standby ensure the device is off
+          :standby ->
+            put_in(state, [:standby_reason], :api_call)
+            |> adjust_device(:off)
         end
-
-        reply({:ok, mode}, update_state_fn.(mode))
+        |> put_in([:mode], mode)
+        |> reply({:ok, mode})
       end
 
       @doc false
@@ -317,15 +319,18 @@ defmodule GenDevice do
       @doc false
       @impl true
       def handle_call({:value, opts}, _from, %{device_name: dev_name} = s) do
-        IO.puts(["opts ", inspect(opts)])
+        import Switch, only: [position: 1]
 
         case opts do
           [:cached] ->
-            s[:cached_value] |> reply(s)
+            reply(s, s[:lasts][:value_rc])
 
           [] ->
-            pos_rc = Switch.position(dev_name)
-            put_in(s, [:switch_rc], pos_rc) |> reply(pos_rc)
+            pos_rc = position(dev_name)
+
+            s
+            |> put_in([:lasts, :value_rc], pos_rc)
+            |> reply(pos_rc)
 
           opts ->
             reply(s, {:bad_args, opts})
@@ -334,70 +339,50 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_call(
-            {cmd, cmd_opts} = msg,
-            {pid, _ref},
-            %{opts: opts, lasts: lasts, device_name: dev_name} = s
-          ) do
-        # update the state's cached value, last change and increment the token
-        # to invalidate any pending timers
-
-        with true <- valid_on_off_opts?(cmd_opts),
-             # we have valid opts and this is a new command.
-             # increment the token to lock out any timers currently scheduled
-             state <- update_in(s, [:token], fn x -> x + 1 end),
-             # create the timer message
-             t_msg <- {cmd, cmd_opts, pid},
-             # send a message this command is starting, if in opts
-             _ <- send_at_timer_msg_if_needed(t_msg, :at_start, dev_name),
-             # adjust the switch
-             pos_rc <- adjust_switch(cmd, dev_name),
-             # update 'lasts' tracking info
-             lasts <- Map.merge(lasts, %{cmd: cmd, pid: pid}),
-             # create a map of what to merge into the state
-             # this extra step improves code readibility
-             merge_map <- %{lasts: lasts, switch_rc: pos_rc, active_cmd: cmd},
-             # finalize the new state
-             state <- Map.merge(state, merge_map) do
-          schedule_timer_if_needed_and_reply(state, pid, msg)
-        else
-          false ->
-            reply({:bad_args, cmd_opts}, s)
-        end
+      def handle_call({cmd, _cmd_opts} = msg, {pid, _ref}, %{} = state) do
+        state
+        # if requested in the cmd opts send a msg the cmd is starting
+        # the timer msg ultimately becomes the original msg with the caller's
+        # pid appended
+        |> send_at_timer_msg_if_needed(msg, pid, :at_start)
+        # increment the token to invalidate pending timers
+        |> update_in([:token], fn x -> x + 1 end)
+        |> adjust_device(cmd)
+        |> put_in([:active_cmd], cmd)
+        |> put_in([:lasts, :pid], pid)
+        |> schedule_timer_if_needed_and_reply(pid, msg)
       end
 
       @doc false
       @impl true
-      def handle_continue(:bootstrap, %{device_name: dev_name} = s) do
-        import Switch, only: [exists?: 1]
+      def handle_continue(:bootstrap, %{device_name: dev_name} = state) do
+        import Switch, only: [position: 1, exists?: 1]
 
         # if the device does not exist immediately entry standby mode
         # and note the reason
         case exists?(dev_name) do
           true ->
-            noreply(s)
+            state
+            |> put_in([:lasts, :value_rc], position(dev_name))
+            |> noreply()
 
           false ->
-            map = %{mode: :standby, standby_reason: :device_does_not_exist}
-            noreply_merge_state(s, map)
+            state
+            |> put_in([:mode], :standby)
+            |> put_in([:standby_reason], :device_does_not_exist)
+            |> noreply()
         end
       end
 
       @doc false
       @impl true
       # handle the case when the msg_token matches the current state.
-      def handle_info(
-            {:timer, {cmd, cmd_opts, reply_pid} = msg, msg_token},
-            %{device_name: dev_name, token: token} = s
-          )
+      def handle_info({:timer, msg, msg_token}, %{token: token} = state)
           when msg_token == token do
-        import Helen.Time.Helper, only: [utc_now: 0]
-
-        pos_rc = adjust_switch_if_needed(dev_name, cmd_opts)
-
-        send_at_timer_msg_if_needed(msg, :at_finish, dev_name)
-
-        Map.merge(s, %{switch_rc: pos_rc, active_cmd: :none})
+        state
+        |> send_at_timer_msg_if_needed(msg, :at_finish)
+        |> adjust_device_if_needed([])
+        |> put_in([:active_cmd], :none)
         |> noreply()
       end
 
@@ -410,8 +395,6 @@ defmodule GenDevice do
       @doc false
       @impl true
       def handle_info(:timeout, s) do
-        import TimeSupport, only: [utc_now: 0]
-
         update_last_timeout(s)
         |> timeout_hook()
       end
@@ -428,23 +411,57 @@ defmodule GenDevice do
       ## PRIVATE
       ##
 
-      def adjust_switch(cmd, name) do
-        case cmd do
-          nil -> Switch.position(name)
-          :on -> Switch.on(name)
-          :off -> Switch.off(name)
+      defp adjust_device(%{device_name: dev_name} = state, cmd) do
+        import Helen.Time.Helper, only: [utc_now: 0]
+
+        dev_rc =
+          case cmd do
+            :on -> Switch.on(dev_name)
+            cmd when cmd in [:off, :standby] -> Switch.off(dev_name)
+          end
+
+        state
+        |> put_in([:lasts, :device_rc], dev_rc)
+        |> put_in([:lasts, :cmd], cmd)
+        |> put_in([:lasts, :cycle_at], utc_now())
+        |> update_in([:cycles], fn x -> x + 1 end)
+      end
+
+      defp adjust_device_if_needed(%{} = state, opts) do
+        # if there was an :at_cmd_finish opt specified and it's either :on or
+        # :off then adjust the switch.
+        case opts[:at_cmd_finish] do
+          nil -> state
+          cmd when cmd in [:on, :off] -> adjust_device(state, cmd)
         end
       end
 
-      def adjust_switch_if_needed(name, opts) do
-        adjust_switch(opts[:at_cmd_finish], name)
+      defp call_if_valid_opts(msg, cmd_opts) do
+        case valid_on_off_opts?(cmd_opts) do
+          true -> GenServer.call(__MODULE__, msg)
+          false -> {:bad_args, cmd_opts}
+        end
       end
 
-      def send_at_timer_msg_if_needed(
-            {cmd, cmd_opts, reply_pid} = _original_cmd_msg,
-            category,
-            _dev_name
-          ) do
+      # helper so the same function name can be used for both :at_start and :at_end
+      # this function matches the call from :at_start
+      defp send_at_timer_msg_if_needed(
+             state,
+             {_cmd, _cmd_opts} = msg,
+             pid,
+             category
+           )
+           when is_pid(pid) do
+        send_at_timer_msg_if_needed(state, Tuple.append(msg, pid), category)
+      end
+
+      # this function matches the call from :at_end
+      defp send_at_timer_msg_if_needed(
+             state,
+             # orignal cmd message
+             {cmd, cmd_opts, reply_pid},
+             category
+           ) do
         # if the matching ':at' option was specified
         for {:notify, notify_opts} <- cmd_opts,
             at_opt when at_opt == category <- notify_opts do
@@ -452,6 +469,8 @@ defmodule GenDevice do
 
           send(reply_pid, msg)
         end
+
+        state
       end
 
       defp schedule_timer_if_needed_and_reply(
@@ -459,7 +478,7 @@ defmodule GenDevice do
              reply_pid,
              {cmd, cmd_opts}
            ) do
-        import Helen.Time.Helper, only: [list_to_ms: 2]
+        import Helen.Time.Helper, only: [to_ms: 1]
         import Process, only: [send_after: 3]
 
         case cmd_opts[:for] do
@@ -470,30 +489,23 @@ defmodule GenDevice do
             send_after(
               self(),
               {:timer, {cmd, cmd_opts, reply_pid}, token},
-              list_to_ms(x, [])
+              to_ms(x)
             )
         end
 
         reply(:ok, s)
       end
 
-      defp update_state(state, :switch_rc, sw_rc) do
-        import Helen.Time.Helper, only: [utc_now: 0]
-
-        state
-        |> Map.merge(%{cached_value: sw_rc, last_device_change: utc_now()})
-      end
-
       # empty opts list is always valid
       defp valid_on_off_opts([]), do: true
 
       defp valid_on_off_opts?(opts) do
-        import Helen.Time.Helper, only: [valid_duration_opts?: 1]
+        import Helen.Time.Helper, only: [valid_ms?: 1]
 
         valid? = fn opt ->
           case opt do
             {:for, x} ->
-              valid_duration_opts?(x)
+              valid_ms?(x)
 
             {:notify, notify_opts} ->
               for o <- notify_opts, reduce: true do
@@ -518,9 +530,9 @@ defmodule GenDevice do
       ##
 
       defp loop_timeout(%{opts: opts}) do
-        import TimeSupport, only: [list_to_ms: 2]
+        import Helen.Time.Helper, only: [to_ms: 2]
 
-        list_to_ms(opts[:timeout], seconds: 30)
+        to_ms(opts[:timeout], "PT30.0S")
       end
 
       defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
@@ -533,12 +545,12 @@ defmodule GenDevice do
       end
 
       ##
-      ## handle_* return helpers
+      ## GenServer handle_* return helpers
       ##
 
       defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-      defp noreply_merge_state(s, map), do: {:noreply, Map.merge(s, map)}
-      defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
+      defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
+      defp reply(val, s) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
     end
   end
 end

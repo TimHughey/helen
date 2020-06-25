@@ -37,6 +37,8 @@ defmodule Reef do
 
   defdelegate all_stop, to: Captain
 
+  defdelegate ato_state, to: DisplayTank.Ato, as: :state
+
   defdelegate clean, to: Captain
 
   def clean_status, do: state(:clean)
@@ -45,19 +47,19 @@ defmodule Reef do
     defs = [
       fill: [
         main: [
-          run_for: [hours: 7],
+          run_for: "PT7H0.0S",
           at_step_finish: [off: []],
-          on: [for: [minutes: 2, seconds: 40]],
-          off: [for: [minutes: 17]]
+          on: [for: "PT2M40.0S"],
+          off: [for: "PT7H0.0S"]
         ],
         final: [
-          run_for: [hours: 1],
+          run_for: "PT1H0.0S",
           at_step_finish: [off: []],
-          on: [for: [minutes: 15]],
-          off: [for: [minutes: 5]]
+          on: [for: "PT15M0.0S"],
+          off: [for: "PT5M0.0S"]
         ]
       ],
-      clean: [off: [for: [hours: 3], at_cmd_finish: :on]]
+      clean: [off: [for: "PT2H0.0S", at_cmd_finish: :on]]
     ]
 
     opts(fn _x -> defs end)
@@ -68,23 +70,22 @@ defmodule Reef do
     defs = [
       fill: [
         main: [
-          run_for: [seconds: 10],
+          run_for: "PT10.0S",
           at_step_finish: [off: []],
-          on: [for: [seconds: 2]],
-          off: [for: [seconds: 1]]
+          on: [for: "PT2.0S"],
+          off: [for: "PT1.2S"]
         ],
         final: [
-          run_for: [seconds: 10],
+          run_for: "P10.0S",
           at_step_finish: [off: []],
-          on: [for: [seconds: 1]],
-          off: [for: [seconds: 1]]
+          on: [for: "PT2.0S"],
+          off: [for: "PT1.0S"]
         ]
       ],
-      clean: [off: [for: [seconds: 15], at_cmd_finish: :on]]
+      clean: [off: [for: "PT15.0S", at_cmd_finish: :on]]
     ]
 
     opts(fn _x -> defs end)
-    restart()
   end
 
   def fill(opts \\ [start_with: :main]), do: Captain.fill(opts)
