@@ -122,11 +122,11 @@ defmodule Roost do
 
     PulseWidth.duty("roost el wire", duty: 4096)
     PulseWidth.duty("roost led forest", duty: 200)
-    PulseWidth.duty("roost disco ball", duty: 5200)
+    PulseWidth.duty("roost disco ball", duty: 5500)
 
     state = change_token(state)
 
-    Process.send_after(self(), {:timer, :slow_discoball, state[:token]}, 5000)
+    Process.send_after(self(), {:timer, :slow_discoball, state[:token]}, 15000)
 
     state
     |> put_in([:active_cmd], :spinning_up)
