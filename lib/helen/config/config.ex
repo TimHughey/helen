@@ -32,6 +32,42 @@ defmodule Helen.Module.Config do
       defoverridable config_create: 2
 
       @doc """
+      Dump the the Module configuration to a file (/tmp/<module>.exs)
+
+      Returns the file containing the configuration dump.
+
+      ## Examples
+
+          iex> Helen.Module.Config.config_dump()
+          :ok
+
+      """
+      @doc since: "0.0.27"
+      def config_dump do
+        alias Helen.Module.DB.Config
+
+        opts =
+          Config.opts(__MODULE__, [])
+          |> Keyword.drop([:__available__, :__version__])
+
+        filename =
+          for part <- Module.split(__MODULE__) do
+            String.downcase(part)
+          end
+          |> Enum.join("_")
+
+        path_to_file = ["/tmp", "#{filename}.exs"] |> Path.join()
+
+        contents = """
+        opts = #{inspect(opts, pretty: true)}
+        """
+
+        File.write(path_to_file, contents, [:append])
+
+        path_to_file
+      end
+
+      @doc """
       Returns the configuration opts for the Module.
 
       Takes an optional keyword list of overrides that are applied to the

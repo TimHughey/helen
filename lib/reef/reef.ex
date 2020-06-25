@@ -11,6 +11,7 @@ defmodule Reef do
   #   T.activate_profile("display tank", "75F")
   # end
 
+  alias Reef.Captain.Server, as: Captain
   alias Reef.DisplayTank
   alias Reef.MixTank
 
@@ -34,62 +35,59 @@ defmodule Reef do
   defdelegate air_on(opts \\ []), to: MixTank.Air, as: :on
   defdelegate air_toggle, to: MixTank.Air, as: :toggle
 
-  def all_stop do
-    # abort_all()
-    #
-    # Process.sleep(5000)
+  defdelegate all_stop, to: Captain
 
-    mixtank_standby()
-  end
+  defdelegate clean, to: Captain
 
-  def clean(mode \\ :toggle, sw_name \\ "display tank ato")
-      when is_atom(mode) and
-             mode in [:engage, :disengage, :toggle, :help, :usage] and
-             is_binary(sw_name) do
-    {:ok, pos} = Switch.position(sw_name)
+  def clean_status, do: state(:clean)
 
-    # NOTE:
-    #  display tank ato is wired normally on.  to turn off ATO set the
-    #  switch to on.
-
-    cond do
-      mode == :toggle and pos == true ->
-        Switch.toggle(sw_name)
-        ["\nclean mode DISENGAGED\n"] |> IO.puts()
-        :ok
-
-      mode == :toggle and pos == false ->
-        Switch.toggle(sw_name)
-        ["\nclean mode ENGAGED\n"] |> IO.puts() |> IO.puts()
-        :ok
-
-      mode == :engage ->
-        Switch.on(sw_name, lazy: false)
-        ["\nclean mode forced to ENGAGED\n"] |> IO.puts()
-        :ok
-
-      mode == :disengage ->
-        Switch.off(sw_name, lazy: false)
-        ["\nclean mode forced to DISENGAGED\n"] |> IO.puts()
-        :ok
-
-      mode ->
-        [
-          "\n",
-          "Reef.clean/1: \n",
-          " :toggle    - toogle clean mode (default)\n",
-          " :engage    - engage clean mode with lazy: false\n",
-          " :disengage - disengage clean mode with lazy: false\n"
+  def default_opts do
+    defs = [
+      fill: [
+        main: [
+          run_for: [hours: 7],
+          at_step_finish: [off: []],
+          on: [for: [minutes: 2, seconds: 40]],
+          off: [for: [minutes: 17]]
+        ],
+        final: [
+          run_for: [hours: 1],
+          at_step_finish: [off: []],
+          on: [for: [minutes: 15]],
+          off: [for: [minutes: 5]]
         ]
-        |> IO.puts()
+      ],
+      clean: [off: [for: [hours: 3], at_cmd_finish: :on]]
+    ]
 
-        :ok
-    end
+    opts(fn _x -> defs end)
+    restart()
   end
 
-  # def fill(opts \\ []), do: Reef.Salt.Fill.kickstart(opts)
-  # def fill_abort(opts \\ []), do: Reef.Salt.Fill.abort(opts)
-  # def fill_status(opts \\ []), do: Reef.Salt.Fill.status(opts)
+  def test_opts do
+    defs = [
+      fill: [
+        main: [
+          run_for: [seconds: 10],
+          at_step_finish: [off: []],
+          on: [for: [seconds: 2]],
+          off: [for: [seconds: 1]]
+        ],
+        final: [
+          run_for: [seconds: 10],
+          at_step_finish: [off: []],
+          on: [for: [seconds: 1]],
+          off: [for: [seconds: 1]]
+        ]
+      ],
+      clean: [off: [for: [seconds: 15], at_cmd_finish: :on]]
+    ]
+
+    opts(fn _x -> defs end)
+    restart()
+  end
+
+  def fill(opts \\ [start_with: :main]), do: Captain.fill(opts)
 
   def heat_all_off do
     DisplayTank.Temp.mode(:standby)
@@ -119,13 +117,22 @@ defmodule Reef do
   def mixtank_online, do: mixtank_mode(:active)
   def mixtank_standby, do: mixtank_mode(:standby)
 
+  defdelegate opts, to: Captain, as: :config_opts
+  def opts(func) when is_function(func), do: Captain.config_update(func)
+
+  defdelegate opts_dump, to: Captain, as: :config_dump
+
   defdelegate pump_off(opts \\ []), to: MixTank.Pump, as: :off
   defdelegate pump_on(opts \\ []), to: MixTank.Pump, as: :on
   defdelegate pump_toggle, to: MixTank.Pump, as: :toggle
 
+  defdelegate restart, to: Captain
+
   defdelegate rodi_off(opts \\ []), to: MixTank.Rodi, as: :off
   defdelegate rodi_on(opts \\ []), to: MixTank.Rodi, as: :on
   defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
+
+  defdelegate state(opts \\ []), to: Captain
 
   def temp_ok? do
     dt_temp = Sensor.fahrenheit("display_tank", since_secs: 30)
@@ -139,6 +146,8 @@ defmodule Reef do
   def water_change_complete do
     DisplayTank.Temp.mode(:active)
   end
+
+  defdelegate which_children, to: Reef.Supervisor
 
   #
   # def water_change_begin(opts) when is_list(opts) do
