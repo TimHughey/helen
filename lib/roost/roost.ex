@@ -169,6 +169,7 @@ defmodule Roost do
 
       :all_stop ->
         all_stop(state)
+        |> noreply()
     end
   end
 
