@@ -382,16 +382,9 @@ defmodule Mqtt.Inbound do
     end
   end
 
-  defp check_msg_fault(%{fault: fault} = msg) do
-    error = msg[fault]
-
-    ["msg \"", Atom.to_string(fault), "\" ", inspect(error, pretty: true)]
-    |> Logger.warn()
-
-    {:failed, msg}
+  defp check_msg_fault(msg) do
+    msg |> log_fault_if_needed() |> log_cmd_ack_fault_if_needed()
   end
-
-  defp check_msg_fault(msg), do: {:ok, msg}
 
   defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),
     do: %{s | messages_dispatched: dispatched + 1}
@@ -441,6 +434,45 @@ defmodule Mqtt.Inbound do
     # if greater than epoch + 1 year then it's good
     mtime > 365 * 24 * 60 * 60 - 1
   end
+
+  ##
+  ## Logging Helpers
+  ##
+
+  defp log_cmd_ack_fault_if_needed(%{cmd_ack_fault: fault} = msg) do
+    """
+    cmd ack fault:
+      #{inspect(fault, pretty: true)}
+
+    message:
+        #{inspect(msg, pretty: true)}
+    """
+    |> Logger.warn()
+
+    msg
+  end
+
+  defp log_cmd_ack_fault_if_needed(msg), do: msg
+
+  defp log_fault_if_needed(%{fault: fault} = msg) do
+    error = get_in(msg, fault)
+
+    """
+    fault:
+      #{inspect(fault, pretty: true)}
+
+    error:
+      #{inspect(error, pretty: true)}
+
+    message:
+      #{inspect(msg, pretty: true)}
+    """
+    |> Logger.warn()
+
+    msg
+  end
+
+  defp log_fault_if_needed(msg), do: msg
 
   #
   # Misc Helpers

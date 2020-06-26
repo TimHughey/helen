@@ -27,12 +27,12 @@ defmodule GenDevice do
           mode: args[:mode] || :active,
           active_cmd: nil,
           device_name: c_opts[:device_name],
-          cycles: 0,
-          last_timeout: epoch(),
-          lasts: %{
+          device_adjusts: 0,
+          last: %{
+            timeout: epoch(),
             cmd: nil,
             pid: nil,
-            cycle_at: epoch(),
+            adjust_at: epoch(),
             device_rc: nil,
             value_rc: nil
           },
@@ -323,13 +323,13 @@ defmodule GenDevice do
 
         case opts do
           [:cached] ->
-            reply(s, s[:lasts][:value_rc])
+            reply(s, s[:last][:value_rc])
 
           [] ->
             pos_rc = position(dev_name)
 
             s
-            |> put_in([:lasts, :value_rc], pos_rc)
+            |> put_in([:last, :value_rc], pos_rc)
             |> reply(pos_rc)
 
           opts ->
@@ -349,7 +349,7 @@ defmodule GenDevice do
         |> update_in([:token], fn x -> x + 1 end)
         |> adjust_device(cmd)
         |> put_in([:active_cmd], cmd)
-        |> put_in([:lasts, :pid], pid)
+        |> put_in([:last, :pid], pid)
         |> schedule_timer_if_needed_and_reply(pid, msg)
       end
 
@@ -363,7 +363,7 @@ defmodule GenDevice do
         case exists?(dev_name) do
           true ->
             state
-            |> put_in([:lasts, :value_rc], position(dev_name))
+            |> put_in([:last, :value_rc], position(dev_name))
             |> noreply()
 
           false ->
@@ -387,7 +387,7 @@ defmodule GenDevice do
       end
 
       # NOTE:  when the msg_token does not match the state token then
-      #        a change has occurred and this off message should be ignored
+      #        a change has occurred so ignore this timer message
       def handle_info({:timer, _msg, _msg_token}, s) do
         noreply(s)
       end
@@ -403,8 +403,8 @@ defmodule GenDevice do
       ## GenServer Receive Loop Hooks
       ##
 
-      defp timeout_hook(%{} = s) do
-        noreply(s)
+      defp timeout_hook(%{} = state) do
+        noreply(state)
       end
 
       ##
@@ -421,10 +421,10 @@ defmodule GenDevice do
           end
 
         state
-        |> put_in([:lasts, :device_rc], dev_rc)
-        |> put_in([:lasts, :cmd], cmd)
-        |> put_in([:lasts, :cycle_at], utc_now())
-        |> update_in([:cycles], fn x -> x + 1 end)
+        |> put_in([:last, :device_rc], dev_rc)
+        |> put_in([:last, :cmd], cmd)
+        |> put_in([:last, :adjust_at], utc_now())
+        |> update_in([:device_adjusts], fn x -> x + 1 end)
       end
 
       defp adjust_device_if_needed(%{} = state, opts) do
@@ -476,7 +476,7 @@ defmodule GenDevice do
       defp schedule_timer_if_needed_and_reply(
              %{token: token} = s,
              reply_pid,
-             {cmd, cmd_opts}
+             {_cmd, cmd_opts} = msg
            ) do
         import Helen.Time.Helper, only: [to_ms: 1]
         import Process, only: [send_after: 3]
@@ -486,11 +486,8 @@ defmodule GenDevice do
             nil
 
           x ->
-            send_after(
-              self(),
-              {:timer, {cmd, cmd_opts, reply_pid}, token},
-              to_ms(x)
-            )
+            timer_msg = Tuple.append(msg, reply_pid)
+            send_after(self(), {:timer, timer_msg, token}, to_ms(x))
         end
 
         reply(:ok, s)
@@ -502,26 +499,39 @@ defmodule GenDevice do
       defp valid_on_off_opts?(opts) do
         import Helen.Time.Helper, only: [valid_ms?: 1]
 
-        valid? = fn opt ->
-          case opt do
-            {:for, x} ->
-              valid_ms?(x)
-
-            {:notify, notify_opts} ->
-              for o <- notify_opts, reduce: true do
-                good -> good and o in [:at_start, :at_finish]
-              end
-
-            {:at_cmd_finish, cmd} when is_atom(cmd) ->
-              true
-
-            _x ->
-              false
-          end
-        end
-
+        # we reduce the list down to a boolean that represents if all
+        # the opts are valid (true) or invalid (false)
         for opt <- opts, reduce: true do
-          opts_good -> opts_good and valid?.(opt)
+          # this is either the beginning of the reduction of true or
+          # we've only seen valid opts.  check the current opt.
+          true ->
+            case opt do
+              # for: x must be a valid duration
+              {:for, x} ->
+                valid_ms?(x)
+
+              # notify: should be a list and each opt must be either
+              # :at_start or :at_finish.  here we reduce the list to a
+              # boolean representing if all items in the list are valid.
+              {:notify, notify_opts} when is_list(notify_opts) ->
+                for o <- notify_opts, reduce: true do
+                  true -> o in [:at_start, :at_finish]
+                  false -> false
+                end
+
+              # at_cmd_finish: should be an atom that represents what
+              # final command to execute when this command is finished
+              {:at_cmd_finish, cmd} when is_atom(cmd) ->
+                true
+
+              # none of the above matched, this isn't a valid opt
+              _x ->
+                false
+            end
+
+          # we've already seen an invalid opt, no need to check this opt
+          false ->
+            false
         end
       end
 
@@ -537,10 +547,11 @@ defmodule GenDevice do
 
       defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
 
-      defp update_last_timeout(s) do
+      defp update_last_timeout(state) do
         import TimeSupport, only: [utc_now: 0]
 
-        put_in(s, [:last_timeout], utc_now())
+        state
+        |> put_in([:last, :timeout], utc_now())
         |> Map.update(:timeouts, 1, &(&1 + 1))
       end
 

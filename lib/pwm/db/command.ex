@@ -66,8 +66,8 @@ defmodule PulseWidth.DB.Command do
          _ignore <- write_specific_metric(cmd_rc, msg) do
       msg
     else
-      nil -> Map.put(msg, :pwm_cmd_ack_fault, {:cmd, nil})
-      error -> Map.put(msg, :pwm_cmd_ack_fault, error)
+      nil -> Map.put(msg, :cmd_ack_fault, {:cmd, nil})
+      error -> Map.put(msg, :cmd_ack_fault, error)
     end
   end
 

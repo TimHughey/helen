@@ -280,9 +280,28 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_info({:gen_device, msg}, s) do
+  def handle_info({:gen_device, {at_phase, :off, Ato}}, state) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
+    case at_phase do
+      :at_start ->
+        state
+        |> put_in([:clean, :started_at], utc_now())
+        |> put_in([:clean, :status], :active)
+        |> noreply()
+
+      :at_finish ->
+        state
+        |> put_in([:clean, :finished_at], utc_now())
+        |> put_in([:clean, :ato_rc], Ato.value())
+        |> put_in([:clean, :status], :complete)
+        |> noreply()
+    end
+  end
+
+  @doc false
+  @impl true
+  def handle_info({:gen_device, msg}, s) do
     msg_puts = fn {cat, cmd, mod} = msg ->
       ["\n => ", inspect(mod), inspect(cat), inspect(cmd)]
       |> Enum.join(" ")
@@ -291,28 +310,8 @@ defmodule Reef.Captain.Server do
       msg
     end
 
-    case msg do
-      {:at_start, :off, Ato} ->
-        c_map = Map.merge(s[:clean], %{started_at: utc_now(), status: :active})
-
-        noreply_and_merge(s, %{clean: c_map})
-
-      {:at_finish, :off, Ato} ->
-        rc = Ato.value(:cached)
-
-        c_map =
-          Map.merge(s[:clean], %{
-            finished_at: utc_now(),
-            status: :complete,
-            ato_rc: rc
-          })
-
-        noreply_and_merge(s, %{clean: c_map})
-
-      msg ->
-        msg_puts.(msg)
-        noreply(s)
-    end
+    msg_puts.(msg)
+    noreply(s)
   end
 
   @doc false
@@ -392,7 +391,8 @@ defmodule Reef.Captain.Server do
   ##
 
   defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-  defp noreply_and_merge(s, map), do: {:noreply, Map.merge(s, map)}
+
+  # defp noreply_and_merge(s, map), do: {:noreply, Map.merge(s, map)}
 
   defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
   defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
