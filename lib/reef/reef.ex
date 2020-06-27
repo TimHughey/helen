@@ -46,18 +46,25 @@ defmodule Reef do
   def default_opts do
     defs = [
       fill: [
-        main: [
-          run_for: "PT7H0.0S",
-          on: [for: "PT2M40.0S"],
-          off: [for: "PT7H0.0S"]
-        ],
-        finally: [
-          run_for: "PT1H0.0S",
-          on: [for: "PT15M0.0S"],
-          off: [for: "PT5M0.0S"]
+        steps: [
+          main: [
+            run_for: "PT7H",
+            on: [for: "PT2M"],
+            off: [for: "PT16M"]
+          ],
+          topoff: [
+            run_for: "PT1",
+            on: [for: "PT10M"],
+            off: [for: "PT1M"]
+          ],
+          finally: [msg: {:handoff, :keep_fresh}]
         ]
       ],
-      clean: [off: [for: "PT2H0.0S", at_cmd_finish: :on]]
+      keep_fresh: [
+        air: [leader: true, on: [for: "PT7M"], off: [for: "PT3M"]],
+        pump: [on: [for: "PT1M"], at_cmd_finish: :off]
+      ],
+      clean: [off: [for: "PT2H", at_cmd_finish: :on]]
     ]
 
     opts(fn _x -> defs end)
@@ -66,19 +73,25 @@ defmodule Reef do
   def test_opts do
     defs = [
       fill: [
-        main: [
-          run_for: "PT10.0S",
-          on: [for: "PT2.0S"],
-          off: [for: "PT1.2S"]
-        ],
-        topoff: [
-          run_for: "PT10.0S",
-          on: [for: "PT2.0S"],
-          off: [for: "PT1.0S"]
-        ],
-        finally: [msg: {:handoff, :keep_fresh}]
+        steps: [
+          main: [
+            run_for: "PT10S",
+            on: [for: "PT0.5S"],
+            off: [for: "PT1.2S"]
+          ],
+          topoff: [
+            run_for: "PT10S",
+            on: [for: "PT2S"],
+            off: [for: "PT0.5S"]
+          ],
+          finally: [msg: {:handoff, :keep_fresh}]
+        ]
       ],
-      clean: [off: [for: "PT15.0S", at_cmd_finish: :on]]
+      keep_fresh: [
+        air: [leader: true, on: [for: "PT10S"], off: [for: "PT5S"]],
+        pump: [on: [for: "PT1S"], at_cmd_finish: :off]
+      ],
+      clean: [off: [for: "PT15S", at_cmd_finish: :on]]
     ]
 
     opts(fn _x -> defs end)

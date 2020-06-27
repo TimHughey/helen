@@ -8,6 +8,8 @@ defmodule GenDevice do
       use GenServer, restart: :transient, shutdown: 7000
       use Helen.Module.Config
 
+      @callback open(opts :: [] | [for: [minutes: 1]]) :: :ok
+
       @use_opts use_opts
 
       ##
@@ -138,7 +140,7 @@ defmodule GenDevice do
       @doc """
       Set the device managed by this server to off.
 
-      See `GenDevice.on/1` for options.
+      See `on/0` for options.
 
       Returns :ok or an error tuple
 
@@ -157,24 +159,17 @@ defmodule GenDevice do
       Set the device managed by this server to on.
 
       Returns :ok or an error tuple
-
-      ## Option Examples
-        `for: [minutes: 1]`
-          switch the device on for the specified duration
-
-        `at_start: [:notify]`
-          send the caller `{:gen_device, :at_start, "switch alias"}` when
-          turning on the switch
-
-        `at_finish: [:notify]`
-          send the caller `{:gen_device, :at_start, "switch alias"}` when
-          turning off the switch
-
       ## Examples
 
-          iex> GenDevice.on()
+          iex> on()
           :ok
 
+      ## Option Examples
+        `for: [minutes: 1]` switch the device on for the specified duration
+
+        `at_start: [:notify]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning on the switch
+
+        `at_finish: [:notify]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning off the switch
       """
       @doc since: "0.0.27"
       def on(opts \\ []) when is_list(opts) do
@@ -341,7 +336,7 @@ defmodule GenDevice do
       @impl true
       def handle_call({cmd, _cmd_opts} = msg, {pid, _ref}, %{} = state) do
         state
-        # if requested in the cmd opts send a msg the cmd is starting
+        # if requested in the cmd opts send a msg the cmd is starting.
         # the timer msg ultimately becomes the original msg with the caller's
         # pid appended
         |> send_at_timer_msg_if_needed(msg, pid, :at_start)

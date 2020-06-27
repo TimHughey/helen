@@ -27,7 +27,6 @@ defmodule Helen.Mixfile do
       homepage_url: "https://www.wisslanding.com",
       source_url: "https://github.com/TimHughey/helen",
       docs: [
-        main: "api-reference.html#modules",
         extras: ["CHANGELOG.md"],
         groups_for_modules: [
           Devices: [PulseWidth, Remote, Sensor, Switch],
@@ -38,8 +37,9 @@ defmodule Helen.Mixfile do
           Helen,
           Mqtt,
           PulseWidth,
+          Reef,
+          Sensor,
           Switch,
-          Thermostat,
           Remote
         ]
       ]

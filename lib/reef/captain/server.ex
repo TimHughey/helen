@@ -124,7 +124,7 @@ defmodule Reef.Captain.Server do
   @doc """
   Fill the MixTank with RODI.
 
-  Returns :ok.
+  Returns `:ok`, `{:not_configured, opts}` or `{:invalid_duration_opts}`
 
   ## Examples
 
@@ -134,16 +134,23 @@ defmodule Reef.Captain.Server do
   """
   @doc since: "0.0.27"
   def fill(opts) do
+    # opts specified here are automatically placed under the :fill key
+    # so they can be succesfully merged with the overall opts
     opts = [opts] |> List.flatten()
+    config_opts = config_opts([])
 
-    final_opts = config_opts(opts)
+    final_opts = Keyword.merge(config_opts[:fill], opts)
+    valid? = validate_durations(final_opts)
 
-    case get_in(final_opts, [:fill]) do
-      nil ->
-        {:not_configured, :fill}
+    cond do
+      not valid? ->
+        {:invalid_duration_opts, final_opts}
 
-      _x ->
-        call_if_active({:fill, final_opts})
+      is_nil(final_opts) ->
+        {:fill_opts_undefined, final_opts}
+
+      true ->
+        cast_if_active({:fill, final_opts})
     end
   end
 
@@ -278,46 +285,6 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_call({:fill, fill_opts}, _from, state) do
-    import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1, to_ms: 1]
-
-    # unfold each step in the  steps list matching on the key :run_for.
-    # convert each value to ms and reduce with a start value of 0.
-    will_finish_by_ms = fn x ->
-      for {_step, details} <- x,
-          {k, run_for} when k == :run_for <- details,
-          reduce: 0 do
-        total_ms -> total_ms + to_ms(run_for)
-      end
-    end
-
-    steps = fill_opts[:fill]
-    {start_step, _} = steps |> hd()
-
-    fill = %{
-      status: :in_progress,
-      active_step: start_step,
-      steps: steps,
-      steps_to_execute: Keyword.keys(steps),
-      step: %{},
-      started_at: utc_now(),
-      will_finish_by: utc_shift(will_finish_by_ms.(steps)),
-      finished_at: nil,
-      elapsed: 0,
-      opts: fill_opts
-    }
-
-    state
-    |> change_token()
-    |> put_in([:reef_mode], :fill)
-    |> put_in([:fill], fill)
-    |> put_in([:fill, :active_step], hd(fill.steps_to_execute))
-    |> fill_start_active_step()
-    |> reply(:ok)
-  end
-
-  @doc false
-  @impl true
   def handle_call({:fill_status}, _from, %{fill: fill} = state) do
     import Helen.Time.Helper, only: [to_binary: 1]
 
@@ -336,7 +303,7 @@ defmodule Reef.Captain.Server do
 
              Elapsed time #{to_binary(fill[:elapsed])}.
 
-             Started : #{to_binary(fill[:started_at])}
+              Started: #{to_binary(fill[:started_at])}
              Finished: #{to_binary(fill[:finished_at])}
 
            """}
@@ -351,8 +318,8 @@ defmodule Reef.Captain.Server do
 
            Elapsed time #{to_binary(fill[:elapsed])}.
 
-                  Started  : #{to_binary(fill[:started_at])}
-           Expected Finish : #{to_binary(fill[:will_finish_by])}
+                   Started: #{to_binary(fill[:started_at])}
+           Expected Finish: #{to_binary(fill[:will_finish_by])}
            """}
       end
 
@@ -361,8 +328,63 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
+  def handle_cast({:fill, fill_opts}, state) do
+    import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1]
+
+    filtered_steps = fn opts ->
+      case get_in(opts, [:steps_to_execute]) do
+        nil ->
+          {opts[:steps], Keyword.keys(opts[:steps])}
+
+        # steps to execute specified in opts, however filter
+        # the list by the steps available
+        x ->
+          steps = Keyword.take(opts[:steps], x)
+          {steps, Keyword.keys(steps)}
+      end
+    end
+
+    {steps, to_execute} = filtered_steps.(fill_opts)
+
+    fill = %{
+      status: :in_progress,
+      steps: steps,
+      steps_to_execute: to_execute,
+      active_step: hd(to_execute),
+      step: %{},
+      started_at: utc_now(),
+      will_finish_ms: will_finish_by_ms(steps),
+      will_finish_by: utc_shift(will_finish_by_ms(steps)),
+      finished_at: nil,
+      elapsed: 0,
+      opts: fill_opts
+    }
+
+    state
+    |> change_token()
+    |> put_in([:reef_mode], :fill)
+    |> put_in([:fill], fill)
+    |> fill_start_active_step()
+    |> noreply()
+  end
+
+  @doc false
+  @impl true
+  def handle_cast({:keep_fresh, _opts}, state) do
+    noreply(state)
+  end
+
+  @doc false
+  @impl true
   def handle_cast({:handoff, _cmd} = msg, state) do
-    msg_puts(msg, state)
+    case msg do
+      {:handoff, :keep_fresh = cmd} ->
+        GenServer.cast(__MODULE__, {cmd, []})
+        noreply(state)
+
+      msg ->
+        msg_puts(msg, state)
+    end
   end
 
   @doc false
@@ -487,6 +509,10 @@ defmodule Reef.Captain.Server do
     if active?(), do: GenServer.call(__MODULE__, msg), else: {:standby_mode}
   end
 
+  defp cast_if_active(msg) do
+    if active?(), do: GenServer.cast(__MODULE__, msg), else: {:standby_mode}
+  end
+
   defp crew_list, do: [Air, Pump, Rodi]
 
   defp fill_finally(%{fill: %{steps: steps}} = state) do
@@ -521,18 +547,29 @@ defmodule Reef.Captain.Server do
   defp fill_start_next_step_if_needed(
          %{fill: %{active_step: active_step, steps: steps}} = state
        ) do
-    import Helen.Time.Helper, only: [elapsed: 2, elapsed?: 2, utc_now: 0]
+    import Helen.Time.Helper,
+      only: [subtract_list: 1, elapsed: 2, elapsed?: 2, utc_now: 0]
 
     # each step contains a :run_for key that defines how long the
     # step will will cycle on and off
     started_at = get_in(state, [:fill, :step, :started_at]) || utc_now()
-    run_for = get_in(steps, [active_step, :run_for])
+
+    # to prevent exceeding the configured run_for include the duration of the
+    # step about to start in the elapsed?
+    config_run_for = get_in(steps, [active_step, :run_for])
+    on_for = get_in(steps, [active_step, :on, :for])
+    off_for = get_in(steps, [active_step, :off, :for])
+
+    # NOTE:  this design decision may result in the fill running for less
+    #        time then the run_for configuration when the duration of the steps
+    #        do not fit evenly
+    run_for = subtract_list([config_run_for, on_for, off_for])
 
     case elapsed?(started_at, run_for) do
       false ->
-        # run_for has not elapsed so turn on Rodi since this function is only
-        # called when ** starting ** a step which always begins with on for fill
-        # this approach for fill also, as bonus,  'skips' the run_for option
+        # run_for has not elapsed so turn on Rodi.
+        # NOTE:  we always turn on Rodi when starting a step even if :on is not
+        #        listed first.  this is a design decision and design constraint
         Air.off()
         get_in(steps, [active_step, :on]) |> add_notify_opts() |> Rodi.on()
 
@@ -584,6 +621,49 @@ defmodule Reef.Captain.Server do
     |> IO.puts()
 
     noreply(state)
+  end
+
+  # primary entry point for validating durations
+  defp validate_durations(opts) do
+    # validate the opts with an initial accumulator of true so an empty
+    # list is considered valid
+    validate_duration_r(opts, true)
+  end
+
+  defp validate_duration_r(opts, acc) do
+    import Helen.Time.Helper, only: [valid_ms?: 1]
+
+    case {opts, acc} do
+      # end of a list (or all list), simply return the acc
+      {[], acc} ->
+        acc
+
+      # seen a bad duration, we're done
+      {_, false} ->
+        false
+
+      # look at the head of the list, when it's key of interest
+      # validate it can be converted to milliseconds and recurse
+      # the tail
+      {[{k, v} | rest], acc} when k in [:run_for, :for] ->
+        validate_duration_r(rest, acc and valid_ms?(v))
+
+      # not a keyword of interest, keep going
+      {[_no_interest | rest], acc} ->
+        validate_duration_r(rest, acc)
+    end
+  end
+
+  defp will_finish_by_ms(steps) do
+    import Helen.Time.Helper, only: [to_ms: 1]
+
+    # unfold each step in the  steps list matching on the key :run_for.
+    # convert each value to ms and reduce with a start value of 0.
+    for {_step, details} <- steps,
+        {k, run_for} when k == :run_for <- details,
+        reduce: 0 do
+      total_ms -> total_ms + to_ms(run_for)
+    end
   end
 
   ##

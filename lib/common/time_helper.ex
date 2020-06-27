@@ -7,6 +7,20 @@ defmodule Helen.Time.Helper do
   use Timex
 
   @doc """
+  Adds a list of durations.  The durations can be either ISO binaries or `%Duration{}`
+
+  Returns a `%Duration{}`
+  """
+  @doc since: "0.0.27"
+  def add_list(d_list) when is_list(d_list) do
+    alias Timex.Duration
+
+    for d <- d_list, reduce: Duration.zero() do
+      acc -> Duration.add(acc, to_duration(d))
+    end
+  end
+
+  @doc """
   Check if a DateTime is between `utc_now/0` shifted backwards by the opts list
 
   ## Examples
@@ -120,6 +134,22 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+  Subtracts a list of durations and returns the absolute value.
+
+  The durations can be either ISO binaries or `%Duration{}`
+
+  Returns a `%Duration{}`
+  """
+  @doc since: "0.0.27"
+  def subtract_list(d_list) when is_list(d_list) do
+    alias Timex.Duration
+
+    for d <- d_list, reduce: Duration.zero() do
+      acc -> Duration.sub(acc, to_duration(d)) |> Duration.abs()
+    end
+  end
+
+  @doc """
   Convert the argument to a binary representation.
 
   Accepts DateTime and Duration.
@@ -150,6 +180,23 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+  Convert an ISO binary duration to a `%Duration{}`.
+
+  Also accepts `%Duration{}` and simply returns it unchanged.
+
+  Returns a `%Duration{}` or raises on error.
+  """
+  @doc since: "0.0.27"
+  def to_duration(d) when is_binary(d) or is_struct(d) do
+    alias Timex.Duration
+
+    case d do
+      %Duration{} = x -> x
+      x -> Duration.parse!(x)
+    end
+  end
+
+  @doc """
   Convert the argument to milliseconds.
 
   Takes an ISO formatted duration binary and an optional default value.
@@ -172,8 +219,8 @@ defmodule Helen.Time.Helper do
     alias Timex.Duration
 
     case args do
-      nil -> Duration.parse!(default)
-      args -> Duration.parse!(args)
+      nil -> to_duration(default)
+      args -> to_duration(args)
     end
     |> Duration.to_milliseconds(truncate: true)
   end
