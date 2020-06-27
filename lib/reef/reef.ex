@@ -3,34 +3,11 @@ defmodule Reef do
   Reef System Maintenance Command Line Interface
   """
 
-  # def init(opts \\ []) when is_list(opts) do
-  #   alias Thermostat.Server, as: T
-  #   switches_all_off()
-  #
-  #   T.standby("mix tank")
-  #   T.activate_profile("display tank", "75F")
-  # end
-
   alias Reef.Captain.Server, as: Captain
   alias Reef.DisplayTank
   alias Reef.MixTank
 
-  # def abort_all do
-  #   MixTank.Temp.mode(:standby)
-  #
-  #   mods = [Reef.Salt.Aerate, Reef.Salt.Fill, Reef.Salt.KeepFresh]
-  #
-  #   for m <- mods do
-  #     apply(m, :abort, [])
-  #   end
-  # end
-  #
-  # def aerate(opts \\ []), do: Reef.Salt.Aerate.kickstart(opts)
-  # def aerate_abort(opts \\ []), do: Reef.Salt.Aerate.abort(opts)
-  # def aerate_elapsed(opts \\ []), do: Reef.Salt.Aerate.elapsed_as_binary(opts)
-  # def aerate_status(opts \\ []), do: Reef.Salt.Aerate.status(opts)
-  # def aerate_state(opts \\ []), do: Reef.Salt.Aerate.state(opts)
-
+  defdelegate active?, to: Captain
   defdelegate air_off(opts \\ []), to: MixTank.Air, as: :off
   defdelegate air_on(opts \\ []), to: MixTank.Air, as: :on
   defdelegate air_toggle, to: MixTank.Air, as: :toggle
@@ -49,11 +26,11 @@ defmodule Reef do
         steps: [
           main: [
             run_for: "PT7H",
-            on: [for: "PT2M"],
+            on: [for: "PT2M40S"],
             off: [for: "PT16M"]
           ],
           topoff: [
-            run_for: "PT1",
+            run_for: "PT1H",
             on: [for: "PT10M"],
             off: [for: "PT1M"]
           ],
@@ -68,6 +45,7 @@ defmodule Reef do
     ]
 
     opts(fn _x -> defs end)
+    restart()
   end
 
   def test_opts do
@@ -75,7 +53,7 @@ defmodule Reef do
       fill: [
         steps: [
           main: [
-            run_for: "PT10S",
+            run_for: "PT11S",
             on: [for: "PT0.5S"],
             off: [for: "PT1.2S"]
           ],
@@ -95,6 +73,7 @@ defmodule Reef do
     ]
 
     opts(fn _x -> defs end)
+    restart()
   end
 
   def fill(opts \\ []), do: Captain.fill(opts)
@@ -128,6 +107,13 @@ defmodule Reef do
 
   def mixtank_online, do: mixtank_mode(:active)
   def mixtank_standby, do: mixtank_mode(:standby)
+
+  def not_ready_reason do
+    case state(:not_ready_reason) do
+      nil -> :none
+      x -> x
+    end
+  end
 
   defdelegate opts, to: Captain, as: :config_opts
   def opts(func) when is_function(func), do: Captain.config_update(func)

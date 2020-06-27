@@ -29,10 +29,7 @@ defmodule Reef.Captain.Server do
       timeouts: 0,
       opts: config_opts(args),
       clean: %{
-        status: :never_requested,
-        token: 1,
-        started_at: epoch(),
-        finished_at: epoch()
+        status: :ready
       },
       fill: %{
         status: :ready,
@@ -52,8 +49,6 @@ defmodule Reef.Captain.Server do
       token: 1
     }
 
-    # opts = state[:opts]
-
     # should the server start?
     cond do
       state[:mode] == :standby -> :ignore
@@ -71,20 +66,6 @@ defmodule Reef.Captain.Server do
   ##
 
   @doc """
-  Bring all reef activities to a stop.
-
-  Returns :ok
-
-  ## Examples
-
-      iex> Reef.Captain.Server.all_stop
-      :ok
-
-  """
-  @doc since: "0.0.27"
-  def all_stop, do: GenServer.call(__MODULE__, {:all_stop})
-
-  @doc """
   Is the server active?
 
   Returns a boolean.
@@ -97,11 +78,26 @@ defmodule Reef.Captain.Server do
   """
   @doc since: "0.0.27"
   def active? do
-    case state(:mode) do
-      :active -> true
-      :standby -> false
+    case state([:mode, :reef_mode]) do
+      %{active: _, reef_mode: :not_ready} -> false
+      %{active: :standby, reef_mode: _} -> false
+      _else -> true
     end
   end
+
+  @doc """
+  Bring all reef activities to a stop.
+
+  Returns :ok
+
+  ## Examples
+
+      iex> Reef.Captain.Server.all_stop
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def all_stop, do: GenServer.call(__MODULE__, {:all_stop})
 
   @doc """
   Enable cleaning mode.
@@ -143,7 +139,7 @@ defmodule Reef.Captain.Server do
     valid? = validate_durations(final_opts)
 
     cond do
-      not valid? ->
+      valid? == false ->
         {:invalid_duration_opts, final_opts}
 
       is_nil(final_opts) ->
@@ -230,13 +226,18 @@ defmodule Reef.Captain.Server do
   end
 
   def state(keys \\ []) do
-    keys = [keys] |> List.flatten()
-    state = GenServer.call(__MODULE__, :state)
+    if is_nil(GenServer.whereis(__MODULE__)) do
+      :DOWN
+    else
+      keys = [keys] |> List.flatten()
 
-    case keys do
-      [] -> state
-      [x] -> Map.get(state, x)
-      x -> Map.take(state, [x] |> List.flatten())
+      state = GenServer.call(__MODULE__, :state)
+
+      case keys do
+        [] -> state
+        [x] -> Map.get(state, x)
+        x -> Map.take(state, [x] |> List.flatten())
+      end
     end
   end
 
@@ -252,35 +253,32 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_call({:all_stop}, _from, %{opts: _opts} = s) do
+  def handle_call({:all_stop}, _from, %{opts: _opts} = state) do
     for c <- crew_list() do
       apply(c, :mode, [:standby])
     end
 
-    change_token(s)
-    |> reply_and_merge(%{reef_mode: :all_stop}, :ok)
+    change_token(state)
+    |> put_in([:reef_mode], :all_stop)
+    |> reply(:answering_all_stop)
   end
 
   @doc false
   @impl true
-  def handle_call(
-        {:clean},
-        _from,
-        %{
-          clean: %{status: _c_mode, token: c_token} = c_map,
-          mode: _r_mode,
-          opts: opts
-        } = s
-      ) do
-    [{cmd, opts}] = opts[:clean]
+  def handle_call({:clean}, _from, %{opts: opts} = state) do
+    [{cmd, cmd_opts}] = opts[:clean]
 
-    ato_opts = [opts, notify: [:at_start, :at_finish]] |> List.flatten()
+    # NOTE:  if a clean cycle is already in progress the call
+    #        to Ato will invalidate it's timer so the previous
+    #        clean cycle is effectively canceled
+    apply_cmd(cmd, Ato, add_notify_opts(cmd_opts))
 
-    apply_cmd(cmd, Ato, ato_opts)
-
-    c_map = Map.merge(c_map, %{status: :requested, token: c_token + 1})
-
-    reply_and_merge(s, %{clean: c_map}, :ok)
+    state
+    # clear out the previous clean cycle, if any
+    |> put_in([:clean], %{})
+    |> put_in([:clean, :status], :requested)
+    |> put_in([:clean, :opts], opts[:clean])
+    |> reply(:ok)
   end
 
   @doc false
@@ -389,27 +387,43 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_continue(:bootstrap, s) do
-    noreply(s)
+  def handle_continue(:bootstrap, state) do
+    valid_opts? = validate_durations(state[:opts])
+
+    case valid_opts? do
+      true ->
+        noreply(state)
+
+      false ->
+        state
+        |> put_in([:reef_mode], :not_ready)
+        |> put_in([:not_ready_reason], :invalid_opts)
+        |> noreply()
+    end
   end
 
   @doc false
   @impl true
   def handle_info({:gen_device, {at_phase, :off, Ato}}, state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0, elapsed: 2]
 
     case at_phase do
       :at_start ->
         state
         |> put_in([:clean, :started_at], utc_now())
+        |> put_in([:clean, :ato_rc], Ato.value())
         |> put_in([:clean, :status], :active)
         |> noreply()
 
       :at_finish ->
+        now = utc_now()
+        started_at = state[:clean][:started_at]
+
         state
-        |> put_in([:clean, :finished_at], utc_now())
+        |> put_in([:clean, :finished_at], now)
         |> put_in([:clean, :ato_rc], Ato.value())
         |> put_in([:clean, :status], :complete)
+        |> put_in([:clean, :elapsed], elapsed(started_at, now))
         |> noreply()
     end
   end
@@ -642,6 +656,9 @@ defmodule Reef.Captain.Server do
       {_, false} ->
         false
 
+      {[{_k, list} | _rest], acc} when is_list(list) ->
+        validate_duration_r(list, acc)
+
       # look at the head of the list, when it's key of interest
       # validate it can be converted to milliseconds and recurse
       # the tail
@@ -649,8 +666,8 @@ defmodule Reef.Captain.Server do
         validate_duration_r(rest, acc and valid_ms?(v))
 
       # not a keyword of interest, keep going
-      {[_no_interest | rest], acc} ->
-        validate_duration_r(rest, acc)
+      {{_k, _v}, acc} ->
+        acc
     end
   end
 
@@ -705,7 +722,4 @@ defmodule Reef.Captain.Server do
 
   defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
   defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
-
-  defp reply_and_merge(s, m, val) when is_map(s) and is_map(m),
-    do: reply(Map.merge(s, m), val)
 end
