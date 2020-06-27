@@ -46,6 +46,7 @@ defmodule Reef.Captain.Server do
       keep_fresh: %{},
       salt_mix: %{},
       change_prep: %{},
+      delayed_cmd: %{},
       token: 1
     }
 
@@ -137,6 +138,7 @@ defmodule Reef.Captain.Server do
 
     final_opts = Keyword.merge(config_opts[:fill], opts)
     valid? = validate_durations(final_opts)
+    start_delay = opts[:start_delay]
 
     cond do
       valid? == false ->
@@ -144,6 +146,9 @@ defmodule Reef.Captain.Server do
 
       is_nil(final_opts) ->
         {:fill_opts_undefined, final_opts}
+
+      is_binary(start_delay) ->
+        cast_if_active({:delayed_cmd, :fill, final_opts})
 
       true ->
         cast_if_active({:fill, final_opts})
@@ -329,6 +334,23 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
+  def handle_cast({:delayed_cmd, cmd, cmd_opts}, state) do
+    import Helen.Time.Helper, only: [utc_now: 0]
+
+    # grab the requested delay and remove :start_delay from the opts
+    {[{_, delay}], opts} = Keyword.split(cmd_opts, [:start_delay])
+
+    msg = {:delayed_cmd, cmd, opts}
+
+    state
+    |> put_in([:delayed_cmd, :cmd], {cmd, cmd_opts})
+    |> put_in([:delayed_cmd, :issued_at], utc_now())
+    |> change_token_and_send_after(msg, delay)
+    |> noreply()
+  end
+
+  @doc false
+  @impl true
   def handle_cast({:fill, fill_opts}, state) do
     import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1]
 
@@ -490,19 +512,36 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   # handle the case when the msg_token matches the current state.
-  def handle_info(
-        {:timer, _msg, msg_token},
-        %{token: token} = s
-      )
+  def handle_info({:timer, msg, msg_token}, %{token: token} = state)
       when msg_token == token do
-    noreply(s)
+    case msg do
+      {:delayed_cmd, :fill, opts} ->
+        GenServer.cast(__MODULE__, {:fill, opts})
+
+        state
+        |> put_in([:delayed_cmd], %{})
+        |> noreply()
+
+      _msg ->
+        noreply(state)
+    end
   end
 
   # NOTE:  when the msg_token does not match the state token then
   #        a change has occurred and this off message should be ignored
-  def handle_info({:timer, _msg, msg_token}, %{token: token} = s)
-      when not msg_token == token do
-    noreply(s)
+  def handle_info({:timer, msg, msg_token}, %{token: token} = state)
+      when msg_token != token do
+    case msg do
+      {:delayed_cmd, _cmd} ->
+        # if this was a delayed cmd message that failed the token match
+        # then null out the delayed_cmd map
+        state
+        |> put_in([:delayed_cmd], %{})
+        |> noreply()
+
+      _no_match ->
+        noreply(state)
+    end
   end
 
   @doc false
@@ -704,13 +743,21 @@ defmodule Reef.Captain.Server do
 
   defp change_token(%{} = s), do: update_in(s, [:token], fn x -> x + 1 end)
 
+  defp change_token_and_send_after(state, msg, delay) do
+    import Helen.Time.Helper, only: [to_ms: 1]
+
+    %{token: token} = state = change_token(state)
+
+    Process.send_after(self(), {:timer, msg, token}, to_ms(delay))
+
+    state
+  end
+
   defp loop_timeout(%{opts: opts}) do
     import Helen.Time.Helper, only: [to_ms: 2]
 
     to_ms(opts[:timeout], "PT30.0S")
   end
-
-  # defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
 
   defp update_last_timeout(s) do
     import Helen.Time.Helper, only: [utc_now: 0]
