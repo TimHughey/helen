@@ -103,7 +103,7 @@ defmodule GenDevice do
       def last_timeout do
         import TimeSupport, only: [epoch: 0, utc_now: 0]
 
-        with last <- state(:last_timeout),
+        with last <- get_in(state(), [:last, :timeout]),
              d when d > 0 <- Timex.diff(last, epoch()) do
           Timex.to_datetime(last, "America/New_York")
         else
@@ -167,9 +167,11 @@ defmodule GenDevice do
       ## Option Examples
         `for: [minutes: 1]` switch the device on for the specified duration
 
-        `at_start: [:notify]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning on the switch
+        `at_cmd_finish: :off` swith the device off when the cmd is finished
 
-        `at_finish: [:notify]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning off the switch
+        `notify: [:at_start]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning on the switch
+
+        `notify: [:at_end]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning off the switch
       """
       @doc since: "0.0.27"
       def on(opts \\ []) when is_list(opts) do
@@ -334,7 +336,7 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_call({cmd, _cmd_opts} = msg, {pid, _ref}, %{} = state) do
+      def handle_call({cmd, cmd_opts} = msg, {pid, _ref}, %{} = state) do
         state
         # if requested in the cmd opts send a msg the cmd is starting.
         # the timer msg ultimately becomes the original msg with the caller's
@@ -345,6 +347,7 @@ defmodule GenDevice do
         |> adjust_device(cmd)
         |> put_in([:active_cmd], cmd)
         |> put_in([:last, :pid], pid)
+        |> put_in([:last, :cmd_opts], cmd_opts)
         |> schedule_timer_if_needed_and_reply(pid, msg)
       end
 
@@ -376,7 +379,7 @@ defmodule GenDevice do
           when msg_token == token do
         state
         |> send_at_timer_msg_if_needed(msg, :at_finish)
-        |> adjust_device_if_needed([])
+        |> adjust_device_if_needed(msg)
         |> put_in([:active_cmd], :none)
         |> noreply()
       end
@@ -422,10 +425,13 @@ defmodule GenDevice do
         |> update_in([:device_adjusts], fn x -> x + 1 end)
       end
 
-      defp adjust_device_if_needed(%{} = state, opts) do
-        # if there was an :at_cmd_finish opt specified and it's either :on or
-        # :off then adjust the switch.
-        case opts[:at_cmd_finish] do
+      defp adjust_device_if_needed(
+             %{} = state,
+             {_cmd, cmd_opts, _caller_pi} = _msg
+           ) do
+        # if there was an :at_cmd_finish opt specified with the original cmd
+        # and it's either :on or :off then adjust the switch.
+        case cmd_opts[:at_cmd_finish] do
           nil -> state
           cmd when cmd in [:on, :off] -> adjust_device(state, cmd)
         end
