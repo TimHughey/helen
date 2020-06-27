@@ -39,8 +39,46 @@ defmodule Helen.Time.Helper do
     end
   end
 
-  def duration_invert(opts) when is_list(opts) do
-    duration_from_list(opts, []) |> Duration.invert()
+  @doc """
+  Calculates the elapsed duration of start and finish arguments.
+
+  A zero duration is returned if an error occurs while calculating
+  the elapsed duration.
+
+  Returns a duration.
+
+  ## Examples
+
+      iex> Helen.Time.Helper.elapsed(start, end)
+
+  """
+  @doc since: "0.0.27"
+  def elapsed(start, finish) do
+    # must pass the latest datetime to Timex.diff as the first
+    # argument to get a positive duration
+    case Timex.diff(finish, start, :duration) do
+      {:error, _error} -> Duration.zero()
+      duration -> duration
+    end
+  end
+
+  @doc """
+  Determines if duration (second argument) has elapsed
+  relative to the reference datatime (first argument)
+
+  Returns a boolean.
+
+  ## Examples
+
+      iex> Helen.Time.Helper.elapsed?(reference, duration)
+
+  """
+  @doc since: "0.0.27"
+  def elapsed?(reference, duration) do
+    import Timex, only: [after?: 2, shift: 2]
+
+    end_dt = shift(reference, milliseconds: to_ms(duration))
+    after?(utc_now(), end_dt)
   end
 
   @doc """
@@ -79,6 +117,36 @@ defmodule Helen.Time.Helper do
     |> Timex.to_gregorian_microseconds()
     |> Duration.from_microseconds()
     |> Duration.to_milliseconds(truncate: true)
+  end
+
+  @doc """
+  Convert the argument to a binary representation.
+
+  Accepts DateTime and Duration.
+
+  Returns a binary representation or "unsupported".  May raise if
+  there is an error related to the DateTime or Duration.
+
+  Defaults to America/New_York timezone.
+  """
+  @doc since: "0.0.27"
+  def to_binary(arg) do
+    import Timex, only: [to_datetime: 2, format!: 3, format_duration: 2]
+    import Duration, only: [to_seconds: 2, from_seconds: 1]
+
+    case arg do
+      %DateTime{} = x ->
+        to_datetime(x, "America/New_York")
+        |> format!("%a, %b %e, %Y %H:%M:%S", :strftime)
+
+      %Duration{} = x ->
+        to_seconds(x, :truncate)
+        |> from_seconds()
+        |> format_duration(:humanized)
+
+      x ->
+        inspect(x, pretty: true)
+    end
   end
 
   @doc """
@@ -173,19 +241,68 @@ defmodule Helen.Time.Helper do
     Timex.now()
   end
 
+  @doc """
+  Shifts UTC now into the future using the supplied args.
+
+  ## Example Args
+     a. %Duration{}
+     b. [hours: 1, minutes: 2, seconds: 3]
+     c. "PT1H2M3.0S"
+
+  Returns a DateTime.
+
+  """
+  @doc since: "0.0.27"
   def utc_shift(args) do
+    import Timex, only: [shift: 2, add: 2]
+    import Timex.Duration, only: [parse!: 1]
     now = utc_now()
 
     case args do
-      args when is_list(args) -> now |> Timex.shift(args)
-      d = %Duration{} -> now |> Timex.shift(duration: d)
-      iso when is_binary(iso) -> Timex.add(now, Duration.parse!(iso))
+      l when is_list(l) -> shift(now, milliseconds: list_to_ms(l, []))
+      d = %Duration{} -> shift(now, duration: d)
+      iso when is_binary(iso) -> add(now, parse!(iso))
+      ms when is_integer(ms) -> shift(now, milliseconds: ms)
       _anything -> now
     end
   end
 
-  def utc_shift_past(opts) when is_list(opts),
-    do: utc_now() |> Timex.shift(duration: duration_invert(opts))
+  @doc """
+  Shifts UTC now into the past using the supplied args.  This function
+  is the inverse of `utc_shift/1`.
+
+  ## Example Args
+     a. %Duration{}
+     b. [hours: 1, minutes: 2, seconds: 3]
+     c. "PT1H2M3.0S"
+     d. 1000 (integer milliseconds)
+
+  Returns a DateTime.
+
+  """
+  @doc since: "0.0.27"
+  def utc_shift_past(args) do
+    import Timex, only: [shift: 2, subtract: 2]
+    import Timex.Duration, only: [invert: 1, parse!: 1]
+    now = utc_now()
+
+    case args do
+      l when is_list(l) -> shift(now, milliseconds: list_to_ms(l, []) * -1)
+      d = %Duration{} -> shift(now, duration: invert(d))
+      iso when is_binary(iso) -> subtract(now, parse!(iso))
+      ms when is_integer(ms) -> shift(now, milliseconds: ms * -1)
+      _anything -> now
+    end
+  end
+
+  @doc """
+  Returns a duration of zero.  Simply put, this is a wrapper for `Timex.Duration.zero/0`
+
+  Returns a duration.
+
+  """
+  @doc since: "0.0.27"
+  def zero, do: Duration.zero()
 
   ##
   ## PRIVATE

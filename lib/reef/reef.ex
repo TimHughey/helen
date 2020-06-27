@@ -48,13 +48,11 @@ defmodule Reef do
       fill: [
         main: [
           run_for: "PT7H0.0S",
-          at_step_finish: [off: []],
           on: [for: "PT2M40.0S"],
           off: [for: "PT7H0.0S"]
         ],
-        final: [
+        finally: [
           run_for: "PT1H0.0S",
-          at_step_finish: [off: []],
           on: [for: "PT15M0.0S"],
           off: [for: "PT5M0.0S"]
         ]
@@ -63,7 +61,6 @@ defmodule Reef do
     ]
 
     opts(fn _x -> defs end)
-    restart()
   end
 
   def test_opts do
@@ -71,16 +68,15 @@ defmodule Reef do
       fill: [
         main: [
           run_for: "PT10.0S",
-          at_step_finish: [off: []],
           on: [for: "PT2.0S"],
           off: [for: "PT1.2S"]
         ],
-        final: [
-          run_for: "P10.0S",
-          at_step_finish: [off: []],
+        topoff: [
+          run_for: "PT10.0S",
           on: [for: "PT2.0S"],
           off: [for: "PT1.0S"]
-        ]
+        ],
+        finally: [msg: {:handoff, :keep_fresh}]
       ],
       clean: [off: [for: "PT15.0S", at_cmd_finish: :on]]
     ]
@@ -88,7 +84,9 @@ defmodule Reef do
     opts(fn _x -> defs end)
   end
 
-  def fill(opts \\ [start_with: :main]), do: Captain.fill(opts)
+  def fill(opts \\ []), do: Captain.fill(opts)
+
+  defdelegate fill_status, to: Captain
 
   def heat_all_off do
     DisplayTank.Temp.mode(:standby)

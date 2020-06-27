@@ -150,7 +150,7 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def off(opts \\ []) when is_list(opts) do
-        GenServer.call(__MODULE__, {:off, opts})
+        GenServer.call(__MODULE__, {:off, List.flatten(opts)})
       end
 
       @doc """
@@ -178,7 +178,7 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def on(opts \\ []) when is_list(opts) do
-        GenServer.call(__MODULE__, {:on, opts})
+        GenServer.call(__MODULE__, {:on, List.flatten(opts)})
       end
 
       @doc delegate_to: {__MODULE__, :value, 1}

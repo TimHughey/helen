@@ -16,14 +16,14 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
-    import Helen.Time.Helper, only: [epoch: 0]
+    import Helen.Time.Helper, only: [epoch: 0, zero: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
 
     state = %{
       mode: args[:mode] || :active,
-      reef_mode: :started,
+      reef_mode: :ready,
       standby_reason: :none,
       last_timeout: epoch(),
       timeouts: 0,
@@ -34,7 +34,17 @@ defmodule Reef.Captain.Server do
         started_at: epoch(),
         finished_at: epoch()
       },
-      fill: %{},
+      fill: %{
+        status: :ready,
+        steps: [],
+        steps_to_execute: [],
+        step: %{cmd: :none},
+        started_at: nil,
+        will_finish_by: nil,
+        finished_at: nil,
+        elapsed: zero(),
+        opts: []
+      },
       aerate: %{},
       keep_fresh: %{},
       salt_mix: %{},
@@ -111,6 +121,18 @@ defmodule Reef.Captain.Server do
   @doc since: "0.0.27"
   def clean, do: call_if_active({:clean})
 
+  @doc """
+  Fill the MixTank with RODI.
+
+  Returns :ok.
+
+  ## Examples
+
+      iex> Reef.Captain.Server.fill()
+      :ok
+
+  """
+  @doc since: "0.0.27"
   def fill(opts) do
     opts = [opts] |> List.flatten()
 
@@ -124,6 +146,20 @@ defmodule Reef.Captain.Server do
         call_if_active({:fill, final_opts})
     end
   end
+
+  @doc """
+  Return the status of the Reef fill command.
+
+  Returns a map.
+
+  ## Examples
+
+      iex> Reef.Captain.Server.fill_status()
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def fill_status, do: call_if_active({:fill_status}) |> IO.puts()
 
   def last_timeout do
     import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
@@ -242,34 +278,91 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_call(
-        {:fill, final_opts},
-        _from,
-        %{fill: _, opts: _opts} = s
-      ) do
+  def handle_call({:fill, fill_opts}, _from, state) do
     import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1, to_ms: 1]
 
-    start_with = final_opts[:start_with] || [:main]
-    steps = Keyword.keys(final_opts[:fill])
+    # unfold each step in the  steps list matching on the key :run_for.
+    # convert each value to ms and reduce with a start value of 0.
+    will_finish_by_ms = fn x ->
+      for {_step, details} <- x,
+          {k, run_for} when k == :run_for <- details,
+          reduce: 0 do
+        total_ms -> total_ms + to_ms(run_for)
+      end
+    end
 
-    max_time_opts = get_in(final_opts, [:fill, start_with, :for])
+    steps = fill_opts[:fill]
+    {start_step, _} = steps |> hd()
 
-    run_ms = to_ms(max_time_opts)
-
-    fill_map = %{
+    fill = %{
+      status: :in_progress,
+      active_step: start_step,
       steps: steps,
-      start_with: start_with,
-      active_step: start_with,
-      fill_opts: final_opts,
-      start_dt: utc_now(),
-      finish_dt: utc_shift(max_time_opts),
-      run_ms: run_ms
+      steps_to_execute: Keyword.keys(steps),
+      step: %{},
+      started_at: utc_now(),
+      will_finish_by: utc_shift(will_finish_by_ms.(steps)),
+      finished_at: nil,
+      elapsed: 0,
+      opts: fill_opts
     }
 
-    merge_map = %{fill: fill_map, reef_mode: :fill}
+    state
+    |> change_token()
+    |> put_in([:reef_mode], :fill)
+    |> put_in([:fill], fill)
+    |> put_in([:fill, :active_step], hd(fill.steps_to_execute))
+    |> fill_start_active_step()
+    |> reply(:ok)
+  end
 
-    change_token(s)
-    |> reply_and_merge(merge_map, :ok)
+  @doc false
+  @impl true
+  def handle_call({:fill_status}, _from, %{fill: fill} = state) do
+    import Helen.Time.Helper, only: [to_binary: 1]
+
+    {state, msg} =
+      case fill[:status] do
+        :ready ->
+          {state,
+           """
+           Reef Fill Ready
+           """}
+
+        :completed ->
+          {state,
+           """
+           Reef Fill Completed
+
+             Elapsed time #{to_binary(fill[:elapsed])}.
+
+             Started : #{to_binary(fill[:started_at])}
+             Finished: #{to_binary(fill[:finished_at])}
+
+           """}
+
+        :in_progress ->
+          state = fill_update_elapsed(state)
+          fill = state[:fill]
+
+          {state,
+           """
+           Reef Fill In-Progress
+
+           Elapsed time #{to_binary(fill[:elapsed])}.
+
+                  Started  : #{to_binary(fill[:started_at])}
+           Expected Finish : #{to_binary(fill[:will_finish_by])}
+           """}
+      end
+
+    reply(state, msg)
+  end
+
+  @doc false
+  @impl true
+  def handle_cast({:handoff, _cmd} = msg, state) do
+    msg_puts(msg, state)
   end
 
   @doc false
@@ -301,18 +394,55 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_info({:gen_device, msg}, s) do
-    msg_puts = fn {cat, cmd, mod} = msg ->
-      ["\n => ", inspect(mod), inspect(cat), inspect(cmd)]
-      |> Enum.join(" ")
-      |> IO.puts()
+  # FILL MODE
+  def handle_info(
+        {:gen_device, {_at_phase, _cmd, Rodi} = msg},
+        %{
+          reef_mode: :fill,
+          fill: %{
+            active_step: step,
+            steps: steps
+          }
+        } = state
+      ) do
+    import Helen.Time.Helper, only: [utc_now: 0]
 
-      msg
+    case msg do
+      {:at_start, cmd, Rodi} when cmd in [:on, :off] ->
+        # for :at_start we only want to record the executing cmd
+        state
+        |> put_in([:fill, :step, :cmd], cmd)
+        |> noreply()
+
+      {:at_finish, :on, Rodi} ->
+        # for :at_finish and :on we want to start off and update :active_cmd
+        # to pattern match
+
+        # NOTE:  we do not check the elapsed step time against :run_for
+        #        :at_finish, :on.  this purposeful as we never want to
+        #        end a step with Rodi on for :fill
+        get_in(steps, [step, :off]) |> add_notify_opts() |> Rodi.off()
+        Air.on()
+
+        state
+        |> put_in([:fill, :cmd], :off)
+        |> noreply()
+
+      {:at_finish, :off, Rodi} ->
+        # for :at_finish and :off we have finished a cycle of this step
+        # NOTE:  we rely on fill_start_active_step to decide if another cycle
+        #        of the current step is necessary (based on :run_for) or if the
+        #        next step should be executed,
+        #
+        state
+        |> fill_start_active_step()
+        |> noreply()
     end
-
-    msg_puts.(msg)
-    noreply(s)
   end
+
+  @doc false
+  @impl true
+  def handle_info({:gen_device, _} = msg, state), do: msg_puts(msg, state)
 
   @doc false
   @impl true
@@ -344,6 +474,8 @@ defmodule Reef.Captain.Server do
   ## PRIVATE
   ##
 
+  defp add_notify_opts(opts), do: [opts, notify: [:at_start, :at_finish]]
+
   defp apply_cmd(cmd, mod, opts) do
     case cmd do
       :on -> apply(mod, cmd, [opts])
@@ -356,6 +488,103 @@ defmodule Reef.Captain.Server do
   end
 
   defp crew_list, do: [Air, Pump, Rodi]
+
+  defp fill_finally(%{fill: %{steps: steps}} = state) do
+    import Helen.Time.Helper, only: [elapsed: 2, elapsed?: 2, utc_now: 0]
+
+    # :finally is a "reserved keyword" and requires special handling as it
+    # is not a typical fill step but rather an instruction of what to
+    # do when all steps complete
+
+    GenServer.cast(__MODULE__, get_in(steps, [:finally, :msg]))
+
+    # :finally is also the last step and, as such, signals the end of
+    # the fill command.  record finished_at and calculate the
+    # elapsed duration and note fill is completed.
+    now = utc_now()
+    started_at = get_in(state, [:fill, :started_at])
+
+    # NOTE: we return the updated step, with fill containing only relevant keys
+    state
+    |> update_in([:fill], fn x -> Map.take(x, [:started_at]) end)
+    |> put_in([:fill, :finished_at], now)
+    |> put_in([:fill, :elapsed], elapsed(started_at, now))
+    |> put_in([:fill, :status], :completed)
+  end
+
+  defp fill_start_active_step(%{fill: %{active_step: a, steps: s}} = state)
+       when a == :finally or s == [],
+       do: fill_finally(state)
+
+  defp fill_start_active_step(state), do: fill_start_next_step_if_needed(state)
+
+  defp fill_start_next_step_if_needed(
+         %{fill: %{active_step: active_step, steps: steps}} = state
+       ) do
+    import Helen.Time.Helper, only: [elapsed: 2, elapsed?: 2, utc_now: 0]
+
+    # each step contains a :run_for key that defines how long the
+    # step will will cycle on and off
+    started_at = get_in(state, [:fill, :step, :started_at]) || utc_now()
+    run_for = get_in(steps, [active_step, :run_for])
+
+    case elapsed?(started_at, run_for) do
+      false ->
+        # run_for has not elapsed so turn on Rodi since this function is only
+        # called when ** starting ** a step which always begins with on for fill
+        # this approach for fill also, as bonus,  'skips' the run_for option
+        Air.off()
+        get_in(steps, [active_step, :on]) |> add_notify_opts() |> Rodi.on()
+
+        state
+        |> put_in([:fill, :step, :started_at], started_at)
+        |> put_in([:fill, :step, :elapsed], elapsed(started_at, utc_now()))
+        |> update_in([:fill, :step, :cycles], fn
+          nil -> 1
+          x -> x + 1
+        end)
+
+      true ->
+        import List, only: [delete_at: 2]
+
+        # run_for has elapsed, remove the current active step from
+        # steps_to_execute, clear out the step tracked (:step) then call
+        # this function again to start the next step
+        state
+        # set the active step to the next one in the list of steps to execute
+        |> put_in(
+          [:fill, :active_step],
+          get_in(state, [:fill, :steps_to_execute]) |> hd()
+        )
+        # remove the step just completed
+        |> update_in([:fill, :steps_to_execute], fn x -> delete_at(x, 0) end)
+        # a new step is about to begin, reset the step control map
+        |> put_in([:fill, :step], %{cmd: :none})
+        # call fill_start_active_step
+        |> fill_start_active_step()
+    end
+  end
+
+  defp fill_update_elapsed(
+         %{fill: %{started_at: started, step: %{started_at: step_started}}} =
+           state
+       ) do
+    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
+
+    state
+    |> put_in([:fill, :elapsed], elapsed(started, utc_now()))
+    |> put_in([:fill, :step, :elapsed], elapsed(step_started, utc_now()))
+  end
+
+  defp msg_puts(msg, state) do
+    """
+     ==> #{inspect(msg)}
+
+    """
+    |> IO.puts()
+
+    noreply(state)
+  end
 
   ##
   ## GenServer Receive Loop Hooks
