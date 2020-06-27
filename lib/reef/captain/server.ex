@@ -487,7 +487,7 @@ defmodule Reef.Captain.Server do
         air_run_for =
           get_in(steps, [step, :off, :for]) |> to_duration() |> scale(0.25)
 
-        Air.on(for: air_run_for)
+        Air.on(for: air_run_for, at_cmd_finish: :off)
 
         state
         |> put_in([:fill, :cmd], :off)
