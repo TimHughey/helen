@@ -291,7 +291,7 @@ defmodule Reef.Captain.Server do
         :ready ->
           {state,
            """
-           Reef Fill Ready
+           Reef Fill is Ready
            """}
 
         :completed ->
@@ -303,7 +303,6 @@ defmodule Reef.Captain.Server do
 
               Started: #{to_binary(fill[:started_at])}
              Finished: #{to_binary(fill[:finished_at])}
-
            """}
 
         :in_progress ->
@@ -312,12 +311,16 @@ defmodule Reef.Captain.Server do
 
           {state,
            """
-           Reef Fill In-Progress
-
-           Elapsed time #{to_binary(fill[:elapsed])}.
+           Reef Fill In-Progress, elapsed time #{to_binary(fill[:elapsed])}.
 
                    Started: #{to_binary(fill[:started_at])}
            Expected Finish: #{to_binary(fill[:will_finish_by])}
+
+                 Executing: #{inspect(fill[:active_step])}
+                 Remaining: #{inspect(fill[:steps_to_execute] |> tl())}
+                   Command: #{inspect(fill[:step][:cmd])}
+                   Elapsed: #{to_binary(fill[:step][:elapsed])}
+                    Cycles: #{inspect(fill[:step][:cycles])}
            """}
       end
 
@@ -441,7 +444,7 @@ defmodule Reef.Captain.Server do
           }
         } = state
       ) do
-    import Helen.Time.Helper, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [scale: 2, to_duration: 1, utc_now: 0]
 
     case msg do
       {:at_start, cmd, Rodi} when cmd in [:on, :off] ->
@@ -458,7 +461,11 @@ defmodule Reef.Captain.Server do
         #        :at_finish, :on.  this purposeful as we never want to
         #        end a step with Rodi on for :fill
         get_in(steps, [step, :off]) |> add_notify_opts() |> Rodi.off()
-        Air.on()
+
+        air_run_for =
+          get_in(steps, [step, :off, :for]) |> to_duration() |> scale(0.25)
+
+        Air.on(for: air_run_for)
 
         state
         |> put_in([:fill, :cmd], :off)

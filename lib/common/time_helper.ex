@@ -133,6 +133,9 @@ defmodule Helen.Time.Helper do
     |> Duration.to_milliseconds(truncate: true)
   end
 
+  @doc delegate_to: {Timex.Duration, :scale, 2}
+  defdelegate scale(d, factor), to: Timex.Duration
+
   @doc """
   Subtracts a list of durations and returns the absolute value.
 

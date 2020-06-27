@@ -26,8 +26,8 @@ defmodule Reef do
         steps: [
           main: [
             run_for: "PT7H",
-            on: [for: "PT2M40S"],
-            off: [for: "PT16M"]
+            on: [for: "PT2M10S"],
+            off: [for: "PT12M"]
           ],
           topoff: [
             run_for: "PT1H",
@@ -38,8 +38,11 @@ defmodule Reef do
         ]
       ],
       keep_fresh: [
-        air: [leader: true, on: [for: "PT7M"], off: [for: "PT3M"]],
-        pump: [on: [for: "PT1M"], at_cmd_finish: :off]
+        leader: :aerate,
+        steps: [
+          aerate: [on: [for: "PT7M"], off: [for: "PT3M"]],
+          circulate: [on: [for: "PT1M"], at_cmd_finish: :off]
+        ]
       ],
       clean: [off: [for: "PT2H", at_cmd_finish: :on]]
     ]
@@ -66,8 +69,11 @@ defmodule Reef do
         ]
       ],
       keep_fresh: [
-        air: [leader: true, on: [for: "PT10S"], off: [for: "PT5S"]],
-        pump: [on: [for: "PT1S"], at_cmd_finish: :off]
+        leader: :aerate,
+        steps: [
+          air: [leader: true, on: [for: "PT10S"], off: [for: "PT5S"]],
+          pump: [on: [for: "PT1S"], at_cmd_finish: :off]
+        ]
       ],
       clean: [off: [for: "PT15S", at_cmd_finish: :on]]
     ]
