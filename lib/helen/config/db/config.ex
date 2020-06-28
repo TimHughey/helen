@@ -60,12 +60,14 @@ defmodule Helen.Module.DB.Config do
   @doc false
   def eval_opts(mod, overrides)
       when is_atom(mod) and is_list(overrides) do
+    import DeepMerge, only: [deep_merge: 2]
+
     with %Schema{opts: opts, version: vsn} <- find(mod),
          # NOTE: accepting risk of evaling string because it is coming
          #       from the database
          {val, _} <- Code.eval_string(opts),
          # apply any overrides
-         opts <- Keyword.merge(val, overrides) do
+         opts <- deep_merge(val, overrides) do
       [opts, __available__: true, __version__: vsn] |> List.flatten()
     else
       _anything -> [overrides, __available__: false] |> List.flatten()

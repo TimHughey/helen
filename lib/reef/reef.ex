@@ -38,10 +38,19 @@ defmodule Reef do
         ]
       ],
       keep_fresh: [
+        # the leader of this mode
         leader: :aerate,
+        step_devices: [aerate: :air, circulate: :pump],
         steps: [
-          aerate: [on: [for: "PT7M"], off: [for: "PT3M"]],
-          circulate: [on: [for: "PT1M"], at_cmd_finish: :off]
+          aerate: [
+            on: [for: "PT5M", at_cmd_finish: :off],
+            circulate: :on,
+            off: [for: "PT15M", at_cmd_finish: :off],
+            repeat: true
+          ],
+          # :circulate is used only as a lookup of the details of a device
+          # command listed in the leader (:aerate)
+          circulate: [on: [for: "PT1M", at_cmd_finish: :off]]
         ]
       ],
       clean: [off: [for: "PT2H", at_cmd_finish: :on]]
@@ -70,9 +79,17 @@ defmodule Reef do
       ],
       keep_fresh: [
         leader: :aerate,
+        step_devices: [aerate: :air, circulate: :pump],
         steps: [
-          air: [leader: true, on: [for: "PT10S"], off: [for: "PT5S"]],
-          pump: [on: [for: "PT1S"], at_cmd_finish: :off]
+          aerate: [
+            on: [for: "PT4S", at_cmd_finish: :off],
+            circulate: :on,
+            off: [for: "PT4S", at_cmd_finish: :off],
+            repeat: true
+          ],
+          # :circulate is used only as a lookup of the details of a device
+          # command listed in the leader (:aerate)
+          circulate: [on: [for: "PT1S", at_cmd_finish: :off]]
         ]
       ],
       clean: [off: [for: "PT15S", at_cmd_finish: :on]]
@@ -90,6 +107,9 @@ defmodule Reef do
     DisplayTank.Temp.mode(:standby)
     MixTank.Temp.mode(:standby)
   end
+
+  def keep_fresh(opts \\ []), do: Captain.keep_fresh(opts)
+  defdelegate(keep_fresh_status, to: Captain)
 
   # def keep_fresh(opts \\ []), do: Reef.Salt.KeepFresh.kickstart(opts)
   # def keep_fresh_abort(opts \\ []), do: Reef.Salt.KeepFresh.abort(opts)

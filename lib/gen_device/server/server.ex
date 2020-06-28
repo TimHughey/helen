@@ -140,7 +140,7 @@ defmodule GenDevice do
       @doc """
       Set the device managed by this server to off.
 
-      See `on/0` for options.
+      See `on/1` for options.
 
       Returns :ok or an error tuple
 
@@ -158,7 +158,7 @@ defmodule GenDevice do
       @doc """
       Set the device managed by this server to on.
 
-      Returns :ok or an error tuple
+      Returns :ok, {:ok, reference} or an error tuple
       ## Examples
 
           iex> on()
@@ -169,9 +169,21 @@ defmodule GenDevice do
 
         `at_cmd_finish: :off` swith the device off when the cmd is finished
 
-        `notify: [:at_start]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning on the switch
+        `notify: [:at_start, :at_finish]` send the caller:
+          returns: `{:ok, reference}`
 
-        `notify: [:at_end]` send the caller `{:gen_device, :at_start, "switch alias"}` when turning off the switch
+          sends the caller a message when cmd is :at_start or :at_finish:
+            {:gen_device,
+              %{mod: __MODULE__, cmd: :on | :off, at: :at_start | :at_finish,
+                ref: reference, token: nil}}
+
+        `notify: [:at_start, :at_finish, token: term]`
+          returns: `{:ok, reference}`
+
+          sends the caller a message when cmd is :at_start or :at_finish:
+            {:gen_device,
+              %{mod: __MODULE__, cmd: :on | :off, at: :at_start | :at_finish,
+                ref: reference, token: token}}
       """
       @doc since: "0.0.27"
       def on(opts \\ []) when is_list(opts) do
@@ -338,6 +350,9 @@ defmodule GenDevice do
       @impl true
       def handle_call({cmd, cmd_opts} = msg, {pid, _ref}, %{} = state) do
         state
+        # always add a reference for this cmd to the state in case
+        # it is needed later
+        |> put_in([:last, :reference], make_ref())
         # if requested in the cmd opts send a msg the cmd is starting.
         # the timer msg ultimately becomes the original msg with the caller's
         # pid appended
@@ -466,7 +481,26 @@ defmodule GenDevice do
         # if the matching ':at' option was specified
         for {:notify, notify_opts} <- cmd_opts,
             at_opt when at_opt == category <- notify_opts do
-          msg = {:gen_device, {category, cmd, __MODULE__}}
+          # extract the token from the opts, if included.
+          # since the notifiy opts are a mix of atoms and keywords
+          # let's use a for loop, with an accumulator starting with nil
+          # if this for loop finds [token: term] then term is the result
+          token =
+            for {:token, v} <- notify_opts, reduce: nil do
+              token -> v
+            end
+
+          # assemble the payload map that is always sent regardless if
+          # the token opt is passed
+          payload = %{
+            mod: __MODULE__,
+            cmd: cmd,
+            at: category,
+            ref: state[:last][:reference],
+            token: token
+          }
+
+          msg = {:gen_device, payload}
 
           send(reply_pid, msg)
         end
