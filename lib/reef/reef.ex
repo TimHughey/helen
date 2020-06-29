@@ -4,6 +4,7 @@ defmodule Reef do
   """
 
   alias Reef.Captain.Server, as: Captain
+  alias Reef.Captain.Status, as: Status
   alias Reef.DisplayTank
   alias Reef.MixTank
 
@@ -47,9 +48,11 @@ defmodule Reef do
             circulate: :on,
             off: [for: "PT15M", at_cmd_finish: :off],
             repeat: true
-          ],
-          # :circulate is used only as a lookup of the details of a device
-          # command listed in the leader (:aerate)
+          ]
+        ],
+        # sub_steps are step definitions only executed when included in
+        # a step listed in steps
+        sub_steps: [
           circulate: [on: [for: "PT1M", at_cmd_finish: :off]]
         ]
       ],
@@ -86,9 +89,11 @@ defmodule Reef do
             circulate: :on,
             off: [for: "PT4S", at_cmd_finish: :off],
             repeat: true
-          ],
-          # :circulate is used only as a lookup of the details of a device
-          # command listed in the leader (:aerate)
+          ]
+        ],
+        sub_steps: [
+          # sub_steps are step definitions only executed when included in
+          # a step listed in steps
           circulate: [on: [for: "PT1S", at_cmd_finish: :off]]
         ]
       ],
@@ -101,7 +106,19 @@ defmodule Reef do
 
   def fill(opts \\ []), do: Captain.fill(opts)
 
-  defdelegate fill_status, to: Captain
+  @doc """
+  Reef mode Fill status.
+
+  Outputs message to stdout, returns :ok.
+
+  ## Examples
+
+      iex> Reef.Captain.Server.fill_status()
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def fill_status, do: Status.msg(:fill) |> IO.puts()
 
   def heat_all_off do
     DisplayTank.Temp.mode(:standby)
@@ -109,19 +126,24 @@ defmodule Reef do
   end
 
   def keep_fresh(opts \\ []), do: Captain.keep_fresh(opts)
-  defdelegate(keep_fresh_status, to: Captain)
 
-  # def keep_fresh(opts \\ []), do: Reef.Salt.KeepFresh.kickstart(opts)
-  # def keep_fresh_abort(opts \\ []), do: Reef.Salt.KeepFresh.abort(opts)
-  # def keep_fresh_status(opts \\ []), do: Reef.Salt.KeepFresh.status(opts)
-  #
+  @doc """
+  Reef mode Keep Fresh status.
+
+  Outputs message to stdout, returns :ok.
+
+  ## Examples
+
+      iex> Reef.Captain.Server.keep_fresh_status()
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def keep_fresh_status, do: Status.msg(:keep_fresh) |> IO.puts()
+
   # def match_display_tank do
   #   IO.puts(["not implemented!!"])
   # end
-
-  # def mix(opts \\ []), do: Reef.Salt.Mix.kickstart(opts)
-  # def mix_abort(opts \\ []), do: Reef.Salt.Mix.abort(opts)
-  # def mix_status(opts \\ []), do: Reef.Salt.Mix.status(opts)
 
   def mixtank_mode(mode) when mode in [:active, :standby] do
     mods = [MixTank.Air, MixTank.Pump, MixTank.Rodi]
