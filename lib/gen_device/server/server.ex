@@ -19,22 +19,20 @@ defmodule GenDevice do
       @doc false
       @impl true
       def init(args) do
-        import TimeSupport, only: [epoch: 0]
-
         # just in case we were passed a map?!?
         args = Enum.into(args, [])
         c_opts = Keyword.merge(@use_opts, args)
 
         state = %{
           mode: args[:mode] || :active,
-          active_cmd: nil,
+          active_cmd: :none,
           device_name: c_opts[:device_name],
           device_adjusts: 0,
           last: %{
-            timeout: epoch(),
+            timeout: nil,
             cmd: nil,
             pid: nil,
-            adjust_at: epoch(),
+            adjust_at: nil,
             device_rc: nil,
             value_rc: nil
           },
