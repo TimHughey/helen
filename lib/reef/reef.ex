@@ -39,8 +39,6 @@ defmodule Reef do
         ]
       ],
       keep_fresh: [
-        # the leader of this mode
-        leader: :aerate,
         step_devices: [aerate: :air, circulate: :pump],
         steps: [
           aerate: [
@@ -56,7 +54,26 @@ defmodule Reef do
           circulate: [on: [for: "PT1M", at_cmd_finish: :off]]
         ]
       ],
-      clean: [off: [for: "PT2H", at_cmd_finish: :on]]
+      clean: [off: [for: "PT2H", at_cmd_finish: :on]],
+      mix: [
+        step_devices: [salt: :pump, stir: :pump, aerate: :air],
+        steps: [
+          salt: [
+            on: [for: "PT30M"],
+            next_step: :stir
+          ],
+          stir: [
+            run_for: "PT1H",
+            on: [for: "PT5M", at_cmd_finish: :off],
+            aerate: :on,
+            off: [for: "PT7M", at_cmd_finish: :off]
+          ],
+          finally: [msg: {:handoff, :prep_for_change}]
+        ],
+        sub_steps: [
+          aerate: [on: [for: "PT6M", at_cmd_finish: :off]]
+        ]
+      ]
     ]
 
     opts(fn _x -> defs end)
@@ -81,7 +98,6 @@ defmodule Reef do
         ]
       ],
       keep_fresh: [
-        leader: :aerate,
         step_devices: [aerate: :air, circulate: :pump],
         steps: [
           aerate: [
@@ -97,7 +113,26 @@ defmodule Reef do
           circulate: [on: [for: "PT1S", at_cmd_finish: :off]]
         ]
       ],
-      clean: [off: [for: "PT15S", at_cmd_finish: :on]]
+      clean: [off: [for: "PT15S", at_cmd_finish: :on]],
+      mix: [
+        step_devices: [salt: :pump, stir: :pump, aerate: :air],
+        steps: [
+          salt: [
+            on: [for: "PT30M"],
+            next_step: :stir
+          ],
+          stir: [
+            run_for: "PT1H",
+            on: [for: "PT5M", at_cmd_finish: :off],
+            aerate: :on,
+            off: [for: "PT7M", at_cmd_finish: :off]
+          ],
+          finally: [msg: {:handoff, :prep_for_change}]
+        ],
+        sub_steps: [
+          aerate: [on: [for: "PT6M", at_cmd_finish: :off]]
+        ]
+      ]
     ]
 
     opts(fn _x -> defs end)

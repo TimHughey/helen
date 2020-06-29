@@ -53,7 +53,7 @@ defmodule Reef.Captain.Status do
               Remaining: #{inspect(fill[:steps_to_execute] |> tl())}
                 Command: #{inspect(fill[:step][:cmd])}
                 Elapsed: #{to_binary(fill[:step][:elapsed])}
-                 Cycles: #{inspect(fill[:step][:cycles])}
+                 Cycles: #{step_cycles(fill)}
         """
     end
   end
@@ -78,16 +78,22 @@ defmodule Reef.Captain.Status do
         """
 
       :running ->
+        active_step = keep_fresh[:active_step]
+
         """
         Reef Keep Fresh Running, elapsed time #{to_binary(keep_fresh[:elapsed])}.
 
                 Started: #{to_binary(keep_fresh[:started_at])}
 
-              Executing: #{inspect(keep_fresh[:active_step])}
+              Executing: #{inspect(active_step)}
                 Command: #{inspect(keep_fresh[:step][:cmd])}
                 Elapsed: #{to_binary(keep_fresh[:step][:elapsed])}
-                 Cycles: #{inspect(keep_fresh[:step][:cycles])}
+                 Cycles: #{step_cycles(keep_fresh)}
         """
     end
+  end
+
+  defp step_cycles(%{active_step: active_step} = reef_mode) do
+    get_in(reef_mode, [:cycles, active_step]) |> inspect()
   end
 end
