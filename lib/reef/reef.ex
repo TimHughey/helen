@@ -22,123 +22,24 @@ defmodule Reef do
   def clean_status, do: state(:clean)
 
   def default_opts do
-    defs = [
-      fill: [
-        steps: [
-          main: [
-            run_for: "PT7H",
-            on: [for: "PT2M10S"],
-            off: [for: "PT12M"]
-          ],
-          topoff: [
-            run_for: "PT1H",
-            on: [for: "PT10M"],
-            off: [for: "PT1M"]
-          ],
-          finally: [msg: {:handoff, :keep_fresh}]
-        ]
-      ],
-      keep_fresh: [
-        step_devices: [aerate: :air, circulate: :pump],
-        steps: [
-          aerate: [
-            on: [for: "PT5M", at_cmd_finish: :off],
-            circulate: :on,
-            off: [for: "PT15M", at_cmd_finish: :off],
-            repeat: true
-          ]
-        ],
-        # sub_steps are step definitions only executed when included in
-        # a step listed in steps
-        sub_steps: [
-          circulate: [on: [for: "PT1M", at_cmd_finish: :off]]
-        ]
-      ],
-      clean: [off: [for: "PT2H", at_cmd_finish: :on]],
-      mix: [
-        step_devices: [salt: :pump, stir: :pump, aerate: :air],
-        steps: [
-          salt: [
-            on: [for: "PT30M"],
-            next_step: :stir
-          ],
-          stir: [
-            run_for: "PT1H",
-            on: [for: "PT5M", at_cmd_finish: :off],
-            aerate: :on,
-            off: [for: "PT7M", at_cmd_finish: :off]
-          ],
-          finally: [msg: {:handoff, :prep_for_change}]
-        ],
-        sub_steps: [
-          aerate: [on: [for: "PT6M", at_cmd_finish: :off]]
-        ]
-      ]
-    ]
+    alias Reef.Opts.Prod
 
-    opts(fn _x -> defs end)
+    opts(fn _x -> Prod.defaults() end)
     restart()
   end
 
   def test_opts do
-    defs = [
-      fill: [
-        steps: [
-          main: [
-            run_for: "PT11S",
-            on: [for: "PT0.5S"],
-            off: [for: "PT1.2S"]
-          ],
-          topoff: [
-            run_for: "PT10S",
-            on: [for: "PT2S"],
-            off: [for: "PT0.5S"]
-          ],
-          finally: [msg: {:handoff, :keep_fresh}]
-        ]
-      ],
-      keep_fresh: [
-        step_devices: [aerate: :air, circulate: :pump],
-        steps: [
-          aerate: [
-            on: [for: "PT4S", at_cmd_finish: :off],
-            circulate: :on,
-            off: [for: "PT4S", at_cmd_finish: :off],
-            repeat: true
-          ]
-        ],
-        sub_steps: [
-          # sub_steps are step definitions only executed when included in
-          # a step listed in steps
-          circulate: [on: [for: "PT1S", at_cmd_finish: :off]]
-        ]
-      ],
-      clean: [off: [for: "PT15S", at_cmd_finish: :on]],
-      mix: [
-        step_devices: [salt: :pump, stir: :pump, aerate: :air],
-        steps: [
-          salt: [
-            on: [for: "PT30M"],
-            next_step: :stir
-          ],
-          stir: [
-            run_for: "PT1H",
-            on: [for: "PT5M", at_cmd_finish: :off],
-            aerate: :on,
-            off: [for: "PT7M", at_cmd_finish: :off]
-          ],
-          finally: [msg: {:handoff, :prep_for_change}]
-        ],
-        sub_steps: [
-          aerate: [on: [for: "PT6M", at_cmd_finish: :off]]
-        ]
-      ]
-    ]
+    alias Reef.Opts.Test
 
-    opts(fn _x -> defs end)
+    opts(fn _x -> Test.defaults() end)
     restart()
   end
 
+  @doc """
+  The first step of mixing a batch of reef replacement water.  This step
+  fills the MixTank with RODI.
+  """
+  @doc since: "0.0.27"
   def fill(opts \\ []), do: Captain.fill(opts)
 
   @doc """
@@ -160,6 +61,12 @@ defmodule Reef do
     MixTank.Temp.mode(:standby)
   end
 
+  @doc """
+  A holding step of mixing a batch of reef replacement water.  This step
+  is used between other steps to maintain the freshness of the new batch
+  of water.
+  """
+  @doc since: "0.0.27"
   def keep_fresh(opts \\ []), do: Captain.keep_fresh(opts)
 
   @doc """
@@ -175,6 +82,28 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def keep_fresh_status, do: Status.msg(:keep_fresh) |> IO.puts()
+
+  @doc """
+  The second step of mixing a batch of replacement water.  This step runs
+  the necessary component while salt is added to the MixTank then executes
+  an extended circulate and aerate before moving to keep fresh.
+  """
+  @doc since: "0.0.27"
+  def mix_salt(opts \\ []), do: Captain.mix_salt(opts)
+
+  @doc """
+  Reef mode Mix Salt status.
+
+  Outputs message to stdout, returns :ok.
+
+  ## Examples
+
+      iex> Reef.Captain.Server.mix_salt_status()
+      :ok
+
+  """
+  @doc since: "0.0.27"
+  def mix_salt_status, do: Status.msg(:salt_mix) |> IO.puts()
 
   # def match_display_tank do
   #   IO.puts(["not implemented!!"])

@@ -114,32 +114,7 @@ defmodule Reef.Captain.Server do
 
   """
   @doc since: "0.0.27"
-  def fill(opts) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    # opts specified here are automatically placed under the :fill key
-    # so they can be succesfully merged with the overall opts
-    opts = [opts] |> List.flatten()
-    config_opts = config_opts([])
-
-    final_opts = deep_merge(config_opts[:fill], opts)
-    valid? = validate_durations(final_opts)
-    start_delay = opts[:start_delay]
-
-    cond do
-      valid? == false ->
-        {:invalid_duration_opts, final_opts}
-
-      is_nil(final_opts) ->
-        {:fill_opts_undefined, final_opts}
-
-      is_binary(start_delay) ->
-        cast_if_active({:delayed_cmd, :fill, final_opts})
-
-      true ->
-        cast_if_active({:fill, final_opts})
-    end
-  end
+  def fill(opts), do: cast_if_valid_and_active(:fill, opts)
 
   @doc """
   Keep the MixTank fresh by aerating and circulating the water.
@@ -156,31 +131,7 @@ defmodule Reef.Captain.Server do
 
   """
   @doc since: "0.0.27"
-  def keep_fresh(opts) do
-    import DeepMerge, only: [deep_merge: 2]
-    # opts specified here are automatically placed under the :fill key
-    # so they can be succesfully merged with the overall opts
-    opts = [opts] |> List.flatten()
-    config_opts = config_opts([])
-
-    final_opts = deep_merge(config_opts[:keep_fresh], opts)
-    valid? = validate_durations(final_opts)
-    start_delay = opts[:start_delay]
-
-    cond do
-      valid? == false ->
-        {:keep_fresh, :invalid_duration_opts, final_opts}
-
-      is_nil(final_opts) ->
-        {:keep_fresh, :opts_undefined, final_opts}
-
-      is_binary(start_delay) ->
-        cast_if_active({:delayed_cmd, :keep_fresh, final_opts})
-
-      true ->
-        cast_if_active({:keep_fresh, final_opts})
-    end
-  end
+  def keep_fresh(opts), do: cast_if_valid_and_active(:keep_fresh, opts)
 
   def last_timeout do
     import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
@@ -192,6 +143,23 @@ defmodule Reef.Captain.Server do
       _epoch -> epoch()
     end
   end
+
+  @doc """
+  Runs the necessary components to mix salt into the MixTank.
+
+  Returns `:ok`, `{:not_configured, opts}` or `{:invalid_duration_opts}`
+
+  ## Examples
+
+      iex> Reef.Captain.Server.mix_salt()
+      :ok
+
+  ### Example Options
+    `start_delay: "PT5M30S"` delay the start of this command by 1 min 30 secs
+
+  """
+  @doc since: "0.0.27"
+  def mix_salt(opts), do: cast_if_valid_and_active(:mix_salt, opts)
 
   @doc """
   Set the mode of the server.
@@ -321,43 +289,19 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_cast({:fill, fill_opts}, state) do
-    import Helen.Time.Helper, only: [utc_now: 0, utc_shift: 1]
+  def handle_cast({:fill, cmd_opts}, %{opts: opts} = state) do
+    import DeepMerge, only: [deep_merge: 2]
 
-    filtered_steps = fn opts ->
-      case get_in(opts, [:steps_to_execute]) do
-        nil ->
-          {opts[:steps], Keyword.keys(opts[:steps])}
-
-        # steps to execute specified in opts, however filter
-        # the list by the steps available
-        x ->
-          steps = Keyword.take(opts[:steps], x)
-          {steps, Keyword.keys(steps)}
-      end
-    end
-
-    {steps, to_execute} = filtered_steps.(fill_opts)
-
-    fill = %{
-      status: :in_progress,
-      steps: steps,
-      steps_to_execute: to_execute,
-      active_step: hd(to_execute),
-      cycles: %{},
-      step: %{},
-      started_at: utc_now(),
-      will_finish_ms: will_finish_by_ms(steps),
-      will_finish_by: utc_shift(will_finish_by_ms(steps)),
-      finished_at: nil,
-      elapsed: 0,
-      opts: fill_opts
-    }
+    cmd_opts = deep_merge(opts[:fill], cmd_opts)
 
     state
-    |> change_reef_mode(:fill)
-    |> put_in([:fill], fill)
-    |> fill_start_active_step()
+    |> put_in([:fill, :status], :in_progress)
+    |> put_in([:fill, :steps], cmd_opts[:steps])
+    |> put_in([:fill, :sub_steps], cmd_opts[:sub_steps])
+    |> put_in([:fill, :steps_to_execute], Keyword.keys(cmd_opts[:steps]))
+    |> put_in([:fill, :step_devices], cmd_opts[:step_devices])
+    |> put_in([:fill, :opts], cmd_opts)
+    |> start_mode(:fill)
     |> noreply()
   end
 
@@ -372,7 +316,6 @@ defmodule Reef.Captain.Server do
     |> put_in([:keep_fresh, :status], :running)
     |> put_in([:keep_fresh, :steps], cmd_opts[:steps])
     |> put_in([:keep_fresh, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([:keep_fresh, :steps_to_execute], Keyword.keys(cmd_opts[:steps]))
     |> put_in([:keep_fresh, :step_devices], cmd_opts[:step_devices])
     |> put_in([:keep_fresh, :opts], cmd_opts)
     |> start_mode(:keep_fresh)
@@ -381,11 +324,31 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_cast({:handoff, _cmd} = msg, state) do
+  def handle_cast({:mix_salt, cmd_opts}, %{opts: opts} = state) do
+    import DeepMerge, only: [deep_merge: 2]
+
+    cmd_opts = deep_merge(opts[:mix_salt], cmd_opts)
+
+    state
+    |> put_in([:mix_salt, :status], :in_progress)
+    |> put_in([:mix_salt, :steps], cmd_opts[:steps])
+    |> put_in([:mix_salt, :sub_steps], cmd_opts[:sub_steps])
+    |> put_in([:mix_salt, :step_devices], cmd_opts[:step_devices])
+    |> put_in([:mix_salt, :opts], cmd_opts)
+    |> start_mode(:mix_salt)
+    |> noreply()
+  end
+
+  @doc false
+  @impl true
+  def handle_cast({:msg, msg}, state) do
     case msg do
-      {:handoff, :keep_fresh = cmd} ->
-        GenServer.cast(__MODULE__, {cmd, []})
+      {:handoff, :keep_fresh} ->
+        keep_fresh(skip_active_check: true)
         noreply(state)
+
+      {:handoff, :prep_for_change} ->
+        state |> change_token() |> noreply()
 
       msg ->
         msg_puts(msg, state)
@@ -437,87 +400,33 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  # FILL MODE
   def handle_info(
-        {:gen_device, %{mod: Rodi} = msg},
-        %{
-          reef_mode: :fill,
-          fill: %{
-            active_step: step,
-            steps: steps
-          }
-        } = state
-      ) do
-    import Helen.Time.Helper, only: [scale: 2, to_duration: 1, utc_now: 0]
-
-    case msg do
-      %{at: :at_start, cmd: cmd} when cmd in [:on, :off] ->
-        # for :at_start we only want to record the executing cmd
-        state
-        |> put_in([:fill, :step, :cmd], cmd)
-        |> noreply()
-
-      %{at: :at_finish, cmd: :on} ->
-        # for :at_finish and :on we want to start off and update :active_cmd
-        # to pattern match
-
-        # NOTE:  we do not check the elapsed step time against :run_for
-        #        :at_finish, :on.  this purposeful as we never want to
-        #        end a step with Rodi on for :fill
-        get_in(steps, [step, :off]) |> add_notify_opts() |> Rodi.off()
-
-        air_run_for =
-          get_in(steps, [step, :off, :for]) |> to_duration() |> scale(0.25)
-
-        Air.on(for: air_run_for, at_cmd_finish: :off)
-
-        state
-        |> put_in([:fill, :cmd], :off)
-        |> noreply()
-
-      %{at: :at_finish, cmd: :off} ->
-        # for :at_finish and :off we have finished a cycle of this step
-        # NOTE:  we rely on fill_start_active_step to decide if another cycle
-        #        of the current step is necessary (based on :run_for) or if the
-        #        next step should be executed,
-        #
-        state
-        |> fill_start_active_step()
-        |> noreply()
-    end
-  end
-
-  @doc false
-  @impl true
-  def handle_info(
-        {:gen_device, %{token: msg_token, mod: mod, at: at, cmd: cmd} = msg},
+        {:gen_device, %{token: msg_token, mod: mod, at: at, cmd: cmd}},
         %{
           reef_mode: reef_mode,
           token: token
         } = state
       )
-      when reef_mode == :keep_fresh and msg_token == token do
+      when msg_token == token do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     # for all messages we want capture when they were received and update
     # the elapsed time
     state =
-      put_in(
-        state,
-        [reef_mode, :device_last_cmds, mod, cmd, at],
-        utc_now()
-      )
+      put_in(state, [reef_mode, :device_last_cmds, mod, cmd, at], utc_now())
       |> update_elapsed()
 
-    # for the keep fresh implementation we rely on the :at_finish messages
-    # from Air to move us forward in the list of cmds
-    case msg do
-      %{mod: Air, at: :at_finish} ->
-        start_next_cmd_in_step(state) |> noreply()
+    # we only want to process :at_finish messages from step_devices
+    # associated to steps and not sub steps
+    active_step = get_in(state, [reef_mode, :active_step])
 
-      _msg ->
-        state |> noreply
-    end
+    expected_mod =
+      get_in(state, [reef_mode, :step_devices, active_step])
+      |> step_device_to_mod()
+
+    if expected_mod == mod and at == :at_finish,
+      do: state |> start_next_cmd_in_step() |> noreply(),
+      else: state |> noreply()
   end
 
   @doc false
@@ -532,8 +441,9 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_info({:gen_device, _payload} = msg, state),
-    do: msg_puts(msg, state)
+  def handle_info({:gen_device, _payload} = msg, state) do
+    msg_puts(msg, state)
+  end
 
   @doc false
   @impl true
@@ -588,16 +498,11 @@ defmodule Reef.Captain.Server do
   defp add_notify_opts_include_token(%{token: t}, opts),
     do: [opts, notify: [:at_start, :at_finish, token: t]] |> List.flatten()
 
-  defp apply_cmd(state, mod, cmd, opts)
-       when mod in [:air, :pump] and cmd in [:on, :off] do
-    atom_to_mod = fn
-      :air -> Air
-      :pump -> Pump
-    end
-
+  defp apply_cmd(state, dev, cmd, opts)
+       when dev in [:air, :pump, :rodi] and cmd in [:on, :off] do
     cmd_opts = add_notify_opts_include_token(state, opts)
 
-    apply(atom_to_mod.(mod), cmd, [cmd_opts])
+    apply(step_device_to_mod(dev), cmd, [cmd_opts])
   end
 
   # TODO eliminate this function
@@ -608,12 +513,51 @@ defmodule Reef.Captain.Server do
     end
   end
 
+  defp step_device_to_mod(dev) do
+    case dev do
+      :air -> Air
+      :pump -> Pump
+      :rodi -> Rodi
+    end
+  end
+
   defp call_if_active(msg) do
     if active?(), do: GenServer.call(__MODULE__, msg), else: {:standby_mode}
   end
 
-  defp cast_if_active(msg) do
-    if active?(), do: GenServer.cast(__MODULE__, msg), else: {:standby_mode}
+  defp cast_if_valid_and_active(reef_mode, opts) do
+    import DeepMerge, only: [deep_merge: 2]
+
+    opts = [opts] |> List.flatten()
+    config_opts = config_opts([])
+
+    final_opts = deep_merge(get_in(config_opts, [reef_mode]), opts)
+
+    valid? = validate_durations(final_opts)
+    start_delay = opts[:start_delay]
+    skip_active_check? = opts[:skip_active_check] || false
+
+    final_opts = Keyword.drop(final_opts, [:skip_active_check])
+
+    cond do
+      valid? == false ->
+        {reef_mode, :invalid_duration_opts, final_opts}
+
+      is_nil(final_opts) ->
+        {reef_mode, :opts_undefined, final_opts}
+
+      is_binary(start_delay) ->
+        if active?(),
+          do: GenServer.cast(__MODULE__, {:delayed_cmd, reef_mode, final_opts})
+
+      skip_active_check? ->
+        GenServer.cast(__MODULE__, {reef_mode, final_opts})
+
+      true ->
+        if active?(),
+          do: GenServer.cast(__MODULE__, {reef_mode, final_opts}),
+          else: {:standby_mode}
+    end
   end
 
   defp change_reef_mode(%{reef_mode: old_reef_mode} = state, new_reef_mode) do
@@ -647,90 +591,6 @@ defmodule Reef.Captain.Server do
 
   defp crew_list, do: [Air, Pump, Rodi]
 
-  defp fill_finally(%{fill: %{steps: steps}} = state) do
-    import Helen.Time.Helper, only: [elapsed: 2, elapsed?: 2, utc_now: 0]
-
-    # :finally is a "reserved keyword" and requires special handling as it
-    # is not a typical fill step but rather an instruction of what to
-    # do when all steps complete
-
-    GenServer.cast(__MODULE__, get_in(steps, [:finally, :msg]))
-
-    # :finally is also the last step and, as such, signals the end of
-    # the fill command.  record finished_at and calculate the
-    # elapsed duration and note fill is completed.
-    now = utc_now()
-    started_at = get_in(state, [:fill, :started_at])
-
-    # NOTE: we return the updated step, with fill containing only relevant keys
-    state
-    |> update_in([:fill], fn x -> Map.take(x, [:started_at]) end)
-    |> put_in([:fill, :finished_at], now)
-    |> put_in([:fill, :elapsed], elapsed(started_at, now))
-    |> put_in([:fill, :status], :completed)
-  end
-
-  defp fill_start_active_step(%{fill: %{active_step: a, steps: s}} = state)
-       when a == :finally or s == [],
-       do: fill_finally(state)
-
-  defp fill_start_active_step(state), do: fill_start_next_step_if_needed(state)
-
-  defp fill_start_next_step_if_needed(
-         %{fill: %{active_step: active_step, steps: steps}} = state
-       ) do
-    import Helen.Time.Helper,
-      only: [subtract_list: 1, elapsed: 2, elapsed?: 2, utc_now: 0]
-
-    # each step contains a :run_for key that defines how long the
-    # step will will cycle on and off
-    started_at = get_in(state, [:fill, :step, :started_at]) || utc_now()
-
-    # to prevent exceeding the configured run_for include the duration of the
-    # step about to start in the elapsed?
-    config_run_for = get_in(steps, [active_step, :run_for])
-    on_for = get_in(steps, [active_step, :on, :for])
-    off_for = get_in(steps, [active_step, :off, :for])
-
-    # NOTE:  this design decision may result in the fill running for less
-    #        time then the run_for configuration when the duration of the steps
-    #        do not fit evenly
-    run_for = subtract_list([config_run_for, on_for, off_for])
-
-    case elapsed?(started_at, run_for) do
-      false ->
-        # run_for has not elapsed so turn on Rodi.
-        # NOTE:  we always turn on Rodi when starting a step even if :on is not
-        #        listed first.  this is a design decision and design constraint
-        Air.off()
-        get_in(steps, [active_step, :on]) |> add_notify_opts() |> Rodi.on()
-
-        state
-        |> put_in([:fill, :step, :started_at], started_at)
-        |> put_in([:fill, :step, :elapsed], elapsed(started_at, utc_now()))
-        |> update_step_cycles()
-
-      true ->
-        import List, only: [delete_at: 2]
-
-        # run_for has elapsed, remove the current active step from
-        # steps_to_execute, clear out the step tracked (:step) then call
-        # this function again to start the next step
-        state
-        # set the active step to the next one in the list of steps to execute
-        |> put_in(
-          [:fill, :active_step],
-          get_in(state, [:fill, :steps_to_execute]) |> hd()
-        )
-        # remove the step just completed
-        |> update_in([:fill, :steps_to_execute], fn x -> delete_at(x, 0) end)
-        # a new step is about to begin, reset the step control map
-        |> put_in([:fill, :step], %{cmd: :none})
-        # call fill_start_active_step
-        |> fill_start_active_step()
-    end
-  end
-
   defp msg_puts(msg, state) do
     """
      ==> #{inspect(msg)}
@@ -741,22 +601,15 @@ defmodule Reef.Captain.Server do
     noreply(state)
   end
 
-  defp reef_mode_complete(%{reef_mode: mode} = state) do
+  defp finish_mode(%{reef_mode: mode} = state) do
     import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
-
-    # is there a finally step we need to handle?
-    case get_in(state, [mode, :steps, :finally]) do
-      x when is_nil(x) -> nil
-      [{:msg, _payload} = msg] -> GenServer.cast(__MODULE__, msg)
-      finally -> IO.puts(["unhandled #{inspect(finally)}"])
-    end
 
     # record the mode execution metrics
     started_at = get_in(state, [mode, :started_at])
     now = utc_now()
 
     state
-    |> put_in([mode, :status], :complete)
+    |> put_in([mode, :status], :completed)
     |> put_in([mode, :finished_at], now)
     |> put_in([mode, :elapsed], elapsed(started_at, now))
     |> put_in([:reef_mode], :ready)
@@ -781,9 +634,13 @@ defmodule Reef.Captain.Server do
         {config_device_to_mod(v), map}
       end
 
+    steps = get_in(state, [reef_mode, :steps])
+
     change_reef_mode(state, reef_mode)
+    |> calculate_will_finish_by_if_needed()
     # mode -> :device_last_cmds is 'global' for the mode and not specific
     # to a single step or command
+    |> put_in([reef_mode, :steps_to_execute], Keyword.keys(steps))
     |> put_in([reef_mode, :started_at], utc_now())
     |> put_in([reef_mode, :device_last_cmds], device_last_cmds)
     |> put_in([reef_mode, :step], %{})
@@ -795,48 +652,46 @@ defmodule Reef.Captain.Server do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     # the next step is always the head of :steps_to_execute
-    next_step = get_in(state, [reef_mode, :steps_to_execute]) |> hd()
-    cmds = get_in(state, [reef_mode, :steps, next_step])
-
-    state
-    # remove the step we're starting
-    |> update_in([reef_mode, :steps_to_execute], fn x -> tl(x) end)
-    |> put_in([reef_mode, :active_step], next_step)
-    # |> put_in([reef_mode, :cycles, next_step], 1)
-    # the reef_mode step key contains the control map for the step executing
-    |> put_in([reef_mode, :step, :started_at], utc_now())
-    |> put_in([reef_mode, :step, :elapsed], 0)
-    |> put_in([reef_mode, :step, :cmds_to_execute], cmds)
-    |> update_step_cycles()
-    |> start_next_cmd_in_step()
-  end
-
-  defp start_next_cmd_in_step(%{reef_mode: mode} = state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    cmds_to_execute = get_in(state, [mode, :step, :cmds_to_execute])
-
+    steps_to_execute = get_in(state, [reef_mode, :steps_to_execute])
     # NOTE:  each clause returns the state, even if unchanged
     cond do
-      cmds_to_execute == [] ->
-        # we've reached the end of this
+      steps_to_execute == [] ->
+        # we've reached the end of this mode!
         state
-        |> reef_mode_complete()
+        |> finish_mode()
 
       true ->
-        state |> start_next_cmd()
+        next_step = steps_to_execute |> hd()
+
+        cmds = get_in(state, [reef_mode, :steps, next_step])
+
+        state
+        # remove the step we're starting
+        |> update_in([reef_mode, :steps_to_execute], fn x -> tl(x) end)
+        |> put_in([reef_mode, :active_step], next_step)
+        # the reef_mode step key contains the control map for the step executing
+        |> put_in([reef_mode, :step, :started_at], utc_now())
+        |> put_in([reef_mode, :step, :elapsed], 0)
+        |> put_in([reef_mode, :step, :run_for], nil)
+        |> put_in([reef_mode, :step, :repeat?], nil)
+        |> put_in([reef_mode, :step, :cmds_to_execute], cmds)
+        |> update_step_cycles()
+        |> start_next_cmd_in_step()
     end
   end
 
-  defp start_next_cmd(%{reef_mode: mode} = state) do
-    # example:  state -> keep_fresh -> aerate
+  defp start_next_cmd_in_step(%{reef_mode: mode} = state) do
+    import Helen.Time.Helper, only: [elapsed?: 2, subtract_list: 1, utc_now: 0]
 
     active_step = get_in(state, [mode, :active_step])
     cmds_to_execute = get_in(state, [mode, :step, :cmds_to_execute])
-    next_cmd = cmds_to_execute |> hd()
 
-    case next_cmd do
-      {:repeat, true} ->
+    repeat? = get_in(state, [mode, :step, :repeat?]) || false
+    run_for = get_in(state, [mode, :step, :run_for])
+
+    # NOTE:  each clause returns the state, even if unchanged
+    cond do
+      cmds_to_execute == [] and repeat? == true ->
         # when repeating populate the steps to execute with this step
         # at the head of the list and call start_mode_next_step
         steps_to_execute =
@@ -847,9 +702,70 @@ defmodule Reef.Captain.Server do
         |> put_in([mode, :steps_to_execute], steps_to_execute)
         |> start_mode_next_step()
 
-      ##
-      ## TODO include handling of multiple steps
-      ##
+      cmds_to_execute == [] ->
+        # we've reached the end of this step, start the next one
+        state
+        |> start_mode_next_step()
+
+      is_binary(run_for) ->
+        started_at = get_in(state, [mode, :step, :started_at]) || utc_now()
+
+        # to prevent exceeding the configured run_for include the duration of the
+        # step about to start in the elapsed?
+        steps = get_in(state, [mode, :steps])
+        on_for = get_in(steps, [active_step, :on, :for])
+        off_for = get_in(steps, [active_step, :off, :for])
+
+        # NOTE:  this design decision may result in the fill running for less
+        #        time then the run_for configuration when the duration of the steps
+        #        do not fit evenly
+        calculated_run_for = subtract_list([run_for, on_for, off_for])
+
+        if elapsed?(started_at, calculated_run_for) do
+          # run_for has elapsed, move on to the next step
+          state |> start_mode_next_step()
+        else
+          # there is still time in this step, run the command
+          state |> start_next_cmd_and_pop()
+        end
+
+      true ->
+        state |> start_next_cmd_and_pop()
+    end
+  end
+
+  defp start_next_cmd_and_pop(%{reef_mode: mode} = state) do
+    next_cmd = get_in(state, [mode, :step, :cmds_to_execute]) |> hd()
+
+    put_in(state, [mode, :step, :next_cmd], next_cmd)
+    |> update_in([mode, :step, :cmds_to_execute], fn x -> tl(x) end)
+    |> start_next_cmd()
+  end
+
+  defp start_next_cmd(%{reef_mode: mode} = state) do
+    # example:  state -> keep_fresh -> aerate
+
+    active_step = get_in(state, [mode, :active_step])
+    next_cmd = get_in(state, [mode, :step, :next_cmd])
+
+    case next_cmd do
+      {:run_for, duration} ->
+        # consume the run_for command by putting it in the step control map
+        # then call start_next_cmd/1
+        state
+        |> put_in([mode, :step, :run_for], duration)
+        |> start_next_cmd_in_step()
+
+      {:repeat, true} ->
+        # consume the repeat command by putting it in the step control map
+        # then call start_next_cmd/1
+        state
+        |> put_in([mode, :step, :repeat?], true)
+        |> start_next_cmd_in_step()
+
+      {:msg, _} = msg ->
+        GenServer.cast(__MODULE__, msg)
+        state |> start_mode_next_step()
 
       # this is an actual command to start
       {cmd, cmd_opts} when is_list(cmd_opts) and cmd in [:on, :off] ->
@@ -857,10 +773,7 @@ defmodule Reef.Captain.Server do
 
         apply_cmd(state, dev, cmd, cmd_opts)
 
-        # remove this cmd from the list.  the :at_finish of the command
-        # started will move us forward in the list of cmds to execute
-        update_in(state, [mode, :step, :cmds_to_execute], fn x -> tl(x) end)
-        |> put_in([mode, :step, :cmd], cmd)
+        state |> put_in([mode, :step, :cmd], cmd)
 
       # this is a reference to another step cmd
       # execute the referenced step/cmd
@@ -870,10 +783,7 @@ defmodule Reef.Captain.Server do
         cmd_opts = get_in(state, [mode, :sub_steps, step_ref, cmd])
         apply_cmd(state, dev, cmd, cmd_opts)
 
-        # always call ourself again with sub steps since there won't be
-        # an :at_finish to move us forward
-        update_in(state, [mode, :step, :cmds_to_execute], fn x -> tl(x) end)
-        |> start_next_cmd_in_step()
+        state |> start_next_cmd_in_step()
     end
   end
 
@@ -927,15 +837,33 @@ defmodule Reef.Captain.Server do
     end
   end
 
-  defp will_finish_by_ms(steps) do
-    import Helen.Time.Helper, only: [to_ms: 1]
+  defp calculate_will_finish_by_if_needed(%{reef_mode: reef_mode} = state) do
+    import Helen.Time.Helper, only: [to_ms: 1, utc_shift: 1]
 
-    # unfold each step in the  steps list matching on the key :run_for.
-    # convert each value to ms and reduce with a start value of 0.
-    for {_step, details} <- steps,
-        {k, run_for} when k == :run_for <- details,
-        reduce: 0 do
-      total_ms -> total_ms + to_ms(run_for)
+    # grab the list of steps to avoid redundant traversals
+    steps = get_in(state, [reef_mode, :steps])
+
+    # will_finish_by can not be calculated if the reef mode
+    # contains the cmd repeat: true
+    has_repeat? =
+      for {_name, cmds} <- steps, {:repeat, true} <- cmds, reduce: false do
+        _acc -> true
+      end
+
+    if has_repeat? == true do
+      state
+    else
+      # unfold each step in the steps list matching on the key :run_for.
+      # convert each value to ms and reduce with a start value of 0.
+      will_finish_by =
+        for {_step, details} <- get_in(state, [reef_mode, :steps]),
+            {k, run_for} when k == :run_for <- details,
+            reduce: 0 do
+          total_ms -> total_ms + to_ms(run_for)
+        end
+        |> utc_shift()
+
+      state |> put_in([reef_mode, :will_finish_by], will_finish_by)
     end
   end
 
@@ -974,7 +902,7 @@ defmodule Reef.Captain.Server do
       :clean,
       :fill,
       :keep_fresh,
-      :salt_mix,
+      :mix_salt,
       :prep_for_change,
       :transfer_h2o,
       :finalize_change
