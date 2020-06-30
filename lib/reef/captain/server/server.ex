@@ -243,12 +243,8 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def handle_call({:all_stop}, _from, %{opts: _opts} = state) do
-    for c <- crew_list() do
-      apply(c, :mode, [:standby])
-    end
-
-    change_token(state)
-    |> set_all_modes_ready()
+    state
+    |> all_stop()
     |> reply(:answering_all_stop)
   end
 
@@ -488,6 +484,13 @@ defmodule Reef.Captain.Server do
     |> timeout_hook()
   end
 
+  @doc false
+  def terminate(_reason, %{reef_mode: reef_mode} = state) do
+    case reef_mode do
+      :keep_fresh -> state |> all_stop()
+    end
+  end
+
   ##
   ## PRIVATE
   ##
@@ -511,6 +514,16 @@ defmodule Reef.Captain.Server do
       :on -> apply(mod, cmd, [opts])
       :off -> apply(mod, cmd, [opts])
     end
+  end
+
+  defp all_stop(state) do
+    for c <- crew_list() do
+      apply(c, :mode, [:standby])
+    end
+
+    state
+    |> change_token()
+    |> set_all_modes_ready()
   end
 
   defp step_device_to_mod(dev) do
@@ -935,8 +948,6 @@ defmodule Reef.Captain.Server do
   ##
 
   defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-
-  # defp noreply_and_merge(s, map), do: {:noreply, Map.merge(s, map)}
 
   defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
   defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
