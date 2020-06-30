@@ -485,6 +485,7 @@ defmodule Reef.Captain.Server do
   end
 
   @doc false
+  @impl true
   def terminate(_reason, %{reef_mode: reef_mode} = state) do
     case reef_mode do
       :keep_fresh -> state |> all_stop()
