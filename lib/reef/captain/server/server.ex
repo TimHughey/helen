@@ -260,12 +260,12 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def handle_call({:clean}, _from, %{opts: opts} = state) do
-    [{cmd, cmd_opts}] = opts[:clean]
+    [{cmd, cmd_opts}] = get_in(opts, [:clean, :steps, :cleaning])
 
     # NOTE:  if a clean cycle is already in progress the call
     #        to Ato will invalidate it's timer so the previous
     #        clean cycle is effectively canceled
-    apply_cmd(state, cmd, Ato, add_notify_opts(cmd_opts))
+    apply_cmd(state, :ato, cmd, add_notify_opts(cmd_opts))
 
     state
     # clear out the previous clean cycle, if any
@@ -404,7 +404,7 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_info({:gen_device, %{at: at_phase, cmd: :off, mod: Ato}}, state) do
+  def handle_info({:gen_device, %{at: at_phase, mod: Ato}}, state) do
     import Helen.Time.Helper, only: [utc_now: 0, elapsed: 2]
 
     case at_phase do
@@ -538,7 +538,7 @@ defmodule Reef.Captain.Server do
     do: [opts, notify: [:at_start, :at_finish, token: t]] |> List.flatten()
 
   defp apply_cmd(state, dev, cmd, opts)
-       when dev in [:air, :pump, :rodi] and cmd in [:on, :off] do
+       when dev in [:air, :pump, :rodi, :ato] and cmd in [:on, :off] do
     cmd_opts = add_notify_opts_include_token(state, opts)
 
     apply(step_device_to_mod(dev), cmd, [cmd_opts])
@@ -575,6 +575,7 @@ defmodule Reef.Captain.Server do
       :air -> Air
       :pump -> Pump
       :rodi -> Rodi
+      :ato -> Ato
     end
   end
 

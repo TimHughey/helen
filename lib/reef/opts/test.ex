@@ -39,7 +39,10 @@ defmodule Reef.Opts.Test do
           circulate: [on: [for: "PT1S", at_cmd_finish: :off]]
         ]
       ],
-      clean: [off: [for: "PT15S", at_cmd_finish: :on]],
+      clean: [
+        step_devices: [cleaning: :ato],
+        steps: [cleaning: [off: [for: "PT2H", at_cmd_finish: :on]]]
+      ],
       mix_salt: [
         step_devices: [salt: :pump, stir: :pump, aerate: :air],
         steps: [
