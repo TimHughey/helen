@@ -5,7 +5,9 @@ defmodule Irrigation.Supervisor do
 
   @impl true
   def init(opts) do
-    Supervisor.init([{Irrigation.Server, opts}],
+    server_opts = [opts, server_mode: :standby] |> List.flatten()
+
+    Supervisor.init([{Irrigation.Server, server_opts}],
       strategy: :one_for_one
     )
   end

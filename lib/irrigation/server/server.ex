@@ -17,6 +17,7 @@ defmodule Irrigation.Server do
     import Helen.Time.Helper, only: [epoch: 0]
 
     state = %{
+      server_mode: args[:server_mode] || :active,
       last_timeout: epoch(),
       timeouts: 0,
       opts: config_opts(args),
@@ -121,18 +122,20 @@ defmodule Irrigation.Server do
 
   @doc false
   @impl true
-  def handle_continue(:bootstrap, s) do
+  def handle_continue(:bootstrap, %{server_mode: mode} = s) do
     Process.flag(:trap_exit, true)
 
     Switch.off_names_begin_with(s[:opts][:device_group])
 
-    # NOTE:
-    #  schedule_jobs_if_needed/1 handles the possible race condition / delay
-    #  related to Agnus acquiring sun info at start up.  if sun info isn't
-    #  available yet scheduling is attempted at the next timeout.
-    state = schedule_jobs_if_needed(s)
-
-    noreply(state)
+    if mode == :active do
+      # NOTE:
+      #  schedule_jobs_if_needed/1 handles the possible race condition / delay
+      #  related to Agnus acquiring sun info at start up.  if sun info isn't
+      #  available yet scheduling is attempted at the next timeout.
+      s |> schedule_jobs_if_needed() |> noreply
+    else
+      noreply(s)
+    end
   end
 
   @doc false
