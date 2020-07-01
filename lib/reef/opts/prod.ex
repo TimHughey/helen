@@ -40,23 +40,34 @@ defmodule Reef.Opts.Prod do
         ]
       ],
       clean: [off: [for: "PT2H", at_cmd_finish: :on]],
-      mix: [
+      mix_salt: [
         step_devices: [salt: :pump, stir: :pump, aerate: :air],
         steps: [
           salt: [
-            on: [for: "PT30M"],
+            on: [for: "PT45M"],
             next_step: :stir
           ],
           stir: [
             run_for: "PT1H",
             on: [for: "PT5M", at_cmd_finish: :off],
-            aerate: :on,
-            off: [for: "PT7M", at_cmd_finish: :off]
+            off: [for: "PT7M", at_cmd_finish: :off],
+            aerate: :on
           ],
           finally: [msg: {:handoff, :prep_for_change}]
         ],
         sub_steps: [
-          aerate: [on: [for: "PT6M", at_cmd_finish: :off]]
+          aerate: [on: [for: "PT5M", at_cmd_finish: :off]]
+        ]
+      ],
+      prep_for_change: [
+        step_devices: [stir: :pump, match_display_tank: :heat],
+        steps: [
+          match_display_tank: [msg: {:mixtank_temp, :active}],
+          stir: [
+            on: [for: "PT1M", at_cmd_finish: :off],
+            off: [for: "PT5M", at_cmd_finish: :off],
+            repeat: true
+          ]
         ]
       ]
     ]

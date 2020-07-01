@@ -9,7 +9,7 @@ defmodule Reef.Supervisor do
       [
         {Reef.DisplayTank.Temp, []},
         {Reef.DisplayTank.Ato, []},
-        {Reef.MixTank.Temp, [mode: :standby]},
+        {Reef.MixTank.Temp, [server_mode: :standby]},
         {Reef.MixTank.Pump, opts},
         {Reef.MixTank.Air, opts},
         {Reef.MixTank.Rodi, opts},

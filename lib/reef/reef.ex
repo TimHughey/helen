@@ -140,6 +140,9 @@ defmodule Reef do
 
   defdelegate opts_dump, to: Captain, as: :config_dump
 
+  @doc delegate_to: {Captain, :prep_for_change, 1}
+  def prep_for_change(opts \\ []), do: Captain.prep_for_change(opts)
+
   defdelegate pump_off(opts \\ []), to: MixTank.Pump, as: :off
   defdelegate pump_on(opts \\ []), to: MixTank.Pump, as: :on
   defdelegate pump_toggle, to: MixTank.Pump, as: :toggle
@@ -151,6 +154,15 @@ defmodule Reef do
   defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
 
   defdelegate state(opts \\ []), to: Captain
+
+  @doc """
+  Output the Reef status based on the active reef mode.
+
+  Outputs message to stdout, returns :ok.
+
+  """
+  @doc since: "0.0.27"
+  def status, do: Status.msg() |> IO.puts()
 
   def temp_ok? do
     dt_temp = Sensor.fahrenheit("display_tank", since_secs: 30)

@@ -188,6 +188,15 @@ defmodule Reef.Captain.Server do
   end
 
   @doc """
+  Prepare the MixTank for transfer to Water Stabilization Tank
+
+  Returns :ok or an error tuple
+  """
+  @doc since: "0.0.27"
+  def prep_for_change(opts),
+    do: cast_if_valid_and_active(:prep_for_change, opts)
+
+  @doc """
   Restarts the server via the Supervisor
 
   ## Examples
@@ -256,7 +265,7 @@ defmodule Reef.Captain.Server do
     # NOTE:  if a clean cycle is already in progress the call
     #        to Ato will invalidate it's timer so the previous
     #        clean cycle is effectively canceled
-    apply_cmd(cmd, Ato, add_notify_opts(cmd_opts))
+    apply_cmd(state, cmd, Ato, add_notify_opts(cmd_opts))
 
     state
     # clear out the previous clean cycle, if any
@@ -337,14 +346,39 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
+  def handle_cast({:prep_for_change, cmd_opts}, %{opts: opts} = state) do
+    import DeepMerge, only: [deep_merge: 2]
+
+    cmd_opts = deep_merge(opts[:prep_for_change], cmd_opts)
+
+    state
+    |> put_in([:prep_for_change, :status], :running)
+    |> put_in([:prep_for_change, :steps], cmd_opts[:steps])
+    |> put_in([:prep_for_change, :sub_steps], cmd_opts[:sub_steps])
+    |> put_in([:prep_for_change, :step_devices], cmd_opts[:step_devices])
+    |> put_in([:prep_for_change, :opts], cmd_opts)
+    |> start_mode(:prep_for_change)
+    |> noreply()
+  end
+
+  @doc false
+  @impl true
   def handle_cast({:msg, msg}, state) do
+    alias Reef.DisplayTank.Temp, as: DisplayTank
+    alias Reef.MixTank.Temp, as: MixTank
+
     case msg do
-      {:handoff, :keep_fresh} ->
-        keep_fresh(skip_active_check: true)
+      {:handoff, next_reef_mode} ->
+        cast_if_valid_and_active(next_reef_mode, skip_active_check: true)
         noreply(state)
 
-      {:handoff, :prep_for_change} ->
-        state |> change_token() |> noreply()
+      {:mixtank_temp, mode} ->
+        MixTank.mode(mode)
+        noreply(state)
+
+      {:displaytank_temp, mode} ->
+        DisplayTank.mode(mode)
+        noreply(state)
 
       msg ->
         msg_puts(msg, state)
@@ -489,6 +523,7 @@ defmodule Reef.Captain.Server do
   def terminate(_reason, %{reef_mode: reef_mode} = state) do
     case reef_mode do
       :keep_fresh -> state |> all_stop()
+      _nomatch -> state
     end
   end
 
@@ -509,14 +544,6 @@ defmodule Reef.Captain.Server do
     apply(step_device_to_mod(dev), cmd, [cmd_opts])
   end
 
-  # TODO eliminate this function
-  defp apply_cmd(cmd, mod, opts) do
-    case cmd do
-      :on -> apply(mod, cmd, [opts])
-      :off -> apply(mod, cmd, [opts])
-    end
-  end
-
   defp all_stop(state) do
     # setting all crew modules to standby is the best way to ensure
     # they are stopped
@@ -534,50 +561,20 @@ defmodule Reef.Captain.Server do
     |> set_all_modes_ready()
   end
 
+  defp assemble_reef_mode_final_opts(reef_mode, overrides) do
+    import DeepMerge, only: [deep_merge: 2]
+
+    opts = [overrides] |> List.flatten()
+    config_opts = config_opts([])
+
+    deep_merge(get_in(config_opts, [reef_mode]), opts)
+  end
+
   defp step_device_to_mod(dev) do
     case dev do
       :air -> Air
       :pump -> Pump
       :rodi -> Rodi
-    end
-  end
-
-  defp call_if_active(msg) do
-    if active?(), do: GenServer.call(__MODULE__, msg), else: {:standby_mode}
-  end
-
-  defp cast_if_valid_and_active(reef_mode, opts) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    opts = [opts] |> List.flatten()
-    config_opts = config_opts([])
-
-    final_opts = deep_merge(get_in(config_opts, [reef_mode]), opts)
-
-    valid? = validate_durations(final_opts)
-    start_delay = opts[:start_delay]
-    skip_active_check? = opts[:skip_active_check] || false
-
-    final_opts = Keyword.drop(final_opts, [:skip_active_check])
-
-    cond do
-      valid? == false ->
-        {reef_mode, :invalid_duration_opts, final_opts}
-
-      is_nil(final_opts) ->
-        {reef_mode, :opts_undefined, final_opts}
-
-      is_binary(start_delay) ->
-        if active?(),
-          do: GenServer.cast(__MODULE__, {:delayed_cmd, reef_mode, final_opts})
-
-      skip_active_check? ->
-        GenServer.cast(__MODULE__, {reef_mode, final_opts})
-
-      true ->
-        if active?(),
-          do: GenServer.cast(__MODULE__, {reef_mode, final_opts}),
-          else: {:standby_mode}
     end
   end
 
@@ -600,13 +597,12 @@ defmodule Reef.Captain.Server do
 
   defp config_device_to_mod(atom) when atom in [:air, :pump, :rodi, :heat] do
     alias Reef.MixTank.{Air, Pump, Rodi}
-    alias Reef.MixTank.Temp, as: Heat
 
     case atom do
       :air -> Air
       :pump -> Pump
       :rodi -> Rodi
-      :heat -> Heat
+      :heat -> :external_server
     end
   end
 
@@ -786,6 +782,8 @@ defmodule Reef.Captain.Server do
 
       {:msg, _} = msg ->
         GenServer.cast(__MODULE__, msg)
+        # if this is the last cmd in the last step (e.g. finally) then the
+        # call to start_mode_start_next/1 will wrap up this reef mode
         state |> start_mode_next_step()
 
       # this is an actual command to start
@@ -949,6 +947,42 @@ defmodule Reef.Captain.Server do
 
     put_in(s, [:last_timeout], utc_now())
     |> Map.update(:timeouts, 1, &(&1 + 1))
+  end
+
+  ##
+  ## GenServer.{call, cast} Helpers
+  ##
+
+  defp call_if_active(msg) do
+    if active?(), do: GenServer.call(__MODULE__, msg), else: {:standby_mode}
+  end
+
+  defp cast_if_valid_and_active(reef_mode, opts) do
+    final_opts = assemble_reef_mode_final_opts(reef_mode, opts)
+
+    valid? = validate_durations(final_opts)
+    start_delay = opts[:start_delay]
+    skip_active_check? = opts[:skip_active_check] || false
+
+    cond do
+      valid? == false ->
+        {reef_mode, :invalid_duration_opts, final_opts}
+
+      is_nil(final_opts) ->
+        {reef_mode, :opts_undefined, final_opts}
+
+      is_binary(start_delay) ->
+        if active?(),
+          do: GenServer.cast(__MODULE__, {:delayed_cmd, reef_mode, final_opts})
+
+      skip_active_check? ->
+        GenServer.cast(__MODULE__, {reef_mode, final_opts})
+
+      true ->
+        if active?(),
+          do: GenServer.cast(__MODULE__, {reef_mode, final_opts}),
+          else: {:standby_mode}
+    end
   end
 
   ##

@@ -57,6 +57,17 @@ defmodule Reef.Opts.Test do
         sub_steps: [
           aerate: [on: [for: "PT4S", at_cmd_finish: :off]]
         ]
+      ],
+      prep_for_change: [
+        step_devices: [stir: :pump, match_display_tank: :heat],
+        steps: [
+          match_display_tank: [msg: {:mixtank_temp, :active}],
+          stir: [
+            on: [for: "PT2S", at_cmd_finish: :off],
+            off: [for: "PT2S", at_cmd_finish: :off],
+            repeat: true
+          ]
+        ]
       ]
     ]
   end

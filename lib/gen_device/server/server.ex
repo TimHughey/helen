@@ -24,7 +24,7 @@ defmodule GenDevice do
         c_opts = Keyword.merge(@use_opts, args)
 
         state = %{
-          mode: args[:mode] || :active,
+          server_mode: args[:server_mode] || :active,
           active_cmd: :none,
           device_name: c_opts[:device_name],
           device_adjusts: 0,
@@ -47,7 +47,6 @@ defmodule GenDevice do
         # should the server start?
         cond do
           is_nil(state[:device_name]) -> :ignore
-          state[:mode] == :standby -> :ignore
           true -> {:ok, state, {:continue, :bootstrap}}
         end
       end
@@ -74,7 +73,7 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def active? do
-        case state(:mode) do
+        case state(:server_mode) do
           :active -> true
           :standby -> false
         end
@@ -132,7 +131,7 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def mode(atom) when atom in [:active, :standby] do
-        GenServer.call(__MODULE__, {:mode, atom})
+        GenServer.call(__MODULE__, {:server_mode, atom})
       end
 
       @doc """
@@ -228,10 +227,10 @@ defmodule GenDevice do
       def standby_reason do
         s = state()
 
-        with %{mode: :standby, standby_reason: reason} <- s do
+        with %{server_mode: :standby, standby_reason: reason} <- s do
           reason
         else
-          %{mode: :active} -> :active
+          %{server_mode: :active} -> :active
         end
       end
 
@@ -265,13 +264,13 @@ defmodule GenDevice do
 
       ## Examples
 
-          iex> GenServer.toggle()
+          iex> GenServer.toggle([lazy: false])
           :ok
 
       """
       @doc since: "0.0.27"
-      def toggle do
-        GenServer.call(__MODULE__, {:toggle})
+      def toggle(opts \\ []) when is_list(opts) do
+        GenServer.call(__MODULE__, {:toggle, opts})
       end
 
       @doc """
@@ -296,7 +295,7 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_call({:mode, mode}, _from, state) do
+      def handle_call({:server_mode, mode}, _from, state) do
         case mode do
           # the GenDevice is being made ready for commands when set :active,
           # don't adjust the device
@@ -308,7 +307,7 @@ defmodule GenDevice do
             put_in(state, [:standby_reason], :api_call)
             |> adjust_device(:off)
         end
-        |> put_in([:mode], mode)
+        |> put_in([:server_mode], mode)
         |> reply({:ok, mode})
       end
 
@@ -320,7 +319,7 @@ defmodule GenDevice do
       @impl true
       # prevent any actions aside from changing the mode and getting the
       # state (matched above) when in standby
-      def handle_call(_msg, _from, %{mode: :standby} = s),
+      def handle_call(_msg, _from, %{server_mode: :standby} = s),
         do: reply(:standby_mode, s)
 
       @doc false
@@ -346,6 +345,20 @@ defmodule GenDevice do
 
       @doc false
       @impl true
+      def handle_call(
+            {:toggle, cmd_opts},
+            from,
+            %{device_name: dev_name} = state
+          ) do
+        case Switch.position(dev_name) do
+          {:ok, false} -> handle_call({:on, cmd_opts}, from, state)
+          {:ok, true} -> handle_call({:off, cmd_opts}, from, state)
+          nomatch -> {:failed, nomatch} |> reply(state)
+        end
+      end
+
+      @doc false
+      @impl true
       def handle_call({cmd, cmd_opts} = msg, {pid, _ref}, %{} = state) do
         state
         # always add a reference for this cmd to the state in case
@@ -366,21 +379,32 @@ defmodule GenDevice do
 
       @doc false
       @impl true
-      def handle_continue(:bootstrap, %{device_name: dev_name} = state) do
+      def handle_continue(
+            :bootstrap,
+            %{device_name: dev_name, server_mode: server_mode} = state
+          ) do
         import Switch, only: [position: 1, exists?: 1]
 
         # if the device does not exist immediately entry standby mode
         # and note the reason
-        case exists?(dev_name) do
+        cond do
+          # immediately drop into :standby mode if specified in args
+          server_mode == :standby ->
+            state
+            |> put_in([:standby_reason], :startup_args)
+            |> noreply()
+
+          # the configured device does not exist, drop to standby
+          exists?(dev_name) == false ->
+            state
+            |> put_in([:server_mode], :standby)
+            |> put_in([:standby_reason], :device_does_not_exist)
+            |> noreply()
+
+          # all is well, normal operations
           true ->
             state
             |> put_in([:last, :value_rc], position(dev_name))
-            |> noreply()
-
-          false ->
-            state
-            |> put_in([:mode], :standby)
-            |> put_in([:standby_reason], :device_does_not_exist)
             |> noreply()
         end
       end

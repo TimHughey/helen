@@ -16,19 +16,20 @@ defmodule Reef.Temp.Server do
       @doc false
       @impl true
       def init(args) do
-        import Helen.Time.Helper, only: [epoch: 0]
+        import Helen.Time.Helper, only: [utc_now: 0]
 
         # just in case we were passed a map?!?
         args = Enum.into(args, [])
 
         state = %{
-          mode: args[:mode] || :active,
+          server_mode: args[:server_mode] || :active,
           last_timeout: nil,
           timeouts: 0,
           opts: config_opts(args),
+          standby_reason: :none,
           ample_msgs: false,
           status: :startup,
-          status_at: nil,
+          status_at: utc_now(),
           devices_seen: :never,
           devices: %{}
         }
@@ -41,7 +42,6 @@ defmodule Reef.Temp.Server do
           is_nil(opts[:switch]) -> :ignore
           is_nil(opts[:setpoint]) -> :ignore
           is_nil(opts[:offsets]) -> :ignore
-          state[:mode] == :standby -> :ignore
           true -> {:ok, state, {:continue, :bootstrap}}
         end
       end
@@ -68,7 +68,7 @@ defmodule Reef.Temp.Server do
       """
       @doc since: "0.0.27"
       def active? do
-        case state(:mode) do
+        case state(:server_mode) do
           :active -> true
           :standby -> false
         end
@@ -108,7 +108,7 @@ defmodule Reef.Temp.Server do
       """
       @doc since: "0.0.27"
       def mode(atom) when atom in [:active, :standby] do
-        GenServer.call(__MODULE__, {:mode, atom})
+        GenServer.call(__MODULE__, {:server_mode, atom})
       end
 
       @doc """
@@ -182,7 +182,7 @@ defmodule Reef.Temp.Server do
 
       @doc false
       @impl true
-      def handle_call({:mode, mode}, _from, %{opts: opts} = s) do
+      def handle_call({:server_mode, mode}, _from, %{opts: opts} = s) do
         import Switch, only: [off: 1]
 
         case mode do
@@ -191,13 +191,11 @@ defmodule Reef.Temp.Server do
             Switch.off(opts[:switch][:name])
 
           # no action when switching to :active, the server will take control
-          true ->
+          :active ->
             nil
         end
 
-        state = put_in(s, [:mode], mode)
-
-        reply({:ok, mode}, state)
+        state = put_in(s, [:server_mode], mode) |> reply({:ok, mode})
       end
 
       @doc false
@@ -218,20 +216,31 @@ defmodule Reef.Temp.Server do
 
       @doc false
       @impl true
-      def handle_continue(:bootstrap, %{opts: opts} = s) do
+      def handle_continue(
+            :bootstrap,
+            %{server_mode: server_mode, opts: opts} = state
+          ) do
         Switch.notify_register(opts[:switch])
         Sensor.notify_register(opts[:sensor])
 
         # if the set_pt is a binary then it's a sensor name and we want those
         # notifies too
-        setpoint = opts[:setpoint]
+        case opts[:setpoint] do
+          setpoint when is_binary(setpoint) ->
+            setpoint_opts = opts[:sensor] |> put_in([:name], setpoint)
+            Sensor.notify_register(setpoint_opts)
 
-        if is_binary(setpoint) do
-          setpoint_opts = opts[:sensor] |> put_in([:name], setpoint)
-          Sensor.notify_register(setpoint_opts)
+          _is_number ->
+            nil
         end
 
-        noreply(s)
+        # if the server is starting in :standby ensure the heater is off
+        if server_mode == :standby do
+          Switch.off(opts[:switch][:name])
+          state |> put_in([:standby_reason], :startup_args) |> noreply()
+        else
+          state |> noreply()
+        end
       end
 
       @doc false
@@ -276,7 +285,7 @@ defmodule Reef.Temp.Server do
         end)
         # ensure the control key exists
         |> update_in([:devices, dev_name, :control], fn
-          nil -> :startup
+          nil -> :initialized
           x -> x
         end)
         # update the state and then continue with controlling the temperature
@@ -352,12 +361,12 @@ defmodule Reef.Temp.Server do
       # standby mode
       # the server continues to receive updates from sensors and switches
       # but takes no action relative to adjusting the temperature
-      defp control_temperature(%{mode: :standby} = s), do: s
+      defp control_temperature(%{server_mode: :standby} = s), do: s
 
       # happy and normal path, both devices have been seen recently
       defp control_temperature(
              %{
-               mode: :active,
+               server_mode: :active,
                ample_msgs: true,
                devices_seen: true,
                opts: opts,
@@ -416,7 +425,8 @@ defmodule Reef.Temp.Server do
 
       # unhappy path, one or both devices are missing
       defp control_temperature(
-             %{mode: :active, ample_msgs: true, devices_seen: false} = state
+             %{server_mode: :active, ample_msgs: true, devices_seen: false} =
+               state
            ) do
         import Helen.Time.Helper, only: [utc_now: 0]
         import Switch, only: [off: 1]
@@ -509,15 +519,15 @@ defmodule Reef.Temp.Server do
         end
       end
 
-      defp dev_value(%{devices: devices, opts: opts} = state, dev_type)
-           when dev_type in [:switch, :sensor, :match_sensor] do
-        get_in(devices, [
-          case dev_type do
-            type when type in [:switch, :sensor] -> get_in(opts, [dev_type])
-            :match -> get_in(opts, [:setpoint])
-          end,
-          :value
-        ])
+      defp dev_value(dev_type, %{opts: opts} = state)
+           when dev_type in [:switch, :sensor] do
+        dev_name = get_in(opts, [dev_type, :name])
+
+        case get_in(state, [:devices, dev_name, :value]) do
+          nil -> :initializing
+          x when is_float(x) -> Float.round(x, 1)
+          x -> x
+        end
       end
 
       ##

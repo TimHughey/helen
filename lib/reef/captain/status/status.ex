@@ -6,12 +6,36 @@ defmodule Reef.Captain.Status do
   alias Reef.Captain.Server
 
   @doc false
+  def msg do
+    with %{server_mode: :active, reef_mode: reef_mode} = state <- Server.state() do
+      case reef_mode do
+        :fill -> fill(state)
+        :keep_fresh -> keep_fresh(state)
+        :mix_salt -> mix_salt(state)
+        :prep_for_change -> prep_for_change(state)
+        :ready -> ready(state)
+      end
+    else
+      :DOWN ->
+        """
+        Reef Captain is DOWN
+        """
+
+      %{server_mode: :standby} ->
+        """
+        Reef Captain is in Standby Mode
+        """
+    end
+  end
+
+  @doc false
   def msg(reef_mode) when is_atom(reef_mode) do
     with %{server_mode: :active} = state <- Server.state() do
       case reef_mode do
         :fill -> fill(state)
         :keep_fresh -> keep_fresh(state)
         :mix_salt -> mix_salt(state)
+        :prep_for_change -> prep_for_change(state)
       end
     else
       :DOWN ->
@@ -128,6 +152,46 @@ defmodule Reef.Captain.Status do
 
         """
     end
+  end
+
+  def prep_for_change(%{prep_for_change: map}) do
+    import Helen.Time.Helper, only: [to_binary: 1]
+
+    case map[:status] do
+      :ready ->
+        """
+        Reef Prep For Change is Ready
+        """
+
+      :completed ->
+        """
+        Reef Prep For Change Completed, elapsed time #{to_binary(map[:elapsed])}.
+
+           Started: #{to_binary(map[:started_at])}
+          Finished: #{to_binary(map[:finished_at])}
+        """
+
+      :running ->
+        """
+        Reef Prep For Change Running, elapsed time #{to_binary(map[:elapsed])}.
+
+                Started: #{to_binary(map[:started_at])}
+
+         MixTank Temp F: #{inspect(Reef.MixTank.Temp.temperature())}
+
+              Executing: #{inspect(map[:active_step])}
+              Remaining: #{inspect(map[:steps_to_execute])}
+                Command: #{inspect(map[:step][:cmd])}
+                Elapsed: #{to_binary(map[:step][:elapsed])}
+                 Cycles: #{step_cycles(map)}
+        """
+    end
+  end
+
+  def ready(_state) do
+    """
+    Reef Captain is Ready
+    """
   end
 
   defp step_cycles(%{active_step: active_step} = reef_mode) do
