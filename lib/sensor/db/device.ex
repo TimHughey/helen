@@ -174,20 +174,15 @@ defmodule Sensor.DB.Device do
   Loads datapoints for a device
   """
   @doc since: "0.0.16"
-  def load_datapoints(%Schema{} = dev, opts \\ []) do
+  def load_datapoints(%Schema{} = dev, opts) do
     import Ecto.Query, only: [from: 2]
     import Repo, only: [preload: 2]
 
-    import Helen.Time.Helper,
-      only: [to_seconds: 1, utc_now: 0, utc_shift_past: 1]
-
-    secs = opts[:since_secs] || to_seconds(opts[:since])
-
-    dt = utc_shift_past(secs)
+    since = since(opts)
 
     q =
       from(dp in DataPoint,
-        where: dp.reading_at >= ^dt,
+        where: dp.reading_at >= ^since,
         order_by: [desc: dp.reading_at]
       )
 
@@ -343,5 +338,18 @@ defmodule Sensor.DB.Device do
 
   def upsert(_x, params) do
     {:error, params}
+  end
+
+  defp since(opts) do
+    import Helen.Time.Helper, only: [utc_shift_past: 1]
+
+    possible_opts = Keyword.take(opts, [:since, :since_secs])
+
+    case possible_opts do
+      [{:since, val} | _tail] -> val
+      [{:since_secs, val} | _tail] -> val * 1000
+      _x -> "PT2M"
+    end
+    |> utc_shift_past()
   end
 end

@@ -143,7 +143,7 @@ defmodule Sensor do
   Returns the fahrenheit temperature for a Sensor by alias
   """
   @doc since: "0.0.19"
-  def fahrenheit(sensor_alias, opts \\ [since: "PT30S"])
+  def fahrenheit(sensor_alias, opts \\ [])
       when is_binary(sensor_alias) and is_list(opts) do
     with %Alias{device: dev} <- Alias.find(sensor_alias),
          %Device{datapoints: dp} <- Device.load_datapoints(dev, opts),
@@ -158,7 +158,7 @@ defmodule Sensor do
   Returns the relative humidity for a Sensor by alias
   """
   @doc since: "0.0.19"
-  def relhum(sensor_alias, opts \\ [since: "PT30S"])
+  def relhum(sensor_alias, opts \\ [])
       when is_binary(sensor_alias) and is_list(opts) do
     with %Alias{device: dev} <- Alias.find(sensor_alias),
          %Device{datapoints: dp} <- Device.load_datapoints(dev, opts),
