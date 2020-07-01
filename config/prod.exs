@@ -30,9 +30,13 @@ config :helen, Mqtt.Inbound,
   ]
 
 config :helen, Fact.Influx,
-  database: "helen_dev",
-  host: "influx.dev.wisslanding.com",
-  auth: [method: :basic, username: "helen_dev", password: "helen_dev"],
+  database: "helen_prod",
+  host: "** set in prod.secret.exs",
+  auth: [
+    method: :basic,
+    username: "** set in prod.secret.exs",
+    password: "** set in prod.secret.exs"
+  ],
   http_opts: [insecure: true],
   pool: [max_overflow: 15, size: 10, timeout: 150_000, max_connections: 25],
   port: 8086,
