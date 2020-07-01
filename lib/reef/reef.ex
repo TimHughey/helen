@@ -165,8 +165,8 @@ defmodule Reef do
   def status, do: Status.msg() |> IO.puts()
 
   def temp_ok? do
-    dt_temp = Sensor.fahrenheit("display_tank", since_secs: 30)
-    mt_temp = Sensor.fahrenheit("mixtank", since_secs: 30)
+    dt_temp = Sensor.fahrenheit("display_tank")
+    mt_temp = Sensor.fahrenheit("mixtank")
 
     diff = abs(dt_temp - mt_temp)
 
@@ -178,59 +178,4 @@ defmodule Reef do
   end
 
   defdelegate which_children, to: Reef.Supervisor
-
-  #
-  # def water_change_begin(opts) when is_list(opts) do
-  #   check_diff = Keyword.get(opts, :check_diff, true)
-  #   allowed_diff = Keyword.get(opts, :allowed_diff, 0.8)
-  #   interactive = Keyword.get(opts, :interactive, true)
-  #
-  #   mixtank_temp = Sensor.fahrenheit(name: "mixtank", since_secs: 30)
-  #
-  #   display_temp = Sensor.fahrenhei(name: "display_tank", since_secs: 30)
-  #
-  #   temp_diff = abs(mixtank_temp - display_temp)
-  #
-  #   if temp_diff > allowed_diff and check_diff do
-  #     if interactive do
-  #       IO.puts("--> WARNING <--")
-  #
-  #       IO.puts([
-  #         " Mixtank and Display Tank variance greater than ",
-  #         Float.to_string(allowed_diff)
-  #       ])
-  #
-  #       IO.puts([
-  #         " Display Tank: ",
-  #         Float.round(display_temp, 1) |> Float.to_string(),
-  #         "   Mixtank: ",
-  #         Float.round(mixtank_temp, 1) |> Float.to_string()
-  #       ])
-  #     end
-  #
-  #     {:failed, {:temp_diff, temp_diff}}
-  #   else
-  #     rmp() |> halt()
-  #     rma() |> halt()
-  #     ato() |> halt()
-  #
-  #     status()
-  #     {:ok}
-  #   end
-  # end
-  #
-  # def water_change_end do
-  #   rmp() |> halt()
-  #   rma() |> halt()
-  #   ato() |> halt()
-  #
-  #   status()
-  # end
-  #
-  # def xfer_swmt_to_wst,
-  #   do: dc_activate_profile(rmp(), "mx to wst")
-  #
-  # def xfer_wst_to_sewer,
-  #   do: dc_activate_profile(rmp(), "drain wst")
-  #
 end
