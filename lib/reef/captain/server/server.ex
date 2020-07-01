@@ -544,6 +544,9 @@ defmodule Reef.Captain.Server do
     apply(step_device_to_mod(dev), cmd, [cmd_opts])
   end
 
+  # skip unmatched commands, devices
+  defp apply_cmd(_state, _dev, _cmd, _opts), do: {:no_match}
+
   defp all_stop(state) do
     # setting all crew modules to standby is the best way to ensure
     # they are stopped
@@ -800,7 +803,12 @@ defmodule Reef.Captain.Server do
         # steps to execute and call ourself again
         dev = get_in(state, [mode, :step_devices, step_ref])
         cmd_opts = get_in(state, [mode, :sub_steps, step_ref, cmd])
-        apply_cmd(state, dev, cmd, cmd_opts)
+
+        # only attempt to process the sub step if we located the
+        # device and opts.  if we couldn't then the step doesn't make
+        # sense and is quietly skipped
+        if is_atom(dev) and is_list(cmd_opts),
+          do: apply_cmd(state, dev, cmd, cmd_opts)
 
         state |> start_next_cmd_in_step()
     end

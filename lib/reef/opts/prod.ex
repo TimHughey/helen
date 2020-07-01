@@ -44,8 +44,7 @@ defmodule Reef.Opts.Prod do
         step_devices: [salt: :pump, stir: :pump, aerate: :air],
         steps: [
           salt: [
-            on: [for: "PT45M"],
-            next_step: :stir
+            on: [for: "PT30M"]
           ],
           stir: [
             run_for: "PT1H",
