@@ -54,7 +54,7 @@ defmodule Sensor.DB.Device do
   """
   @doc since: "0.0.27"
   def delete_unavailable(opts) when is_list(opts) do
-    import TimeSupport, only: [utc_shift_past: 1, valid_duration_opts?: 1]
+    import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
     import Ecto.Query, only: [from: 2]
     import Repo, only: [all: 1]
 
@@ -177,11 +177,13 @@ defmodule Sensor.DB.Device do
   def load_datapoints(%Schema{} = dev, opts \\ []) do
     import Ecto.Query, only: [from: 2]
     import Repo, only: [preload: 2]
-    import TimeSupport, only: [duration_secs: 1, utc_now: 0]
 
-    secs = opts[:since_secs] || duration_secs(opts[:since])
+    import Helen.Time.Helper,
+      only: [to_seconds: 1, utc_now: 0, utc_shift_past: 1]
 
-    dt = Timex.shift(utc_now(), seconds: secs * -1)
+    secs = opts[:since_secs] || to_seconds(opts[:since])
+
+    dt = utc_shift_past(secs)
 
     q =
       from(dp in DataPoint,
@@ -249,7 +251,7 @@ defmodule Sensor.DB.Device do
   """
   @doc since: "0.0.27"
   def unavailable(opts) when is_list(opts) do
-    import TimeSupport, only: [utc_shift_past: 1, valid_duration_opts?: 1]
+    import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
     import Ecto.Query, only: [from: 2]
     import Repo, only: [all: 1]
 
@@ -283,7 +285,7 @@ defmodule Sensor.DB.Device do
 
   @doc since: "0.0.15"
   def upsert(%{device: _, host: _, dev_latency_us: _, mtime: mtime} = msg) do
-    import TimeSupport, only: [from_unix: 1, utc_now: 0]
+    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
 
     params = [:device, :host, :dev_latency_us, :discovered_at, :last_seen_at]
 

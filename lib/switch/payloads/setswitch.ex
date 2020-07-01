@@ -3,8 +3,6 @@ defmodule Switch.Payload.Position do
 
   require Logger
 
-  alias TimeSupport
-
   alias Switch.DB.Device, as: Device
   alias Switch.DB.Command, as: Command
 
@@ -15,7 +13,7 @@ defmodule Switch.Payload.Position do
         opts \\ []
       )
       when is_list(opts) do
-    import TimeSupport, only: [unix_now: 1]
+    import Helen.Time.Helper, only: [unix_now: 1]
 
     %{
       payload: "switch state",

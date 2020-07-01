@@ -314,7 +314,7 @@ defmodule PulseWidth.DB.Alias do
   end
 
   defp duty_now(%_{ttl_ms: ttl_ms, device: %_{duty: duty} = x}, opts) do
-    import TimeSupport, only: [ttl_expired?: 2]
+    import Helen.Time.Helper, only: [ttl_expired?: 2]
 
     if ttl_expired?(last_seen_at(x), opts[:ttl_ms] || ttl_ms),
       do: {:ttl_expired, duty},

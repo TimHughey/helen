@@ -54,7 +54,7 @@ defmodule Switch.DB.Command do
         } = msg
       ) do
     import Switch.Fact.Command, only: [write_specific_metric: 2]
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     set_base_opts = [acked: true, ack_at: utc_now()]
 
@@ -79,7 +79,7 @@ defmodule Switch.DB.Command do
 
   def ack_immediate_if_needed({:pending, res} = rc, opts)
       when is_list(res) and is_list(opts) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     #
     # if ack: false (host expected to ack) then immediately ack
@@ -126,15 +126,15 @@ defmodule Switch.DB.Command do
     do: [
       orphan: [
         startup_check: true,
-        sent_before: [seconds: 12],
-        older_than: [minutes: 1]
+        sent_before: "PT45S",
+        older_than: "PT1M"
       ],
       purge: [
         at_startup: true,
-        interval: [minutes: 2],
-        older_than: [days: 30]
+        interval: "PT3M",
+        older_than: "PT30D"
       ],
-      metrics: [minutes: 5]
+      metrics: "PT5M"
     ]
 
   def update(refid, opts) when is_binary(refid) and is_list(opts) do

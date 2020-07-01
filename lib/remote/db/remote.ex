@@ -240,7 +240,7 @@ defmodule Remote.DB.Remote do
 
   @doc since: "0.0.15"
   def upsert(%{host: _, name: _, mtime: _mtime} = msg) do
-    import TimeSupport, only: [from_unix: 1, utc_now: 0]
+    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
 
     params = [
       :host,
@@ -312,7 +312,7 @@ defmodule Remote.DB.Remote do
   end
 
   defp add_last_start_if_needed(params, %{type: type} = _msg) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     case type do
       "boot" -> Map.put(params, :last_start_at, utc_now())

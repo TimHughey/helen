@@ -15,7 +15,7 @@ defmodule Sequencer.Server do
       @doc false
       @impl true
       def init(args) do
-        import TimeSupport, only: [epoch: 0]
+        import Helen.Time.Helper, only: [epoch: 0]
 
         # just in case we were passed a map?!?
         args = Enum.into(args, [])
@@ -70,7 +70,7 @@ defmodule Sequencer.Server do
       end
 
       def last_timeout do
-        import TimeSupport, only: [epoch: 0, utc_now: 0]
+        import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
         with last <- state(:last_timeout),
              d when d > 0 <- Timex.diff(last, epoch()) do
@@ -207,7 +207,7 @@ defmodule Sequencer.Server do
       #   cond do
       #     # the device name matches one from the configuration
       #     n == get_in(opts, [dev_type, :name]) ->
-      #       import TimeSupport, only: [utc_now: 0]
+      #       import Helen.Time.Helper, only: [utc_now: 0]
       #
       #       # stuff the actual device struct into :devices
       #       put_in(s, [:devices, dev_type], obj)
@@ -231,7 +231,7 @@ defmodule Sequencer.Server do
       @doc false
       @impl true
       def handle_info(:timeout, s) do
-        import TimeSupport, only: [utc_now: 0]
+        import Helen.Time.Helper, only: [utc_now: 0]
 
         update_last_timeout(s)
         |> timeout_hook()
@@ -254,13 +254,13 @@ defmodule Sequencer.Server do
       ##
 
       defp loop_timeout(%{opts: opts}) do
-        import TimeSupport, only: [list_to_ms: 2]
+        import Helen.Time.Helper, only: [to_ms: 2]
 
-        list_to_ms(opts[:timeout], minutes: 5)
+        to_ms(opts[:timeout], "PT5M")
       end
 
       defp update_last_timeout(s) do
-        import TimeSupport, only: [utc_now: 0]
+        import Helen.Time.Helper, only: [utc_now: 0]
 
         put_in(s[:last_timeout], utc_now())
         |> Map.update(:timeouts, 1, &(&1 + 1))

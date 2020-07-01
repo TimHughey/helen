@@ -14,10 +14,10 @@ defmodule ReefTemperatureControlTest do
     opts = [
       sensor: [
         name: "sensor",
-        notify_interval: [minutes: 2],
-        since: [seconds: 30]
+        notify_interval: "PT1M",
+        since: "PT30S"
       ],
-      switch: [name: "switch", notify_interval: [minutes: 2]]
+      switch: [name: "switch", notify_interval: "PT1M"]
     ]
 
     {:ok, state, {:continue, :bootstrap}} = Control.init(opts)
@@ -41,10 +41,10 @@ defmodule ReefTemperatureControlTest do
     opts = [
       sensor: [
         name: "sensor",
-        notify_interval: [minutes: 2],
-        since: [seconds: 30]
+        notify_interval: "PT2M",
+        since: "PT30S"
       ],
-      switch: [name: "switch", notify_interval: [minutes: 2]]
+      switch: [name: "switch", notify_interval: "PT2M"]
     ]
 
     {:ok, state, {:continue, :bootstrap}} = Control.init(opts)

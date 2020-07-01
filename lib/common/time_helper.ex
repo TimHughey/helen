@@ -104,6 +104,31 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+    Returns a boolean indicating if reference DateTime, shifted by opts
+    is after now.
+
+    This is the inverse of current?/3.
+
+    Useful to determining if a DateTime is stale, deteriming if caching/ttl
+    are expired.
+  """
+  @doc since: "0.0.26"
+  def expired?(reference, duration) do
+    import Timex, only: [after?: 2, shift: 2]
+
+    end_dt = shift(reference, milliseconds: to_ms(duration))
+    after?(utc_now(), end_dt)
+  end
+
+  @doc """
+  Convert a UNIX mtime (in seconds) to a DateTime with microsecond precision.
+  """
+  @doc since: "0.0.27"
+  def from_unix(mtime) do
+    DateTime.from_unix!(mtime, :microsecond)
+  end
+
+  @doc """
   Convert a list of time options to milliseconds
 
   Returns an integer.
@@ -133,8 +158,22 @@ defmodule Helen.Time.Helper do
     |> Duration.to_milliseconds(truncate: true)
   end
 
+  @doc """
+  Return the current time in the specified timezone
+
+  If is_nil(tz) UTC is used as the timexone
+  """
+  @doc since: "0.0.27"
+  def local_now(tz) do
+    if is_nil(tz), do: Timex.now("UTC"), else: Timex.now(tz)
+  end
+
   @doc delegate_to: {Timex.Duration, :scale, 2}
-  defdelegate scale(d, factor), to: Timex.Duration
+  def scale(d, factor) do
+    alias Timex.Duration
+
+    d |> to_duration() |> Duration.scale(factor)
+  end
 
   @doc """
   Subtracts a list of durations and returns the absolute value.
@@ -165,7 +204,7 @@ defmodule Helen.Time.Helper do
   @doc since: "0.0.27"
   def to_binary(arg) do
     import Timex, only: [to_datetime: 2, format!: 3, format_duration: 2]
-    import Duration, only: [to_seconds: 2, from_seconds: 1]
+    import Duration, only: [from_seconds: 1]
 
     case arg do
       %DateTime{} = x ->
@@ -173,7 +212,7 @@ defmodule Helen.Time.Helper do
         |> format!("%a, %b %e, %Y %H:%M:%S", :strftime)
 
       %Duration{} = x ->
-        to_seconds(x, :truncate)
+        Duration.to_seconds(x, :truncate)
         |> from_seconds()
         |> format_duration(:humanized)
 
@@ -194,6 +233,7 @@ defmodule Helen.Time.Helper do
     alias Timex.Duration
 
     case d do
+      d when is_list(d) -> list_to_ms(d, []) |> Duration.from_milliseconds()
       %Duration{} = x -> x
       x -> Duration.parse!(x)
     end
@@ -229,6 +269,64 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+  Convert the argument to seconds.
+
+  Takes an ISO formatted duration binary and an optional default value.
+  The default value is used when the first argument is nil.  Useful for
+  situations where a configuration does not exist.
+
+  Raises if neither the first argument or the default can not be parse.  The
+  default is an empty binary when not supplied.
+
+  Returns an integer representing the seconds.
+
+  ## Examples
+
+      iex> Helen.Time.Helper.to_seconds("PT1M")
+      60
+
+  """
+  @doc since: "0.0.27"
+  def to_seconds(args, default \\ "") do
+    alias Timex.Duration
+
+    case args do
+      nil -> to_duration(default)
+      args -> to_duration(args)
+    end
+    |> Duration.to_seconds(truncate: true)
+  end
+
+  @doc """
+  Validates if a ttl has expired
+
+  If passed :ttl_ms in opts the third argument is overriden.
+
+  Returns {:ttl_expired, val} || {:ok, val}
+
+  """
+  @doc since: "0.0.27"
+  def ttl_check(at, val, ttl_ms, opts) do
+    # ttl_ms in opts overrides passed in ttl_ms
+    ms = Keyword.get(opts, :ttl_ms, ttl_ms)
+
+    if ttl_expired?(at, ms), do: {:ttl_expired, val}, else: {:ok, val}
+  end
+
+  @doc """
+  Has a ttl expired?
+
+  Returns a boolean.
+  """
+  @doc since: "0.0.27"
+
+  def ttl_expired?(at, ttl_ms) when is_integer(ttl_ms) do
+    ttl_dt = utc_shift_past(ttl_ms)
+
+    Timex.before?(at, ttl_dt)
+  end
+
+  @doc """
   Validates the argument can be converted to an integer representation of
   milliseconds.
 
@@ -259,10 +357,10 @@ defmodule Helen.Time.Helper do
 
   ## Examples
 
-      iex> TimeSupport.valid_duration_opts?([days: 7])
+      iex> Helen.Time.Helper.valid_duration_opts?([days: 7])
       true
 
-      iex> TimeSupport.valid_duration_opts?([hello: "doctor"])
+      iex> Helen.Time.Helper.valid_duration_opts?([hello: "doctor"])
       false
   """
   @doc since: "0.0.27"
@@ -275,6 +373,34 @@ defmodule Helen.Time.Helper do
       x when x == [] -> false
       _x -> true
     end
+  end
+
+  @doc """
+  Returns the current time as UNIX microseconds
+
+  ## Examples
+
+      iex> Helen.Time.Helper.unix_now()
+      ~U[2020-06-22 15:16:02.447077Z]
+
+  """
+  @doc since: "0.0.27"
+  def unix_now do
+    Timex.now() |> DateTime.to_unix(:microsecond)
+  end
+
+  @doc """
+  Returns the current time as UNIX in specified unit
+
+  ## Examples
+
+      iex> Helen.Time.Helper.unix_now(:milliseconds)
+      ~U[2020-06-22 15:16:02.44Z]
+
+  """
+  @doc since: "0.0.27"
+  def unix_now(unit) when is_atom(unit) do
+    Timex.now() |> DateTime.to_unix(unit)
   end
 
   @doc """

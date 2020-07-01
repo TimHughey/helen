@@ -36,7 +36,7 @@ defmodule Mqtt.Handler do
   end
 
   def handle_message([_env, "r", src_host] = topic, payload, state) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     %{payload: payload, topic: topic, host: src_host, msg_recv_dt: utc_now()}
     |> Mqtt.Inbound.process()

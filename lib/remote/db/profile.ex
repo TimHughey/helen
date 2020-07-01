@@ -218,10 +218,12 @@ defmodule Remote.DB.Profile do
   """
   @doc since: "0.0.21"
   def create_profile_payload(%{host: host, name: name}, %Schema{} = p) do
+    import Helen.Time.Helper, only: [unix_now: 1]
+
     Map.merge(
       %{
         payload: "profile",
-        mtime: TimeSupport.unix_now(:second),
+        mtime: unix_now(:second),
         host: host,
         assigned_name: name
       },

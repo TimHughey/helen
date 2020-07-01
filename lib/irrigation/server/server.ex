@@ -14,7 +14,7 @@ defmodule Irrigation.Server do
   @doc false
   @impl true
   def init(args) do
-    import TimeSupport, only: [epoch: 0]
+    import Helen.Time.Helper, only: [epoch: 0]
 
     state = %{
       last_timeout: epoch(),
@@ -41,7 +41,7 @@ defmodule Irrigation.Server do
 
   @doc false
   def last_timeout do
-    import TimeSupport, only: [epoch: 0, utc_now: 0]
+    import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
     with last <- state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
@@ -73,7 +73,7 @@ defmodule Irrigation.Server do
   @doc since: "0.0.27"
   def restart(opts \\ []) do
     # the Supervisor is the first part of the module
-    [_elixir, sup_base | _remainder] = Module.split(__MODULE__)
+    [sup_base | _remainder] = Module.split(__MODULE__)
 
     sup_mod = Module.concat([sup_base, "Supervisor"])
 
@@ -203,7 +203,7 @@ defmodule Irrigation.Server do
   @doc false
   @impl true
   def handle_info(:timeout, s) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     schedule_jobs_if_needed(s)
     |> update_last_timeout()
@@ -258,7 +258,7 @@ defmodule Irrigation.Server do
     alias Quantum.Job
 
     # import Atom, only: [to_string: 1]
-    import TimeSupport, only: [now_local: 1]
+    import Helen.Time.Helper, only: [local_now: 1]
 
     # iterate through the keyword list :jobs from the opts selecting only
     # the key :schedule
@@ -285,15 +285,15 @@ defmodule Irrigation.Server do
       end
     end
 
-    put_in(s[:last_scheduled], now_local(opts[:timezone]))
+    put_in(s[:last_scheduled], local_now(opts[:timezone]))
   end
 
   defp schedule_jobs_if_needed(%{last_scheduled: last, opts: opts} = s) do
     import Agnus, only: [current?: 0]
-    import TimeSupport, only: [now_local: 1]
+    import Helen.Time.Helper, only: [local_now: 1]
     import Timex, only: [day: 1]
 
-    now = now_local(opts[:timezone])
+    now = local_now(opts[:timezone])
 
     cond do
       # handles the startup case when Agnus does not yet have info for us
@@ -306,10 +306,10 @@ defmodule Irrigation.Server do
   end
 
   defp spawned_job(job_name, job, _tod, duration, opts) do
-    import TimeSupport, only: [list_to_ms: 2]
+    import Helen.Time.Helper, only: [to_ms: 2]
 
-    power_up_delay_ms = list_to_ms(opts[:power][:power_up_delay], secondd: 0)
-    sleep_ms = list_to_ms(duration, seconds: 0)
+    power_up_delay_ms = to_ms(opts[:power][:power_up_delay], "PT0S")
+    sleep_ms = to_ms(duration, "PT0S")
     device = Keyword.get(opts[:jobs], job) |> Keyword.get(:device)
 
     Process.sleep(power_up_delay_ms)
@@ -342,9 +342,9 @@ defmodule Irrigation.Server do
   ##
 
   defp loop_timeout(%{opts: opts}) do
-    import TimeSupport, only: [list_to_ms: 2]
+    import Helen.Time.Helper, only: [to_ms: 2]
 
-    list_to_ms(opts[:timeout], minutes: 1)
+    to_ms(opts[:timeout], "PT1M")
   end
 
   defp update_last_timeout(s) do

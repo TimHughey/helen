@@ -95,7 +95,7 @@ defmodule PulseWidth.DB.Device do
 
   def record_cmd(%Schema{} = d, %Alias{} = a, opts) when is_list(opts) do
     import PulseWidth.Payload.Duty, only: [send_cmd: 3]
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     {cmd_opts, record_opts} = Keyword.split(opts, [:ack])
     cmd_map = record_opts[:cmd_map] || {:bad_args, opts}
@@ -140,7 +140,7 @@ defmodule PulseWidth.DB.Device do
   end
 
   def upsert(%{device: _, host: _, mtime: mtime} = msg) do
-    import TimeSupport, only: [from_unix: 1, utc_now: 0]
+    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
 
     params = [
       :device,

@@ -17,10 +17,10 @@ defmodule Sensor.Notify.Server do
   @doc false
   @impl true
   def init(args) do
-    import TimeSupport, only: [now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     state =
-      %{last_timeout: now(), opts: config_opts(args), notify_map: %{}}
+      %{last_timeout: utc_now(), opts: config_opts(args), notify_map: %{}}
       |> loop_put_timeout()
 
     {:ok, state, 100}
@@ -95,7 +95,7 @@ defmodule Sensor.Notify.Server do
   @doc false
   @impl true
   def handle_call({:notify_register, x, interval}, {pid, _ref}, s) do
-    import TimeSupport, only: [epoch: 0]
+    import Helen.Time.Helper, only: [epoch: 0]
 
     # NOTE:  shape of s (state) relevant for this function
     #
@@ -126,7 +126,7 @@ defmodule Sensor.Notify.Server do
   @doc false
   @impl true
   def handle_cast({:notify, seen_list}, %{notify_map: _notify_map} = s) do
-    import TimeSupport, only: [expired?: 3, utc_now: 0]
+    import Helen.Time.Helper, only: [expired?: 2, utc_now: 0]
     import List, only: [flatten: 1]
 
     # NOTE:  shape of s (state) relevant for this function
@@ -169,7 +169,7 @@ defmodule Sensor.Notify.Server do
 
         # grab some additional items for final checks before notifying
         alive? = Process.alive?(pid_key)
-        should_notify? = expired?(l, :interval, o)
+        should_notify? = expired?(l, o[:interval] || "PT1M")
 
         cond do
           alive? and should_notify? ->
@@ -223,9 +223,10 @@ defmodule Sensor.Notify.Server do
   @doc false
   @impl true
   def handle_info(:timeout, s) do
-    import TimeSupport, only: [now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
-    state = Map.update(s, :loops, 1, &(&1 + 1)) |> Map.put(:last_timeout, now())
+    state =
+      Map.update(s, :loops, 1, &(&1 + 1)) |> Map.put(:last_timeout, utc_now())
 
     loop_hook(state)
   end
@@ -239,9 +240,9 @@ defmodule Sensor.Notify.Server do
   end
 
   defp loop_put_timeout(%{opts: opts} = s) do
-    import TimeSupport, only: [opts_as_ms: 1]
+    import Helen.Time.Helper, only: [to_ms: 1]
 
-    ms = (opts[:loop_timeout] || [minutes: 1]) |> opts_as_ms()
+    ms = (opts[:loop_timeout] || "PT1M") |> to_ms()
 
     Map.put(s, :loop_timeout_ms, ms)
   end

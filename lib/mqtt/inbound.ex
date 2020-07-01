@@ -439,15 +439,15 @@ defmodule Mqtt.Inbound do
   ## Logging Helpers
   ##
 
-  defp log_cmd_ack_fault_if_needed(%{cmd_ack_fault: fault} = msg) do
-    """
-    cmd ack fault:
-      #{inspect(fault, pretty: true)}
-
-    message:
-        #{inspect(msg, pretty: true)}
-    """
-    |> Logger.warn()
+  defp log_cmd_ack_fault_if_needed(%{cmd_ack_fault: _fault} = msg) do
+    # """
+    # cmd ack fault:
+    #   #{inspect(fault, pretty: true)}
+    #
+    # message:
+    #     #{inspect(msg, pretty: true)}
+    # """
+    # |> Logger.warn()
 
     msg
   end

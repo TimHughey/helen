@@ -1,4 +1,5 @@
 # This file is responsible for configuring your application
+ˇ
 # and its dependencies with the aid of the Mix.Config module.
 use Mix.Config
 
@@ -18,8 +19,7 @@ config :helen, Mqtt.Client,
     server:
       {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
     keep_alive: 36
-  ],
-  timesync: [frequency: {:secs, 5}, loops: 5, forever: false, log: false]
+  ]
 
 config :helen, Mqtt.Inbound,
   log: [
@@ -42,14 +42,14 @@ config :helen, Fact.Influx,
 config :helen, PulseWidth.DB.Command,
   orphan: [
     startup_check: true,
-    sent_before: [seconds: 1]
+    sent_before: "PT1S"
   ],
   purge: [
     at_startup: false,
-    interval: [minutes: 2],
-    older_than: [days: 30]
+    interval: "PT2M",
+    older_than: "PT10D"
   ],
-  metrics: [minutes: 5]
+  metrics: "PT1M"
 
 config :helen, Repo,
   username: "helen_test",
@@ -62,18 +62,17 @@ config :helen, Repo,
   adapter: Ecto.Adapters.Postgres
 
 config :helen, Switch.DB.Command,
-  log: [dryrun: false],
   # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [
     at_startup: true,
-    sent_before: [seconds: 1]
+    sent_before: "PT1S"
   ],
   purge: [
     at_startup: true,
-    schedule: {:extended, "33 */3 * * *"},
-    older_than: [days: 30]
+    interval: "PT1M",
+    older_than: "PT1D"
   ],
-  metrics: [minutes: 1]
+  metrics: "PT1M"
 
 config :helen, Helen.Scheduler,
   global: true,

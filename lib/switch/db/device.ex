@@ -276,7 +276,7 @@ defmodule Switch.DB.Device do
   def record_cmd(%Schema{} = sd, %Alias{} = sa, opts)
       when is_list(opts) do
     import Switch.Payload.Position, only: [send_cmd: 4]
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     sd = reload(sd)
 
@@ -324,7 +324,7 @@ defmodule Switch.DB.Device do
   end
 
   def upsert(%{device: _, host: _, mtime: mtime, states: _} = msg) do
-    import TimeSupport, only: [from_unix: 1, utc_now: 0]
+    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
 
     params = [
       :device,
@@ -390,7 +390,7 @@ defmodule Switch.DB.Device do
   end
 
   defp actual_pio_state(%Schema{device: device} = sd, pio, opts) do
-    import TimeSupport, only: [ttl_check: 4]
+    import Helen.Time.Helper, only: [ttl_check: 4]
 
     alias Switch.DB.Device.State, as: State
 

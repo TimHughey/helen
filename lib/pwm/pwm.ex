@@ -48,7 +48,7 @@ defmodule PulseWidth do
   #
   # def basic(%Device{} = pwm, %{name: name} = cmd, opts)
   #     when is_list(opts) do
-  #   import TimeSupport, only: [utc_now: 0]
+  #   import Helen.Time.Helper, only: [utc_now: 0]
   #   import PulseWidth.Payload.Basic, only: [send_cmd: 4]
   #
   #   # update the PulseWidth
@@ -324,7 +324,7 @@ defmodule PulseWidth do
   #
   # def random(%Device{} = pwm, %{name: name} = cmd, opts)
   #     when is_list(opts) do
-  #   import TimeSupport, only: [utc_now: 0]
+  #   import Helen.Time.Helper, only: [utc_now: 0]
   #   import PulseWidth.Payload.Random, only: [send_cmd: 4]
   #
   #   # update the PulseWidth

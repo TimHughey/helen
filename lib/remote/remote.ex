@@ -288,7 +288,7 @@ defmodule Remote do
        )
        when cmd in ["restart", "ota"] do
     import Mqtt.Client, only: [publish_to_host: 2]
-    import TimeSupport, only: [unix_now: 0]
+    import Helen.Time.Helper, only: [unix_now: 0]
 
     # all commands must include the basic information
     base_cmd = %{name: name, host: host, mtime: unix_now()}

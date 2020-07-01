@@ -99,7 +99,7 @@ defmodule GenDevice do
       def device_module_map, do: Map.put(%{}, state(:device_name), __MODULE__)
 
       def last_timeout do
-        import TimeSupport, only: [epoch: 0, utc_now: 0]
+        import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
         with last <- get_in(state(), [:last, :timeout]),
              d when d > 0 <- Timex.diff(last, epoch()) do
@@ -581,7 +581,7 @@ defmodule GenDevice do
       defp state_merge(%{} = s, %{} = map), do: Map.merge(s, map)
 
       defp update_last_timeout(state) do
-        import TimeSupport, only: [utc_now: 0]
+        import Helen.Time.Helper, only: [utc_now: 0]
 
         state
         |> put_in([:last, :timeout], utc_now())

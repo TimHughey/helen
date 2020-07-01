@@ -283,7 +283,7 @@ defmodule Mqtt.Client do
   end
 
   defp host_feed(host, subtopic) when is_binary(host) and is_binary(subtopic) do
-    import TimeSupport, only: [unix_now: 1]
+    import Helen.Time.Helper, only: [unix_now: 1]
 
     # append the current time (in unix seconds since epoch)
     # to the topic (feed).  the remote device can use this information

@@ -136,7 +136,7 @@ defmodule Broom do
       defoverridable insert_and_track: 1
 
       def orphan(%{acked: false} = cmd) do
-        import TimeSupport, only: [utc_now: 0]
+        import Helen.Time.Helper, only: [utc_now: 0]
 
         cmd = reload(cmd)
         {:orphan, update(cmd, acked: true, ack_at: utc_now(), orphan: true)}
@@ -146,12 +146,12 @@ defmodule Broom do
 
       def orphan_list(opts \\ []) when is_list(opts) do
         import Ecto.Query, only: [from: 2]
-        import TimeSupport, only: [utc_shift_past: 1]
+        import Helen.Time.Helper, only: [utc_shift_past: 1]
 
         # sent before passed as an option will override the app env config
         # if not passed in then grab it from the config
         # finally, as a last resort use the hardcoded value
-        sent_before_opts = Keyword.take(opts, [:sent_before, seconds: 31])
+        sent_before_opts = Keyword.take(opts, [:sent_before, "PT31S"])
         preloads = __MODULE__.__schema__(:associations)
 
         before = utc_shift_past(sent_before_opts)
@@ -312,9 +312,9 @@ defmodule Broom do
 
   @doc false
   def handle_cast({:track, %{cmd: {_rc, cmd}}}, %{opts: opts} = s) do
-    import TimeSupport, only: [list_to_ms: 2]
+    import Helen.Time.Helper, only: [to_ms: 2]
 
-    ms = list_to_ms(opts[:orphan][:sent_before], seconds: 3)
+    ms = to_ms(opts[:orphan][:sent_before], "PT3M")
 
     %{refid: refid, __struct__: schema} = cmd
     timer = Process.send_after(self(), {:possible_orphan, refid}, ms)
@@ -374,7 +374,7 @@ defmodule Broom do
   ## to ensure separation of concerns we only allow Broom to orphan a command
   ##
   defp orphan(%{__struct__: schema} = cmd) do
-    import TimeSupport, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     cmd = apply(schema, :reload, [cmd])
 
@@ -391,7 +391,7 @@ defmodule Broom do
 
   defp report_metrics(%{counts: counts, opts: opts} = state) do
     import Fact.Influx, only: [write: 2]
-    import TimeSupport, only: [unix_now: 1]
+    import Helen.Time.Helper, only: [unix_now: 1]
 
     datapoint_map = %{
       points: [
@@ -410,9 +410,9 @@ defmodule Broom do
   end
 
   defp schedule_metrics(%{opts_vsn: v, opts: opts} = state) do
-    import TimeSupport, only: [list_to_ms: 2]
+    import Helen.Time.Helper, only: [to_ms: 2]
 
-    ms = list_to_ms(opts[:timeout], minutes: 5)
+    ms = to_ms(opts[:timeout], "PT5M")
     Process.send_after(self(), {:report_metrics, v}, ms)
 
     state

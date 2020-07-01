@@ -109,6 +109,14 @@ defmodule Reef do
   #   IO.puts(["not implemented!!"])
   # end
 
+  @doc """
+  Warm the MixTank to match the DisplayTank
+  """
+  @doc since: "0.0.27"
+  def mixtank_match_display_tank do
+    MixTank.Temp.restart()
+  end
+
   def mixtank_mode(mode) when mode in [:active, :standby] do
     mods = [MixTank.Air, MixTank.Pump, MixTank.Rodi]
 

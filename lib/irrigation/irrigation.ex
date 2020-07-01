@@ -5,6 +5,24 @@ defmodule Irrigation do
 
   alias Irrigation.Server
 
+  def default_opts do
+    opts = [
+      jobs: [
+        flower_boxes: [
+          device: "irrigation flower boxes",
+          schedule: [am: "PT45S", noon: "PT30S", pm: "PT30S"]
+        ],
+        garden: [device: "irrigation garden", schedule: [am: "PT30M"]]
+      ],
+      power: [device: "irrigation 12v power", power_up_delay: "PT5S"],
+      device_group: "irrigation",
+      timezone: "America/New_York"
+    ]
+
+    config_update(fn _x -> opts end)
+    restart()
+  end
+
   @doc delegate_to: {Server, :config_opts, 0}
   defdelegate opts, to: Server, as: :config_opts
 
@@ -24,7 +42,7 @@ defmodule Irrigation do
   @doc """
   Execute a oneshot irrigation of the flower boxes
 
-  Default [seconds: 45]
+  Default "PT45S"
 
   Returns :ok
 
@@ -33,19 +51,19 @@ defmodule Irrigation do
       iex> Irrigation.fflower_boxes_oneshot()
       :ok
 
-      iex> Irrigation.flower_boxes_oneshot([seconds: 15])
+      iex> Irrigation.flower_boxes_oneshot("PT45S")
       :ok
 
   """
   @doc since: "0.0.27"
-  def flower_boxes_oneshot(opts \\ [seconds: 45]) do
+  def flower_boxes_oneshot(opts \\ "PT45S") do
     Server.start_job(:flower_boxes_oneshot, :flower_boxes, :oneshot, opts)
   end
 
   @doc """
   Execute a oneshot irrigation of the garden
 
-  Default [minutes: 30]
+  Default "PT45S"
 
   Returns :ok
 
@@ -59,7 +77,7 @@ defmodule Irrigation do
 
   """
   @doc since: "0.0.27"
-  def garden_oneshot(opts \\ [minutes: 30]) do
+  def garden_oneshot(opts \\ "PT30M") do
     Server.start_job(:garden_oneshot, :garden, :oneshot, opts)
   end
 
