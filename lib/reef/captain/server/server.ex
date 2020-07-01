@@ -518,8 +518,15 @@ defmodule Reef.Captain.Server do
   end
 
   defp all_stop(state) do
+    # setting all crew modules to standby is the best way to ensure
+    # they are stopped
     for c <- crew_list() do
       apply(c, :mode, [:standby])
+    end
+
+    # now reset all crew modules to active so they are ready for future use
+    for c <- crew_list() do
+      apply(c, :mode, [:active])
     end
 
     state
