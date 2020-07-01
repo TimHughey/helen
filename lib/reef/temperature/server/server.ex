@@ -296,6 +296,16 @@ defmodule Reef.Temp.Server do
         |> timeout_hook()
       end
 
+      @doc false
+      @impl true
+      def terminate(_reason, %{opts: opts}) do
+        import Switch, only: [off: 2]
+
+        switch_name = opts[:switch][:name]
+
+        off(switch_name, ack: false)
+      end
+
       ##
       ## GenServer Receive Loop Hooks
       ##
