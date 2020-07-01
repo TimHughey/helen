@@ -630,6 +630,7 @@ defmodule Reef.Captain.Server do
     now = utc_now()
 
     state
+    |> change_token()
     |> put_in([mode, :status], :completed)
     |> put_in([mode, :finished_at], now)
     |> put_in([mode, :elapsed], elapsed(started_at, now))

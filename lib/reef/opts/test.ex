@@ -52,8 +52,8 @@ defmodule Reef.Opts.Test do
           stir: [
             run_for: "PT10S",
             on: [for: "PT2S", at_cmd_finish: :off],
-            aerate: :on,
-            off: [for: "PT2S", at_cmd_finish: :off]
+            off: [for: "PT2S", at_cmd_finish: :off],
+            aerate: :on
           ],
           finally: [msg: {:handoff, :prep_for_change}]
         ],
