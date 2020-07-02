@@ -17,7 +17,7 @@ defmodule Reef do
 
   defdelegate ato_state, to: DisplayTank.Ato, as: :state
 
-  defdelegate clean, to: Captain
+  defdelegate clean(opts \\ :start), to: Captain
 
   def clean_status, do: x_state(:clean)
 
@@ -171,6 +171,10 @@ defmodule Reef do
     diff = abs(dt_temp - mt_temp)
 
     if diff < 0.7, do: true, else: true
+  end
+
+  def water_change_start do
+    [captain: all_stop(), display_tank: DisplayTank.Temp.mode(:standby)]
   end
 
   def water_change_complete do

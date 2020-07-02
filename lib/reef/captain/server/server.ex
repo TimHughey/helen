@@ -91,7 +91,9 @@ defmodule Reef.Captain.Server do
 
   Display tank ato is stopped for the configured clean duration.
 
-  If unconfigured the default is [hours: 2]
+  Optional options:
+    `:start`  -> start cleaning mode (default)
+    `:finish` -> finish cleaning mode (switch on auto-top-off)
 
   Returns :ok.
 
@@ -102,7 +104,7 @@ defmodule Reef.Captain.Server do
 
   """
   @doc since: "0.0.27"
-  def clean, do: call_if_active({:clean})
+  def clean(opts), do: call_if_active({:clean, opts})
 
   @doc """
   Fill the MixTank with RODI.
@@ -261,12 +263,8 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_call({:clean}, _from, %{opts: opts} = state) do
+  def handle_call({:clean, _clean_opts}, _from, %{opts: opts} = state) do
     [{cmd, cmd_opts}] = get_in(opts, [:clean, :steps, :cleaning])
-
-    # NOTE:  if a clean cycle is already in progress the call
-    #        to Ato will invalidate it's timer so the previous
-    #        clean cycle is effectively canceled
     apply_cmd(state, :ato, cmd, add_notify_opts(cmd_opts))
 
     state
@@ -556,8 +554,8 @@ defmodule Reef.Captain.Server do
       apply(c, :mode, [:standby])
     end
 
-    # now reset all crew modules to active so they are ready for future use
-    for c <- crew_list() do
+    # now reset all crew modules to active (except MixTank.Temp) so they are ready for future use
+    for c when c in [Air, Pump, Rodi] <- crew_list() do
       apply(c, :mode, [:active])
     end
 
@@ -612,7 +610,7 @@ defmodule Reef.Captain.Server do
     end
   end
 
-  defp crew_list, do: [Air, Pump, Rodi]
+  defp crew_list, do: [Air, Pump, Rodi, MixTank.Temp]
 
   defp msg_puts(msg, state) do
     """
