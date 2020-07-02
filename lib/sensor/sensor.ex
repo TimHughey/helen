@@ -169,6 +169,10 @@ defmodule Sensor do
     end
   end
 
+  @doc delegate_to: {Sensor.Notify.Server, :restart, 1}
+  @doc since: "0.0.27"
+  defdelegate restart(opts \\ []), to: Sensor.Notify.Server
+
   @doc """
   Return a list of devices that are not aliased ordered by inserted at desc
   """

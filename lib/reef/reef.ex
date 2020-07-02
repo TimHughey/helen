@@ -19,7 +19,7 @@ defmodule Reef do
 
   defdelegate clean, to: Captain
 
-  def clean_status, do: state(:clean)
+  def clean_status, do: x_state(:clean)
 
   def default_opts do
     alias Reef.Opts.Prod
@@ -129,7 +129,7 @@ defmodule Reef do
   def mixtank_standby, do: mixtank_mode(:standby)
 
   def not_ready_reason do
-    case state(:not_ready_reason) do
+    case x_state(:not_ready_reason) do
       nil -> :none
       x -> x
     end
@@ -153,7 +153,7 @@ defmodule Reef do
   defdelegate rodi_on(opts \\ []), to: MixTank.Rodi, as: :on
   defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
 
-  defdelegate state(opts \\ []), to: Captain
+  defdelegate x_state(opts \\ []), to: Captain
 
   @doc """
   Output the Reef status based on the active reef mode.

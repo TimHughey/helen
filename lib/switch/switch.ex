@@ -5,8 +5,6 @@ defmodule Switch do
   Primary entry module for all Switch functionality.
   """
 
-  require Logger
-
   alias Switch.DB.Alias, as: Alias
   alias Switch.DB.Device, as: Device
   alias Switch.DB.Command, as: Command
@@ -290,7 +288,7 @@ defmodule Switch do
   @doc delegate_to: {Alias, :toggle, 2}
   defdelegate toggle(name_or_id, opts), to: Alias
 
-  @doc delegate_to: {Switch.Notify.Server, :restart, 0}
+  @doc delegate_to: {Switch.Notify.Server, :restart, 1}
   @doc since: "0.0.27"
-  defdelegate restart, to: Switch.Notify.Server
+  defdelegate restart(opts \\ []), to: Switch.Notify.Server
 end

@@ -30,10 +30,9 @@ defmodule Helen.Mixfile do
         extras: ["CHANGELOG.md"],
         groups_for_modules: [
           Devices: [PulseWidth, Remote, Sensor, Switch],
-          Servers: [Thermostat]
+          Servers: [Reef]
         ],
         nest_modules_by_prefix: [
-          Fact,
           Helen,
           Mqtt,
           PulseWidth,
@@ -105,8 +104,6 @@ defmodule Helen.Mixfile do
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:agnus, "~> 0.0.3"}
       # {:agnus, path: "../agnus"}
-      # {:vera, path: "../vera"}
-      # {:vera, git: "https://github.com/TimHughey/vera.git", tag: "0.0.3"}
       # {:phoenix, "~> 1.4.0"},
       # {:phoenix_pubsub, "~> 1.0"},
       # {:phoenix_ecto, "~> 4.0"},
@@ -168,7 +165,7 @@ defmodule Helen.Mixfile do
     ]
   end
 
-  defp escript_config, do: [main_module: Helenp]
+  defp escript_config, do: [main_module: Helen]
 
   defp git_describe do
     {result, _rc} = System.cmd("git", ["describe"])
@@ -180,22 +177,6 @@ defmodule Helen.Mixfile do
       tool: Coverex.Task,
       ignore_modules: [
         Helen.IExHelpers,
-        Fact.Celsius.Fields,
-        Fact.Celsius.Tags,
-        Fact.EngineMetric.Fields,
-        Fact.EngineMetric.Tags,
-        Fact.Fahrenheit.Fields,
-        Fact.Fahrenheit.Tags,
-        Fact.DevMetric.Fields,
-        Fact.DevMetric.Tags,
-        Fact.FreeRamStat.Fields,
-        Fact.FreeRamStat.Tags,
-        Fact.RelativeHumidity.Fields,
-        Fact.RelativeHumidity.Tags,
-        Fact.RunMetric.Fields,
-        Fact.RunMetric.Tags,
-        Fact.StartupAnnouncement.Fields,
-        Fact.StartupAnnouncement.Tags,
         Repo
       ]
     ]

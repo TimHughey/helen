@@ -7,11 +7,11 @@ defmodule Reef.DisplayTank.Temp do
 
   def test_opts do
     opts = [
-      switch: [name: "display tank heater", notify_interval: "PT1M"],
+      switch: [name: "display tank heater", notify_interval: "PT30S"],
       sensor: [
         name: "display_tank",
         since: "PT2M",
-        notify_interval: "PT1M"
+        notify_interval: "PT30S"
       ],
       setpoint: 75.0,
       offsets: [low: -0.2, high: 0.2]

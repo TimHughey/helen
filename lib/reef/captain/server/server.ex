@@ -24,7 +24,8 @@ defmodule Reef.Captain.Server do
     state =
       %{
         server_mode: args[:server_mode] || :active,
-        token: 1,
+        token: nil,
+        token_at: nil,
         reef_mode: :ready,
         timeouts: 0,
         last_timeout: epoch(),
@@ -32,6 +33,7 @@ defmodule Reef.Captain.Server do
         standby_reason: :none,
         delayed_cmd: %{}
       }
+      |> change_token()
       |> set_all_modes_ready()
 
     # should the server start?
@@ -63,7 +65,7 @@ defmodule Reef.Captain.Server do
   """
   @doc since: "0.0.27"
   def active? do
-    case state([:server_mode, :reef_mode]) do
+    case x_state([:server_mode, :reef_mode]) do
       %{active: _, reef_mode: :not_ready} -> false
       %{active: :standby, reef_mode: _} -> false
       _else -> true
@@ -136,7 +138,7 @@ defmodule Reef.Captain.Server do
   def last_timeout do
     import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
-    with last <- state(:last_timeout),
+    with last <- x_state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
       Timex.to_datetime(last, "America/New_York")
     else
@@ -220,7 +222,7 @@ defmodule Reef.Captain.Server do
     Supervisor.start_child(sup_mod, {__MODULE__, opts})
   end
 
-  def state(keys \\ []) do
+  def x_state(keys \\ []) do
     if is_nil(GenServer.whereis(__MODULE__)) do
       :DOWN
     else
@@ -236,7 +238,7 @@ defmodule Reef.Captain.Server do
     end
   end
 
-  def timeouts, do: state() |> Map.get(:timeouts)
+  def timeouts, do: x_state() |> Map.get(:timeouts)
 
   ##
   ## GenServer handle_* callbacks
@@ -622,6 +624,17 @@ defmodule Reef.Captain.Server do
     noreply(state)
   end
 
+  defp ensure_sub_steps_off(%{reef_mode: reef_mode} = state) do
+    sub_steps = get_in(state, [reef_mode, :sub_steps])
+
+    for {step, _cmds} <- sub_steps do
+      dev = get_in(state, [reef_mode, :step_devices, step])
+      apply_cmd(state, dev, :off, at_cmd_finish: :off)
+    end
+
+    state
+  end
+
   defp finish_mode(%{reef_mode: mode} = state) do
     import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
 
@@ -630,11 +643,12 @@ defmodule Reef.Captain.Server do
     now = utc_now()
 
     state
-    |> change_token()
+    |> ensure_sub_steps_off()
     |> put_in([mode, :status], :completed)
     |> put_in([mode, :finished_at], now)
     |> put_in([mode, :elapsed], elapsed(started_at, now))
     |> put_in([:reef_mode], :ready)
+    |> change_token()
   end
 
   ##
@@ -908,7 +922,13 @@ defmodule Reef.Captain.Server do
   ## State Helpers
   ##
 
-  defp change_token(%{} = s), do: update_in(s, [:token], fn x -> x + 1 end)
+  defp change_token(state) do
+    import Helen.Time.Helper, only: [utc_now: 0]
+
+    state
+    |> update_in([:token], fn _x -> make_ref() end)
+    |> update_in([:token_at], fn _x -> utc_now() end)
+  end
 
   defp change_token_and_send_after(state, msg, delay) do
     import Helen.Time.Helper, only: [to_ms: 1]

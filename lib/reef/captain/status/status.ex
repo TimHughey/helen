@@ -7,7 +7,8 @@ defmodule Reef.Captain.Status do
 
   @doc false
   def msg do
-    with %{server_mode: :active, reef_mode: reef_mode} = state <- Server.state() do
+    with %{server_mode: :active, reef_mode: reef_mode} = state <-
+           Server.x_state() do
       case reef_mode do
         :fill -> fill(state)
         :keep_fresh -> keep_fresh(state)
@@ -30,7 +31,7 @@ defmodule Reef.Captain.Status do
 
   @doc false
   def msg(reef_mode) when is_atom(reef_mode) do
-    with %{server_mode: :active} = state <- Server.state() do
+    with %{server_mode: :active} = state <- Server.x_state() do
       case reef_mode do
         :fill -> fill(state)
         :keep_fresh -> keep_fresh(state)
@@ -172,18 +173,25 @@ defmodule Reef.Captain.Status do
         """
 
       :running ->
+        dt_temp = Reef.DisplayTank.Temp.temperature()
+        mt_temp = Reef.MixTank.Temp.temperature()
+
+        diff_temp = calculate_temp_difference(dt_temp, mt_temp)
+
         """
         Reef Prep For Change Running, elapsed time #{to_binary(map[:elapsed])}.
 
-                Started: #{to_binary(map[:started_at])}
+                   Started: #{to_binary(map[:started_at])}
 
-         MixTank Temp F: #{inspect(Reef.MixTank.Temp.temperature())}
+        DisplayTank Temp F: #{inspect(dt_temp)}
+            MixTank Temp F: #{inspect(mt_temp)}
+                 Temp Diff: #{inspect(diff_temp)}
 
-              Executing: #{inspect(map[:active_step])}
-              Remaining: #{inspect(map[:steps_to_execute])}
-                Command: #{inspect(map[:step][:cmd])}
-                Elapsed: #{to_binary(map[:step][:elapsed])}
-                 Cycles: #{step_cycles(map)}
+                 Executing: #{inspect(map[:active_step])}
+                 Remaining: #{inspect(map[:steps_to_execute])}
+                   Command: #{inspect(map[:step][:cmd])}
+                   Elapsed: #{to_binary(map[:step][:elapsed])}
+                    Cycles: #{step_cycles(map)}
         """
     end
   end
@@ -193,6 +201,13 @@ defmodule Reef.Captain.Status do
     Reef Captain is Ready
     """
   end
+
+  defp calculate_temp_difference(t1, t2)
+       when is_number(t1) and is_number(t2) do
+    abs(t1 - t2) |> Float.round(1)
+  end
+
+  defp calculate_temp_difference(_t1, _t2), do: :initializing
 
   defp step_cycles(%{active_step: active_step} = reef_mode) do
     get_in(reef_mode, [:cycles, active_step]) |> inspect()

@@ -46,7 +46,7 @@ config :helen, Fact.Influx,
 config :helen, PulseWidth.DB.Command,
   orphan: [
     startup_check: true,
-    sent_before: "PT1S",
+    sent_before: "PT12S",
     older_than: "PT1M"
   ],
   purge: [

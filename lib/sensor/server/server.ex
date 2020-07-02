@@ -54,7 +54,11 @@ defmodule Sensor.Notify.Server do
   def notify_register(opts) when is_list(opts) do
     with name when is_binary(name) <- opts[:name],
          interval when is_list(opts) <- opts[:notify_interval] do
-      GenServer.call(__MODULE__, {:notify_register, name, interval})
+      import Process, only: [monitor: 1]
+
+      rc = GenServer.call(__MODULE__, {:notify_register, name, interval})
+
+      {rc, monitor(__MODULE__)}
     else
       _bad_opts ->
         {:bad_args, usage: [name: "name", notify_interval: [minutes: 1]]}
@@ -79,9 +83,18 @@ defmodule Sensor.Notify.Server do
   Restarts the server.
   """
   @doc since: "0.0.27"
-  def restart do
-    Supervisor.terminate_child(Switch.Supervisor, __MODULE__)
-    Supervisor.restart_child(Switch.Supervisor, __MODULE__)
+  def restart(opts \\ []) do
+    # the Supervisor is the base of the module name with Supervisor appended
+    [sup_base | _tail] = Module.split(__MODULE__)
+
+    sup_mod = Module.concat([sup_base, "Supervisor"])
+
+    if GenServer.whereis(__MODULE__) do
+      Supervisor.terminate_child(sup_mod, __MODULE__)
+    end
+
+    Supervisor.delete_child(sup_mod, __MODULE__)
+    Supervisor.start_child(sup_mod, {__MODULE__, opts})
   end
 
   ##
@@ -94,7 +107,7 @@ defmodule Sensor.Notify.Server do
 
   @doc false
   @impl true
-  def handle_call({:notify_register, x, interval}, {pid, _ref}, s) do
+  def handle_call({:notify_register, x, interval}, {pid, _ref}, state) do
     import Helen.Time.Helper, only: [epoch: 0]
 
     # NOTE:  shape of s (state) relevant for this function
@@ -109,18 +122,17 @@ defmodule Sensor.Notify.Server do
     #   }
     # }
 
-    # create the opts that will be used for this device notification
-    opts = [interval: interval]
+    # info for this registeration
+    registration_details = %{opts: [inteval: interval], last: epoch()}
 
-    # get the existing pid map for the name
-    pid_map = s[:notify_map][x][pid] || %{}
-
-    # put a new entry in the pid map for this registration
-    new_pid_map = Map.put(pid_map, pid, %{opts: opts, last: epoch()})
-
-    state = put_in(s[:notify_map][x], new_pid_map)
-
-    reply(:ok, state)
+    state
+    |> update_in([:notify_map, x], fn
+      # create a new map containing only this pid
+      nil -> %{pid => registration_details}
+      # there is already a registration for this name, add this new one
+      %{} = map -> Map.put(map, pid, registration_details)
+    end)
+    |> reply(:ok)
   end
 
   @doc false
@@ -250,5 +262,6 @@ defmodule Sensor.Notify.Server do
   defp loop_timeout(%{loop_timeout_ms: ms}), do: ms
 
   defp noreply(s), do: {:noreply, s, loop_timeout(s)}
+  defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
   defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
 end
