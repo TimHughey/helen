@@ -477,7 +477,7 @@ defmodule Reef.Temp.Server do
           {:ok, pos} when pos == expected_pos ->
             state
             |> update_in([:devices, dev_name], fn x ->
-              Map.drop(x, :fault)
+              Map.drop(x, [:fault])
             end)
 
           {:ok, pos} when pos != expected_pos ->
