@@ -105,36 +105,6 @@ defmodule Reef do
   @doc since: "0.0.27"
   def mix_salt_status, do: Status.msg(:salt_mix) |> IO.puts()
 
-  # def match_display_tank do
-  #   IO.puts(["not implemented!!"])
-  # end
-
-  @doc """
-  Warm the MixTank to match the DisplayTank
-  """
-  @doc since: "0.0.27"
-  def mixtank_match_display_tank do
-    MixTank.Temp.restart()
-  end
-
-  def mixtank_mode(mode) when mode in [:active, :standby] do
-    mods = [MixTank.Air, MixTank.Pump, MixTank.Rodi]
-
-    for mod <- mods, into: [] do
-      {mod, apply(mod, :mode, [mode])}
-    end
-  end
-
-  def mixtank_online, do: mixtank_mode(:active)
-  def mixtank_standby, do: mixtank_mode(:standby)
-
-  def not_ready_reason do
-    case x_state(:not_ready_reason) do
-      nil -> :none
-      x -> x
-    end
-  end
-
   defdelegate opts, to: Captain, as: :config_opts
   def opts(func) when is_function(func), do: Captain.config_update(func)
 
@@ -153,7 +123,8 @@ defmodule Reef do
   defdelegate rodi_on(opts \\ []), to: MixTank.Rodi, as: :on
   defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
 
-  defdelegate x_state(opts \\ []), to: Captain
+  @doc delegate_to: {Captain, :server_mode, 1}
+  defdelegate mode(opts), to: Captain, as: :server_mode
 
   @doc """
   Output the Reef status based on the active reef mode.
@@ -163,6 +134,13 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def status, do: Status.msg() |> IO.puts()
+
+  def standby_reason do
+    case x_state(:standby_reason) do
+      nil -> :none
+      x -> x
+    end
+  end
 
   def temp_ok? do
     dt_temp = Sensor.fahrenheit("display_tank")
@@ -181,5 +159,6 @@ defmodule Reef do
     DisplayTank.Temp.mode(:active)
   end
 
-  defdelegate which_children, to: Reef.Supervisor
+  defdelegate x_which_children, to: Reef.Supervisor, as: :which_children
+  defdelegate x_state(opts \\ []), to: Captain
 end

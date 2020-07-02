@@ -34,6 +34,12 @@ defmodule Switch.DB.Command do
     timestamps(type: :utc_datetime_usec)
   end
 
+  @doc """
+  Is the command refid acked?
+
+  Returns a boolean.
+  """
+  @doc since: "0.0.27"
   def acked?(refid) do
     cmd = find_refid(refid)
 

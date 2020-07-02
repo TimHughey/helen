@@ -194,7 +194,7 @@ defmodule Reef.Temp.Server do
             state
             |> put_in([:server_mode], mode)
             |> put_in([:server_standby_reason], :api)
-            |> put_in([:devices, dev_name, :control], Switch.off(dev_name))
+            |> put_in([:devices, dev_name, :control], off(dev_name))
             |> reply({:ok, mode})
 
           # no action when switching to :active, the server will take control
@@ -226,9 +226,9 @@ defmodule Reef.Temp.Server do
       @impl true
       def handle_continue(:bootstrap, state) do
         state
-        |> handle_server_startup_mode()
         |> build_and_put_devices_required()
         |> build_and_put_device_maps()
+        |> handle_server_startup_mode()
         |> register_for_device_notifications()
         |> noreply()
       end
@@ -250,14 +250,17 @@ defmodule Reef.Temp.Server do
           )
           when dev_type in [:sensor, :switch] do
         import Helen.Time.Helper, only: [utc_now: 0]
+        import Sensor, only: [fahrenheit: 2]
+        import Switch, only: [position: 1]
 
         # function to retrieve the value of the device
         value_fn = fn
-          :switch -> Switch.position(dev_name)
-          :sensor -> Sensor.fahrenheit(dev_name, sensor_opts(opts))
+          :switch -> position(dev_name)
+          :sensor -> fahrenheit(dev_name, sensor_opts(opts))
         end
 
         state
+        |> check_pending_cmds_if_needed()
         # ensure the dev_name key contains a map
         |> update_in([:devices, dev_name], fn
           nil -> %{}
@@ -359,30 +362,24 @@ defmodule Reef.Temp.Server do
 
           # lower than the set point, needs heating
           curr_temp <= low_temp ->
-            switch_rc = on(switch_name)
-
             state
             |> put_in([:status], :temp_low)
             |> put_in([:status_at], utc_now())
-            |> put_in([:devices, switch_name, :control], switch_rc)
+            |> put_in([:devices, switch_name, :control], on(switch_name))
 
           # equal to or high than set point, stop heating
           curr_temp >= high_temp ->
-            switch_rc = off(switch_name)
-
             state
             |> put_in([:status], :temp_high)
             |> put_in([:status_at], utc_now())
-            |> put_in([:devices, switch_name, :control], switch_rc)
+            |> put_in([:devices, switch_name, :control], off(switch_name))
 
           # for minimize risk of overheating, default to heater off
           true ->
-            switch_rc = off(switch_name)
-
             state
             |> put_in([:status], :no_match)
             |> put_in([:status_at], utc_now())
-            |> put_in([:devices, switch_name, :control], switch_rc)
+            |> put_in([:devices, switch_name, :control], off(switch_name))
         end
       end
 
@@ -396,12 +393,10 @@ defmodule Reef.Temp.Server do
 
         switch_name = get_in(state, [:opts, :switch, :name])
 
-        switch_rc = off(switch_name)
-
         state
         |> put_in([:status], :fault_missing_device)
         |> put_in([:status_at], utc_now())
-        |> put_in([:devices, switch_name, :control], switch_rc)
+        |> put_in([:devices, switch_name, :control], off(switch_name))
       end
 
       ##
@@ -455,6 +450,45 @@ defmodule Reef.Temp.Server do
       ##
       ## Device Map Helpers
       ##
+
+      defp check_pending_cmds_if_needed(state) do
+        import Switch, only: [acked?: 1, position: 1]
+
+        for {dev_name, %{control: {:pending, pending_info}}} <- state[:devices],
+            reduce: state do
+          state ->
+            refid = pending_info[:refid]
+
+            if acked?(refid) do
+              sw_rc_now = position(dev_name)
+              expected = pending_info[:position]
+
+              state
+              |> put_in([:devices, dev_name, :control], sw_rc_now)
+              |> dev_verify_switch_position(dev_name, expected, sw_rc_now)
+            else
+              state
+            end
+        end
+      end
+
+      def dev_verify_switch_position(state, dev_name, expected_pos, sw_rc_now) do
+        case sw_rc_now do
+          {:ok, pos} when pos == expected_pos ->
+            state
+            |> update_in([:devices, dev_name], fn x ->
+              Map.drop(x, :fault)
+            end)
+
+          {:ok, pos} when pos != expected_pos ->
+            state
+            |> update_in([:devices, dev_name, :fault], :position_mismatch)
+
+          unmatched ->
+            state
+            |> update_in([:devices, dev_name, :fault], unmatched)
+        end
+      end
 
       defp dev_ample_msgs?(state) do
         # unfold the required_devices and examine the devices seen thus far
@@ -560,11 +594,16 @@ defmodule Reef.Temp.Server do
       end
 
       defp handle_server_startup_mode(%{server_mode: mode} = state) do
+        import Switch, only: [off: 1]
+
         case mode do
           :standby ->
             # if the server is starting in :standby ensure the heater is off
-            get_in(state, [:opts, :switch, :name]) |> Switch.off()
-            state |> put_in([:standby_reason], :startup_args)
+            dev_name = get_in(state, [:opts, :switch, :name])
+
+            state
+            |> put_in([:standby_reason], :startup_args)
+            |> put_in([:devices, dev_name, :control], off(dev_name))
 
           :active ->
             state

@@ -13,9 +13,8 @@ defmodule Switch do
   ## Public API
   #
 
-  def test do
-    names() |> hd() |> on()
-  end
+  @doc delegate_to: {Command, :acked?, 1}
+  defdelegate acked?(refid), to: Command
 
   def aliases(mode \\ :print) do
     import Ecto.Query, only: [from: 2]

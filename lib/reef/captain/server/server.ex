@@ -17,25 +17,19 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
-    import Helen.Time.Helper, only: [epoch: 0, zero: 0]
-
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
 
-    state =
-      %{
-        server_mode: args[:server_mode] || :active,
-        token: nil,
-        token_at: nil,
-        reef_mode: :ready,
-        timeouts: 0,
-        last_timeout: epoch(),
-        opts: config_opts(args),
-        standby_reason: :none,
-        delayed_cmd: %{}
-      }
-      |> change_token()
-      |> set_all_modes_ready()
+    state = %{
+      server_mode: args[:server_mode] || :active,
+      server_standby_reason: :none,
+      token: nil,
+      token_at: nil,
+      reef_mode: :ready,
+      timeouts: %{last: :never, count: 0},
+      opts: config_opts(args),
+      delayed_cmd: %{}
+    }
 
     # should the server start?
     cond do
@@ -66,9 +60,9 @@ defmodule Reef.Captain.Server do
   """
   @doc since: "0.0.27"
   def active? do
-    case x_state([:server_mode, :reef_mode]) do
-      %{active: _, reef_mode: :not_ready} -> false
-      %{active: :standby, reef_mode: _} -> false
+    case x_state() do
+      %{server_mode: :standby, reef_mode: _} -> false
+      %{server_mode: _, reef_mode: :not_ready} -> false
       _else -> true
     end
   end
@@ -170,25 +164,22 @@ defmodule Reef.Captain.Server do
   Set the mode of the server.
 
   ## Modes
-  When set to `:active` (normal mode) the server will actively control
-  the temperature based on the readings of the configured sensor by
-  turning on and off the switch.
+  When set to `:active` (normal mode) the server is ready for reef commands.
 
   If set to `:standby` the server will:
-    1. Ensure the switch if off
-    2. Continue to receive updates from sensors and switches
-    3. Will *not* attempt to control the temperature.
+    1. Take all crew members offline
+    2. Denies all reef command mode requeests
 
   Returns {:ok, new_mode}
 
   ## Examples
 
-      iex> Reef.Temp.Control.mode(:standby)
+      iex> Reef.Captain.Server(:standby)
       {:ok, :standby}
 
   """
   @doc since: "0.0.27"
-  def mode(atom) when atom in [:active, :standby] do
+  def server_mode(atom) when atom in [:active, :standby] do
     GenServer.call(__MODULE__, {:server_mode, atom})
   end
 
@@ -226,12 +217,17 @@ defmodule Reef.Captain.Server do
   end
 
   def x_state(keys \\ []) do
+    import Helen.Time.Helper, only: [utc_now: 0]
+
     if is_nil(GenServer.whereis(__MODULE__)) do
       :DOWN
     else
       keys = [keys] |> List.flatten()
 
-      state = GenServer.call(__MODULE__, :state)
+      state =
+        GenServer.call(__MODULE__, :state)
+        |> Map.drop([:opts])
+        |> put_in([:state_at], utc_now())
 
       case keys do
         [] -> state
@@ -258,7 +254,7 @@ defmodule Reef.Captain.Server do
   @impl true
   def handle_call({:all_stop}, _from, state) do
     state
-    |> all_stop()
+    |> all_stop__()
     |> reply(:answering_all_stop)
   end
 
@@ -274,6 +270,30 @@ defmodule Reef.Captain.Server do
     |> put_in([:clean, :status], :requested)
     |> put_in([:clean, :opts], opts[:clean])
     |> reply(:ok)
+  end
+
+  @doc false
+  @impl true
+  def handle_call({:server_mode, mode}, _from, state) do
+    case mode do
+      # when switching to :standby ensure the switch is off
+      :standby ->
+        state
+        |> change_token()
+        |> crew_offline()
+        |> put_in([:server_mode], mode)
+        |> put_in([:server_standby_reason], :api)
+        |> reply({:ok, mode})
+
+      # no action when switching to :active, the server will take control
+      :active ->
+        state
+        |> change_token()
+        |> crew_online()
+        |> put_in([:server_mode], mode)
+        |> put_in([:server_standby_reason], :none)
+        |> reply({:ok, mode})
+    end
   end
 
   @doc false
@@ -393,7 +413,11 @@ defmodule Reef.Captain.Server do
 
     case valid_opts? do
       true ->
-        noreply(state)
+        state
+        |> change_token()
+        |> crew_online()
+        |> set_all_modes_ready()
+        |> noreply()
 
       false ->
         state
@@ -523,7 +547,7 @@ defmodule Reef.Captain.Server do
   @impl true
   def terminate(_reason, %{reef_mode: reef_mode} = state) do
     case reef_mode do
-      :keep_fresh -> state |> all_stop()
+      :keep_fresh -> state |> all_stop__()
       _nomatch -> state
     end
   end
@@ -548,20 +572,14 @@ defmodule Reef.Captain.Server do
   # skip unmatched commands, devices
   defp apply_cmd(_state, _dev, _cmd, _opts), do: {:no_match}
 
-  defp all_stop(state) do
-    # setting all crew modules to standby is the best way to ensure
-    # they are stopped
-    for c <- crew_list() do
-      apply(c, :mode, [:standby])
-    end
-
-    # now reset all crew modules to active (except MixTank.Temp) so they are ready for future use
-    for c when c in [Air, Pump, Rodi] <- crew_list() do
-      apply(c, :mode, [:active])
-    end
-
+  defp all_stop__(state) do
     state
+    # prevent processing of any lingering messages
     |> change_token()
+    # the safest way to stop everything is to take all the crew offline
+    |> crew_offline()
+    # bring them back online so they're ready for whatever comes next
+    |> crew_online()
     |> set_all_modes_ready()
   end
 
@@ -612,6 +630,27 @@ defmodule Reef.Captain.Server do
   end
 
   defp crew_list, do: [Air, Pump, Rodi, MixTank.Temp]
+  defp crew_list_no_heat, do: [Air, Pump, Rodi]
+
+  # NOTE:  state is unchanged however is parameter for use in pipelines
+  defp crew_offline(state) do
+    for crew_member <- crew_list() do
+      apply(crew_member, :mode, [:standby])
+    end
+
+    state
+  end
+
+  # NOTE:  state is unchanged however is parameter for use in pipelines
+  defp crew_online(state) do
+    # NOTE:  we NEVER bring MixTank.Temp online unless explictly requested
+    #        in a mode step/cmd
+    for crew_member <- crew_list_no_heat() do
+      apply(crew_member, :mode, [:active])
+    end
+
+    state
+  end
 
   defp msg_puts(msg, state) do
     """
@@ -971,11 +1010,12 @@ defmodule Reef.Captain.Server do
     end)
   end
 
-  defp update_last_timeout(s) do
+  defp update_last_timeout(state) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
-    put_in(s, [:last_timeout], utc_now())
-    |> Map.update(:timeouts, 1, &(&1 + 1))
+    state
+    |> put_in([:timeouts, :last], utc_now())
+    |> update_in([:timeouts, :count], fn x -> x + 1 end)
   end
 
   ##
