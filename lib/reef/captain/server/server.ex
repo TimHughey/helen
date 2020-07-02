@@ -7,6 +7,7 @@ defmodule Reef.Captain.Server do
   use Helen.Module.Config
 
   alias Reef.DisplayTank.Ato
+  alias Reef.MixTank
   alias Reef.MixTank.{Air, Pump, Rodi}
 
   ##
@@ -255,7 +256,7 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_call({:all_stop}, _from, %{opts: _opts} = state) do
+  def handle_call({:all_stop}, _from, state) do
     state
     |> all_stop()
     |> reply(:answering_all_stop)

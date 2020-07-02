@@ -183,20 +183,27 @@ defmodule Reef.Temp.Server do
 
       @doc false
       @impl true
-      def handle_call({:server_mode, mode}, _from, %{opts: opts} = s) do
+      def handle_call({:server_mode, mode}, _from, %{opts: opts} = state) do
         import Switch, only: [off: 1]
 
         case mode do
           # when switching to :standby ensure the switch is off
           :standby ->
-            Switch.off(opts[:switch][:name])
+            dev_name = opts[:switch][:name]
+
+            state
+            |> put_in([:server_mode], mode)
+            |> put_in([:server_standby_reason], :api)
+            |> put_in([:devices, dev_name, :control], Switch.off(dev_name))
+            |> reply({:ok, mode})
 
           # no action when switching to :active, the server will take control
           :active ->
-            nil
+            state
+            |> put_in([:server_mode], mode)
+            |> put_in([:server_standby_reason], :none)
+            |> reply({:ok, mode})
         end
-
-        state = put_in(s, [:server_mode], mode) |> reply({:ok, mode})
       end
 
       @doc false
