@@ -13,6 +13,16 @@ defmodule Helen.Module.Config do
       @behaviour Helen.Module.Config
 
       @doc """
+      Is there an available configuraton?
+
+      Returns a boolean.
+      """
+      @doc since: "0.0.27"
+      def config_available? do
+        get_in(config_opts([]), [:__available__]) || false
+      end
+
+      @doc """
       Create (or update) a new Module Configuration
 
       Takes two optional parametets:

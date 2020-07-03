@@ -5,7 +5,7 @@ defmodule Reef do
 
   alias Reef.Captain.Server, as: Captain
   alias Reef.Captain.Status, as: Status
-  alias Reef.DisplayTank
+  alias Reef.FirstMate.Server, as: FirstMate
   alias Reef.MixTank
 
   defdelegate active?, to: Captain
@@ -15,11 +15,13 @@ defmodule Reef do
 
   defdelegate all_stop, to: Captain
 
-  defdelegate ato_state, to: DisplayTank.Ato, as: :state
-
-  defdelegate clean(opts \\ :start), to: Captain
-
-  def clean_status, do: x_state(:clean)
+  @doc """
+  Engage clean mode by turning off the DisplayTank auto-top-off.
+  """
+  @doc since: "0.0.27"
+  def clean(opts \\ []) do
+    FirstMate.mode(:clean, opts)
+  end
 
   def default_opts do
     alias Reef.Opts.Prod
@@ -56,9 +58,21 @@ defmodule Reef do
   @doc since: "0.0.27"
   def fill_status, do: Status.msg(:fill) |> IO.puts()
 
+  @doc delegate_to: {FirstMate, :all_stop, 0}
+  defdelegate firstmate_all_stop, to: FirstMate, as: :all_stop
+
+  @doc delegate_to: {FirstMate, :config_opts, 1}
+  defdelegate firstmate_opts(opts \\ []), to: FirstMate, as: :config_opts
+
+  @doc delegate_to: {FirstMate, :x_state, 1}
+  defdelegate firstmate_x_state(opts \\ []), to: FirstMate, as: :x_state
+
   def heat_all_off do
-    DisplayTank.Temp.mode(:standby)
-    MixTank.Temp.mode(:standby)
+    alias Reef.DisplayTank.Temp, as: DisplayTank
+    alias Reef.MixTank.Temp, as: MixTank
+
+    DisplayTank.mode(:standby)
+    MixTank.mode(:standby)
   end
 
   @doc """
@@ -143,20 +157,48 @@ defmodule Reef do
   end
 
   def temp_ok? do
-    dt_temp = Sensor.fahrenheit("display_tank")
-    mt_temp = Sensor.fahrenheit("mixtank")
+    alias Reef.DisplayTank.Temp, as: DisplayTank
+    alias Reef.MixTank.Temp, as: MixTank
 
-    diff = abs(dt_temp - mt_temp)
+    case {DisplayTank.temperature(), MixTank.temperature()} do
+      {dt_temp, mt_temp} when is_number(dt_temp) and is_number(mt_temp) ->
+        if abs(dt_temp - mt_temp) < 0.7, do: true, else: true
 
-    if diff < 0.7, do: true, else: true
+      _anything ->
+        false
+    end
   end
 
   def water_change_start do
-    [captain: all_stop(), display_tank: DisplayTank.Temp.mode(:standby)]
+    alias Reef.DisplayTank.Temp, as: DisplayTank
+    alias Reef.MixTank.Temp, as: MixTank
+
+    if temp_ok?() do
+      [
+        captain: all_stop(),
+        first_mate: FirstMate.mode(:water_change_start, []),
+        display_tank: DisplayTank.mode(:standby)
+      ]
+    else
+      [
+        temperature_mismatch: [
+          display_tank: DisplayTank.temperature(),
+          mixtank: MixTank.temperature()
+        ]
+      ]
+    end
   end
 
-  def water_change_complete do
-    DisplayTank.Temp.mode(:active)
+  def water_change_finish do
+    alias Reef.DisplayTank.Temp, as: DisplayTank
+    alias Reef.MixTank.Temp, as: MixTank
+
+    [
+      captain: all_stop(),
+      first_mate: FirstMate.mode(:water_change_finish, []),
+      display_tank: DisplayTank.mode(:active),
+      mixtank: MixTank.mode(:standby)
+    ]
   end
 
   defdelegate x_which_children, to: Reef.Supervisor, as: :which_children

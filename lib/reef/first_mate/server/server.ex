@@ -1,14 +1,12 @@
-defmodule Reef.Captain.Server do
+defmodule Reef.FirstMate.Server do
   @moduledoc """
-  Orchestration of Reef Activities (e.g. salt mix, cleaning)
+  Provides support to Reef.FirstMate.Server, specificially reef clean mode.
   """
 
   use GenServer, restart: :transient, shutdown: 7000
   use Helen.Module.Config
 
   alias Reef.DisplayTank.Ato
-  alias Reef.MixTank
-  alias Reef.MixTank.{Air, Pump, Rodi}
 
   ##
   ## GenServer Start and Initialization
@@ -19,6 +17,8 @@ defmodule Reef.Captain.Server do
   def init(args) do
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
+
+    create_default_config_if_needed()
 
     state = %{
       server_mode: args[:server_mode] || :active,
@@ -54,7 +54,7 @@ defmodule Reef.Captain.Server do
 
   ## Examples
 
-      iex> Reef.Captain.Server.active?
+      iex> Reef.FirstMate.Server.active?
       true
 
   """
@@ -74,7 +74,7 @@ defmodule Reef.Captain.Server do
 
   ## Examples
 
-      iex> Reef.Captain.Server.all_stop
+      iex> Reef.FirstMate.Server.all_stop
       :ok
 
   """
@@ -82,35 +82,24 @@ defmodule Reef.Captain.Server do
   def all_stop, do: GenServer.call(__MODULE__, {:all_stop})
 
   @doc """
-  Fill the MixTank with RODI.
+  Enable cleaning mode.
 
-  Returns `:ok`, `{:not_configured, opts}` or `{:invalid_duration_opts}`
+  Display tank ato is stopped for the configured clean duration.
+
+  Required parameters:
+    `mode:` <mode defined in config>
+    `opts:` [] | <list to merge into config opts>
+
+  Returns :ok.
 
   ## Examples
 
-      iex> Reef.Captain.Server.fill()
+      iex> Reef.FirstMate.Server.mode(:clean, [])
       :ok
 
   """
   @doc since: "0.0.27"
-  def fill(opts), do: cast_if_valid_and_active(:fill, opts)
-
-  @doc """
-  Keep the MixTank fresh by aerating and circulating the water.
-
-  Returns `:ok`, `{:not_configured, opts}` or `{:invalid_duration_opts}`
-
-  ## Examples
-
-      iex> Reef.Captain.Server.keep_fresh()
-      :ok
-
-  ### Example Options
-    `start_delay: "PT5M30S"` delay the start of this command by 1 min 30 secs
-
-  """
-  @doc since: "0.0.27"
-  def keep_fresh(opts), do: cast_if_valid_and_active(:keep_fresh, opts)
+  def mode(mode, opts), do: cast_if_valid_and_active(mode, opts)
 
   @doc """
   Return the DateTime of the last GenServer timeout.
@@ -128,37 +117,20 @@ defmodule Reef.Captain.Server do
   end
 
   @doc """
-  Runs the necessary components to mix salt into the MixTank.
-
-  Returns `:ok`, `{:not_configured, opts}` or `{:invalid_duration_opts}`
-
-  ## Examples
-
-      iex> Reef.Captain.Server.mix_salt()
-      :ok
-
-  ### Example Options
-    `start_delay: "PT5M30S"` delay the start of this command by 1 min 30 secs
-
-  """
-  @doc since: "0.0.27"
-  def mix_salt(opts), do: cast_if_valid_and_active(:mix_salt, opts)
-
-  @doc """
   Set the mode of the server.
 
   ## Modes
   When set to `:active` (normal mode) the server is ready for reef commands.
 
   If set to `:standby` the server will:
-    1. Take all crew members offline
+    1. Switch on the DisplayTank auto-top-off
     2. Denies all reef command mode requeests
 
   Returns {:ok, new_mode}
 
   ## Examples
 
-      iex> Reef.Captain.Server(:standby)
+      iex> Reef.FirstMate.Server(:standby)
       {:ok, :standby}
 
   """
@@ -168,20 +140,11 @@ defmodule Reef.Captain.Server do
   end
 
   @doc """
-  Prepare the MixTank for transfer to Water Stabilization Tank
-
-  Returns :ok or an error tuple
-  """
-  @doc since: "0.0.27"
-  def prep_for_change(opts),
-    do: cast_if_valid_and_active(:prep_for_change, opts)
-
-  @doc """
   Restarts the server via the Supervisor
 
   ## Examples
 
-      iex> Reef.Captain.Server.restart([])
+      iex> Reef.FirstMate.Server.restart([])
       :ok
 
   """
@@ -203,7 +166,7 @@ defmodule Reef.Captain.Server do
   @doc """
   Return the GenServer state.
 
-  A single key (e.g. :keep_fresh) or a list of keys (e.g. :reef_mode, :keep_fresh)
+  A single key (e.g. :server_mode) or a list of keys (e.g. :reef_mode, :server_mode)
   can be specified and only those keys are returned.
   """
   @doc since: "0.0.27"
@@ -296,94 +259,21 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_cast({:fill, cmd_opts}, %{opts: opts} = state) do
+  # START A CASTED MODE
+  def handle_cast({mode, cmd_opts}, %{opts: opts} = state) do
     import DeepMerge, only: [deep_merge: 2]
 
-    cmd_opts = deep_merge(opts[:fill], cmd_opts)
+    cmd_opts = deep_merge(opts[mode], cmd_opts)
 
     state
-    |> put_in([:fill, :status], :in_progress)
-    |> put_in([:fill, :steps], cmd_opts[:steps])
-    |> put_in([:fill, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([:fill, :step_devices], cmd_opts[:step_devices])
-    |> put_in([:fill, :opts], cmd_opts)
-    |> start_mode(:fill)
+    |> ensure_reef_mode_map(mode)
+    |> put_in([mode, :status], :in_progress)
+    |> put_in([mode, :steps], cmd_opts[:steps])
+    |> put_in([mode, :sub_steps], cmd_opts[:sub_steps])
+    |> put_in([mode, :step_devices], cmd_opts[:step_devices])
+    |> put_in([mode, :opts], cmd_opts)
+    |> start_mode(mode)
     |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_cast({:keep_fresh, cmd_opts}, %{opts: opts} = state) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    cmd_opts = deep_merge(opts[:keep_fresh], cmd_opts)
-
-    state
-    |> put_in([:keep_fresh, :status], :running)
-    |> put_in([:keep_fresh, :steps], cmd_opts[:steps])
-    |> put_in([:keep_fresh, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([:keep_fresh, :step_devices], cmd_opts[:step_devices])
-    |> put_in([:keep_fresh, :opts], cmd_opts)
-    |> start_mode(:keep_fresh)
-    |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_cast({:mix_salt, cmd_opts}, %{opts: opts} = state) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    cmd_opts = deep_merge(opts[:mix_salt], cmd_opts)
-
-    state
-    |> put_in([:mix_salt, :status], :in_progress)
-    |> put_in([:mix_salt, :steps], cmd_opts[:steps])
-    |> put_in([:mix_salt, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([:mix_salt, :step_devices], cmd_opts[:step_devices])
-    |> put_in([:mix_salt, :opts], cmd_opts)
-    |> start_mode(:mix_salt)
-    |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_cast({:prep_for_change, cmd_opts}, %{opts: opts} = state) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    cmd_opts = deep_merge(opts[:prep_for_change], cmd_opts)
-
-    state
-    |> put_in([:prep_for_change, :status], :running)
-    |> put_in([:prep_for_change, :steps], cmd_opts[:steps])
-    |> put_in([:prep_for_change, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([:prep_for_change, :step_devices], cmd_opts[:step_devices])
-    |> put_in([:prep_for_change, :opts], cmd_opts)
-    |> start_mode(:prep_for_change)
-    |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_cast({:msg, msg}, state) do
-    alias Reef.DisplayTank.Temp, as: DisplayTank
-    alias Reef.MixTank.Temp, as: MixTank
-
-    case msg do
-      {:handoff, next_reef_mode} ->
-        cast_if_valid_and_active(next_reef_mode, skip_active_check: true)
-        noreply(state)
-
-      {:mixtank_temp, mode} ->
-        MixTank.mode(mode)
-        noreply(state)
-
-      {:displaytank_temp, mode} ->
-        DisplayTank.mode(mode)
-        noreply(state)
-
-      msg ->
-        msg_puts(msg, state)
-    end
   end
 
   @doc false
@@ -460,8 +350,8 @@ defmodule Reef.Captain.Server do
   def handle_info({:timer, msg, msg_token}, %{token: token} = state)
       when msg_token == token do
     case msg do
-      {:delayed_cmd, :fill, opts} ->
-        GenServer.cast(__MODULE__, {:fill, opts})
+      {:delayed_cmd, :clean, opts} ->
+        GenServer.cast(__MODULE__, {:clean, opts})
 
         state
         |> put_in([:delayed_cmd], %{})
@@ -501,7 +391,7 @@ defmodule Reef.Captain.Server do
   @impl true
   def terminate(_reason, %{reef_mode: reef_mode} = state) do
     case reef_mode do
-      :keep_fresh -> state |> all_stop__()
+      # :keep_fresh -> state |> all_stop__()
       _nomatch -> state
     end
   end
@@ -545,20 +435,17 @@ defmodule Reef.Captain.Server do
 
   defp step_device_to_mod(dev) do
     case dev do
-      :air -> Air
-      :pump -> Pump
-      :rodi -> Rodi
       :ato -> Ato
     end
   end
 
   defp change_reef_mode(%{reef_mode: old_reef_mode} = state, new_reef_mode) do
     update_running_mode_status = fn
-      x, :keep_fresh ->
-        import Helen.Time.Helper, only: [utc_now: 0]
-
-        put_in(x, [:keep_fresh, :status], :completed)
-        |> put_in([:keep_fresh, :finished_at], utc_now())
+      # x, :keep_fresh ->
+      #   import Helen.Time.Helper, only: [utc_now: 0]
+      #
+      #   put_in(x, [:keep_fresh, :status], :completed)
+      #   |> put_in([:keep_fresh, :finished_at], utc_now())
 
       x, _anything ->
         x
@@ -569,19 +456,14 @@ defmodule Reef.Captain.Server do
     |> change_token()
   end
 
-  defp config_device_to_mod(atom) when atom in [:air, :pump, :rodi, :heat] do
-    alias Reef.MixTank.{Air, Pump, Rodi}
-
+  defp config_device_to_mod(atom) when atom in [:ato] do
     case atom do
-      :air -> Air
-      :pump -> Pump
-      :rodi -> Rodi
-      :heat -> :external_server
+      :ato -> Ato
     end
   end
 
-  defp crew_list, do: [Air, Pump, Rodi, MixTank.Temp]
-  defp crew_list_no_heat, do: [Air, Pump, Rodi]
+  defp crew_list, do: [Ato]
+  defp crew_list_no_heat, do: [Ato]
 
   # NOTE:  state is unchanged however is parameter for use in pipelines
   defp crew_offline(state) do
@@ -603,6 +485,8 @@ defmodule Reef.Captain.Server do
     state
   end
 
+  def ensure_reef_mode_map(state, mode), do: state |> Map.put_new(mode, %{})
+
   defp msg_puts(msg, state) do
     """
      ==> #{inspect(msg)}
@@ -614,7 +498,7 @@ defmodule Reef.Captain.Server do
   end
 
   defp ensure_sub_steps_off(%{reef_mode: reef_mode} = state) do
-    sub_steps = get_in(state, [reef_mode, :sub_steps])
+    sub_steps = get_in(state, [reef_mode, :sub_steps]) || []
 
     for {step, _cmds} <- sub_steps do
       dev = get_in(state, [reef_mode, :step_devices, step])
@@ -904,6 +788,126 @@ defmodule Reef.Captain.Server do
   end
 
   ##
+  ## Configuration Helpers
+  ##
+
+  defp create_default_config_if_needed do
+    if config_available?() do
+      nil
+    else
+      opts = [
+        timeout: "PT1M",
+        clean: [
+          step_devices: [ato_disable: :ato, ato_enable: :ato],
+          steps: [
+            ato_disable: [
+              run_for: "PT1H10S",
+              off: [for: "PT1M", at_cmd_finish: :off]
+            ],
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
+          ]
+        ],
+        water_change_start: [
+          step_devices: [ato_disable: :ato, ato_enable: :ato],
+          steps: [
+            ato_disable: [
+              run_for: "PT3H10S",
+              off: [for: "PT1M", at_cmd_finish: :off]
+            ],
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
+          ]
+        ],
+        water_change_finish: [
+          step_devices: [ato_disable: :ato, ato_enable: :ato],
+          steps: [
+            ato_disable: [
+              run_for: "PT30M10S",
+              off: [for: "PT30M", at_cmd_finish: :off]
+            ],
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
+          ]
+        ],
+        normal_operations: [
+          steps: [
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
+          ]
+        ]
+      ]
+
+      config_create(opts, "auto created defaults")
+    end
+  end
+
+  def test_opts do
+    opts = [
+      timeout: "PT1M",
+      clean: [
+        step_devices: [ato_disable: :ato, ato_enable: :ato],
+        steps: [
+          ato_disable: [
+            run_for: "PT11S",
+            off: [for: "PT1S", at_cmd_finish: :off]
+          ],
+          ato_enable: [
+            run_for: "PT3S",
+            on: [for: "PT1S", at_cmd_finish: :on]
+          ]
+        ]
+      ],
+      water_change_start: [
+        step_devices: [ato_disable: :ato, ato_enable: :ato],
+        steps: [
+          ato_disable: [
+            run_for: "PT11S",
+            off: [for: "PT1S", at_cmd_finish: :off]
+          ],
+          ato_enable: [
+            run_for: "PT3S",
+            on: [for: "PT1S", at_cmd_finish: :on]
+          ]
+        ]
+      ],
+      water_change_finish: [
+        step_devices: [ato_disable: :ato, ato_enable: :ato],
+        steps: [
+          ato_disable: [
+            run_for: "PT10S",
+            off: [for: "PT1S", at_cmd_finish: :off]
+          ],
+          ato_enable: [
+            run_for: "PT11S",
+            on: [for: "PT3S", at_cmd_finish: :on]
+          ]
+        ]
+      ],
+      normal_operations: [
+        steps: [
+          ato_enable: [
+            run_for: "PT11S",
+            on: [for: "PT10S", at_cmd_finish: :on]
+          ]
+        ]
+      ]
+    ]
+
+    config_create(opts, "test opts")
+
+    restart()
+  end
+
+  ##
   ## GenServer Receive Loop Hooks
   ##
 
@@ -941,12 +945,7 @@ defmodule Reef.Captain.Server do
 
   defp set_all_modes_ready(state) do
     modes = [
-      :fill,
-      :keep_fresh,
-      :mix_salt,
-      :prep_for_change,
-      :transfer_h2o,
-      :finalize_change
+      :clean
     ]
 
     for m <- modes, reduce: state do
@@ -986,6 +985,7 @@ defmodule Reef.Captain.Server do
     valid? = validate_durations(final_opts)
     start_delay = opts[:start_delay]
     skip_active_check? = opts[:skip_active_check] || false
+    reef_mode_exists? = get_in(final_opts, [:steps]) || false
 
     cond do
       valid? == false ->
@@ -993,6 +993,9 @@ defmodule Reef.Captain.Server do
 
       is_nil(final_opts) ->
         {reef_mode, :opts_undefined, final_opts}
+
+      reef_mode_exists? == false ->
+        {reef_mode, :does_not_exist}
 
       is_binary(start_delay) ->
         if active?(),

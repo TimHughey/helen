@@ -186,7 +186,8 @@ defmodule Helen.Time.Helper do
   def subtract_list(d_list) when is_list(d_list) do
     alias Timex.Duration
 
-    for d <- d_list, reduce: Duration.zero() do
+    for d when is_binary(d) or is_struct(d) <- d_list,
+        reduce: Duration.zero() do
       acc -> Duration.sub(acc, to_duration(d)) |> Duration.abs()
     end
   end

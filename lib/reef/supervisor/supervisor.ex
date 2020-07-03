@@ -13,7 +13,8 @@ defmodule Reef.Supervisor do
         {Reef.MixTank.Pump, opts},
         {Reef.MixTank.Air, opts},
         {Reef.MixTank.Rodi, opts},
-        {Reef.Captain.Server, opts}
+        {Reef.Captain.Server, opts},
+        {Reef.FirstMate.Server, opts}
       ],
       strategy: :one_for_one
     )
