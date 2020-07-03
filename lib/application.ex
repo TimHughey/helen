@@ -65,7 +65,7 @@ defmodule Helen.Application do
     children_str =
       case length(children) do
         x when x == 1 -> "1 child"
-        x -> "#{inspect(Integer.to_string(x))} children"
+        x -> "#{Integer.to_string(x)} children"
       end
 
     log =
