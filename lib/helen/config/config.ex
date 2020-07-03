@@ -19,7 +19,9 @@ defmodule Helen.Module.Config do
       """
       @doc since: "0.0.27"
       def config_available? do
-        get_in(config_opts([]), [:__available__]) || false
+        alias Helen.Module.Config
+
+        Config.available?(__MODULE__)
       end
 
       @doc """
@@ -135,6 +137,18 @@ defmodule Helen.Module.Config do
   """
   @doc since: "0.0.27"
   defdelegate all, to: Helen.Module.DB.Config
+
+  @doc """
+  Is there an available configuraton?
+
+  Returns a boolean.
+  """
+  @doc since: "0.0.27"
+  def available?(module) do
+    alias Helen.Module.DB.Config
+
+    get_in(Config.opts(module, []), [:__available__]) || false
+  end
 
   @doc """
   Copies an existing module config applying an optional function to the copy
