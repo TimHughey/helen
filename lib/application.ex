@@ -22,7 +22,7 @@ defmodule Helen.Application do
          db_passwd <- Keyword.get(repo_config, :password),
          {:db_passwd, true} <- {:db_passwd, is_binary(db_passwd)} do
       # we have children to start and the Repo db passwd is set
-      log_if_needed(args)
+      log_if_needed(args, c)
 
       Supervisor.start_link(c,
         strategy: :rest_for_one,
@@ -40,6 +40,8 @@ defmodule Helen.Application do
   def default_opts, do: @type(start_type :: :normal)
   @type args :: term
 
+  def which_children, do: Supervisor.which_children(Helen.Supervisor)
+
   ###
   ### PRIVATE
   ###
@@ -52,24 +54,19 @@ defmodule Helen.Application do
       mod, args -> {mod, Keyword.get(args, :initial_args, [])}
     end
 
-    for mod <- [
-          Repo,
-          Fact.Supervisor,
-          Mqtt.Supervisor,
-          Switch.Supervisor,
-          PulseWidth.Supervisor,
-          Sensor.Supervisor,
-          Helen.Scheduler,
-          Reef.Supervisor,
-          Irrigation.Supervisor,
-          Roost.Supervisor
-        ] do
+    for mod <- modules_to_start() do
       make_tuple.(mod, get_env(:helen, mod))
     end
   end
 
-  defp log_if_needed(args) do
+  defp log_if_needed(args, children) do
     import Application, only: [get_env: 3]
+
+    children_str =
+      case length(children) do
+        x when x == 1 -> "1 child"
+        x -> "#{inspect(Integer.to_string(x))} children"
+      end
 
     log =
       get_env(:helen, Helen.Application, [])
@@ -81,9 +78,31 @@ defmodule Helen.Application do
         [
           "starting supervisor version=\"",
           Keyword.get(args, :version, "unknown"),
-          "\""
+          "\" with #{children_str}"
         ]
         |> IO.iodata_to_binary()
         |> Logger.info()
   end
+
+  defp modules_to_start do
+    if only_repo?() do
+      [Repo]
+    else
+      [
+        Repo,
+        Fact.Supervisor,
+        Mqtt.Supervisor,
+        Switch.Supervisor,
+        PulseWidth.Supervisor,
+        Sensor.Supervisor,
+        Helen.Scheduler,
+        Reef.Supervisor,
+        Irrigation.Supervisor,
+        Roost.Supervisor
+      ]
+    end
+  end
+
+  defp only_repo?,
+    do: ["/tmp", "helen-repo-only"] |> Path.join() |> File.exists?()
 end
