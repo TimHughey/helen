@@ -1,18 +1,13 @@
 defmodule PulseWidth do
   @moduledoc """
-    The PulseWidth module provides the base of a sensor reading.
+    The PulseWidth module provides the public API for PulseWidth devices.
   """
 
   require Logger
   use Timex
 
-  alias PulseWidth.DB.Alias, as: Alias
-  alias PulseWidth.DB.Command, as: Command
-  alias PulseWidth.DB.Device, as: Device
-
-  def test do
-    names() |> hd() |> duty(duty: :rand.uniform(8191))
-  end
+  alias PulseWidth.DB.{Alias, Command, Device}
+  alias PulseWidth.Notify
 
   @doc """
     Public API for creating a PulseWidth Alias
@@ -266,7 +261,7 @@ defmodule PulseWidth do
          {:ok, %Device{}} <- device,
          # technically the message has been processed at this point
          msg <- Map.put(msg, :processed, true),
-         # Switch does not write any data to the timeseries database
+         # PulseWidth does not write any data to the timeseries database
          # (unlike Sensor, Remote) so simulate the write_rc success
          # now send the augmented message to the timeseries database
          msg <- Map.put(msg, :write_rc, {:processed, :ok}) do
@@ -288,6 +283,18 @@ defmodule PulseWidth do
   # since it wasn't for switch and/or has already been processed in the
   # pipeline
   def handle_message(%{} = msg_in), do: msg_in
+
+  @doc delegate_to: {Notify, :notify_as_needed, 1}
+  @doc since: "0.0.26"
+  defdelegate notify_as_needed(msg), to: Notify
+
+  @doc delegate_to: {Server, :notify_register, 1}
+  @doc since: "0.0.26"
+  defdelegate notify_register(name), to: Notify
+
+  @doc delegate_to: {Server, :notify_map, 0}
+  @doc since: "0.0.27"
+  defdelegate notify_map, to: Notify
 
   @doc """
     Retrieve a list of alias names
@@ -313,6 +320,14 @@ defmodule PulseWidth do
   """
   @doc since: "0.0.25"
   defdelegate on(name_or_id), to: Alias
+
+  @doc delegate_to: {Notify, :state, 0}
+  @doc since: "0.0.26"
+  defdelegate state, to: Notify
+
+  @doc delegate_to: {Notify, :restart, 1}
+  @doc since: "0.0.27"
+  defdelegate restart(opts \\ []), to: Notify
 
   # @doc """
   #   Send a random command to a PulseWidth found by name or actual struct

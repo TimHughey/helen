@@ -5,9 +5,8 @@ defmodule Switch do
   Primary entry module for all Switch functionality.
   """
 
-  alias Switch.DB.Alias, as: Alias
-  alias Switch.DB.Device, as: Device
-  alias Switch.DB.Command, as: Command
+  alias Switch.DB.{Alias, Command, Device}
+  alias Switch.Notify
 
   #
   ## Public API
@@ -116,17 +115,17 @@ defmodule Switch do
   @doc since: "0.0.22"
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
-  @doc delegate_to: {Switch.Notify.Server, :notify_as_needed, 1}
+  @doc delegate_to: {Notify, :notify_as_needed, 1}
   @doc since: "0.0.26"
-  defdelegate notify_as_needed(msg), to: Switch.Notify.Server
+  defdelegate notify_as_needed(msg), to: Notify
 
-  @doc delegate_to: {Server, :notify_register, 1}
+  @doc delegate_to: {Notify, :notify_register, 1}
   @doc since: "0.0.26"
-  defdelegate notify_register(name), to: Switch.Notify.Server
+  defdelegate notify_register(name), to: Notify
 
-  @doc delegate_to: {Server, :notify_map, 0}
+  @doc delegate_to: {Notify, :notify_map, 0}
   @doc since: "0.0.27"
-  defdelegate notify_map, to: Switch.Notify.Server
+  defdelegate notify_map, to: Notify
 
   @doc delegate_to: {Device, :find, 1}
   @doc since: "0.0.21"
@@ -168,7 +167,7 @@ defmodule Switch do
   """
   @doc since: "0.0.21"
   def handle_message(%{processed: false, type: "switch"} = msg_in) do
-    alias Switch.Notify.Server, as: Server
+    alias Notify, as: Notify
 
     # the with begins with processing the message through DB.Device.upsert/1
     with %{device: switch_device} = msg <- Device.upsert(msg_in),
@@ -177,7 +176,7 @@ defmodule Switch do
          # technically the message has been processed at this point
          msg <- Map.put(msg, :processed, true),
          # send any notifications requested
-         msg <- Server.notify_as_needed(msg),
+         msg <- Notify.notify_as_needed(msg),
          # Switch does not write any data to the timeseries database
          # (unlike Sensor, Remote) so simulate the write_rc success
          # now send the augmented message to the timeseries database
@@ -277,9 +276,9 @@ defmodule Switch do
     end
   end
 
-  @doc delegate_to: {Switch.Notify.Server, :state, 0}
+  @doc delegate_to: {Notify, :state, 0}
   @doc since: "0.0.26"
-  defdelegate state, to: Switch.Notify.Server
+  defdelegate state, to: Notify
 
   @doc delegate_to: {Alias, :toggle, 1}
   defdelegate toggle(name_or_id), to: Alias
@@ -287,7 +286,7 @@ defmodule Switch do
   @doc delegate_to: {Alias, :toggle, 2}
   defdelegate toggle(name_or_id, opts), to: Alias
 
-  @doc delegate_to: {Switch.Notify.Server, :restart, 1}
+  @doc delegate_to: {Notify, :restart, 1}
   @doc since: "0.0.27"
-  defdelegate restart(opts \\ []), to: Switch.Notify.Server
+  defdelegate restart(opts \\ []), to: Notify
 end

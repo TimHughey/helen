@@ -1,4 +1,4 @@
-defmodule PulseWidth.Supervisor do
+defmodule Switch.Supervisor do
   use Supervisor
 
   def start_link(args) do
@@ -7,9 +7,10 @@ defmodule PulseWidth.Supervisor do
 
   @impl true
   def init(_args) do
-    alias PulseWidth.DB.Command, as: Command
+    alias Switch.DB.Command, as: Command
+    alias Switch.Notify, as: Notify
 
-    Supervisor.init([Command],
+    Supervisor.init([Notify, Command],
       strategy: :one_for_one,
       name: __MODULE__
     )

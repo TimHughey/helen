@@ -1,4 +1,4 @@
-defmodule Sensor.Supervisor do
+defmodule PulseWidth.Supervisor do
   use Supervisor
 
   def start_link(args) do
@@ -7,9 +7,10 @@ defmodule Sensor.Supervisor do
 
   @impl true
   def init(_args) do
-    alias Sensor.Notify.Server, as: Server
+    alias PulseWidth.DB.Command, as: Command
+    alias PulseWidth.Notify, as: Notify
 
-    Supervisor.init([Server],
+    Supervisor.init([Notify, Command],
       strategy: :one_for_one,
       name: __MODULE__
     )
