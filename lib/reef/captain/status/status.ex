@@ -7,9 +7,9 @@ defmodule Reef.Captain.Status do
 
   @doc false
   def msg do
-    with %{server_mode: :active, reef_mode: reef_mode} = state <-
+    with %{server_mode: :active, worker_mode: worker_mode} = state <-
            Server.x_state() do
-      case reef_mode do
+      case worker_mode do
         :fill -> fill(state)
         :keep_fresh -> keep_fresh(state)
         :mix_salt -> mix_salt(state)
@@ -30,9 +30,9 @@ defmodule Reef.Captain.Status do
   end
 
   @doc false
-  def msg(reef_mode) when is_atom(reef_mode) do
+  def msg(worker_mode) when is_atom(worker_mode) do
     with %{server_mode: :active} = state <- Server.x_state() do
-      case reef_mode do
+      case worker_mode do
         :fill -> fill(state)
         :keep_fresh -> keep_fresh(state)
         :mix_salt -> mix_salt(state)
@@ -209,7 +209,7 @@ defmodule Reef.Captain.Status do
 
   defp calculate_temp_difference(_t1, _t2), do: :initializing
 
-  defp step_cycles(%{active_step: active_step} = reef_mode) do
-    get_in(reef_mode, [:cycles, active_step]) |> inspect()
+  defp step_cycles(%{active_step: active_step} = worker_mode) do
+    get_in(worker_mode, [:cycles, active_step]) |> inspect()
   end
 end
