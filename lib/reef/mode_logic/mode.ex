@@ -104,6 +104,38 @@ defmodule Reef.Mode do
     |> start_mode_next_step()
   end
 
+  defp start_mode_next_step(%{worker_mode: worker_mode} = state) do
+    import Helen.Time.Helper, only: [utc_now: 0]
+
+    # the next step is always the head of :steps_to_execute
+    steps_to_execute = get_in(state, [worker_mode, :steps_to_execute])
+    # NOTE:  each clause returns the state, even if unchanged
+    cond do
+      steps_to_execute == [] ->
+        # we've reached the end of this mode!
+        state
+        |> finish_mode()
+
+      true ->
+        next_step = steps_to_execute |> hd()
+
+        cmds = get_in(state, [worker_mode, :steps, next_step])
+
+        state
+        # remove the step we're starting
+        |> update_in([worker_mode, :steps_to_execute], fn x -> tl(x) end)
+        |> put_in([worker_mode, :active_step], next_step)
+        # the worker_mode step key contains the control map for the step executing
+        |> put_in([worker_mode, :step, :started_at], utc_now())
+        |> put_in([worker_mode, :step, :elapsed], 0)
+        |> put_in([worker_mode, :step, :run_for], nil)
+        |> put_in([worker_mode, :step, :repeat?], nil)
+        |> put_in([worker_mode, :step, :cmds_to_execute], cmds)
+        |> update_step_cycles()
+        |> start_next_cmd_in_step()
+    end
+  end
+
   def start_next_cmd_in_step(%{worker_mode: mode} = state) do
     import Helen.Time.Helper, only: [elapsed?: 2, subtract_list: 1, utc_now: 0]
 
@@ -126,16 +158,29 @@ defmodule Reef.Mode do
         |> put_in([mode, :steps_to_execute], steps_to_execute)
         |> start_mode_next_step()
 
-      cmds_to_execute == [] ->
-        # we've reached the end of this step, start the next one
-        state
-        |> start_mode_next_step()
+      # run_for was specified and we've reached the end of the cmds to
+      # execute so repopulate the cmds to execute and drop the run_for key.
+      # if the run_for key isn't dropped it will be processed again thereby
+      # turning this into repeat: true rather than a time limited execution.
+      #
+      # call ourself and let the next match determine if this step should
+      # continue
+      cmds_to_execute == [] and is_binary(run_for) ->
+        cmds =
+          get_in(state, [mode, :steps, active_step]) |> Keyword.drop([:run_for])
 
+        state
+        # note that we're executing another cycle
+        |> update_step_cycles()
+        |> put_in([mode, :step, :cmds_to_execute], cmds)
+        |> start_next_cmd_in_step
+
+      # run ror check
       is_binary(run_for) ->
         started_at = get_in(state, [mode, :step, :started_at]) || utc_now()
 
         # to prevent exceeding the configured run_for include the duration of the
-        # step about to start in the elapsed?
+        # step about to start in the elapsed check
         steps = get_in(state, [mode, :steps])
         on_for = get_in(steps, [active_step, :on, :for])
         off_for = get_in(steps, [active_step, :off, :for])
@@ -152,6 +197,11 @@ defmodule Reef.Mode do
           # there is still time in this step, run the command
           state |> start_next_cmd_and_pop()
         end
+
+      cmds_to_execute == [] ->
+        # we've reached the end of this step, start the next one
+        state
+        |> start_mode_next_step()
 
       true ->
         state |> start_next_cmd_and_pop()
@@ -315,8 +365,6 @@ defmodule Reef.Mode do
 
         state |> put_in([worker_mode, :will_finish_by], will_finish_by)
 
-      # TODO implement will finish by calculation using :for in each step cmd
-      # when there isn't :repeat or :run_for has neither :run_for or :repat
       true ->
         will_finish_by =
           for {_name, cmds} <- steps,
@@ -400,38 +448,6 @@ defmodule Reef.Mode do
     end
 
     state
-  end
-
-  defp start_mode_next_step(%{worker_mode: worker_mode} = state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    # the next step is always the head of :steps_to_execute
-    steps_to_execute = get_in(state, [worker_mode, :steps_to_execute])
-    # NOTE:  each clause returns the state, even if unchanged
-    cond do
-      steps_to_execute == [] ->
-        # we've reached the end of this mode!
-        state
-        |> finish_mode()
-
-      true ->
-        next_step = steps_to_execute |> hd()
-
-        cmds = get_in(state, [worker_mode, :steps, next_step])
-
-        state
-        # remove the step we're starting
-        |> update_in([worker_mode, :steps_to_execute], fn x -> tl(x) end)
-        |> put_in([worker_mode, :active_step], next_step)
-        # the worker_mode step key contains the control map for the step executing
-        |> put_in([worker_mode, :step, :started_at], utc_now())
-        |> put_in([worker_mode, :step, :elapsed], 0)
-        |> put_in([worker_mode, :step, :run_for], nil)
-        |> put_in([worker_mode, :step, :repeat?], nil)
-        |> put_in([worker_mode, :step, :cmds_to_execute], cmds)
-        |> update_step_cycles()
-        |> start_next_cmd_in_step()
-    end
   end
 
   defp start_next_cmd_and_pop(%{worker_mode: mode} = state) do

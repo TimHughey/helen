@@ -7,13 +7,13 @@ defmodule Reef.Opts.Test do
         step_devices: [main: :rodi, topoff: :rodi, aerate: :air],
         steps: [
           main: [
-            run_for: "PT10S",
+            run_for: "PT30S",
             on: [for: "PT2S", at_cmd_finish: :off],
             aerate: :on,
             off: [for: "PT1S", at_cmd_finish: :off]
           ],
           topoff: [
-            run_for: "PT10S",
+            run_for: "PT30S",
             on: [for: "PT2S", at_cmd_finish: :off],
             off: [for: "PT2S", at_cmd_finish: :off]
           ],
