@@ -7,14 +7,14 @@ defmodule Reef.Opts.Prod do
         step_devices: [main: :rodi, topoff: :rodi, aerate: :air],
         steps: [
           main: [
-            run_for: "PT7H",
+            run_for: "PT5H",
             on: [for: "PT2M10S", at_cmd_finish: :off],
             aerate: :on,
             off: [for: "PT12M"]
           ],
           topoff: [
-            run_for: "PT1H",
-            on: [for: "PT10M", at_cmd_finish: :off],
+            run_for: "PT30M",
+            on: [for: "PT5M", at_cmd_finish: :off],
             off: [for: "PT1M"]
           ],
           finally: [msg: {:handoff, :keep_fresh}]
