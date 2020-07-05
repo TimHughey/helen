@@ -10,12 +10,12 @@ defmodule Reef.Opts.Prod do
             run_for: "PT7H",
             on: [for: "PT2M10S", at_cmd_finish: :off],
             aerate: :on,
-            off: [for: "PT12M", at_cmd_finish: :off]
+            off: [for: "PT12M"]
           ],
           topoff: [
             run_for: "PT1H",
             on: [for: "PT10M", at_cmd_finish: :off],
-            off: [for: "PT1M", at_cmd_finish: :off]
+            off: [for: "PT1M"]
           ],
           finally: [msg: {:handoff, :keep_fresh}]
         ],
@@ -29,7 +29,7 @@ defmodule Reef.Opts.Prod do
           aerate: [
             on: [for: "PT5M", at_cmd_finish: :off],
             circulate: :on,
-            off: [for: "PT15M", at_cmd_finish: :off],
+            off: [for: "PT15M"],
             repeat: true
           ]
         ],
@@ -52,7 +52,7 @@ defmodule Reef.Opts.Prod do
           stir: [
             run_for: "PT1H",
             on: [for: "PT5M", at_cmd_finish: :off],
-            off: [for: "PT7M", at_cmd_finish: :off],
+            off: [for: "PT7M"],
             aerate: :on
           ],
           finally: [msg: {:handoff, :prep_for_change}]
@@ -67,9 +67,32 @@ defmodule Reef.Opts.Prod do
           match_display_tank: [msg: {:mixtank_temp, :active}],
           stir: [
             on: [for: "PT1M", at_cmd_finish: :off],
-            off: [for: "PT5M", at_cmd_finish: :off],
+            off: [for: "PT5M"],
             repeat: true
           ]
+        ]
+      ],
+      water_change: [
+        step_devices: [
+          air_off: :air,
+          prep: :pump,
+          dump_to_sewer: :pump,
+          transfer_h2o: :pump,
+          final_check: :pump,
+          normal_operations: :none
+        ],
+        steps: [
+          air_off: [off: [for: "PT10S"]],
+          prep: [
+            off: [for: "PT30S"],
+            msg: {:mixtank_temp, :standby},
+            msg: {:display_temp, :standby}
+          ],
+          dump_to_sewer: [on: [for: "PT2M35S", at_cmd_finish: :off]],
+          adjust_valves: [off: [for: "PT2M"]],
+          transfer_h2o: [on: [for: "PT2M35S", at_cmd_finish: :off]],
+          final_check: [off: [for: "PT10M"]],
+          normal_operations: [msg: {:display_tank, :active}]
         ]
       ]
     ]

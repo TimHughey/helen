@@ -71,6 +71,29 @@ defmodule Reef.Opts.Test do
             repeat: true
           ]
         ]
+      ],
+      water_change: [
+        step_devices: [
+          air_off: :air,
+          prep: :pump,
+          dump_to_sewer: :pump,
+          transfer_h2o: :pump,
+          final_check: :pump,
+          normal_operations: :none
+        ],
+        steps: [
+          air_off: [off: [for: "PT11S"]],
+          prep: [
+            off: [for: "PT5S"],
+            msg: {:mixtank_temp, :standby},
+            msg: {:display_temp, :standby}
+          ],
+          dump_to_sewer: [on: [for: "PT30S", at_cmd_finish: :off]],
+          adjust_valves: [off: [for: "PT2S"]],
+          transfer_h2o: [on: [for: "PT30S", at_cmd_finish: :off]],
+          final_check: [off: [for: "PT5S"]],
+          normal_operations: [msg: {:display_temp, :active}]
+        ]
       ]
     ]
   end

@@ -68,7 +68,7 @@ defmodule Reef.Captain.Status do
           Finished: #{to_binary(map[:finished_at])}
         """
 
-      :in_progress ->
+      :running ->
         """
         Reef Fill In-Progress, elapsed time #{to_binary(map[:elapsed])}.
 
@@ -134,7 +134,7 @@ defmodule Reef.Captain.Status do
           Finished: #{to_binary(map[:finished_at])}
         """
 
-      :in_progress ->
+      :running ->
         active_step = map[:active_step]
 
         """

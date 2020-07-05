@@ -345,9 +345,18 @@ defmodule Helen.Time.Helper do
   def valid_ms?(args) do
     alias Timex.Duration
 
-    case Duration.parse(args) do
-      {:ok, _} -> true
-      _failed -> false
+    case args do
+      nil ->
+        false
+
+      arg when is_binary(arg) ->
+        case Duration.parse(args) do
+          {:ok, _} -> true
+          _failed -> false
+        end
+
+      _arg ->
+        false
     end
   end
 

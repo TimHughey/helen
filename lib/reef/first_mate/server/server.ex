@@ -23,14 +23,15 @@ defmodule Reef.FirstMate.Server do
     create_default_config_if_needed()
 
     state = %{
+      module: __MODULE__,
       server_mode: args[:server_mode] || :active,
+      worker_mode: :ready,
       server_standby_reason: :none,
       token: nil,
       token_at: nil,
-      reef_mode: :ready,
+      pending: %{},
       timeouts: %{last: :never, count: 0},
-      opts: config_opts(args),
-      delayed_cmd: %{}
+      opts: config_opts(args)
     }
 
     # should the server start?
@@ -63,8 +64,8 @@ defmodule Reef.FirstMate.Server do
   @doc since: "0.0.27"
   def active? do
     case x_state() do
-      %{server_mode: :standby, reef_mode: _} -> false
-      %{server_mode: _, reef_mode: :not_ready} -> false
+      %{server_mode: :standby, worker_mode: _} -> false
+      %{server_mode: _, worker_mode: :not_ready} -> false
       _else -> true
     end
   end
@@ -81,27 +82,30 @@ defmodule Reef.FirstMate.Server do
 
   """
   @doc since: "0.0.27"
-  def all_stop, do: GenServer.call(__MODULE__, {:all_stop})
+  def all_stop, do: call({:all_stop})
 
   @doc """
-  Enable cleaning mode.
+  Return a list of available reef modes.
 
-  Display tank ato is stopped for the configured clean duration.
-
-  Required parameters:
-    `mode:` <mode defined in config>
-    `opts:` [] | <list to merge into config opts>
-
-  Returns :ok.
+  Returns a list.
 
   ## Examples
 
-      iex> Reef.FirstMate.Server.mode(:clean, [])
-      :ok
+      iex> Reef.FirstMate.Server.available_modes()
+      [:keep_fresh, :prep_for_change]
 
   """
   @doc since: "0.0.27"
-  def mode(mode, opts), do: cast_if_valid_and_active(mode, opts)
+  def available_modes, do: call({:available_modes})
+
+  @doc """
+  Set the FirstMate to a specific mode.
+  """
+  @doc since: "0.0.27"
+  def worker_mode(mode, opts), do: call({:worker_mode, mode, opts})
+
+  @doc since: "0.0.27"
+  def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
 
   @doc """
   Return the DateTime of the last GenServer timeout.
@@ -116,29 +120,6 @@ defmodule Reef.FirstMate.Server do
     else
       _epoch -> epoch()
     end
-  end
-
-  @doc """
-  Set the mode of the server.
-
-  ## Modes
-  When set to `:active` (normal mode) the server is ready for reef commands.
-
-  If set to `:standby` the server will:
-    1. Switch on the DisplayTank auto-top-off
-    2. Denies all reef command mode requeests
-
-  Returns {:ok, new_mode}
-
-  ## Examples
-
-      iex> Reef.FirstMate.Server(:standby)
-      {:ok, :standby}
-
-  """
-  @doc since: "0.0.27"
-  def server_mode(atom) when atom in [:active, :standby] do
-    GenServer.call(__MODULE__, {:server_mode, atom})
   end
 
   @doc """
@@ -166,9 +147,32 @@ defmodule Reef.FirstMate.Server do
   end
 
   @doc """
+  Set the mode of the server.
+
+  ## Modes
+  When set to `:active` (normal mode) the server is ready for reef commands.
+
+  If set to `:standby` the server will:
+    1. Take all crew members offline
+    2. Denies all reef command mode requeests
+
+  Returns {:ok, new_mode}
+
+  ## Examples
+
+      iex> Reef.Captain.Server(:standby)
+      {:ok, :standby}
+
+  """
+  @doc since: "0.0.27"
+  def server_mode(atom) when atom in [:active, :standby] do
+    call({:server_mode, atom})
+  end
+
+  @doc """
   Return the GenServer state.
 
-  A single key (e.g. :server_mode) or a list of keys (e.g. :reef_mode, :server_mode)
+  A single key (e.g. :server_mode) or a list of keys (e.g. :worker_mode, :server_mode)
   can be specified and only those keys are returned.
   """
   @doc since: "0.0.27"
@@ -220,6 +224,40 @@ defmodule Reef.FirstMate.Server do
 
   @doc false
   @impl true
+  def handle_call({:available_modes}, _from, state) do
+    import Reef.Mode, only: [available_modes: 1]
+
+    reply(state, state |> available_modes())
+  end
+
+  @doc false
+  @impl true
+  def handle_call({:cancel_delayed_cmd}, _from, state) do
+    import Reef.Mode, only: [change_token: 1]
+
+    timer = get_in(state, [:pending, :delayed])
+
+    if is_reference(timer), do: Process.cancel_timer(timer)
+
+    state
+    |> put_in([:pending], %{})
+    |> reply(:ok)
+  end
+
+  @doc false
+  @impl true
+  def handle_call({:worker_mode, mode, api_opts}, _from, state) do
+    # import Reef.Mode, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
+
+    state
+    |> Reef.Mode.init_precheck(mode, api_opts)
+    |> Reef.Mode.init_mode()
+    |> Reef.Mode.start_mode()
+    |> check_fault_and_reply()
+  end
+
+  @doc false
+  @impl true
   def handle_call({:server_mode, mode}, _from, state) do
     import Reef.Mode, only: [change_token: 1]
 
@@ -246,48 +284,31 @@ defmodule Reef.FirstMate.Server do
 
   @doc false
   @impl true
-  def handle_cast({:delayed_cmd, cmd, cmd_opts}, state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-    import Reef.Mode, only: [change_token: 1]
+  def handle_call(msg, _from, state),
+    do: state |> msg_puts(msg) |> reply({:unmatched})
 
-    # grab the requested delay and remove :start_delay from the opts
-    {[{_, delay}], opts} = Keyword.split(cmd_opts, [:start_delay])
-
-    msg = {:delayed_cmd, cmd, opts}
+  @doc false
+  @impl true
+  def handle_cast({:msg, {:handoff, worker_mode}}, state) do
+    import Reef.Mode, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
 
     state
-    |> put_in([:delayed_cmd, :cmd], {cmd, cmd_opts})
-    |> put_in([:delayed_cmd, :issued_at], utc_now())
-    |> change_token_and_send_after(msg, delay)
+    |> init_precheck(worker_mode, [])
+    |> init_mode()
+    |> start_mode()
     |> noreply()
   end
 
   @doc false
   @impl true
-  # START A CASTED MODE
-  def handle_cast({mode, cmd_opts}, %{opts: opts} = state) do
-    import DeepMerge, only: [deep_merge: 2]
-    import Reef.Mode, only: [start_mode: 2]
-
-    cmd_opts = deep_merge(opts[mode], cmd_opts)
-
-    state
-    |> ensure_reef_mode_map(mode)
-    |> put_in([mode, :status], :in_progress)
-    |> put_in([mode, :steps], cmd_opts[:steps])
-    |> put_in([mode, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([mode, :step_devices], cmd_opts[:step_devices])
-    |> put_in([mode, :opts], cmd_opts)
-    |> start_mode(mode)
-    |> noreply()
-  end
+  def handle_cast({:msg, _cmd} = msg, state),
+    do: state |> msg_puts(msg) |> noreply()
 
   @doc false
   @impl true
   def handle_continue(:bootstrap, state) do
-    import Reef.Mode, only: [change_token: 1]
-
-    valid_opts? = validate_durations(state[:opts])
+    import Reef.Mode, only: [change_token: 1, validate_all_durations: 1]
+    valid_opts? = state |> validate_all_durations()
 
     case valid_opts? do
       true ->
@@ -299,7 +320,7 @@ defmodule Reef.FirstMate.Server do
 
       false ->
         state
-        |> put_in([:reef_mode], :not_ready)
+        |> put_in([:worker_mode], :not_ready)
         |> put_in([:not_ready_reason], :invalid_opts)
         |> noreply()
     end
@@ -310,7 +331,7 @@ defmodule Reef.FirstMate.Server do
   def handle_info(
         {:gen_device, %{token: msg_token, mod: mod, at: at, cmd: cmd}},
         %{
-          reef_mode: reef_mode,
+          worker_mode: worker_mode,
           token: token
         } = state
       )
@@ -321,15 +342,15 @@ defmodule Reef.FirstMate.Server do
     # for all messages we want capture when they were received and update
     # the elapsed time
     state =
-      put_in(state, [reef_mode, :device_last_cmds, mod, cmd, at], utc_now())
+      put_in(state, [worker_mode, :device_last_cmds, mod, cmd, at], utc_now())
       |> update_elapsed()
 
     # we only want to process :at_finish messages from step_devices
     # associated to steps and not sub steps
-    active_step = get_in(state, [reef_mode, :active_step])
+    active_step = get_in(state, [worker_mode, :active_step])
 
     expected_mod =
-      get_in(state, [reef_mode, :step_devices, active_step])
+      get_in(state, [worker_mode, :step_devices, active_step])
       |> step_device_to_mod()
 
     if expected_mod == mod and at == :at_finish,
@@ -340,52 +361,24 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   # quietly drop gen_device messages that do not match the current token
-  def handle_info(
-        {:gen_device, %{token: msg_token}},
-        %{token: token} = state
-      )
+  def handle_info({:gen_device, %{token: msg_token}}, %{token: token} = state)
       when msg_token != token,
       do: noreply(state)
 
   @doc false
   @impl true
-  def handle_info({:gen_device, _payload} = msg, state) do
-    msg_puts(msg, state)
-  end
+  def handle_info({:gen_device, _payload} = msg, state),
+    do: state |> msg_puts(msg) |> noreply()
 
   @doc false
   @impl true
-  # handle the case when the msg_token matches the current state.
-  def handle_info({:timer, msg, msg_token}, %{token: token} = state)
-      when msg_token == token do
-    case msg do
-      {:delayed_cmd, :clean, opts} ->
-        GenServer.cast(__MODULE__, {:clean, opts})
+  def handle_info({:timer, :delayed_cmd}, state) do
+    import Reef.Mode, only: [start_mode: 1]
 
-        state
-        |> put_in([:delayed_cmd], %{})
-        |> noreply()
-
-      _msg ->
-        noreply(state)
-    end
-  end
-
-  # NOTE:  when the msg_token does not match the state token then
-  #        a change has occurred and this off message should be ignored
-  def handle_info({:timer, msg, msg_token}, %{token: token} = state)
-      when msg_token != token do
-    case msg do
-      {:delayed_cmd, _cmd} ->
-        # if this was a delayed cmd message that failed the token match
-        # then null out the delayed_cmd map
-        state
-        |> put_in([:delayed_cmd], %{})
-        |> noreply()
-
-      _no_match ->
-        noreply(state)
-    end
+    state
+    |> update_in([:pending], fn x -> Map.drop(x, [:delay, :timer]) end)
+    |> start_mode()
+    |> noreply()
   end
 
   @doc false
@@ -398,8 +391,8 @@ defmodule Reef.FirstMate.Server do
 
   @doc false
   @impl true
-  def terminate(_reason, %{reef_mode: reef_mode} = state) do
-    case reef_mode do
+  def terminate(_reason, %{worker_mode: worker_mode} = state) do
+    case worker_mode do
       _nomatch -> state
     end
   end
@@ -419,15 +412,6 @@ defmodule Reef.FirstMate.Server do
     # bring them back online so they're ready for whatever comes next
     |> crew_online()
     |> set_all_modes_ready()
-  end
-
-  defp assemble_reef_mode_final_opts(reef_mode, overrides) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    opts = [overrides] |> List.flatten()
-    config_opts = config_opts([])
-
-    deep_merge(get_in(config_opts, [reef_mode]), opts)
   end
 
   defp crew_list, do: [Ato]
@@ -453,19 +437,19 @@ defmodule Reef.FirstMate.Server do
     state
   end
 
-  def ensure_reef_mode_map(state, mode), do: state |> Map.put_new(mode, %{})
+  def ensure_worker_mode_map(state, mode), do: state |> Map.put_new(mode, %{})
 
-  defp msg_puts(msg, state) do
+  defp msg_puts(state, msg) do
     """
      ==> #{inspect(msg)}
 
     """
     |> IO.puts()
 
-    noreply(state)
+    state
   end
 
-  defp update_elapsed(%{reef_mode: mode} = state) do
+  defp update_elapsed(%{worker_mode: mode} = state) do
     import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
 
     if get_in(state, [mode, :status]) do
@@ -481,44 +465,6 @@ defmodule Reef.FirstMate.Server do
     end
   end
 
-  # primary entry point for validating durations
-  defp validate_durations(opts) do
-    # validate the opts with an initial accumulator of true so an empty
-    # list is considered valid
-    validate_duration_r(opts, true)
-  end
-
-  defp validate_duration_r(opts, acc) do
-    import Helen.Time.Helper, only: [valid_ms?: 1]
-
-    case {opts, acc} do
-      # end of a list (or all list), simply return the acc
-      {[], acc} ->
-        acc
-
-      # seen a bad duration, we're done
-      {_, false} ->
-        false
-
-      # process the head (tuple) and the tail (a list or a tuple)
-      {[head | tail], acc} ->
-        acc && validate_duration_r(head, acc) &&
-          validate_duration_r(tail, acc)
-
-      # keep unfolding
-      {{_, v}, acc} when is_list(v) ->
-        acc && validate_duration_r(v, acc)
-
-      # we have a tuple to check
-      {{k, d}, acc} when k in [:run_for, :for] and is_binary(d) ->
-        acc && valid_ms?(d)
-
-      # not a tuple of interest, keep going
-      {_no_interest, acc} ->
-        acc
-    end
-  end
-
   ##
   ## GenServer Receive Loop Hooks
   ##
@@ -531,17 +477,6 @@ defmodule Reef.FirstMate.Server do
   ## State Helpers
   ##
 
-  defp change_token_and_send_after(state, msg, delay) do
-    import Helen.Time.Helper, only: [to_ms: 1]
-    import Reef.Mode, only: [change_token: 1]
-
-    %{token: token} = state = change_token(state)
-
-    Process.send_after(self(), {:timer, msg, token}, to_ms(delay))
-
-    state
-  end
-
   defp loop_timeout(%{opts: opts}) do
     import Helen.Time.Helper, only: [to_ms: 2]
 
@@ -549,14 +484,12 @@ defmodule Reef.FirstMate.Server do
   end
 
   defp set_all_modes_ready(state) do
-    modes = [
-      :clean
-    ]
+    import Reef.Mode, only: [available_modes: 1]
 
-    for m <- modes, reduce: state do
+    for m <- available_modes(state), reduce: state do
       state -> state |> put_in([m], %{status: :ready})
     end
-    |> put_in([:reef_mode], :ready)
+    |> put_in([:worker_mode], :ready)
   end
 
   defp update_last_timeout(state) do
@@ -571,41 +504,37 @@ defmodule Reef.FirstMate.Server do
   ## GenServer.{call, cast} Helpers
   ##
 
-  defp cast_if_valid_and_active(reef_mode, opts) do
-    final_opts = assemble_reef_mode_final_opts(reef_mode, opts)
-
-    valid? = validate_durations(final_opts)
-    start_delay = opts[:start_delay]
-    skip_active_check? = opts[:skip_active_check] || false
-    reef_mode_exists? = get_in(final_opts, [:steps]) || false
-
+  defp call(msg) do
     cond do
-      valid? == false ->
-        {reef_mode, :invalid_duration_opts, final_opts}
+      server_down?() -> {:failed, :server_down}
+      standby?() -> {:failed, :standby_mode}
+      true -> GenServer.call(__MODULE__, msg)
+    end
+  end
 
-      is_nil(final_opts) ->
-        {reef_mode, :opts_undefined, final_opts}
+  defp server_down? do
+    GenServer.whereis(__MODULE__) |> is_nil()
+  end
 
-      reef_mode_exists? == false ->
-        {reef_mode, :does_not_exist}
-
-      is_binary(start_delay) ->
-        if active?(),
-          do: GenServer.cast(__MODULE__, {:delayed_cmd, reef_mode, final_opts})
-
-      skip_active_check? ->
-        GenServer.cast(__MODULE__, {reef_mode, final_opts})
-
-      true ->
-        if active?(),
-          do: GenServer.cast(__MODULE__, {reef_mode, final_opts}),
-          else: {:standby_mode}
+  defp standby? do
+    case x_state() do
+      %{server_mode: :standby} -> true
+      %{server_mode: :active} -> false
+      _state -> true
     end
   end
 
   ##
   ## handle_* return helpers
   ##
+
+  defp check_fault_and_reply(%{fault: fault} = state) do
+    {:reply, {:fault, fault}, state, loop_timeout(state)}
+  end
+
+  defp check_fault_and_reply(%{worker_mode: worker_mode} = state) do
+    {:reply, {:ok, worker_mode}, state, loop_timeout(state)}
+  end
 
   defp noreply(s), do: {:noreply, s, loop_timeout(s)}
 

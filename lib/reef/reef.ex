@@ -5,6 +5,7 @@ defmodule Reef do
 
   alias Reef.Captain.Server, as: Captain
   alias Reef.Captain.Status, as: Status
+  alias Reef.FirstMate
   alias Reef.FirstMate.Server, as: FirstMate
   alias Reef.MixTank
 
@@ -15,13 +16,30 @@ defmodule Reef do
 
   defdelegate all_stop, to: Captain
 
+  @doc delegate_to: {Captain, :available_modes, 0}
+  defdelegate available_worker_modes, to: Captain, as: :available_modes
+
   @doc """
   Engage clean mode by turning off the DisplayTank auto-top-off.
   """
   @doc since: "0.0.27"
   def clean(opts \\ []) do
-    FirstMate.mode(:clean, opts)
+    FirstMate.worker_mode(:clean, opts)
   end
+
+  @doc """
+  Output the clean mode status
+  """
+  @doc since: "0.0.27"
+  def clean_status do
+    firstmate_status()
+  end
+
+  @doc """
+  Execute the steps required to perform the physical water change.
+  """
+  @doc since: "0.0.27"
+  def change_water(opts), do: Captain.worker_mode(:change_water, opts)
 
   def default_opts do
     alias Reef.Opts.Prod
@@ -42,7 +60,9 @@ defmodule Reef do
   fills the MixTank with RODI.
   """
   @doc since: "0.0.27"
-  def fill(opts \\ []), do: Captain.fill(opts)
+  def fill(opts \\ []) do
+    Captain.worker_mode(:fill, opts)
+  end
 
   @doc """
   Reef mode Fill status.
@@ -64,6 +84,16 @@ defmodule Reef do
   @doc delegate_to: {FirstMate, :config_opts, 1}
   defdelegate firstmate_opts(opts \\ []), to: FirstMate, as: :config_opts
 
+  @doc """
+  Output the status of FirstMate
+  """
+  @doc since: "0.0.27"
+  def firstmate_status do
+    alias Reef.FirstMate
+
+    firstmate_x_state() |> FirstMate.Status.msg() |> IO.puts()
+  end
+
   @doc delegate_to: {FirstMate, :x_state, 1}
   defdelegate firstmate_x_state(opts \\ []), to: FirstMate, as: :x_state
 
@@ -81,7 +111,7 @@ defmodule Reef do
   of water.
   """
   @doc since: "0.0.27"
-  def keep_fresh(opts \\ []), do: Captain.keep_fresh(opts)
+  def keep_fresh(opts \\ []), do: Captain.worker_mode(:keep_fresh, opts)
 
   @doc """
   Reef mode Keep Fresh status.
@@ -98,12 +128,21 @@ defmodule Reef do
   def keep_fresh_status, do: Status.msg(:keep_fresh) |> IO.puts()
 
   @doc """
-  The second step of mixing a batch of replacement water.  This step runs
-  the necessary component while salt is added to the MixTank then executes
-  an extended circulate and aerate before moving to keep fresh.
+  Runs the necessary components to mix salt into the MixTank.
+
+  Returns `:ok`, `{:not_configured, opts}` or `{:invalid_duration_opts}`
+
+  ## Examples
+
+      iex> Reef.mix_salt()
+      :ok
+
+  ### Example Options
+    `start_delay: "PT5M30S"` delay the start of this command by 1 min 30 secs
+
   """
   @doc since: "0.0.27"
-  def mix_salt(opts \\ []), do: Captain.mix_salt(opts)
+  def mix_salt(opts \\ []), do: Captain.worker_mode(:mix_salt, opts)
 
   @doc """
   Reef mode Mix Salt status.
@@ -124,12 +163,21 @@ defmodule Reef do
 
   defdelegate opts_dump, to: Captain, as: :config_dump
 
-  @doc delegate_to: {Captain, :prep_for_change, 1}
-  def prep_for_change(opts \\ []), do: Captain.prep_for_change(opts)
+  @doc """
+  Prepare the MixTank for transfer to Water Stabilization Tank
+
+  Returns :ok or an error tuple
+  """
+  @doc since: "0.0.27"
+  def prep_for_change(opts \\ []),
+    do: Captain.worker_mode(:prep_for_change, opts)
 
   defdelegate pump_off(opts \\ []), to: MixTank.Pump, as: :off
   defdelegate pump_on(opts \\ []), to: MixTank.Pump, as: :on
   defdelegate pump_toggle, to: MixTank.Pump, as: :toggle
+
+  @doc delegate_to: {Captain, :worker_mode, 2}
+  defdelegate worker_mode(mode, opts \\ []), to: Captain
 
   defdelegate restart, to: Captain
 
@@ -176,7 +224,7 @@ defmodule Reef do
     if temp_ok?() do
       [
         captain: all_stop(),
-        first_mate: FirstMate.mode(:water_change_start, []),
+        first_mate: FirstMate.worker_mode(:water_change_start, []),
         display_tank: DisplayTank.mode(:standby)
       ]
     else
@@ -195,7 +243,7 @@ defmodule Reef do
 
     [
       captain: all_stop(),
-      first_mate: FirstMate.mode(:water_change_finish, []),
+      first_mate: FirstMate.worker_mode(:water_change_finish, []),
       display_tank: DisplayTank.mode(:active),
       mixtank: MixTank.mode(:standby)
     ]
