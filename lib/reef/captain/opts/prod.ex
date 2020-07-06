@@ -62,7 +62,7 @@ defmodule Reef.Opts.Prod do
         ]
       ],
       prep_for_change: [
-        step_devices: [stir: :pump, match_display_tank: :heat],
+        step_devices: [stir: :pump, match_display_tank: :none],
         steps: [
           match_display_tank: [msg: {:mixtank_temp, :active}],
           stir: [
