@@ -3,7 +3,7 @@ defmodule PulseWidth.Command.Example do
   Example coomand payloads for PulseWidth devices.
   """
 
-  alias PulseWidth.DB.{Alias, Command, Device}
+  alias PulseWidth.DB.{Command, Device}
 
   def cmd(type, opts) when is_atom(type) do
     import Ecto.Query, only: [from: 2]
