@@ -25,16 +25,16 @@ defmodule PulseWidth.Payload.Random do
   @doc since: "0.0.22"
   def example(%Device{} = pwm_dev) do
     cmd = %{
-      name: "cool",
+      name: "random fade",
       type: "random",
       activate: true,
       random: %{
-        min: 0,
-        max: 8191,
-        primes: 10,
-        step_ms: 75,
-        step: 100,
-        priority: 14
+        min: 256,
+        max: 2048,
+        primes: 25,
+        step_ms: 50,
+        step: 7,
+        priority: 7
       }
     }
 
