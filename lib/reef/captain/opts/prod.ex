@@ -77,19 +77,20 @@ defmodule Reef.Opts.Prod do
           air_off: :air,
           prep: :pump,
           dump_to_sewer: :pump,
+          adjust_valves: :pump,
           transfer_h2o: :pump,
           final_check: :pump,
           normal_operations: :none
         ],
         steps: [
-          air_off: [off: [for: "PT10S"]],
+          air_off: [off: [for: "PT1S"]],
           prep: [
             off: [for: "PT30S"],
             msg: {:mixtank_temp, :standby},
             msg: {:display_temp, :standby}
           ],
           dump_to_sewer: [on: [for: "PT2M35S", at_cmd_finish: :off]],
-          adjust_valves: [off: [for: "PT2M"]],
+          adjust_valves: [off: [for: "PT45S"]],
           transfer_h2o: [on: [for: "PT2M35S", at_cmd_finish: :off]],
           final_check: [off: [for: "PT10M"]],
           normal_operations: [msg: {:display_tank, :active}]
