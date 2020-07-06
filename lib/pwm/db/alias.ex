@@ -39,6 +39,21 @@ defmodule PulseWidth.DB.Alias do
   end
 
   @doc """
+  Send a command map directly to a PulseWidth device.
+  """
+  @doc since: "0.0.27"
+  def cmd_direct(name_or_id, cmd_map, opts) do
+    case find(name_or_id) do
+      %Schema{device: %Device{} = d} = a ->
+        Device.record_cmd(d, a, cmd_map: cmd_map)
+
+      x when is_nil(x) ->
+        {:not_found, name_or_id}
+    end
+    |> Command.ack_immediate_if_needed(opts)
+  end
+
+  @doc """
     Create a PulseWidth alias to a device
   """
   @doc since: "0.0.25"

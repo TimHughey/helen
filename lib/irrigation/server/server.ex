@@ -44,7 +44,7 @@ defmodule Irrigation.Server do
   def last_timeout do
     import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
-    with last <- state(:last_timeout),
+    with last <- x_state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
       last
     else
@@ -60,7 +60,7 @@ defmodule Irrigation.Server do
   a message to start a job or messages from jobs ending.
   """
   @doc since: "0.0.27"
-  def timeouts, do: state() |> Map.get(:timeouts)
+  def timeouts, do: x_state() |> Map.get(:timeouts)
 
   @doc """
   Restarts the server via the Supervisor
@@ -105,7 +105,7 @@ defmodule Irrigation.Server do
   Return the server state (for diagnostic purposes)
   """
   @doc since: "0.0.27"
-  def state(keys \\ []) do
+  def x_state(keys \\ []) do
     keys = [keys] |> List.flatten()
     state = GenServer.call(__MODULE__, :state)
 
@@ -146,38 +146,36 @@ defmodule Irrigation.Server do
   @impl true
   def handle_cast(
         {:start_job, job_name, job, tod, d},
-        %{jobs: jobs, opts: opts} = s
+        %{opts: opts} = state
       ) do
     alias Helen.Scheduler
 
-    # power up the +12v for the valves
-    state = power_on_if_needed(s)
-
+    # spawn the job, it will wait for the configured power up delay
+    # before starting
     pid = spawn_link(fn -> spawned_job(job_name, job, tod, d, opts) end)
 
-    running = Map.put(jobs[:running], pid, job_name)
-
-    state = put_in(state[:jobs][:running], running)
-
-    noreply(state)
+    # power up the +12v for the valves
+    state
+    |> power_on_if_needed()
+    |> put_in([:jobs, :running, pid], job_name)
+    |> noreply()
   end
 
   @doc false
   @impl true
-  def handle_cast({:job_ending, pid, job_name, last_rc}, %{jobs: jobs} = s) do
+  def handle_cast({:job_ending, pid, job_name, last_rc}, state) do
     alias Helen.Scheduler
 
     # remove the job from the running map
-    running = Map.drop(jobs[:running], [pid])
-    # add the job's last_rc {rc, run_duration}
-    last_rc_map = Map.put(jobs[:last_rc], job_name, last_rc)
-
-    state = put_in(s[:jobs][:running], running)
-    state = put_in(state[:jobs][:last_rc], last_rc_map)
-
-    state = power_off_if_needed(state)
-
-    noreply(state)
+    state
+    |> update_in([:jobs, :running], fn x -> Map.drop(x, [pid]) end)
+    |> update_in([:jobs, :last_rc, job_name], fn
+      nil -> %{}
+      x -> x
+    end)
+    |> put_in([:jobs, :last_rc, job_name], last_rc)
+    |> power_off_if_needed()
+    |> noreply()
   end
 
   @doc false

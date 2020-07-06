@@ -112,5 +112,5 @@ defmodule Irrigation do
   defdelegate restart, to: Server
 
   @doc delegate_to: {Server, :state, 0}
-  defdelegate state, to: Server
+  defdelegate x_state, to: Server
 end

@@ -7,22 +7,15 @@ defmodule PulseWidth.Payload.Random do
 
   require Logger
 
-  def create_cmd(
-        %Device{device: device, host: host},
-        refid,
-        %{name: _cmd_name} = cmd,
-        opts
-      )
-      when is_list(opts) and is_binary(refid) do
-    # def = %{name: "none", steps: [], run: false, repeat: false}
-
+  def create_cmd(%_{device: d, host: h, cmds: [%_{refid: ref}]}, cmd_map, opts)
+      when is_list(opts) do
     %{
       pwm_cmd: 0x12,
-      device: device,
-      refid: refid,
-      host: host,
-      ack: Keyword.get(opts, :ack, true),
-      cmd: Map.put(cmd, :type, "random")
+      device: d,
+      refid: ref,
+      host: h,
+      ack: opts[:ack] || true,
+      cmd: Map.put(cmd_map, :type, "random")
     }
   end
 
@@ -31,8 +24,6 @@ defmodule PulseWidth.Payload.Random do
   """
   @doc since: "0.0.22"
   def example(%Device{} = pwm_dev) do
-    alias Ecto.UUID
-
     cmd = %{
       name: "cool",
       type: "random",
@@ -47,24 +38,14 @@ defmodule PulseWidth.Payload.Random do
       }
     }
 
-    create_cmd(pwm_dev, UUID.generate(), cmd, [])
+    create_cmd(pwm_dev, cmd, [])
   end
 
-  def send_cmd(
-        %Device{device: device} = pwm,
-        refid,
-        %{name: _cmd_name} = cmd,
-        opts \\ []
-      )
-      when is_binary(refid) do
-    import Mqtt.Client, only: [publish_to_host: 3]
-    # remove the keys from opts that are consumed by create_cmd
-    pub_opts = Keyword.drop(opts, [:ack])
-
+  def send_cmd(%Device{device: device} = pwm, %{} = cmd_map, opts \\ []) do
     # extract the prefix of the device and use it as the subtopic
     subtopic = String.split(device, "/") |> hd()
 
-    create_cmd(pwm, refid, cmd, opts)
-    |> publish_to_host(subtopic, pub_opts)
+    create_cmd(pwm, cmd_map, opts)
+    |> Mqtt.Client.publish_to_host(subtopic, opts)
   end
 end

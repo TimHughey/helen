@@ -94,18 +94,29 @@ defmodule PulseWidth.DB.Device do
   def preload(%_{} = x), do: preload_unacked_cmds(x) |> Repo.preload([:_alias_])
 
   def record_cmd(%Schema{} = d, %Alias{} = a, opts) when is_list(opts) do
-    import PulseWidth.Payload.Duty, only: [send_cmd: 3]
+    import PulseWidth.Payload.Auto, only: [send_cmd: 3]
     import Helen.Time.Helper, only: [utc_now: 0]
 
     {cmd_opts, record_opts} = Keyword.split(opts, [:ack])
     cmd_map = record_opts[:cmd_map] || {:bad_args, opts}
 
+    dev_updates =
+      if cmd_map[:duty] do
+        [last_cmd_at: utc_now(), running_cmd: "duty"]
+      else
+        [last_cmd_at: utc_now(), running_cmd: cmd_map[:name]]
+      end
+
     with %{cmd: {:ok, %Command{refid: refid}}} <- Command.add(d, a, utc_now()),
          # the command was inserted, now update the device last_cmd_at
-         {:ok, device} <- update(d, last_cmd_at: utc_now()),
+         {:ok, device} <- update(d, dev_updates),
          %_{cmds: [%{refid: ref}]} = device <- preload_last_cmd(device, refid),
          pub_rc <- send_cmd(device, cmd_map, cmd_opts) do
-      {:pending, [duty: cmd_map[:duty], refid: ref, pub_rc: pub_rc]}
+      if cmd_map[:duty] || false do
+        {:pending, [duty: cmd_map[:duty], refid: ref, pub_rc: pub_rc]}
+      else
+        {:pending, [cmd: cmd_map[:name], refid: ref, pub_rc: pub_rc]}
+      end
     else
       %{cmd: {_, _} = rc} -> {:failed, {:cmd, rc}}
       error -> {:failed, error}
