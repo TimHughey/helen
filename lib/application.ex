@@ -97,7 +97,7 @@ defmodule Helen.Application do
         Sensor.Supervisor,
         Helen.Scheduler,
         Reef.Supervisor,
-        Irrigation.Supervisor,
+        Garden.Supervisor,
         Roost.Supervisor
       ]
     end

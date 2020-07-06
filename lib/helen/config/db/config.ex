@@ -29,6 +29,23 @@ defmodule Helen.Module.DB.Config do
     end
   end
 
+  @doc """
+  Get the opts for modules that are like the specified pattern.
+  """
+  @doc since: "0.0.27"
+  def begin_with(pattern) when is_atom(pattern) do
+    import Ecto.Query, only: [from: 2]
+
+    like_string = [mod_as_binary(pattern), "%"] |> IO.iodata_to_binary()
+
+    from(x in Schema,
+      where: like(x.module, ^like_string),
+      order_by: x.module,
+      select: x.module
+    )
+    |> Repo.all()
+  end
+
   @doc false
   def create_or_update(mod, opts, description) do
     # turn the opts list into a binary to store in the db

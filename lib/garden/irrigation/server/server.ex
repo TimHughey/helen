@@ -1,4 +1,4 @@
-defmodule Irrigation.Server do
+defmodule Garden.Irrigation.Server do
   @moduledoc """
   Controls the irrigation of Wiss Landing
   """
@@ -15,6 +15,9 @@ defmodule Irrigation.Server do
   @impl true
   def init(args) do
     import Helen.Time.Helper, only: [epoch: 0]
+    import Garden.Irrigation.Opts, only: [create_default_config_if_needed: 1]
+
+    create_default_config_if_needed()
 
     state = %{
       server_mode: args[:server_mode] || :active,

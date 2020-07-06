@@ -34,7 +34,7 @@ defmodule Helen.Module.Config do
       @doc since: "0.0.27"
       def config_create(opts \\ [], description \\ "<none>")
           when is_list(opts) and is_binary(description) do
-        alias Helen.Module.DB.Config
+        alias Helen.Module.Config
 
         Config.create_or_update(__MODULE__, opts, description)
       end
@@ -132,6 +132,8 @@ defmodule Helen.Module.Config do
     end
   end
 
+  alias Helen.Module.DB.Config
+
   @doc """
   Show all Helen Module Config records
   """
@@ -145,8 +147,6 @@ defmodule Helen.Module.Config do
   """
   @doc since: "0.0.27"
   def available?(module) do
-    alias Helen.Module.DB.Config
-
     get_in(Config.opts(module, []), [:__available__]) || false
   end
 
@@ -161,14 +161,17 @@ defmodule Helen.Module.Config do
   @doc since: "0.0.27"
   def copy(from, to, func \\ & &1)
       when is_atom(from) and is_atom(to) and is_function(func) do
-    alias Helen.Module.DB.Config
-
     opts =
       Config.opts(from, [])
       |> Keyword.drop([:__version__, :__available__])
 
     Config.put(to, func.(opts))
   end
+
+  @doc delegate_to: {Config, :create_or_update, 3}
+  @doc since: "0.0.27"
+  defdelegate create_or_update(module, opts \\ [], description \\ "<none>"),
+    to: Config
 
   @doc """
   Delete a module config
@@ -179,5 +182,8 @@ defmodule Helen.Module.Config do
       :ok
   """
   @doc since: "0.0.27"
-  defdelegate delete(mod), to: Helen.Module.DB.Config
+  defdelegate delete(mod), to: Config
+
+  @doc delegate_to: {Config, :begin_with, 1}
+  defdelegate modules_begin_with(pattern), to: Config, as: :begin_with
 end

@@ -3,7 +3,7 @@ defmodule Irrigation do
     Irrigation Implementation for Wiss Landing
   """
 
-  alias Irrigation.Server
+  alias Garden.Irrigation.Server
 
   def default_opts do
     opts = [
