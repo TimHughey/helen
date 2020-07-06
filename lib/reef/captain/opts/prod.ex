@@ -13,8 +13,8 @@ defmodule Reef.Opts.Prod do
             off: [for: "PT12M"]
           ],
           topoff: [
-            run_for: "PT30M",
-            on: [for: "PT5M", at_cmd_finish: :off],
+            run_for: "PT15M",
+            on: [for: "PT2M", at_cmd_finish: :off],
             off: [for: "PT1M"]
           ],
           finally: [msg: {:handoff, :keep_fresh}]
