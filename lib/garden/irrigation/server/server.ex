@@ -17,7 +17,7 @@ defmodule Garden.Irrigation.Server do
     import Helen.Time.Helper, only: [epoch: 0]
     import Garden.Irrigation.Opts, only: [create_default_config_if_needed: 1]
 
-    create_default_config_if_needed()
+    create_default_config_if_needed(__MODULE__)
 
     state = %{
       server_mode: args[:server_mode] || :active,
