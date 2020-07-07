@@ -17,6 +17,7 @@ defmodule Garden.Lighting.Opts do
       cmd_definitions: [
         random_fade_bright: %{
           name: "slow fade",
+          activate: true,
           random: %{
             min: 256,
             max: 2048,
@@ -28,6 +29,7 @@ defmodule Garden.Lighting.Opts do
         },
         random_fade_dim: %{
           name: "slow fade",
+          activate: true,
           random: %{
             min: 128,
             max: 1024,

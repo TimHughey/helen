@@ -124,6 +124,7 @@ defmodule Roost do
 
     led_forest_cmd_map = %{
       name: "medium slow fade",
+      activate: true,
       random: %{
         min: 256,
         max: 2048,
@@ -210,6 +211,7 @@ defmodule Roost do
     PulseWidth.duty_names_begin_with("roost el wire", duty: 0)
 
     led_forest_cmd_map = %{
+      activate: true,
       name: "dim slow fade",
       random: %{
         min: 256,
