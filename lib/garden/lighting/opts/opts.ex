@@ -105,7 +105,7 @@ defmodule Garden.Lighting.Opts do
     ]
   end
 
-  def syntax_version, do: 3
+  def syntax_version, do: 1
 
   def syntax_version_match?(module) do
     opts = Config.opts(module)
