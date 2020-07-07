@@ -48,12 +48,12 @@ defmodule Garden.Lighting.Opts do
               cmd: :off
             ],
             evening: [
-              sun_ref: :civil_twilight_end,
+              sun_ref: :sunset,
               after: "PT0S",
               cmd: :random_fade_bright
             ],
             night: [
-              sun_ref: :civil_twilight_end,
+              sun_ref: :sunset,
               after: "PT1H30M",
               cmd: :random_fade_dim
             ]
@@ -68,12 +68,12 @@ defmodule Garden.Lighting.Opts do
               cmd: :off
             ],
             evening: [
-              sun_ref: :civil_twilight_end,
+              sun_ref: :sunset,
               after: "PT0S",
               cmd: :random_fade_bright
             ],
             night: [
-              sun_ref: :civil_twilight_end,
+              sun_ref: :sunset,
               after: "PT1H30M",
               cmd: :random_fade_dim
             ]
@@ -88,12 +88,12 @@ defmodule Garden.Lighting.Opts do
               cmd: :off
             ],
             evening: [
-              sun_ref: :civil_twilight_end,
+              sun_ref: :sunset,
               after: "PT0S",
               cmd: :random_fade_bright
             ],
             night: [
-              sun_ref: :civil_twilight_end,
+              sun_ref: :sunset,
               after: "PT1H30M",
               cmd: :random_fade_dim
             ]
@@ -103,7 +103,7 @@ defmodule Garden.Lighting.Opts do
     ]
   end
 
-  def syntax_version, do: 1
+  def syntax_version, do: 2
 
   def syntax_version_match?(module) do
     opts = Config.opts(module)
