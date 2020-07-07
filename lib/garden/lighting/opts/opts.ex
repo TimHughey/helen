@@ -2,39 +2,113 @@ defmodule Garden.Lighting.Opts do
   alias Helen.Module.Config
 
   def create_default_config_if_needed(module) do
-    if Config.available?(module) do
-      nil
+    if Config.available?(module) and syntax_version_match?(module) do
+      :ok
     else
-      opts = [
-        timeout: "PT1M",
-        jobs: [
-          porch: [
-            device: "front leds porch",
-            schedule: [
-              morning: [
-                reference: :civil_twilight_begin,
-                before: "PT1H",
-                duty: 0
-              ],
-              evening: [
-                reference: :civil_twilight_end,
-                after: "PT15M",
-                duty: 0.3
-              ]
+      Config.create_or_update(module, default_opts(), "auto created defaults")
+    end
+  end
+
+  def default_opts do
+    [
+      syntax_vsn: syntax_version(),
+      timeout: "PT1M",
+      timezone: "America/New_York",
+      cmd_definitions: [
+        random_fade_bright: %{
+          name: "slow fade",
+          random: %{
+            min: 256,
+            max: 2048,
+            primes: 35,
+            step_ms: 50,
+            step: 13,
+            priority: 7
+          }
+        },
+        random_fade_dim: %{
+          name: "slow fade",
+          random: %{
+            min: 128,
+            max: 1024,
+            primes: 35,
+            step_ms: 50,
+            step: 13,
+            priority: 7
+          }
+        }
+      ],
+      jobs: [
+        porch: [
+          device: "front leds porch",
+          schedule: [
+            morning: [
+              sun_ref: :civil_twilight_begin,
+              before: "PT30M",
+              cmd: :off
+            ],
+            evening: [
+              sun_ref: :civil_twilight_end,
+              after: "PT1M",
+              cmd: :random_fade_bright
+            ],
+            night: [
+              sun_ref: :civil_twilight_end,
+              after: "PT1H30M",
+              cmd: :random_fade_dim
             ]
-          ],
-          red_maple: [
-            device: "front leds red maple",
-            schedule: [
-              morning: [reference: :civil_twilight_end, before: "PT1H", duty: 0],
-              evening: [reference: :civil_twilight_begin, after: "PT15M"]
+          ]
+        ],
+        red_maple: [
+          device: "front leds red maple",
+          schedule: [
+            morning: [
+              sun_ref: :civil_twilight_begin,
+              before: "PT30M",
+              cmd: :off
+            ],
+            evening: [
+              sun_ref: :civil_twilight_end,
+              after: "PT1M",
+              cmd: :random_fade_bright
+            ],
+            night: [
+              sun_ref: :civil_twilight_end,
+              after: "PT1H30M",
+              cmd: :random_fade_dim
+            ]
+          ]
+        ],
+        evergreen: [
+          device: "front leds evergreen",
+          schedule: [
+            morning: [
+              sun_ref: :civil_twilight_begin,
+              before: "PT30M",
+              cmd: :off
+            ],
+            evening: [
+              sun_ref: :civil_twilight_end,
+              after: "PT1M",
+              cmd: :random_fade_bright
+            ],
+            night: [
+              sun_ref: :civil_twilight_end,
+              after: "PT1H30M",
+              cmd: :random_fade_dim
             ]
           ]
         ]
       ]
+    ]
+  end
 
-      Config.create_or_update(module, opts, "auto created defaults")
-    end
+  def syntax_version, do: 1
+
+  def syntax_version_match?(module) do
+    opts = Config.opts(module)
+
+    if opts[:syntax_version] == syntax_version(), do: true, else: false
   end
 
   def test_opts do

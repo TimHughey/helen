@@ -129,6 +129,21 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+  Is the argument an ISO duration?
+  """
+  @doc since: "0.0.27"
+  def is_iso_duration?(arg) when is_binary(arg) do
+    import Duration, only: [parse: 1]
+
+    case parse(arg) do
+      {:ok, _} -> true
+      _error -> false
+    end
+  end
+
+  def is_iso_duration?(_not_binary), do: false
+
+  @doc """
   Convert a list of time options to milliseconds
 
   Returns an integer.
@@ -173,6 +188,58 @@ defmodule Helen.Time.Helper do
     alias Timex.Duration
 
     d |> to_duration() |> Duration.scale(factor)
+  end
+
+  @doc """
+  Shifts the given DateTime into the future using the supplied args.
+
+  ## Example Args
+     a. %Duration{}
+     b. [hours: 1, minutes: 2, seconds: 3]
+     c. "PT1H2M3.0S"
+
+  Returns a DateTime.
+
+  """
+  @doc since: "0.0.27"
+  def shift_future(dt, args) do
+    import Timex, only: [shift: 2, add: 2]
+    import Timex.Duration, only: [parse!: 1]
+
+    case args do
+      l when is_list(l) -> shift(dt, milliseconds: list_to_ms(l, []))
+      d = %Duration{} -> shift(dt, duration: d)
+      iso when is_binary(iso) -> add(dt, parse!(iso))
+      ms when is_integer(ms) -> shift(dt, milliseconds: ms)
+      _anything -> dt
+    end
+  end
+
+  @doc """
+  Shifts the given DateTime into the past using the supplied args.  This function
+  is the inverse of `shift/2`.
+
+  ## Example Args
+     a. %Duration{}
+     b. [hours: 1, minutes: 2, seconds: 3]
+     c. "PT1H2M3.0S"
+     d. 1000 (integer milliseconds)
+
+  Returns a DateTime.
+
+  """
+  @doc since: "0.0.27"
+  def shift_past(dt, args) do
+    import Timex, only: [shift: 2, subtract: 2]
+    import Timex.Duration, only: [invert: 1, parse!: 1]
+
+    case args do
+      l when is_list(l) -> shift(dt, milliseconds: list_to_ms(l, []) * -1)
+      d = %Duration{} -> shift(dt, duration: invert(d))
+      iso when is_binary(iso) -> subtract(dt, parse!(iso))
+      ms when is_integer(ms) -> shift(dt, milliseconds: ms * -1)
+      _anything -> dt
+    end
   end
 
   @doc """
@@ -439,19 +506,7 @@ defmodule Helen.Time.Helper do
 
   """
   @doc since: "0.0.27"
-  def utc_shift(args) do
-    import Timex, only: [shift: 2, add: 2]
-    import Timex.Duration, only: [parse!: 1]
-    now = utc_now()
-
-    case args do
-      l when is_list(l) -> shift(now, milliseconds: list_to_ms(l, []))
-      d = %Duration{} -> shift(now, duration: d)
-      iso when is_binary(iso) -> add(now, parse!(iso))
-      ms when is_integer(ms) -> shift(now, milliseconds: ms)
-      _anything -> now
-    end
-  end
+  def utc_shift(args), do: shift_future(utc_now(), args)
 
   @doc """
   Shifts UTC now into the past using the supplied args.  This function
@@ -467,19 +522,7 @@ defmodule Helen.Time.Helper do
 
   """
   @doc since: "0.0.27"
-  def utc_shift_past(args) do
-    import Timex, only: [shift: 2, subtract: 2]
-    import Timex.Duration, only: [invert: 1, parse!: 1]
-    now = utc_now()
-
-    case args do
-      l when is_list(l) -> shift(now, milliseconds: list_to_ms(l, []) * -1)
-      d = %Duration{} -> shift(now, duration: invert(d))
-      iso when is_binary(iso) -> subtract(now, parse!(iso))
-      ms when is_integer(ms) -> shift(now, milliseconds: ms * -1)
-      _anything -> now
-    end
-  end
+  def utc_shift_past(args), do: shift_past(utc_now(), args)
 
   @doc """
   Returns a duration of zero.  Simply put, this is a wrapper for `Timex.Duration.zero/0`

@@ -121,7 +121,20 @@ defmodule Roost do
     PulseWidth.duty_names_begin_with("roost el wire entry", duty: 8191)
 
     PulseWidth.duty("roost el wire", duty: 4096)
-    PulseWidth.duty("roost led forest", duty: 200)
+
+    led_forest_cmd_map = %{
+      name: "medium slow fade",
+      random: %{
+        min: 256,
+        max: 2048,
+        primes: 35,
+        step_ms: 50,
+        step: 13,
+        priority: 7
+      }
+    }
+
+    PulseWidth.random("roost led forest", led_forest_cmd_map)
     PulseWidth.duty("roost disco ball", duty: 5500)
 
     state = change_token(state)
@@ -144,8 +157,6 @@ defmodule Roost do
     PulseWidth.duty("roost led forest", duty: 8191)
     PulseWidth.duty("roost el wire entry", duty: 8191)
 
-    PulseWidth.duty_names_begin_with("front", duty: 0.03)
-
     state = change_token(state)
 
     Process.send_after(self(), {:timer, :all_stop, state[:token]}, to_ms(opts))
@@ -160,7 +171,7 @@ defmodule Roost do
       when msg_token == token do
     case cmd do
       :slow_discoball ->
-        PulseWidth.duty("roost disco ball", duty: 4500)
+        PulseWidth.duty("roost disco ball", duty: 5100)
 
         state
         |> put_in([:active_cmd], :dancing)
@@ -198,8 +209,19 @@ defmodule Roost do
     PulseWidth.duty_names_begin_with("roost lights", duty: 0)
     PulseWidth.duty_names_begin_with("roost el wire", duty: 0)
 
-    PulseWidth.duty("roost led forest", duty: 0.02)
-    PulseWidth.duty_names_begin_with("front", duty: 0.03)
+    led_forest_cmd_map = %{
+      name: "dim slow fade",
+      random: %{
+        min: 64,
+        max: 768,
+        primes: 35,
+        step_ms: 50,
+        step: 13,
+        priority: 7
+      }
+    }
+
+    PulseWidth.random("roost led forest", led_forest_cmd_map)
 
     state
     |> change_token()

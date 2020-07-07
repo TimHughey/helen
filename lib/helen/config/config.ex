@@ -186,4 +186,9 @@ defmodule Helen.Module.Config do
 
   @doc delegate_to: {Config, :begin_with, 1}
   defdelegate modules_begin_with(pattern), to: Config, as: :begin_with
+
+  @doc """
+  Return the configuration opts for a module
+  """
+  def opts(module), do: Config.opts(module, [])
 end

@@ -336,9 +336,8 @@ defmodule Garden.Irrigation.Server do
   ## GenServer Receive Loop Hooks
   ##
 
-  defp timeout_hook(%{} = s) do
-    state = schedule_jobs_if_needed(s)
-    noreply(state)
+  defp timeout_hook(state) do
+    state |> schedule_jobs_if_needed() |> noreply()
   end
 
   ##

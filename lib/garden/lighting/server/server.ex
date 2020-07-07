@@ -24,10 +24,10 @@ defmodule Garden.Lighting.Server do
       module: __MODULE__,
       server_mode: args[:server_mode] || :active,
       worker_mode: :ready,
+      devices: %{},
       server_standby_reason: :none,
       token: nil,
       token_at: nil,
-      pending: %{},
       timeouts: %{last: :never, count: 0},
       opts: config_opts(args)
     }
@@ -131,6 +131,16 @@ defmodule Garden.Lighting.Server do
   end
 
   @doc """
+  Exposed API for Helen.Scheduler to start a job identified by name and
+  time of day.
+  """
+  @doc since: "0.0.27"
+  def start_job(job_name, job_tod, token)
+      when is_atom(job_name) and is_atom(job_tod) do
+    call({:start_job, job_name, job_tod, token})
+  end
+
+  @doc """
   Return the GenServer state.
 
   A single key (e.g. :server_mode) or a list of keys (e.g. :worker_mode, :server_mode)
@@ -170,6 +180,31 @@ defmodule Garden.Lighting.Server do
 
   @doc false
   @impl true
+  def handle_call(
+        {:start_job, job_atom, job_tod, job_token},
+        _from,
+        %{token: token} = state
+      )
+      when job_token == token do
+    import Garden.Lighting.Logic, only: [execute_job: 3]
+
+    state
+    |> execute_job(job_atom, job_tod)
+    |> reply(:ok)
+  end
+
+  @doc false
+  @impl true
+  def handle_call(
+        {:start_job, _job_atom, _job_tod, job_token},
+        _from,
+        %{token: token} = state
+      )
+      when job_token != token,
+      do: state |> reply({:failed, :token_mismatch})
+
+  @doc false
+  @impl true
   def handle_call(:state, _from, state) do
     state = update_elapsed(state)
     reply(state, state)
@@ -185,7 +220,6 @@ defmodule Garden.Lighting.Server do
       :standby ->
         state
         |> change_token()
-        # |> crew_offline()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :api)
         |> reply({:ok, mode})
@@ -194,7 +228,6 @@ defmodule Garden.Lighting.Server do
       :active ->
         state
         |> change_token()
-        # |> crew_online()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :none)
         |> reply({:ok, mode})
@@ -205,7 +238,12 @@ defmodule Garden.Lighting.Server do
   @impl true
   def handle_continue(:bootstrap, state) do
     import Garden.Lighting.Logic,
-      only: [change_token: 1, validate_all_durations: 1]
+      only: [
+        change_token: 1,
+        ensure_devices_map: 1,
+        schedule_jobs_if_needed: 1,
+        validate_all_durations: 1
+      ]
 
     valid_opts? = state |> validate_all_durations()
 
@@ -213,8 +251,9 @@ defmodule Garden.Lighting.Server do
       true ->
         state
         |> change_token()
-        # |> crew_online()
-        |> set_all_modes_ready()
+        |> ensure_devices_map()
+        |> schedule_jobs_if_needed()
+        |> put_in([:worker_mode], :ready)
         |> noreply()
 
       false ->
@@ -265,8 +304,10 @@ defmodule Garden.Lighting.Server do
   ## GenServer Receive Loop Hooks
   ##
 
-  defp timeout_hook(%{} = s) do
-    noreply(s)
+  defp timeout_hook(state) do
+    import Garden.Lighting.Logic, only: [schedule_jobs_if_needed: 1]
+
+    state |> schedule_jobs_if_needed() |> noreply()
   end
 
   ##
@@ -274,19 +315,21 @@ defmodule Garden.Lighting.Server do
   ##
 
   defp loop_timeout(%{opts: opts}) do
-    import Helen.Time.Helper, only: [to_ms: 2]
+    import Helen.Time.Helper, only: [is_iso_duration?: 1, to_ms: 2]
 
-    to_ms(opts[:timeout], "PT30.0S")
+    if is_iso_duration?(opts[:timeout]),
+      do: to_ms(opts[:timeout], "PT30.0S"),
+      else: 30_000
   end
 
-  defp set_all_modes_ready(state) do
-    import Garden.Lighting.Logic, only: [available_modes: 1]
-
-    for m <- available_modes(state), reduce: state do
-      state -> state |> put_in([m], %{status: :ready})
-    end
-    |> put_in([:worker_mode], :ready)
-  end
+  # defp set_all_modes_ready(state) do
+  #   import Garden.Lighting.Logic, only: [available_modes: 1]
+  #
+  #   for m <- available_modes(state), reduce: state do
+  #     state -> state |> put_in([m], %{status: :ready})
+  #   end
+  #   |> put_in([:worker_mode], :ready)
+  # end
 
   defp update_last_timeout(state) do
     import Helen.Time.Helper, only: [utc_now: 0]
