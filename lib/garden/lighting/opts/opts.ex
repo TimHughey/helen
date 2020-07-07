@@ -20,9 +20,9 @@ defmodule Garden.Lighting.Opts do
           random: %{
             min: 256,
             max: 2048,
-            primes: 35,
+            primes: 25,
             step_ms: 50,
-            step: 13,
+            step: 3,
             priority: 7
           }
         },
@@ -31,9 +31,9 @@ defmodule Garden.Lighting.Opts do
           random: %{
             min: 128,
             max: 1024,
-            primes: 35,
+            primes: 15,
             step_ms: 50,
-            step: 13,
+            step: 3,
             priority: 7
           }
         }
