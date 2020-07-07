@@ -118,7 +118,7 @@ defmodule Garden.Lighting.Logic do
     backward = job_details[:before]
     forward = job_details[:after]
 
-    %{hour: hour, month: month, minute: minute, day: day} =
+    %{hour: hour, month: month, minute: minute, second: second, day: day} =
       cond do
         is_binary(backward) -> ref |> shift_past(backward)
         is_binary(forward) -> ref |> shift_future(forward)
@@ -126,7 +126,8 @@ defmodule Garden.Lighting.Logic do
       end
 
     %Cron{
-      extended: false,
+      extended: true,
+      second: [second],
       minute: [minute],
       hour: [hour],
       month: [month],

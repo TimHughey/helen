@@ -49,7 +49,7 @@ defmodule Garden.Lighting.Opts do
             ],
             evening: [
               sun_ref: :civil_twilight_end,
-              after: "PT1M",
+              after: "PT0S",
               cmd: :random_fade_bright
             ],
             night: [
@@ -69,7 +69,7 @@ defmodule Garden.Lighting.Opts do
             ],
             evening: [
               sun_ref: :civil_twilight_end,
-              after: "PT1M",
+              after: "PT0S",
               cmd: :random_fade_bright
             ],
             night: [
@@ -89,7 +89,7 @@ defmodule Garden.Lighting.Opts do
             ],
             evening: [
               sun_ref: :civil_twilight_end,
-              after: "PT1M",
+              after: "PT0S",
               cmd: :random_fade_bright
             ],
             night: [
