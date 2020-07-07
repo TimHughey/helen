@@ -196,6 +196,12 @@ defmodule PulseWidth do
     Alias.cmd_direct(name_id_pwm, cmd_map, opts)
   end
 
+  @doc """
+  Create and send a random command to a device via cli prompts
+  """
+  @doc since: "0.0.27"
+  defdelegate random_from_cli(name_or_id), to: Example
+
   @doc delegate_to: {Alias, :rename, 2}
   @doc since: "0.0.27"
   defdelegate rename(name_or_id, new_name), to: Alias

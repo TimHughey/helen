@@ -126,4 +126,35 @@ defmodule PulseWidth.Command.Example do
         cmd
     end
   end
+
+  def random_from_cli(name_pattern) do
+    inputs = [
+      {:name, "Name of cmd (default: \"generic\") ", "generic"},
+      {:min, "Minimum duty (default: 128) ", 128},
+      {:max, "Maximum duty (default 2048) ", 2048},
+      {:primes, "Number of primes to use (1-35) ", 35},
+      {:step_ms, "Milliseconds per step (defautlt: 50) ", 50},
+      {:step, "Duty change per step (default: 7) ", 7},
+      {:priority, "Task priority (default: 7) ", 7}
+    ]
+
+    cmd_map =
+      for {k, prompt, default} <- inputs,
+          reduce: %{name: nil, activate: true, random: %{}} do
+        cmd ->
+          val_bin = IO.gets(prompt) |> String.trim_trailing()
+          length = String.length(val_bin)
+
+          cond do
+            k == :name and length == 0 -> cmd |> put_in([k], default)
+            k == :name -> cmd |> put_in([k], val_bin)
+            length == 0 -> cmd |> put_in([:random, k], default)
+            true -> cmd |> put_in([:random, k], String.to_integer(val_bin))
+          end
+      end
+
+    for name <- PulseWidth.names_begin_with(name_pattern), into: %{} do
+      {name, PulseWidth.random(name, cmd_map)}
+    end
+  end
 end
