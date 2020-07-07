@@ -127,7 +127,7 @@ defmodule Roost do
       random: %{
         min: 256,
         max: 2048,
-        primes: 34,
+        primes: 10,
         step_ms: 50,
         step: 7,
         priority: 7
@@ -212,9 +212,9 @@ defmodule Roost do
     led_forest_cmd_map = %{
       name: "dim slow fade",
       random: %{
-        min: 64,
+        min: 256,
         max: 768,
-        primes: 35,
+        primes: 10,
         step_ms: 50,
         step: 7,
         priority: 7

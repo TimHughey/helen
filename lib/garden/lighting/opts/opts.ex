@@ -20,7 +20,7 @@ defmodule Garden.Lighting.Opts do
           random: %{
             min: 256,
             max: 2048,
-            primes: 35,
+            primes: 20,
             step_ms: 50,
             step: 7,
             priority: 7
@@ -31,7 +31,7 @@ defmodule Garden.Lighting.Opts do
           random: %{
             min: 128,
             max: 1024,
-            primes: 35,
+            primes: 10,
             step_ms: 50,
             step: 7,
             priority: 7
@@ -103,7 +103,7 @@ defmodule Garden.Lighting.Opts do
     ]
   end
 
-  def syntax_version, do: 2
+  def syntax_version, do: 3
 
   def syntax_version_match?(module) do
     opts = Config.opts(module)
