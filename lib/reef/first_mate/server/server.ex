@@ -213,7 +213,7 @@ defmodule Reef.FirstMate.Server do
   Retrieve the number of GenServer timeouts that have occurred.
   """
   @doc since: "0.0.27"
-  def timeouts, do: x_state() |> Map.get(:timeouts)
+  def timeouts, do: x_state() |> get_in([:timeouts])
 
   ##
   ## GenServer handle_* callbacks
@@ -237,7 +237,7 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def handle_call({:available_modes}, _from, state) do
-    import Reef.Mode, only: [available_modes: 1]
+    import Reef.Logic, only: [available_modes: 1]
 
     reply(state, state |> available_modes())
   end
@@ -245,7 +245,7 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def handle_call({:cancel_delayed_cmd}, _from, state) do
-    import Reef.Mode, only: [change_token: 1]
+    import Reef.Logic, only: [change_token: 1]
 
     timer = get_in(state, [:pending, :delayed])
 
@@ -258,20 +258,8 @@ defmodule Reef.FirstMate.Server do
 
   @doc false
   @impl true
-  def handle_call({:worker_mode, mode, api_opts}, _from, state) do
-    # import Reef.Mode, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
-
-    state
-    |> Reef.Mode.init_precheck(mode, api_opts)
-    |> Reef.Mode.init_mode()
-    |> Reef.Mode.start_mode()
-    |> check_fault_and_reply()
-  end
-
-  @doc false
-  @impl true
   def handle_call({:server_mode, mode}, _from, state) do
-    import Reef.Mode, only: [change_token: 1]
+    import Reef.Logic, only: [change_token: 1]
 
     case mode do
       # when switching to :standby ensure the switch is off
@@ -296,13 +284,25 @@ defmodule Reef.FirstMate.Server do
 
   @doc false
   @impl true
+  def handle_call({:worker_mode, mode, api_opts}, _from, state) do
+    # import Reef.Logic, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
+
+    state
+    |> Reef.Logic.init_precheck(mode, api_opts)
+    |> Reef.Logic.init_mode()
+    |> Reef.Logic.start_mode()
+    |> check_fault_and_reply()
+  end
+
+  @doc false
+  @impl true
   def handle_call(msg, _from, state),
     do: state |> msg_puts(msg) |> reply({:unmatched})
 
   @doc false
   @impl true
   def handle_cast({:msg, {:handoff, worker_mode}}, state) do
-    import Reef.Mode, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
+    import Reef.Logic, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
 
     state
     |> init_precheck(worker_mode, [])
@@ -319,7 +319,7 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def handle_continue(:bootstrap, state) do
-    import Reef.Mode, only: [change_token: 1, validate_all_durations: 1]
+    import Reef.Logic, only: [change_token: 1, validate_all_durations: 1]
     valid_opts? = state |> validate_all_durations()
 
     case valid_opts? do
@@ -349,7 +349,7 @@ defmodule Reef.FirstMate.Server do
       )
       when msg_token == token do
     import Helen.Time.Helper, only: [utc_now: 0]
-    import Reef.Mode, only: [start_next_cmd_in_step: 1, step_device_to_mod: 1]
+    import Reef.Logic, only: [start_next_cmd_in_step: 1, step_device_to_mod: 1]
 
     # for all messages we want capture when they were received and update
     # the elapsed time
@@ -385,7 +385,7 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def handle_info({:timer, :delayed_cmd}, state) do
-    import Reef.Mode, only: [start_mode: 1]
+    import Reef.Logic, only: [start_mode: 1]
 
     state
     |> update_in([:pending], fn x -> Map.drop(x, [:delay, :timer]) end)
@@ -414,7 +414,7 @@ defmodule Reef.FirstMate.Server do
   ##
 
   defp all_stop__(state) do
-    import Reef.Mode, only: [change_token: 1]
+    import Reef.Logic, only: [change_token: 1]
 
     state
     # prevent processing of any lingering messages
@@ -481,8 +481,8 @@ defmodule Reef.FirstMate.Server do
   ## GenServer Receive Loop Hooks
   ##
 
-  defp timeout_hook(%{} = s) do
-    noreply(s)
+  defp timeout_hook(state) do
+    noreply(state)
   end
 
   ##
@@ -496,7 +496,7 @@ defmodule Reef.FirstMate.Server do
   end
 
   defp set_all_modes_ready(state) do
-    import Reef.Mode, only: [available_modes: 1]
+    import Reef.Logic, only: [available_modes: 1]
 
     for m <- available_modes(state), reduce: state do
       state -> state |> put_in([m], %{status: :ready})

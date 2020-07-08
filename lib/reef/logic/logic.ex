@@ -1,4 +1,4 @@
-defmodule Reef.Mode do
+defmodule Reef.Logic do
   def available_modes(%{opts: opts} = _state) do
     Keyword.drop(opts, [:__available__, :__version__])
     |> Keyword.keys()

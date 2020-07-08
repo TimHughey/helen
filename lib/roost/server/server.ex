@@ -1,32 +1,36 @@
-defmodule Reef.Captain.Server do
-  @moduledoc """
-  Orchestration of Reef Activities (e.g. salt mix, cleaning)
-  """
+defmodule Roost.Server do
+  @moduledoc false
 
-  use GenServer, restart: :transient, shutdown: 7000
+  # @compile {:no_warn_undefined, PulseWidth}
+
+  alias PulseWidth
+  use Timex
+
+  use GenServer, restart: :transient, shutdown: 5000
   use Helen.Module.Config
 
-  alias Reef.MixTank
-  alias Reef.MixTank.{Air, Pump, Rodi}
-
   ##
-  ## GenServer Start and Initialization
+  ## GenServer init and start
   ##
 
-  @doc false
   @impl true
   def init(args) do
+    import Roost.Opts, only: [create_default_config_if_needed: 1]
+
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
+
+    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,
       server_mode: args[:server_mode] || :active,
+      worker_mode: :ready,
+      dance: :init,
       server_standby_reason: :none,
       token: nil,
       token_at: nil,
       pending: %{},
-      worker_mode: :ready,
       timeouts: %{last: :never, count: 0},
       opts: config_opts(args)
     }
@@ -38,9 +42,8 @@ defmodule Reef.Captain.Server do
     end
   end
 
-  @doc false
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   ##
@@ -54,7 +57,7 @@ defmodule Reef.Captain.Server do
 
   ## Examples
 
-      iex> Reef.Captain.Server.active?
+      iex> Reef.FirstMate.Server.active?
       true
 
   """
@@ -68,13 +71,13 @@ defmodule Reef.Captain.Server do
   end
 
   @doc """
-  Bring all reef activities to a stop.
+  Bring all Roost activities to a stop.
 
   Returns :ok
 
   ## Examples
 
-      iex> Reef.Captain.Server.all_stop
+      iex> Roost.Server.all_stop
       :ok
 
   """
@@ -88,15 +91,33 @@ defmodule Reef.Captain.Server do
 
   ## Examples
 
-      iex> Reef.Captain.Server.available_modes()
+      iex> Reef.FirstMate.Server.available_modes()
       [:keep_fresh, :prep_for_change]
 
   """
   @doc since: "0.0.27"
   def available_modes, do: call({:available_modes})
 
+  @doc """
+  Set the FirstMate to a specific mode.
+  """
+  @doc since: "0.0.27"
+  def worker_mode(mode, opts), do: call({:worker_mode, mode, opts})
+
   @doc since: "0.0.27"
   def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
+
+  @doc """
+  Set the Roost for dancing
+  """
+  @doc since: "0.0.27"
+  def dance_with_me, do: call({:dance})
+
+  @doc """
+      Set the Roost to leaving (dancing is over but exit lighting remains)
+  """
+  @doc since: "0.0.27"
+  def leaving(opts \\ "PT10M0.0S"), do: call({:leaving, opts})
 
   @doc """
   Return the DateTime of the last GenServer timeout.
@@ -104,22 +125,26 @@ defmodule Reef.Captain.Server do
   @doc since: "0.0.27"
   def last_timeout do
     import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
+    tz = runtime_opts() |> get_in([:timezone]) || "America/New_York"
 
     with last <- x_state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
-      Timex.to_datetime(last, "America/New_York")
+      Timex.to_datetime(last, tz)
     else
       _epoch -> epoch()
     end
   end
 
   @doc """
-  Start the specified reef mode combining the opts passed to the API
-  with those from the configuration.
+  Return the server runtime options.
   """
   @doc since: "0.0.27"
-  def worker_mode(mode, overrides \\ []) do
-    call_worker_mode(mode, overrides)
+  def runtime_opts do
+    if is_nil(GenServer.whereis(__MODULE__)) do
+      []
+    else
+      GenServer.call(__MODULE__, :state) |> get_in([:opts])
+    end
   end
 
   @doc """
@@ -127,7 +152,7 @@ defmodule Reef.Captain.Server do
 
   ## Examples
 
-      iex> Reef.Captain.Server.restart([])
+      iex> Reef.Temp.Control.restart([])
       :ok
 
   """
@@ -201,39 +226,31 @@ defmodule Reef.Captain.Server do
   Retrieve the number of GenServer timeouts that have occurred.
   """
   @doc since: "0.0.27"
-  def timeouts, do: x_state() |> Map.get(:timeouts)
+  def timeouts, do: x_state() |> get_in([:timeouts])
 
   ##
-  ## GenServer handle_* callbacks
+  ## Roost Public API
   ##
 
   @doc false
   @impl true
   def handle_call(:state, _from, state) do
-    state = update_elapsed(state)
-    reply(state, state)
+    state = state |> update_elapsed()
+
+    state |> reply(state)
   end
 
-  @doc false
   @impl true
   def handle_call({:all_stop}, _from, state) do
     state
-    |> all_stop__()
+    |> all_stop()
     |> reply(:answering_all_stop)
   end
 
   @doc false
   @impl true
-  def handle_call({:available_modes}, _from, state) do
-    import Reef.Logic, only: [available_modes: 1]
-
-    reply(state, state |> available_modes())
-  end
-
-  @doc false
-  @impl true
   def handle_call({:cancel_delayed_cmd}, _from, state) do
-    import Reef.Logic, only: [change_token: 1]
+    import Roost.Logic, only: [change_token: 1]
 
     timer = get_in(state, [:pending, :delayed])
 
@@ -244,29 +261,72 @@ defmodule Reef.Captain.Server do
     |> reply(:ok)
   end
 
-  @doc false
   @impl true
-  def handle_call({:worker_mode, worker_mode, api_opts}, _from, state) do
-    import Reef.Logic, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
+  def handle_call({:dance}, _from, state) do
+    import Roost.Logic, only: [change_token: 1]
+
+    PulseWidth.duty_names_begin_with("roost lights", duty: 8191)
+    PulseWidth.duty_names_begin_with("roost el wire entry", duty: 8191)
+
+    PulseWidth.duty("roost el wire", duty: 4096)
+
+    led_forest_cmd_map = %{
+      name: "medium slow fade",
+      activate: true,
+      random: %{
+        min: 256,
+        max: 2048,
+        primes: 10,
+        step_ms: 50,
+        step: 7,
+        priority: 7
+      }
+    }
+
+    PulseWidth.random("roost led forest", led_forest_cmd_map)
+    PulseWidth.duty("roost disco ball", duty: 5500)
+
+    state = change_token(state)
+
+    Process.send_after(self(), {:timer, :slow_discoball, state[:token]}, 15000)
 
     state
-    |> init_precheck(worker_mode, api_opts)
-    |> init_mode()
-    |> start_mode()
-    |> check_fault_and_reply()
+    |> put_in([:active_cmd], :spinning_up)
+    |> reply(:spinning_up)
+  end
+
+  @impl true
+  def handle_call({:leaving, opts}, _from, state) do
+    import Helen.Time.Helper, only: [to_ms: 1]
+    import Roost.Logic, only: [change_token: 1]
+
+    PulseWidth.duty_names_begin_with("roost lights", duty: 0)
+    PulseWidth.off("roost el wire")
+    PulseWidth.off("roost disco ball")
+
+    PulseWidth.duty("roost led forest", duty: 8191)
+    PulseWidth.duty("roost el wire entry", duty: 8191)
+
+    state = change_token(state)
+
+    Process.send_after(self(), {:timer, :all_stop, state[:token]}, to_ms(opts))
+
+    state
+    |> put_in([:active_cmd], :leaving)
+    |> reply(:goodbye)
   end
 
   @doc false
   @impl true
   def handle_call({:server_mode, mode}, _from, state) do
-    import Reef.Logic, only: [change_token: 1]
+    import Roost.Logic, only: [change_token: 1]
 
     case mode do
       # when switching to :standby ensure the switch is off
       :standby ->
         state
         |> change_token()
-        |> crew_offline()
+        # |> crew_offline()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :api)
         |> reply({:ok, mode})
@@ -275,11 +335,23 @@ defmodule Reef.Captain.Server do
       :active ->
         state
         |> change_token()
-        |> crew_online()
+        # |> crew_online()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :none)
         |> reply({:ok, mode})
     end
+  end
+
+  @doc false
+  @impl true
+  def handle_call({:worker_mode, mode, api_opts}, _from, state) do
+    alias Roost.Logic
+
+    state
+    |> Logic.init_precheck(mode, api_opts)
+    |> Logic.init_mode()
+    # |> Logic.start_mode()
+    |> check_fault_and_reply()
   end
 
   @doc false
@@ -289,32 +361,14 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_cast({:msg, {:handoff, worker_mode}}, state) do
-    import Reef.Logic, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
-
-    state
-    |> init_precheck(worker_mode, [])
-    |> init_mode()
-    |> start_mode()
-    |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_cast({:msg, _cmd} = msg, state),
-    do: state |> msg_puts(msg) |> noreply()
-
-  @doc false
-  @impl true
   def handle_continue(:bootstrap, state) do
-    import Reef.Logic, only: [change_token: 1, validate_all_durations: 1]
+    import Roost.Logic, only: [change_token: 1, validate_all_durations: 1]
     valid_opts? = state |> validate_all_durations()
 
     case valid_opts? do
       true ->
         state
         |> change_token()
-        |> crew_online()
         |> set_all_modes_ready()
         |> noreply()
 
@@ -326,59 +380,30 @@ defmodule Reef.Captain.Server do
     end
   end
 
-  @doc false
   @impl true
-  def handle_info(
-        {:gen_device, %{token: msg_token, mod: mod, at: at, cmd: cmd}},
-        %{
-          worker_mode: worker_mode,
-          token: token
-        } = state
-      )
+  def handle_info({:timer, cmd, msg_token}, %{token: token} = state)
       when msg_token == token do
-    import Helen.Time.Helper, only: [utc_now: 0]
-    import Reef.Logic, only: [start_next_cmd_in_step: 1, step_device_to_mod: 1]
+    case cmd do
+      :slow_discoball ->
+        PulseWidth.duty("roost disco ball", duty: 5100)
 
-    # for all messages we want capture when they were received and update
-    # the elapsed time
-    state =
-      put_in(state, [worker_mode, :device_last_cmds, mod, cmd, at], utc_now())
-      |> update_elapsed()
+        state
+        |> put_in([:active_cmd], :dancing)
+        |> put_in([:dance], :yes)
+        |> noreply()
 
-    # we only want to process :at_finish messages from step_devices
-    # associated to steps and not sub steps
-    active_step = get_in(state, [worker_mode, :active_step])
-
-    expected_mod =
-      get_in(state, [worker_mode, :step_devices, active_step])
-      |> step_device_to_mod()
-
-    if expected_mod == mod and at == :at_finish,
-      do: state |> start_next_cmd_in_step() |> noreply(),
-      else: state |> noreply()
+      :all_stop ->
+        all_stop(state)
+        |> noreply()
+    end
   end
 
-  @doc false
+  # NOTE:  when the msg_token does not match the state token then
+  #        a change has occurred and this message should be ignored
   @impl true
-  # quietly drop gen_device messages that do not match the current token
-  def handle_info({:gen_device, %{token: msg_token}}, %{token: token} = state)
-      when msg_token != token,
-      do: noreply(state)
-
-  @doc false
-  @impl true
-  def handle_info({:gen_device, _payload} = msg, state),
-    do: state |> msg_puts(msg) |> noreply()
-
-  @doc false
-  @impl true
-  def handle_info({:timer, :delayed_cmd}, state) do
-    import Reef.Logic, only: [start_mode: 1]
-
-    state
-    |> update_in([:pending], fn x -> Map.drop(x, [:delay, :timer]) end)
-    |> start_mode()
-    |> noreply()
+  def handle_info({:timer, _msg, msg_token}, %{token: token} = s)
+      when msg_token != token do
+    noreply(s)
   end
 
   @doc false
@@ -393,52 +418,41 @@ defmodule Reef.Captain.Server do
   @impl true
   def terminate(_reason, %{worker_mode: worker_mode} = state) do
     case worker_mode do
-      :keep_fresh -> state |> all_stop__()
       _nomatch -> state
     end
   end
 
   ##
-  ## PRIVATE
+  ## Private
   ##
 
-  defp all_stop__(state) do
-    import Reef.Logic, only: [change_token: 1]
+  defp all_stop(state) do
+    import Roost.Logic, only: [change_token: 1]
+
+    PulseWidth.off("roost disco ball")
+    PulseWidth.duty_names_begin_with("roost lights", duty: 0)
+    PulseWidth.duty_names_begin_with("roost el wire", duty: 0)
+
+    led_forest_cmd_map = %{
+      activate: true,
+      name: "dim slow fade",
+      random: %{
+        min: 256,
+        max: 768,
+        primes: 10,
+        step_ms: 50,
+        step: 7,
+        priority: 7
+      }
+    }
+
+    PulseWidth.random("roost led forest", led_forest_cmd_map)
 
     state
-    # prevent processing of any lingering messages
     |> change_token()
-    # the safest way to stop everything is to take all the crew offline
-    |> crew_offline()
-    # bring them back online so they're ready for whatever comes next
-    |> crew_online()
-    |> set_all_modes_ready()
+    |> put_in([:dance], :no)
+    |> put_in([:active_cmd], :none)
   end
-
-  defp crew_list, do: [Air, Pump, Rodi, MixTank.Temp]
-  defp crew_list_no_heat, do: [Air, Pump, Rodi]
-
-  # NOTE:  state is unchanged however is parameter for use in pipelines
-  defp crew_offline(state) do
-    for crew_member <- crew_list() do
-      apply(crew_member, :mode, [:standby])
-    end
-
-    state
-  end
-
-  # NOTE:  state is unchanged however is parameter for use in pipelines
-  defp crew_online(state) do
-    # NOTE:  we NEVER bring MixTank.Temp online unless explictly requested
-    #        in a mode step/cmd
-    for crew_member <- crew_list_no_heat() do
-      apply(crew_member, :mode, [:active])
-    end
-
-    state
-  end
-
-  def ensure_worker_mode_map(state, mode), do: state |> Map.put_new(mode, %{})
 
   defp msg_puts(state, msg) do
     """
@@ -470,8 +484,8 @@ defmodule Reef.Captain.Server do
   ## GenServer Receive Loop Hooks
   ##
 
-  defp timeout_hook(%{} = s) do
-    noreply(s)
+  defp timeout_hook(state) do
+    noreply(state)
   end
 
   ##
@@ -510,14 +524,6 @@ defmodule Reef.Captain.Server do
       server_down?() -> {:failed, :server_down}
       standby?() -> {:failed, :standby_mode}
       true -> GenServer.call(__MODULE__, msg)
-    end
-  end
-
-  defp call_worker_mode(worker_mode, opts) do
-    cond do
-      server_down?() -> {:failed, :server_down}
-      standby?() -> {:failed, :standby_mode}
-      true -> GenServer.call(__MODULE__, {:worker_mode, worker_mode, opts})
     end
   end
 
