@@ -123,6 +123,18 @@ defmodule Reef.FirstMate.Server do
   end
 
   @doc """
+  Return the server runtime options.
+  """
+  @doc since: "0.0.27"
+  def runtime_opts do
+    if is_nil(GenServer.whereis(__MODULE__)) do
+      []
+    else
+      GenServer.call(__MODULE__, :state) |> get_in([:opts])
+    end
+  end
+
+  @doc """
   Restarts the server via the Supervisor
 
   ## Examples

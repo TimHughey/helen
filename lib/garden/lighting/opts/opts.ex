@@ -21,7 +21,7 @@ defmodule Garden.Lighting.Opts do
           random: %{
             min: 256,
             max: 2048,
-            primes: 20,
+            primes: 35,
             step_ms: 55,
             step: 7,
             priority: 7
@@ -33,9 +33,9 @@ defmodule Garden.Lighting.Opts do
           random: %{
             min: 128,
             max: 1024,
-            primes: 10,
+            primes: 35,
             step_ms: 55,
-            step: 7,
+            step: 3,
             priority: 7
           }
         }
@@ -46,7 +46,7 @@ defmodule Garden.Lighting.Opts do
           schedule: [
             morning: [
               sun_ref: :civil_twilight_begin,
-              before: "PT30M",
+              before: "PT0S",
               cmd: :off
             ],
             evening: [
@@ -66,7 +66,7 @@ defmodule Garden.Lighting.Opts do
           schedule: [
             morning: [
               sun_ref: :civil_twilight_begin,
-              before: "PT30M",
+              before: "PT0S",
               cmd: :off
             ],
             evening: [
@@ -86,7 +86,7 @@ defmodule Garden.Lighting.Opts do
           schedule: [
             morning: [
               sun_ref: :civil_twilight_begin,
-              before: "PT30M",
+              before: "PT0S",
               cmd: :off
             ],
             evening: [
@@ -105,7 +105,15 @@ defmodule Garden.Lighting.Opts do
     ]
   end
 
-  def syntax_version, do: 1
+  @doc """
+  Reset the module options to defaults as specified in default_opts/0 and restart
+  the server.
+  """
+  def reset_to_defaults(module) do
+    Config.create_or_update(module, default_opts(), "reset by api call")
+  end
+
+  def syntax_version, do: 2
 
   def syntax_version_match?(module) do
     opts = Config.opts(module)

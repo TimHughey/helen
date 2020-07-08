@@ -5,20 +5,25 @@ defmodule Lighting do
 
   alias Garden.Lighting.Server
 
+  @doc delegate_to: {Server, :config_update, 1}
+  defdelegate config_update(function), to: Server
+
   @doc delegate_to: {Server, :config_opts, 0}
   defdelegate opts, to: Server, as: :config_opts
 
   @doc delegate_to: {Server, :config_opts, 1}
   defdelegate opts(overrides), to: Server, as: :config_opts
 
-  @doc delegate_to: {Server, :config_update, 1}
-  defdelegate config_update(function), to: Server
+  @doc """
+  Reset  options to compile time defaults then restart server.
+  """
+  @doc since: "0.0.27"
+  def reset_opts do
+    alias Garden.Lighting.Opts
 
-  @doc delegate_to: {Server, :start_job, 3}
-  defdelegate start_job(job_name, job_tod, token), to: Server
-
-  @doc delegate_to: {Server, :timeouts, 0}
-  defdelegate timeouts, to: Server
+    Opts.reset_to_defaults(__MODULE__)
+    restart()
+  end
 
   @doc """
   Return a keyword list of the scheduled irrigation jobs scheduled.
@@ -46,6 +51,12 @@ defmodule Lighting do
     end
     |> List.flatten()
   end
+
+  @doc delegate_to: {Server, :start_job, 3}
+  defdelegate start_job(job_name, job_tod, token), to: Server
+
+  @doc delegate_to: {Server, :timeouts, 0}
+  defdelegate timeouts, to: Server
 
   @doc delegate_to: {Server, :restart, 0}
   defdelegate restart, to: Server
