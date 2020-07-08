@@ -170,8 +170,13 @@ defmodule Remote.DB.Remote do
   @doc """
     Retrieve a list of Remote names that begin with a pattern
   """
-
   @doc since: "0.0.9"
+  def names_begin_with(patterns) when is_list(patterns) do
+    for pattern when is_binary(pattern) <- patterns, reduce: [] do
+      acc -> [acc, names_begin_with(pattern)] |> List.flatten()
+    end
+  end
+
   def names_begin_with(pattern) when is_binary(pattern) do
     import Ecto.Query, only: [from: 2]
 

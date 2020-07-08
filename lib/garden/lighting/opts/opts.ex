@@ -22,7 +22,7 @@ defmodule Garden.Lighting.Opts do
             min: 256,
             max: 2048,
             primes: 20,
-            step_ms: 50,
+            step_ms: 55,
             step: 7,
             priority: 7
           }
@@ -34,7 +34,7 @@ defmodule Garden.Lighting.Opts do
             min: 128,
             max: 1024,
             primes: 10,
-            step_ms: 50,
+            step_ms: 55,
             step: 7,
             priority: 7
           }
