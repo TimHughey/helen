@@ -1,7 +1,7 @@
 defmodule Roost.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: 2
+  def syntax_version, do: 1
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -19,7 +19,6 @@ defmodule Roost.Opts do
       cmd_definitions: [
         dance_fade: %{
           name: "roost dance fade",
-          activate: true,
           random: %{
             min: 128,
             max: 2048,
@@ -31,7 +30,6 @@ defmodule Roost.Opts do
         },
         closed_fade: %{
           name: "roost closed fade",
-          activate: true,
           random: %{
             min: 64,
             max: 768,

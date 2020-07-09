@@ -22,7 +22,6 @@ defmodule PulseWidth.Payload.Basic do
   def example(%Device{} = pwm_dev) do
     cmd = %{
       name: "basic_random",
-      activate: true,
       basic: %{
         repeat: false,
         steps:

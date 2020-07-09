@@ -140,7 +140,7 @@ defmodule PulseWidth.Command.Example do
 
     cmd_map =
       for {k, prompt, default} <- inputs,
-          reduce: %{name: nil, activate: true, random: %{}} do
+          reduce: %{name: nil, random: %{}} do
         cmd ->
           val_bin = IO.gets(prompt) |> String.trim_trailing()
           length = String.length(val_bin)

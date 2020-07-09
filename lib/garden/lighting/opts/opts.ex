@@ -1,7 +1,7 @@
 defmodule Garden.Lighting.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: 4
+  def syntax_version, do: 1
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -19,7 +19,6 @@ defmodule Garden.Lighting.Opts do
       cmd_definitions: [
         random_fade_bright: %{
           name: "slow fade",
-          activate: true,
           random: %{
             min: 256,
             max: 2048,
@@ -31,7 +30,6 @@ defmodule Garden.Lighting.Opts do
         },
         random_fade_dim: %{
           name: "slow fade",
-          activate: true,
           random: %{
             min: 128,
             max: 1024,

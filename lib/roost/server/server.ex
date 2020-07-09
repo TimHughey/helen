@@ -243,8 +243,10 @@ defmodule Roost.Server do
 
   @impl true
   def handle_call({:all_stop}, _from, state) do
+    alias Roost.Logic
+
     state
-    |> all_stop()
+    |> Logic.change_token()
     |> reply(:answering_all_stop)
   end
 
@@ -268,61 +270,6 @@ defmodule Roost.Server do
     state
     |> put_in([:pending], %{})
     |> reply(:ok)
-  end
-
-  @impl true
-  def handle_call({:dance}, _from, state) do
-    import Roost.Logic, only: [change_token: 1]
-
-    PulseWidth.duty_names_begin_with("roost lights", duty: 8191)
-    PulseWidth.duty_names_begin_with("roost el wire entry", duty: 8191)
-
-    PulseWidth.duty("roost el wire", duty: 4096)
-
-    led_forest_cmd_map = %{
-      name: "medium slow fade",
-      activate: true,
-      random: %{
-        min: 256,
-        max: 2048,
-        primes: 10,
-        step_ms: 50,
-        step: 7,
-        priority: 7
-      }
-    }
-
-    PulseWidth.random("roost led forest", led_forest_cmd_map)
-    PulseWidth.duty("roost disco ball", duty: 5500)
-
-    state = change_token(state)
-
-    Process.send_after(self(), {:timer, :slow_discoball, state[:token]}, 15000)
-
-    state
-    |> put_in([:active_cmd], :spinning_up)
-    |> reply(:spinning_up)
-  end
-
-  @impl true
-  def handle_call({:leaving, opts}, _from, state) do
-    import Helen.Time.Helper, only: [to_ms: 1]
-    import Roost.Logic, only: [change_token: 1]
-
-    PulseWidth.duty_names_begin_with("roost lights", duty: 0)
-    PulseWidth.off("roost el wire")
-    PulseWidth.off("roost disco ball")
-
-    PulseWidth.duty("roost led forest", duty: 8191)
-    PulseWidth.duty("roost el wire entry", duty: 8191)
-
-    state = change_token(state)
-
-    Process.send_after(self(), {:timer, :all_stop, state[:token]}, to_ms(opts))
-
-    state
-    |> put_in([:active_cmd], :leaving)
-    |> reply(:goodbye)
   end
 
   @doc false
@@ -403,35 +350,39 @@ defmodule Roost.Server do
     |> noreply()
   end
 
+  # handle step via messages
+  @impl true
+  def handle_info(
+        {:msg, {:worker_mode, mode}, msg_token},
+        %{token: token} = state
+      )
+      when msg_token == token do
+    alias Roost.Logic
+
+    state
+    |> Logic.init_precheck(mode, [])
+    |> Logic.init_mode()
+    |> Logic.start_mode()
+    |> noreply()
+  end
+
   @impl true
   def handle_info({:msg, _msg, msg_token}, %{token: token} = state)
       when msg_token != token,
       do: state
 
   @impl true
-  def handle_info({:timer, cmd, msg_token}, %{token: token} = state)
+  def handle_info({:timer, _cmd, msg_token}, %{token: token} = state)
       when msg_token == token do
-    case cmd do
-      :slow_discoball ->
-        PulseWidth.duty("roost disco ball", duty: 5100)
-
-        state
-        |> put_in([:active_cmd], :dancing)
-        |> put_in([:dance], :yes)
-        |> noreply()
-
-      :all_stop ->
-        all_stop(state)
-        |> noreply()
-    end
+    state |> noreply()
   end
 
   # NOTE:  when the msg_token does not match the state token then
   #        a change has occurred and this message should be ignored
   @impl true
-  def handle_info({:timer, _msg, msg_token}, %{token: token} = s)
+  def handle_info({:timer, _msg, msg_token}, %{token: token} = state)
       when msg_token != token do
-    noreply(s)
+    state |> noreply()
   end
 
   @doc false
@@ -453,34 +404,6 @@ defmodule Roost.Server do
   ##
   ## Private
   ##
-
-  defp all_stop(state) do
-    import Roost.Logic, only: [change_token: 1]
-
-    PulseWidth.off("roost disco ball")
-    PulseWidth.duty_names_begin_with("roost lights", duty: 0)
-    PulseWidth.duty_names_begin_with("roost el wire", duty: 0)
-
-    led_forest_cmd_map = %{
-      activate: true,
-      name: "dim slow fade",
-      random: %{
-        min: 256,
-        max: 768,
-        primes: 10,
-        step_ms: 50,
-        step: 7,
-        priority: 7
-      }
-    }
-
-    PulseWidth.random("roost led forest", led_forest_cmd_map)
-
-    state
-    |> change_token()
-    |> put_in([:dance], :no)
-    |> put_in([:active_cmd], :none)
-  end
 
   defp msg_puts(state, msg) do
     """

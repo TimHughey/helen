@@ -27,7 +27,6 @@ defmodule PulseWidth.Payload.Random do
     cmd = %{
       name: "random fade",
       type: "random",
-      activate: true,
       random: %{
         min: 256,
         max: 2048,
