@@ -34,6 +34,8 @@ defmodule Reef.Logic do
 
     state
     |> put_in([:pending, worker_mode, :steps], cmd_opts[:steps])
+    |> put_in([:pending, worker_mode, :sub_steps], cmd_opts[:sub_steps])
+    |> put_in([:pending, worker_mode, :step_devices], cmd_opts[:step_devices])
     |> build_device_last_cmds_map()
     |> note_delay_if_requested()
   end
