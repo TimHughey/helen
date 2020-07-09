@@ -1,7 +1,7 @@
 defmodule Roost.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: 1
+  def syntax_version, do: 2
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -25,7 +25,7 @@ defmodule Roost.Opts do
             max: 2048,
             primes: 35,
             step_ms: 55,
-            step: 3,
+            step: 1,
             priority: 7
           }
         },
@@ -37,7 +37,7 @@ defmodule Roost.Opts do
             max: 768,
             primes: 35,
             step_ms: 55,
-            step: 3,
+            step: 1,
             priority: 7
           }
         }
@@ -70,15 +70,20 @@ defmodule Roost.Opts do
         ],
         leaving: [
           steps: [
-            off: [:disco_ball, :el_wire, :lights_one, :lights_three],
-            on: [:led_forest, :el_wire_entry],
-            send_msg: [after: "PT10M", msg: {:worker_mode, :closed}],
+            house_lights: [
+              off: [:disco_ball, :el_wire, :lights_one, :lights_three],
+              on: [:led_forest, :el_wire_entry],
+              send_msg: [after: "PT10M", msg: {:worker_mode, :closed}]
+            ],
             exiting: [hold_mode: true]
           ]
         ],
         closed: [
           steps: [
-            led_forest: [random: :closed_fade],
+            turn_down_lights: [
+              off: [:el_wire_entry],
+              led_forest: [random: :closed_fade]
+            ],
             closed: [hold_mode: true]
           ]
         ]
