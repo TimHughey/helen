@@ -1,6 +1,8 @@
 defmodule Garden.Lighting.Opts do
   alias Helen.Module.Config
 
+  def syntax_version, do: 4
+
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
       :ok
@@ -12,7 +14,7 @@ defmodule Garden.Lighting.Opts do
   def default_opts do
     [
       syntax_vsn: syntax_version(),
-      timeout: "PT1M",
+      timeout: "PT3M",
       timezone: "America/New_York",
       cmd_definitions: [
         random_fade_bright: %{
@@ -112,8 +114,6 @@ defmodule Garden.Lighting.Opts do
   def reset_to_defaults(module) do
     Config.create_or_update(module, default_opts(), "reset by api call")
   end
-
-  def syntax_version, do: 2
 
   def syntax_version_match?(module) do
     opts = Config.opts(module)
