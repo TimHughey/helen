@@ -102,7 +102,12 @@ defmodule PulseWidth do
     |> Repo.all()
   end
 
-  defdelegate duty(name, opts \\ []), to: Alias
+  def duty(name, opts \\ [])
+
+  def duty(name, val) when is_binary(name) and is_number(val),
+    do: Alias.duty(name, duty: val)
+
+  defdelegate duty(name, opts), to: Alias
   defdelegate duty_names_begin_with(patterm, opts \\ []), to: Alias
 
   @doc delegate_to: {Example, :cmd, 2}

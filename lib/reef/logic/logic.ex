@@ -34,8 +34,6 @@ defmodule Reef.Logic do
 
     state
     |> put_in([:pending, worker_mode, :steps], cmd_opts[:steps])
-    |> put_in([:pending, worker_mode, :sub_steps], cmd_opts[:sub_steps])
-    |> put_in([:pending, worker_mode, :step_devices], cmd_opts[:step_devices])
     |> build_device_last_cmds_map()
     |> note_delay_if_requested()
   end
@@ -338,9 +336,6 @@ defmodule Reef.Logic do
   defp validate_opts(%{init_fault: _} = state), do: state
   # TODO implement!!
   defp validate_opts(state), do: state
-
-  # defp initialization_fault?(%{init_fault: _} = _state), do: true
-  # defp initialization_fault?(_state), do: false
 
   defp calculate_will_finish_by_if_needed(%{worker_mode: worker_mode} = state) do
     import Helen.Time.Helper, only: [to_ms: 1, utc_shift: 1]

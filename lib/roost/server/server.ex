@@ -26,6 +26,7 @@ defmodule Roost.Server do
       module: __MODULE__,
       server_mode: args[:server_mode] || :active,
       worker_mode: :ready,
+      devices: %{},
       dance: :init,
       server_standby_reason: :none,
       token: nil,
@@ -249,6 +250,14 @@ defmodule Roost.Server do
 
   @doc false
   @impl true
+  def handle_call({:available_modes}, _from, state) do
+    import Roost.Logic, only: [available_modes: 1]
+
+    reply(state, state |> available_modes())
+  end
+
+  @doc false
+  @impl true
   def handle_call({:cancel_delayed_cmd}, _from, state) do
     import Roost.Logic, only: [change_token: 1]
 
@@ -326,7 +335,6 @@ defmodule Roost.Server do
       :standby ->
         state
         |> change_token()
-        # |> crew_offline()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :api)
         |> reply({:ok, mode})
@@ -335,7 +343,6 @@ defmodule Roost.Server do
       :active ->
         state
         |> change_token()
-        # |> crew_online()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :none)
         |> reply({:ok, mode})
@@ -350,25 +357,27 @@ defmodule Roost.Server do
     state
     |> Logic.init_precheck(mode, api_opts)
     |> Logic.init_mode()
-    # |> Logic.start_mode()
+    |> Logic.start_mode()
     |> check_fault_and_reply()
   end
 
   @doc false
   @impl true
   def handle_call(msg, _from, state),
-    do: state |> msg_puts(msg) |> reply({:unmatched})
+    do: state |> msg_puts(msg) |> reply({:unmatched_msg, msg})
 
   @doc false
   @impl true
   def handle_continue(:bootstrap, state) do
-    import Roost.Logic, only: [change_token: 1, validate_all_durations: 1]
-    valid_opts? = state |> validate_all_durations()
+    alias Roost.Logic
+
+    valid_opts? = state |> Logic.validate_all_durations()
 
     case valid_opts? do
       true ->
         state
-        |> change_token()
+        |> Logic.change_token()
+        |> Logic.build_devices_map()
         |> set_all_modes_ready()
         |> noreply()
 
@@ -379,6 +388,25 @@ defmodule Roost.Server do
         |> noreply()
     end
   end
+
+  # handle step via messages
+  @impl true
+  def handle_info(
+        {:msg, {:via_msg, _step}, msg_token} = msg,
+        %{token: token} = state
+      )
+      when msg_token == token do
+    alias Roost.Logic
+
+    state
+    |> Logic.handle_via_msg(msg)
+    |> noreply()
+  end
+
+  @impl true
+  def handle_info({:msg, _msg, msg_token}, %{token: token} = state)
+      when msg_token != token,
+      do: state
 
   @impl true
   def handle_info({:timer, cmd, msg_token}, %{token: token} = state)
@@ -499,7 +527,7 @@ defmodule Roost.Server do
   end
 
   defp set_all_modes_ready(state) do
-    import Reef.Logic, only: [available_modes: 1]
+    import Roost.Logic, only: [available_modes: 1]
 
     for m <- available_modes(state), reduce: state do
       state -> state |> put_in([m], %{status: :ready})

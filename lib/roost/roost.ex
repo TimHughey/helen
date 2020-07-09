@@ -9,9 +9,9 @@ defmodule Roost do
   defdelegate all_stop, to: Server
   defdelegate available_modes, to: Server
   defdelegate cancel_delayed_cmd, to: Server
-  defdelegate dance_with_me, to: Server
+  def dance_with_me, do: worker_mode(:dance_with_me)
   defdelegate last_timeout, to: Server
-  defdelegate leaving, to: Server
+  def leaving, do: worker_mode(:leaving)
   defdelegate restart(opts \\ []), to: Server
   defdelegate runtime_opts, to: Server
   defdelegate server_mode(mode_atom), to: Server
