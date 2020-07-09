@@ -35,12 +35,6 @@ defmodule Reef do
     firstmate_status()
   end
 
-  @doc """
-  Execute the steps required to perform the physical water change.
-  """
-  @doc since: "0.0.27"
-  def change_water(opts), do: Captain.worker_mode(:change_water, opts)
-
   def default_opts do
     alias Reef.Opts.Prod
 
@@ -204,26 +198,35 @@ defmodule Reef do
     end
   end
 
-  def temp_ok? do
+  def temp_ok?(opts) do
     alias Reef.DisplayTank.Temp, as: DisplayTank
     alias Reef.MixTank.Temp, as: MixTank
 
     case {DisplayTank.temperature(), MixTank.temperature()} do
       {dt_temp, mt_temp} when is_number(dt_temp) and is_number(mt_temp) ->
-        if abs(dt_temp - mt_temp) < 0.7, do: true, else: true
+        cond do
+          opts[:skip_temp_check] == true -> true
+          abs(dt_temp - mt_temp) >= 0.7 -> false
+          true -> true
+        end
 
       _anything ->
         false
     end
   end
 
-  def water_change_start do
+  @doc """
+  Execute the steps required to perform the physical water change.
+  """
+  @doc since: "0.0.27"
+  def water_change(opts \\ [skip_temp_check: false]) do
+    alias Reef.Captain.Server, as: Captain
     alias Reef.DisplayTank.Temp, as: DisplayTank
     alias Reef.MixTank.Temp, as: MixTank
 
-    if temp_ok?() do
+    if temp_ok?(opts) do
       [
-        captain: all_stop(),
+        captain: Captain.worker_mode(:water_change, []),
         first_mate: FirstMate.worker_mode(:water_change_start, []),
         display_tank: DisplayTank.mode(:standby)
       ]

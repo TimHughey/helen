@@ -14,6 +14,7 @@ defmodule Reef.Captain.Status do
         :keep_fresh -> keep_fresh(state)
         :mix_salt -> mix_salt(state)
         :prep_for_change -> prep_for_change(state)
+        :water_change -> water_change(state)
         :ready -> ready(state)
       end
     else
@@ -69,6 +70,9 @@ defmodule Reef.Captain.Status do
         """
 
       :running ->
+        active_step = map[:active_step]
+        active_dev = get_in(map, [:step_devices, active_step])
+
         """
         Reef Fill In-Progress, elapsed time #{to_binary(map[:elapsed])}.
 
@@ -77,7 +81,7 @@ defmodule Reef.Captain.Status do
 
               Executing: #{inspect(map[:active_step])}
               Remaining: #{inspect(map[:steps_to_execute])}
-                Command: #{inspect(map[:step][:cmd])}
+                 Device: #{active_dev} [#{inspect(map[:step][:cmd])}]
                 Elapsed: #{to_binary(map[:step][:elapsed])}
                  Cycles: #{step_cycles(map)}
         """
@@ -182,6 +186,48 @@ defmodule Reef.Captain.Status do
         Reef Prep For Change Running, elapsed time #{to_binary(map[:elapsed])}.
 
                    Started: #{to_binary(map[:started_at])}
+
+        DisplayTank Temp F: #{inspect(dt_temp)}
+            MixTank Temp F: #{inspect(mt_temp)}
+                 Temp Diff: #{inspect(diff_temp)}
+
+                 Executing: #{inspect(map[:active_step])}
+                 Remaining: #{inspect(map[:steps_to_execute])}
+                   Command: #{inspect(map[:step][:cmd])}
+                   Elapsed: #{to_binary(map[:step][:elapsed])}
+                    Cycles: #{step_cycles(map)}
+        """
+    end
+  end
+
+  def water_change(%{water_change: map}) do
+    import Helen.Time.Helper, only: [to_binary: 1]
+
+    case map[:status] do
+      :ready ->
+        """
+        Reef Water Change is Ready
+        """
+
+      :completed ->
+        """
+        Reef Water Change Completed, elapsed time #{to_binary(map[:elapsed])}.
+
+           Started: #{to_binary(map[:started_at])}
+          Finished: #{to_binary(map[:finished_at])}
+        """
+
+      :running ->
+        dt_temp = Reef.DisplayTank.Temp.temperature()
+        mt_temp = Reef.MixTank.Temp.temperature()
+
+        diff_temp = calculate_temp_difference(dt_temp, mt_temp)
+
+        """
+        Reef Water Change Running, elapsed time #{to_binary(map[:elapsed])}.
+
+                   Started: #{to_binary(map[:started_at])}
+           Expected Finish: #{to_binary(map[:will_finish_by])}
 
         DisplayTank Temp F: #{inspect(dt_temp)}
             MixTank Temp F: #{inspect(mt_temp)}
