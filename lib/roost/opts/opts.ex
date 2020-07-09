@@ -1,7 +1,7 @@
 defmodule Roost.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: 2
+  def syntax_version, do: 1
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -45,7 +45,7 @@ defmodule Roost.Opts do
         el_wire: "roost el wire",
         el_wire_entry: "roost el wire entry",
         lights_one: "roost lights sound one",
-        lights_three: "roost lights sounds three",
+        lights_three: "roost lights sound three",
         led_forest: "roost led forest"
       ],
       modes: [
