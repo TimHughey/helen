@@ -201,11 +201,14 @@ defmodule Broom do
 
       defoverridable start_link: 1
 
-      @before_compile Broom
+      # @before_compile Broom
     end
   end
 
-  defmacro __before_compile__(%{aliases: _aliases} = _env), do: nil
+  #
+  # defmacro __before_compile__(%{aliases: _aliases} = _env) do
+  #
+  # end
 
   ##
   ## GenServer Start and Init
