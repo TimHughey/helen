@@ -2,7 +2,7 @@ defmodule Reef.FirstMate.Opts do
   alias Helen.Module.Config
   alias Helen.Module.DB.Config, as: DB
 
-  def syntax_version, do: "2020-0710"
+  def syntax_version, do: "2020-0710a"
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -17,50 +17,52 @@ defmodule Reef.FirstMate.Opts do
       syntax_vsn: syntax_version(),
       timeout: "PT1M",
       timezone: "America/New_York",
-      clean: [
-        step_devices: [ato_disable: :ato, ato_enable: :ato],
-        steps: [
-          ato_disable: [
-            run_for: "PT1H10S",
-            off: [for: "PT1M", at_cmd_finish: :off]
-          ],
-          ato_enable: [
-            run_for: "PT11S",
-            on: [for: "PT10S", at_cmd_finish: :on]
+      modes: [
+        clean: [
+          step_devices: [ato_disable: :ato, ato_enable: :ato],
+          steps: [
+            ato_disable: [
+              run_for: "PT1H10S",
+              off: [for: "PT1M", at_cmd_finish: :off]
+            ],
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
           ]
-        ]
-      ],
-      water_change_start: [
-        step_devices: [ato_disable: :ato, ato_enable: :ato],
-        steps: [
-          ato_disable: [
-            run_for: "PT3H10S",
-            off: [for: "PT1M", at_cmd_finish: :off]
-          ],
-          ato_enable: [
-            run_for: "PT11S",
-            on: [for: "PT10S", at_cmd_finish: :on]
+        ],
+        water_change_start: [
+          step_devices: [ato_disable: :ato, ato_enable: :ato],
+          steps: [
+            ato_disable: [
+              run_for: "PT3H10S",
+              off: [for: "PT1M", at_cmd_finish: :off]
+            ],
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
           ]
-        ]
-      ],
-      water_change_finish: [
-        step_devices: [ato_disable: :ato, ato_enable: :ato],
-        steps: [
-          ato_disable: [
-            run_for: "PT30M10S",
-            off: [for: "PT30M", at_cmd_finish: :off]
-          ],
-          ato_enable: [
-            run_for: "PT11S",
-            on: [for: "PT10S", at_cmd_finish: :on]
+        ],
+        water_change_finish: [
+          step_devices: [ato_disable: :ato, ato_enable: :ato],
+          steps: [
+            ato_disable: [
+              run_for: "PT30M10S",
+              off: [for: "PT30M", at_cmd_finish: :off]
+            ],
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
           ]
-        ]
-      ],
-      normal_operations: [
-        steps: [
-          ato_enable: [
-            run_for: "PT11S",
-            on: [for: "PT10S", at_cmd_finish: :on]
+        ],
+        normal_operations: [
+          steps: [
+            ato_enable: [
+              run_for: "PT11S",
+              on: [for: "PT10S", at_cmd_finish: :on]
+            ]
           ]
         ]
       ]
