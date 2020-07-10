@@ -15,12 +15,12 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def init(args) do
-    import Reef.FirstMate.Opts, only: [create_default_config_if_needed: 0]
+    import Reef.FirstMate.Opts, only: [create_default_config_if_needed: 1]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
 
-    create_default_config_if_needed()
+    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,

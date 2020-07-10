@@ -35,20 +35,6 @@ defmodule Reef do
     firstmate_status()
   end
 
-  def default_opts do
-    alias Reef.Opts.Prod
-
-    opts(fn _x -> Prod.defaults() end)
-    restart()
-  end
-
-  def test_opts do
-    alias Reef.Opts.Test
-
-    opts(fn _x -> Test.defaults() end)
-    restart()
-  end
-
   @doc """
   The first step of mixing a batch of reef replacement water.  This step
   fills the MixTank with RODI.
@@ -152,10 +138,19 @@ defmodule Reef do
   @doc since: "0.0.27"
   def mix_salt_status, do: Status.msg(:salt_mix) |> IO.puts()
 
-  defdelegate opts, to: Captain, as: :config_opts
-  def opts(func) when is_function(func), do: Captain.config_update(func)
+  @doc delegate_to: {Captain, :server_mode, 1}
+  defdelegate mode(opts), to: Captain, as: :server_mode
 
-  defdelegate opts_dump, to: Captain, as: :config_dump
+  @doc """
+  Output the server options stored in the database.
+  """
+  @doc since: "0.0.27"
+  def opts(server \\ [:captain]) when server in [:captain, :first_mate] do
+    case server do
+      :captain -> Captain.config_opts()
+      :first_mate -> FirstMate.config_opts()
+    end
+  end
 
   @doc """
   Prepare the MixTank for transfer to Water Stabilization Tank
@@ -170,17 +165,23 @@ defmodule Reef do
   defdelegate pump_on(opts \\ []), to: MixTank.Pump, as: :on
   defdelegate pump_toggle, to: MixTank.Pump, as: :toggle
 
-  @doc delegate_to: {Captain, :worker_mode, 2}
-  defdelegate worker_mode(mode, opts \\ []), to: Captain
-
   defdelegate restart, to: Captain
 
   defdelegate rodi_off(opts \\ []), to: MixTank.Rodi, as: :off
   defdelegate rodi_on(opts \\ []), to: MixTank.Rodi, as: :on
   defdelegate rodi_toggle, to: MixTank.Rodi, as: :toggle
 
-  @doc delegate_to: {Captain, :server_mode, 1}
-  defdelegate mode(opts), to: Captain, as: :server_mode
+  @doc """
+  Output the server runtime (active) options.
+  """
+  @doc since: "0.0.27"
+  def runtime_opts(server \\ [:captain])
+      when server in [:captain, :first_mate] do
+    case server do
+      :captain -> Captain.runtime_opts()
+      :first_mate -> FirstMate.runtime_opts()
+    end
+  end
 
   @doc """
   Output the Reef status based on the active reef mode.
@@ -212,6 +213,29 @@ defmodule Reef do
 
       _anything ->
         false
+    end
+  end
+
+  @doc """
+  Set server test opts.
+
+  Options:
+  `:captain` | `:first_mate`
+
+  """
+  @doc since: "0.0.27"
+  def test_opts(server) when server in [:captain, :first_mate] do
+    alias Reef.Captain
+    alias Reef.FirstMate
+
+    case server do
+      :captain ->
+        Captain.Opts.test_opts()
+        Captain.Server.restart()
+
+      :first_mate ->
+        FirstMate.Opts.test_opts()
+        FirstMate.Server.restart()
     end
   end
 
@@ -254,4 +278,7 @@ defmodule Reef do
 
   defdelegate x_which_children, to: Reef.Supervisor, as: :which_children
   defdelegate x_state(opts \\ []), to: Captain
+
+  @doc delegate_to: {Captain, :worker_mode, 2}
+  defdelegate worker_mode(mode, opts \\ []), to: Captain
 end

@@ -38,7 +38,7 @@ defmodule Garden.Irrigation.Opts do
   def syntax_version_match?(module) do
     opts = Config.opts(module)
 
-    if opts[:syntax_version] == syntax_version(), do: true, else: false
+    if opts[:syntax_vsn] == syntax_version(), do: true, else: false
   end
 
   def test_opts do

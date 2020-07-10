@@ -1,7 +1,7 @@
 defmodule Roost.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: 1
+  def syntax_version, do: "2020-0710"
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -24,7 +24,7 @@ defmodule Roost.Opts do
             max: 2048,
             primes: 35,
             step_ms: 55,
-            step: 7,
+            step: 13,
             priority: 7
           }
         },
@@ -35,7 +35,7 @@ defmodule Roost.Opts do
             max: 768,
             primes: 35,
             step_ms: 55,
-            step: 3,
+            step: 7,
             priority: 7
           }
         }
@@ -100,7 +100,7 @@ defmodule Roost.Opts do
   def syntax_version_match?(module) do
     opts = Config.opts(module)
 
-    if opts[:syntax_version] == syntax_version(), do: true, else: false
+    if opts[:syntax_vsn] == syntax_version(), do: true, else: false
   end
 
   def test_opts do

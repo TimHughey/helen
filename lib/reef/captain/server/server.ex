@@ -16,8 +16,12 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
+    import Reef.Captain.Opts, only: [create_default_config_if_needed: 1]
+
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
+
+    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,
@@ -114,12 +118,15 @@ defmodule Reef.Captain.Server do
   end
 
   @doc """
-  Start the specified reef mode combining the opts passed to the API
-  with those from the configuration.
+  Return the server runtime options.
   """
   @doc since: "0.0.27"
-  def worker_mode(mode, overrides \\ []) do
-    call_worker_mode(mode, overrides)
+  def runtime_opts do
+    if is_nil(GenServer.whereis(__MODULE__)) do
+      []
+    else
+      GenServer.call(__MODULE__, :state) |> get_in([:opts])
+    end
   end
 
   @doc """
@@ -167,6 +174,15 @@ defmodule Reef.Captain.Server do
   @doc since: "0.0.27"
   def server_mode(atom) when atom in [:active, :standby] do
     call({:server_mode, atom})
+  end
+
+  @doc """
+  Start the specified reef mode combining the opts passed to the API
+  with those from the configuration.
+  """
+  @doc since: "0.0.27"
+  def worker_mode(mode, overrides \\ []) do
+    call_worker_mode(mode, overrides)
   end
 
   @doc """

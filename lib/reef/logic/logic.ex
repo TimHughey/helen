@@ -1,6 +1,6 @@
 defmodule Reef.Logic do
   def available_modes(%{opts: opts} = _state) do
-    Keyword.drop(opts, [:__available__, :__version__])
+    get_in(opts, [:modes])
     |> Keyword.keys()
     |> Enum.sort()
   end
@@ -246,7 +246,7 @@ defmodule Reef.Logic do
 
     api_opts = [overrides] |> List.flatten()
 
-    config_opts = get_in(opts, [worker_mode])
+    config_opts = get_in(opts, [:modes, worker_mode])
     final_opts = deep_merge(config_opts, api_opts)
 
     state

@@ -8,8 +8,6 @@ defmodule GenDevice do
       use GenServer, restart: :transient, shutdown: 7000
       use Helen.Module.Config
 
-      @callback open(opts :: [] | [for: [minutes: 1]]) :: :ok
-
       @use_opts use_opts
 
       ##

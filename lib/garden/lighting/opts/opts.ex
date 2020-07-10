@@ -1,7 +1,7 @@
 defmodule Garden.Lighting.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: 1
+  def syntax_version, do: "2020-0710"
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -18,20 +18,20 @@ defmodule Garden.Lighting.Opts do
       timezone: "America/New_York",
       cmd_definitions: [
         random_fade_bright: %{
-          name: "slow fade",
+          name: "fade bright",
           random: %{
             min: 256,
             max: 2048,
             primes: 35,
             step_ms: 55,
-            step: 7,
+            step: 13,
             priority: 7
           }
         },
         random_fade_dim: %{
-          name: "slow fade",
+          name: "fade dim",
           random: %{
-            min: 128,
+            min: 64,
             max: 1024,
             primes: 35,
             step_ms: 55,
@@ -55,8 +55,8 @@ defmodule Garden.Lighting.Opts do
               cmd: :random_fade_bright
             ],
             night: [
-              sun_ref: :sunset,
-              after: "PT1H30M",
+              sun_ref: :civil_twilight_end,
+              after: "PT0S",
               cmd: :random_fade_dim
             ]
           ]
@@ -75,8 +75,8 @@ defmodule Garden.Lighting.Opts do
               cmd: :random_fade_bright
             ],
             night: [
-              sun_ref: :sunset,
-              after: "PT1H30M",
+              sun_ref: :civil_twilight_end,
+              after: "PT0S",
               cmd: :random_fade_dim
             ]
           ]
@@ -95,8 +95,8 @@ defmodule Garden.Lighting.Opts do
               cmd: :random_fade_bright
             ],
             night: [
-              sun_ref: :sunset,
-              after: "PT1H30M",
+              sun_ref: :civil_twilight_end,
+              after: "PT0S",
               cmd: :random_fade_dim
             ]
           ]
@@ -116,7 +116,7 @@ defmodule Garden.Lighting.Opts do
   def syntax_version_match?(module) do
     opts = Config.opts(module)
 
-    if opts[:syntax_version] == syntax_version(), do: true, else: false
+    if opts[:syntax_vsn] == syntax_version(), do: true, else: false
   end
 
   def test_opts do
