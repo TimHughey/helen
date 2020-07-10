@@ -278,7 +278,7 @@ defmodule Reef.Logic do
   end
 
   defp confirm_worker_mode_exists(state, worker_mode) do
-    known_worker_mode? = get_in(state, [:opts, worker_mode]) || false
+    known_worker_mode? = get_in(state, [:opts, :modes, worker_mode]) || false
 
     if known_worker_mode? do
       state |> put_in([:pending, :worker_mode], worker_mode)
