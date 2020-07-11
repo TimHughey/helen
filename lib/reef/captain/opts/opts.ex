@@ -3,7 +3,7 @@ defmodule Reef.Captain.Opts do
 
   alias Helen.Module.Config
 
-  def syntax_version, do: "2020-0710"
+  def syntax_version, do: "2020-0711"
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -109,7 +109,7 @@ defmodule Reef.Captain.Opts do
             adjust_valves: [off: [for: "PT45S"]],
             transfer_h2o: [on: [for: "PT2M35S", at_cmd_finish: :off]],
             final_check: [off: [for: "PT10M"]],
-            normal_operations: [msg: {:display_tank, :active}]
+            normal_operations: [msg: {:display_temp, :active}]
           ]
         ]
       ]
