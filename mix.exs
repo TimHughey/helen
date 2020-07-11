@@ -1,185 +1,23 @@
-defmodule Helen.Mixfile do
-  # Helen Copyright (C) 2020  Tim Hughey (thughey)
-
-  @moduledoc """
-    Mix file defining Helen
-  """
-
+defmodule FatHelen.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :helen,
-      version: "0.0.27",
-      elixir: "~> 1.10",
-      deps: deps(),
-      releases: releases(),
+      apps_path: "apps",
+      version: "0.1.0",
       start_permanent: Mix.env() == :prod,
-      elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [:gettext] ++ Mix.compilers(),
-      aliases: aliases(),
-      package: package(),
-      description: "Helen",
-      escript: escript_config(),
-      test_coverage: test_coverage(),
-      deploy_paths: deploy_paths(),
-      stage_paths: stage_paths(),
-      homepage_url: "https://www.wisslanding.com",
-      source_url: "https://github.com/TimHughey/helen",
-      docs: [
-        extras: ["CHANGELOG.md"],
-        groups_for_modules: [
-          Devices: [PulseWidth, Remote, Sensor, Switch],
-          Servers: [Reef]
-        ],
-        nest_modules_by_prefix: [
-          Helen,
-          Mqtt,
-          PulseWidth,
-          Reef,
-          Sensor,
-          Switch,
-          Remote
-        ]
-      ]
+      deps: deps(),
+      releases: releases()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
-  def application do
-    [
-      mod:
-        {Helen.Application,
-         [
-           version: "#{project() |> Keyword.get(:version)}",
-           git_vsn: "#{git_describe()}"
-         ]},
-      extra_applications: [
-        :logger,
-        :runtime_tools,
-        :parse_trans,
-        :httpoison,
-        :observer,
-        :agnus
-      ],
-      env: []
-    ]
-  end
-
-  def deploy_paths,
-    do: [
-      dev: "/tmp/helen/dev",
-      test: "/tmp/helen/test",
-      prod: "/usr/local/helen"
-    ]
-
-  def stage_paths,
-    do: [prod: "/tmp"]
-
-  # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/common"]
-  defp elixirc_paths(_), do: ["lib"]
-
-  # Run "mix help deps" to learn about dependencies.
+  # Dependencies listed here are available only for this
+  # project and cannot be accessed from applications inside
+  # the apps folder.
+  #
+  # Run "mix help deps" for examples and options.
   defp deps do
-    [
-      {:timex, "~> 3.0"},
-      {:jason, "~> 1.0"},
-      {:instream, "~> 0.17"},
-      {:hackney, "~> 1.1"},
-      {:poolboy, "~> 1.5"},
-      {:httpoison, "~> 1.6"},
-      {:postgrex, ">= 0.0.0"},
-      {:ecto_sql, "~> 3.1"},
-      {:tortoise, "~> 0.9"},
-      {:uuid, "~> 1.1"},
-      {:gettext, "~> 0.11"},
-      {:quantum, "~> 3.0.1"},
-      {:scribe, "~> 0.10"},
-      {:msgpax, "~> 2.0"},
-      {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
-      {:coverex, "~> 1.0", only: :test},
-      {:deep_merge, "~> 1.0"},
-      {:crontab, "~> 1.1"},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:agnus, "~> 0.0.3"}
-      # {:agnus, path: "../agnus"}
-      # {:phoenix, "~> 1.4.0"},
-      # {:phoenix_pubsub, "~> 1.0"},
-      # {:phoenix_ecto, "~> 4.0"},
-      # {:phoenix_html, "~> 2.10"},
-      # {:phoenix_live_reload, "~> 1.2", only: :dev},
-      # {:plug_cowboy, "~> 2.0"},
-      # {:plug, "~> 1.7"},
-      # {:guardian, "~> 1.0"},
-      # {:ueberauth, "~> 0.4"},
-      # {:ueberauth_github, "~> 0.4"},
-      # {:ueberauth_identity, "~> 0.2"},
-    ]
-  end
-
-  defp aliases do
-    [
-      "ecto.migrate": [
-        "ecto.migrate",
-        "ecto.dump --dump-path priv/repo/structure-#{Mix.env()}.sql"
-      ],
-      "ecto.setup": [
-        "ecto.create",
-        "ecto.load --dump-path priv/repo/structure-prod.sql",
-        "ecto.migrate"
-      ],
-      "ecto.reset": [
-        "ecto.drop",
-        "ecto.create",
-        "ecto.load --dump-path priv/repo/structure-prod.sql",
-        "ecto.migrate",
-        "ecto.dump --dump-path priv/repo/structure-#{Mix.env()}.sql"
-      ],
-      "helen.deps.update": [
-        "local.hex --if-missing --force",
-        "deps.get",
-        "deps.clean --unused"
-      ]
-      # test: ["ecto.create --quiet", "ecto.load", "ecto.migrate", "test"]
-    ]
-  end
-
-  # defp aliases do
-  #   [
-  #     "ecto.seed": ["seed"],
-  #     "ecto.setup": ["ecto.create", "ecto.migrate --log-sql", "ecto.seed"],
-  #     "ecto.reset": ["ecto.drop", "ecto.setup"]
-  #   ]
-  # end
-
-  defp package do
-    [
-      name: "helen",
-      files: ~w(config extra lib priv rel special test
-            .credo.exs .formatter.exs mix.exs
-            COPYING* README* LICENSE* CHANGELOG*),
-      links: %{"GitHub" => "https://github.com/TimHughey/helen"},
-      maintainers: ["Tim Hughey"],
-      licenses: ["LGPL-3.0-or-later"]
-    ]
-  end
-
-  defp escript_config, do: [main_module: Helen]
-
-  defp git_describe do
-    {result, _rc} = System.cmd("git", ["describe"])
-    String.trim(result)
-  end
-
-  defp test_coverage do
-    [
-      tool: Coverex.Task,
-      ignore_modules: [
-        Helen.IExHelpers,
-        Repo
-      ]
-    ]
+    []
   end
 
   defp sym_link_data(release) do
@@ -224,6 +62,8 @@ defmodule Helen.Mixfile do
   defp releases do
     [
       helen: [
+        version: "0.1.0",
+        applications: [helen: :permanent],
         include_erts: true,
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],
