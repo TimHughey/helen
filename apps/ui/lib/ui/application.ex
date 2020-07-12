@@ -10,7 +10,10 @@ defmodule UI.Application do
       # Start the Telemetry supervisor
       UI.Telemetry,
       # Start the Endpoint (http/https)
-      UI.Endpoint
+
+      UI.Endpoint,
+      # Start PubSub
+      {Phoenix.PubSub, name: UI.PubSub}
       # Start a worker by calling: UI.Worker.start_link(arg)
       # {UI.Worker, arg}
     ]
