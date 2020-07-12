@@ -69,6 +69,6 @@ chmod -R g+X . && print "done."
 
 print -n "starting latest release of helen..."
 
-./bin/helen daemon
+PORT=4005 ./bin/helen daemon
 
 print " done."

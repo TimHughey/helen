@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 # For production, don't forget to configure the url host
 # to something meaningful, Phoenix uses this information
@@ -10,10 +10,9 @@ use Mix.Config
 # which you should run after static files are built and
 # before starting your production server.
 config :ui, UI.Endpoint,
-  http: [port: 4002],
-  url: [host: "helen.wisslanding.com", port: 4002],
-  cache_static_manifest: "priv/static/cache_manifest.json",
-  root: "."
+  http: [port: 4005],
+  url: [host: "helen.wisslanding.com", port: 4005],
+  cache_static_manifest: "priv/static/cache_manifest.json"
 
 # Do not print debug messages in production
 config :logger, level: :info
