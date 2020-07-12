@@ -369,7 +369,7 @@ defmodule Roost.Server do
   @impl true
   def handle_info({:msg, _msg, msg_token}, %{token: token} = state)
       when msg_token != token,
-      do: state
+      do: state |> noreply()
 
   @impl true
   def handle_info({:timer, _cmd, msg_token}, %{token: token} = state)
