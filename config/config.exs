@@ -16,8 +16,5 @@ config :logger,
     [application: :swarm, level_lower_than: :error]
   ]
 
-# Use Jason for JSON parsing in Phoenix
-config :phoenix, :json_library, Jason
-
 import_config "helen/config.exs"
 import_config "ui/config.exs"

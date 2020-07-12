@@ -8,11 +8,11 @@
 use Mix.Config
 
 # Configures the endpoint
-config :ui, Ui.Endpoint,
+config :ui, UI.Endpoint,
   url: [host: "localhost"],
   secret_key_base: "uHqvJEz8vTo0YlOH4BzlpuJLPvWCjdpbXjdURYPIGlthgj3S79BQU6vzyEhZcBt2",
-  render_errors: [view: Ui.ErrorView, accepts: ~w(html json), layout: false],
-  pubsub_server: Ui.PubSub,
+  render_errors: [view: UI.ErrorView, accepts: ~w(html json), layout: false],
+  pubsub_server: UI.PubSub,
   live_view: [signing_salt: "gcVuZPJL"]
 
 # Use Jason for JSON parsing in Phoenix
