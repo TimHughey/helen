@@ -10,7 +10,7 @@ use Mix.Config
 # which you should run after static files are built and
 # before starting your production server.
 config :ui, UiWeb.Endpoint,
-  url: [host: "example.com", port: 80],
+  url: [host: "helen.wisslanding.com", port: 4002],
   cache_static_manifest: "priv/static/cache_manifest.json"
 
 # Do not print debug messages in production
@@ -52,4 +52,8 @@ config :logger, level: :info
 
 # Finally import the config/prod.secret.exs which loads secrets
 # and configuration from environment variables.
-import_config "prod.secret.exs"
+secret =
+  [System.get_env("HOME"), "devel", "shell", "local", "helen-home", "helen_app_ui"]
+  |> Path.join()
+
+import_config Path.join([secret, "prod.secret.exs"])

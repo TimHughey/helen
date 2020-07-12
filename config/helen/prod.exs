@@ -19,8 +19,7 @@ config :helen, Mqtt.Client,
     client_id: "helen-prod",
     user_name: "** set in prod.secret.exs",
     password: "** set in prod.secret.exs",
-    server:
-      {Tortoise.Transport.Tcp, host: "** set in prod.secret.exs", port: 1883},
+    server: {Tortoise.Transport.Tcp, host: "** set in prod.secret.exs", port: 1883},
     keep_alive: 15
   ]
 
@@ -92,4 +91,8 @@ config :helen, Helen.Scheduler,
      ]}
   ]
 
-import_config "prod.secret.exs"
+secret =
+  [System.get_env("HOME"), "devel", "shell", "local", "helen-home", "helen_app"]
+  |> Path.join()
+
+import_config Path.join([secret, "prod.secret.exs"])
