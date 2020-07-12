@@ -1,4 +1,4 @@
-defmodule UiWeb.Telemetry do
+defmodule UI.Telemetry do
   use Supervisor
   import Telemetry.Metrics
 
@@ -49,7 +49,7 @@ defmodule UiWeb.Telemetry do
     [
       # A module, function and arguments to be invoked periodically.
       # This function must call :telemetry.execute/3 and a metric must be added above.
-      # {UiWeb, :count_users, []}
+      # {UI, :count_users, []}
     ]
   end
 end

@@ -1,4 +1,4 @@
-defmodule UiWeb.Endpoint do
+defmodule UI.Endpoint do
   use Phoenix.Endpoint, otp_app: :ui
 
   # The session will be stored in the cookie and signed,
@@ -6,11 +6,11 @@ defmodule UiWeb.Endpoint do
   # Set :encryption_salt if you would also like to encrypt it.
   @session_options [
     store: :cookie,
-    key: "_helen_ui_key",
-    signing_salt: "UjOfCyiB"
+    key: "_ui_key",
+    signing_salt: "FsujWNyL"
   ]
 
-  socket "/socket", UiWeb.UserSocket,
+  socket "/socket", UI.UserSocket,
     websocket: true,
     longpoll: false
 
@@ -32,6 +32,7 @@ defmodule UiWeb.Endpoint do
     socket "/phoenix/live_reload/socket", Phoenix.LiveReloader.Socket
     plug Phoenix.LiveReloader
     plug Phoenix.CodeReloader
+    plug Phoenix.Ecto.CheckRepoStatus, otp_app: :ui
   end
 
   plug Phoenix.LiveDashboard.RequestLogger,
@@ -49,5 +50,5 @@ defmodule UiWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
-  plug UiWeb.Router
+  plug UI.Router
 end

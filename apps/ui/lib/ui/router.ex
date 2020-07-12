@@ -1,5 +1,5 @@
-defmodule UiWeb.Router do
-  use UiWeb, :router
+defmodule UI.Router do
+  use UI, :router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -13,14 +13,14 @@ defmodule UiWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/", UiWeb do
+  scope "/", UI do
     pipe_through :browser
 
     get "/", PageController, :index
   end
 
   # Other scopes may use custom stacks.
-  # scope "/api", UiWeb do
+  # scope "/api", UI do
   #   pipe_through :api
   # end
 
@@ -36,7 +36,7 @@ defmodule UiWeb.Router do
 
     scope "/" do
       pipe_through :browser
-      live_dashboard "/dashboard", metrics: UiWeb.Telemetry
+      live_dashboard "/dashboard", metrics: UI.Telemetry
     end
   end
 end

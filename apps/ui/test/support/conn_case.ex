@@ -1,4 +1,4 @@
-defmodule UiWeb.ConnCase do
+defmodule UI.ConnCase do
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.
@@ -11,7 +11,7 @@ defmodule UiWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use UiWeb.ConnCase, async: true`, although
+  by setting `use UI.ConnCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -22,20 +22,20 @@ defmodule UiWeb.ConnCase do
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
-      import UiWeb.ConnCase
+      import UI.ConnCase
 
-      alias UiWeb.Router.Helpers, as: Routes
+      alias UI.Router.Helpers, as: Routes
 
       # The default endpoint for testing
-      @endpoint UiWeb.Endpoint
+      @endpoint UI.Endpoint
     end
   end
 
   setup tags do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ui.Repo)
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(UI.Repo)
 
     unless tags[:async] do
-      Ecto.Adapters.SQL.Sandbox.mode(Ui.Repo, {:shared, self()})
+      Ecto.Adapters.SQL.Sandbox.mode(UI.Repo, {:shared, self()})
     end
 
     {:ok, conn: Phoenix.ConnTest.build_conn()}

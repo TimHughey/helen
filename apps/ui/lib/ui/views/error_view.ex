@@ -1,5 +1,5 @@
-defmodule UiWeb.ErrorView do
-  use UiWeb, :view
+defmodule UI.ErrorView do
+  use UI, :view
 
   # If you want to customize a particular status code
   # for a certain format, you may uncomment below.

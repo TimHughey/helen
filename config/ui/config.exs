@@ -8,10 +8,10 @@
 use Mix.Config
 
 # Configures the endpoint
-config :ui, UiWeb.Endpoint,
+config :ui, Ui.Endpoint,
   url: [host: "localhost"],
   secret_key_base: "uHqvJEz8vTo0YlOH4BzlpuJLPvWCjdpbXjdURYPIGlthgj3S79BQU6vzyEhZcBt2",
-  render_errors: [view: UiWeb.ErrorView, accepts: ~w(html json), layout: false],
+  render_errors: [view: Ui.ErrorView, accepts: ~w(html json), layout: false],
   pubsub_server: Ui.PubSub,
   live_view: [signing_salt: "gcVuZPJL"]
 

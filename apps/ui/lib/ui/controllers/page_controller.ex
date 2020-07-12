@@ -1,5 +1,5 @@
-defmodule UiWeb.PageController do
-  use UiWeb, :controller
+defmodule UI.PageController do
+  use UI, :controller
 
   def index(conn, _params) do
     render(conn, "index.html")
