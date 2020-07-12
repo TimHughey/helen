@@ -10,6 +10,7 @@ use Mix.Config
 # which you should run after static files are built and
 # before starting your production server.
 config :ui, UI.Endpoint,
+  http: [port: 4002],
   url: [host: "helen.wisslanding.com", port: 4002],
   cache_static_manifest: "priv/static/cache_manifest.json",
   root: "."
