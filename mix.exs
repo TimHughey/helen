@@ -63,7 +63,7 @@ defmodule FatHelen.MixProject do
     [
       helen: [
         version: "0.1.0",
-        applications: [helen: :permanent],
+        applications: [helen: :permanent, ui: :permanent],
         include_erts: true,
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],
