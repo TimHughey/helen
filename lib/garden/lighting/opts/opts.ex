@@ -1,7 +1,7 @@
 defmodule Garden.Lighting.Opts do
   alias Helen.Module.Config
 
-  def syntax_version, do: "2020-0711"
+  def syntax_version, do: "2020-0712"
 
   def create_default_config_if_needed(module) do
     if Config.available?(module) and syntax_version_match?(module) do
@@ -31,11 +31,11 @@ defmodule Garden.Lighting.Opts do
         random_fade_dim: %{
           name: "fade dim",
           random: %{
-            min: 128,
+            min: 256,
             max: 1024,
             primes: 35,
             step_ms: 55,
-            step: 7,
+            step: 13,
             priority: 7
           }
         }
