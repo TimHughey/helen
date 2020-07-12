@@ -11,7 +11,8 @@ use Mix.Config
 # before starting your production server.
 config :ui, Ui.Endpoint,
   url: [host: "helen.wisslanding.com", port: 4002],
-  cache_static_manifest: "priv/static/cache_manifest.json"
+  cache_static_manifest: "priv/static/cache_manifest.json",
+  root: "."
 
 # Do not print debug messages in production
 config :logger, level: :info
