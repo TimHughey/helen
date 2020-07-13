@@ -190,7 +190,8 @@ defmodule Reef do
 
   """
   @doc since: "0.0.27"
-  def status, do: Status.msg() |> IO.puts()
+  # def status, do: Status.msg() |> IO.puts()
+  def status, do: Status.msg()
 
   def standby_reason do
     case x_state(:standby_reason) do

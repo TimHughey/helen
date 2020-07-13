@@ -1,7 +1,23 @@
+<!-- <section class="phx-hero">
+  <h1><%= gettext "Welcome to!", name: "Phoenix" %></h1>
+  <p>Peace-of-mind from helen prototype to production</p>
+</section> -->
+
 <section class="phx-hero">
-  <h1><%= gettext "Welcome to %{name}!", name: "Phoenix" %></h1>
-  <p>Peace-of-mind from prototype to production</p>
+  <h1>Reef State</h1>
 </section>
+
+<%= build_reef_state() %>
+
+<!-- <section class="row">
+  <article class="column">
+      <label name="refresh" class="switch">
+        <input type="checkbox">
+          <span class="slider round"></span>
+      </label>
+  </article>
+</section> -->
+
 
 <section class="row">
   <article class="column">
