@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 config :helen, Repo,
   hostname: "obviously the hostname of the rdbms",

@@ -12,6 +12,9 @@ function run_cmd {
     return $rc
 }
 
+pushd -q ${HOME}/devel/shell/local/helen-home/helen_app_ui
+source ./secret-base.sh
+
 pushd -q ${HOME}/devel/helen
 
 helen_base=/usr/local/helen
@@ -69,6 +72,6 @@ chmod -R g+X . && print "done."
 
 print -n "starting latest release of helen..."
 
-./bin/helen daemon
+PORT=4009 ./bin/helen daemon
 
 print " done."
