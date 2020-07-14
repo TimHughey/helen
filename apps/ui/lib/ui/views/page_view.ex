@@ -14,7 +14,7 @@ defmodule UI.PageView do
 
   def build_reef_state do
     %{worker_mode: mode} = state = Reef.x_state()
-    display = get_in(state, [mode])
+    display = get_in(state, [mode]) || %{status: :ready}
 
     content_tag :section, class: :row, name: "reef_state" do
       content_tag :table, class: :state_table do
