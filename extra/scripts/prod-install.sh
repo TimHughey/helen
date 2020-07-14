@@ -12,6 +12,9 @@ function run_cmd {
     return $rc
 }
 
+pushd -q ${HOME}/devel/shell/local/helen-home/helen_app_ui
+source ./secret-base.sh
+
 pushd -q ${HOME}/devel/helen
 
 helen_base=/usr/local/helen
