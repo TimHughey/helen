@@ -24,7 +24,9 @@ defmodule UI.PageView do
     for {k, v} <- display do
       content_tag :div, class: "row reef_state_row" do
         [
-          content_tag(:div, "#{inspect(k)}" |> html_escape(), class: "column reef_state_key"),
+          content_tag(:div, "#{Atom.to_string(k)}" |> html_escape(),
+            class: "column reef_state_key"
+          ),
           content_tag(:div, "#{inspect(v)}" |> html_escape(), class: "column reef_state_value")
         ]
       end

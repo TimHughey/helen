@@ -127,14 +127,16 @@ header nav a {
 .reef_state_key {
   margin: 0 auto;
   align-self: baseline;
-  font-size: 2.2rem;
+  font-size: 2.1rem;
   font-style: italic;
   font-weight: bold;
   text-align: right;
 }
 
 .reef_state_value {
-
+  font-family: 'Anonymous Pro', monospace;
+  color: rgb(0, 186, 255);
+  font-size: 1.6rem;
   text-align: left;
 }
 
