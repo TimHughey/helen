@@ -1,23 +1,14 @@
-<!-- <section class="phx-hero">
-  <h1><%= gettext "Welcome to!", name: "Phoenix" %></h1>
-  <p>Peace-of-mind from helen prototype to production</p>
-</section> -->
-
 <section class="helen-hero">
-  <h3 class="reef_state">Reef State</h3>
+  <h3 class="reef_state">Reef</h3>
 </section>
 
 <section >
-
-
-<div class="container">
-
-  <%= build_reef_state() %>
-
-</div>
-
+  <div class="container">
+    <div class="row">
+      <div class="column reef_worker_mode">
+        <%= worker_mode() %>
+      </div>
+    </div>
+    <%= build_reef_state() %>
+  </div>
 </section>
-
-<!-- <section class="row container">
-
-</section> -->
