@@ -33,6 +33,7 @@ pushd -q /usr/local/helen/bin
 if [[ -f ./helen ]]; then
   print -n "stopping helen... "
   ./helen stop 1> /dev/null 2>&1
+  sleep 5
   # check helen is really shutdown
   ./helen ping 1> /dev/null 2>&1
   if [[ $? -eq 0 ]]; then
