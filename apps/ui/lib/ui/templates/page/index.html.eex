@@ -1,14 +1,11 @@
 <section class="helen-hero">
-  <h3 class="reef_state">Reef</h3>
+  <div class="row reef_state_headline">
+    <div class="column reef_subsystem">Reef Subsystem Control</div>
+    <div class="column reef_worker_mode"><%= worker_mode() %></div>
 </section>
 
 <section >
   <div class="container">
-    <div class="row">
-      <div class="column reef_worker_mode">
-        <%= worker_mode() %>
-      </div>
-    </div>
     <%= build_reef_state() %>
   </div>
 </section>
