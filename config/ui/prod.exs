@@ -14,7 +14,7 @@ config :ui, UI.Endpoint,
   url: [host: "helen.wisslanding.com", port: 4005],
   cache_static_manifest: "priv/static/cache_manifest.json"
 
-config :logger, level: :warn
+# config :logger, level: :warn
 
 # ## SSL Support
 #
