@@ -14,6 +14,7 @@ config :logger,
   compile_time_purge_matching: [
     [application: :helen, level_lower_than: :info],
     [application: :ui, level_lower_than: :warn],
+    [application: :cowboy, level_lower_than: :warn],
     [application: :swarm, level_lower_than: :error]
   ]
 
