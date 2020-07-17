@@ -4,9 +4,12 @@
     <meta charset="utf-8"/>
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <meta http-equiv="refresh" content="7">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
-    <link href="https://fonts.googleapis.com/css2?family=Anonymous+Pro&display=swap" rel="stylesheet">
+
+    <%= if UI.HomeView.auto_refresh?(@conn) do %>
+      <meta http-equiv="refresh" content="7">
+    <% end %>
+
+    <link href="https://fonts.googleapis.com/css2?family=Anonymous+Pro&family=Montserrat:wght@300;400;500;600;700&family=Quicksand:wght@300;400;500;600;700&family=Roboto&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.0/milligram.css">
     <title>Helen UI</title>
@@ -15,9 +18,11 @@
   </head>
   <body>
     <header>
-      <div class="row">
+      <div class="row header">
         <div class="column">
-          <h1>I am Helen</h1>
+          <h1 class="i-am">
+            <%= link "I am Helen", to: Routes.home_path(@conn, :index) %>
+          </h1>
           <!-- <a href="https://phoenixframework.org/" class="phx-logo">
             <img src="<%= Routes.static_path(@conn, "/images/phoenix.png") %>" alt="Phoenix Framework Logo"/>
           </a> -->
@@ -31,6 +36,13 @@
               <% end %>
             </ul>
           </nav>
+        </div>
+        <div>
+          <%= if UI.HomeView.auto_refresh?(@conn) do
+                button("Refresh", to: Routes.home_path(@conn, :index, auto_refresh: false), class: "refresh-enabled")
+              else
+                button("Refresh", to: Routes.home_path(@conn, :index, auto_refresh: true), class: "refresh-disabled")
+              end %>
         </div>
       </div>
     </header>

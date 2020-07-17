@@ -1,0 +1,68 @@
+<section>
+  <div class="row reef-banner">
+    <div class="column ">Reef Captain and First Mate Status</div>
+</section>
+
+<section>
+  <div class="container">
+    <div class="row">
+      <div class="column reef-subsystem-heading">
+        Mix Tank
+      </div>
+      <div class="column reef-subsystem-heading">
+        Display Tank
+      </div>
+    </div>
+    <div class="row reef-subsystem-block">
+      <div class="column">
+        <div class="row reef-subsystem">
+          <div class="column">
+            <div class="reef-subsystem-standby">
+              <%= subsystem_status(:mixtank, :pump, "Pump") %>
+            </div>
+          </div>
+          <div class="column">
+            <div class="reef-subsystem-standby">
+              <%= subsystem_status(:mixtank, :air, "Air") %>
+            </div>
+          </div>
+          <div class="column">
+            <div class="reef-subsystem-active">
+              <%= subsystem_status(:mixtank, :heat, "Heat") %>
+            </div>
+          </div>
+          <div class="column">
+            <div class="reef-subsystem-running">
+            <%= subsystem_status(:mixtank, :rodi, "RODI") %>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="row reef-subsystem">
+          <div class="column">
+            <div class="reef-subsystem-standby">
+              <%= subsystem_status(:display_tank, :ato, "ATO") %>
+            </div>
+          </div>
+          <div class="column">
+            <div class="reef-subsystem-running">
+              <%= subsystem_status(:display_tank, :heat, "Heat") %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="row reef-worker-mode">
+      <%= worker_mode(@reef_state) %>
+    </div>
+    <div class="row reef-state-details">
+      <div class="column">
+          <%= build_reef_state(@reef_state) %>
+      </div>
+
+    </div>
+
+  </div>
+</section>

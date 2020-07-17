@@ -16,7 +16,9 @@ defmodule UI.Router do
   scope "/", UI do
     pipe_through :browser
 
-    get "/", PageController, :index
+    get "/reef", ReefController, :home
+    get "/", HomeController, :index
+    resources "/", HomeController, only: [:index, :show, :new, :create]
   end
 
   # Other scopes may use custom stacks.

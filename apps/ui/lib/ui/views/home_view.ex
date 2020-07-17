@@ -1,5 +1,9 @@
-defmodule UI.PageView do
+defmodule UI.HomeView do
   use UI, :view
+
+  def auto_refresh?(conn) do
+    Plug.Conn.get_session(conn, :auto_refresh) || false
+  end
 
   def reef_status do
     alias Phoenix.HTML.Format

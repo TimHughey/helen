@@ -1,0 +1,6 @@
+<section>
+  <p>
+    <%= link "Reef", to: Routes.reef_path(@conn, :home) %>
+
+  </p>
+</section>

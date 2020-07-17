@@ -1,7 +1,7 @@
 /* Main application css. */
 
-body {
-  color: rgba(242, 245, 252, 0.99);
+body, header, button {
+  color: rgb(238, 247, 237);
   background: rgb(18, 18, 18);
 }
 
@@ -23,29 +23,50 @@ a {
   max-width: 90.0rem;
   padding: 0 1.0rem;
   position: relative;
-  width: 100%
+  width: 100%;
 }
 
 /* Headers */
 header {
+  display: flex;
   margin-top: 1rem;
   margin-bottom: 1rem;
   margin-right: 5rem;
   margin-left: 5rem;
   // margin-left: 5rem;
   // margin-right: 5rem;
-  background: rgb(18, 18, 18);
+  // background: rgb(18, 18, 18);
   border-spacing: 0;
   border-bottom: 1px solid rgb(238, 70, 70);
 
 }
 
-header section {
-  align-items: center;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+header button {
+  font-weight: normal;
+  font-style: normal;
+  margin: 0;
+  padding: 0;
+  border-style: none;
 }
+
+header button.refresh-disabled {
+  color: rgb(255, 255, 255);
+}
+
+header button.refresh-enabled {
+  color: rgb(61, 224, 35);
+}
+
+header div.row {
+  align-items: center;
+}
+
+// header section {
+//   align-items: center;
+//   display: flex;
+//   flex-direction: column;
+//   justify-content: space-between;
+// }
 // header section :first-child {
 //   order: 2;
 // }
@@ -63,13 +84,26 @@ header nav li {
 }
 
 header nav ul {
-  margin: 1rem;
-  margin-top: 0;
+  // margin: 1rem;
+  // margin-top: 0;
 }
+
+// font-family: 'Anonymous Pro', monospace;
+// font-family: 'Montserrat', sans-serif;
+// font-family: 'Quicksand', sans-serif;
+// font-family: 'Roboto', sans-serif;
 
 header nav a {
   display: block;
   color: rgb(21, 153, 22);
+}
+
+header h1.i-am {
+  align-self: center;
+  color: rgb(136, 136, 132);
+  font-size: 3rem;
+  font-weight: 400;
+  padding-top: 1rem;
 }
 
 .helen-hero {
@@ -83,22 +117,68 @@ header nav a {
   font-size: 70%;
 }
 
-.reef_subsystem {
-  font-size: 1.9rem;
-  text-align: left;
-  font-weight: bold;
-}
-
-.reef_state_headline {
-  align-items: center;
-}
-
-.reef_worker_mode {
-  color: rgb(50, 149, 57);
-  display: flex;
+.reef-banner {
   text-align: center;
-  letter-spacing: 0.2rem;
-  // font-style: italic;
+  align-items: center;
+  font-size: 1.9rem;
+  font-weight: 300;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid rgb(17, 138, 198);
+}
+
+.reef-state-details {
+  // border-top-style: solid;
+}
+
+.reef-subsystem-block {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgb(156, 156, 156);
+}
+
+.reef-subsystem-heading {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.reef-subsystem {
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 400;
+  text-align: center;
+}
+
+.reef-subsystem-standby {
+  color: rgb(255, 251, 251);
+  background: rgb(111, 111, 111);
+}
+
+.reef-subsystem-ready {
+  color:  rgb(255, 251, 251);
+  background: rgb(13, 131, 7);
+}
+
+.reef-subsystem-active {
+  color:  rgb(255, 251, 251);
+  background: rgb(13, 131, 7);
+}
+
+.reef-subsystem-running {
+  color: rgb(255, 251, 251);
+  background: rgb(195, 0, 0);
+}
+
+.reef-subsystem-ato-running {
+  color: rgb(255, 251, 251);
+  background: rgb(0, 109, 198);
+}
+
+
+.reef-worker-mode {
+  color: rgb(0, 208, 8);
+  text-align: center;
   font-weight: bold;
   font-size: 3.1rem;
 }
