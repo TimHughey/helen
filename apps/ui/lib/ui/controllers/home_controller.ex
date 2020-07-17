@@ -10,7 +10,7 @@ defmodule UI.HomeController do
     render(conn, "index.html", auto_refresh: auto_refresh)
   end
 
-  def create(conn, %{"auto_refresh" => auto_refresh} = params) do
+  def create(conn, %{"auto_refresh" => auto_refresh}) do
     new_auto_refresh =
       case auto_refresh do
         "false" -> false

@@ -18,7 +18,7 @@ defmodule UI.Router do
 
     get "/reef", ReefController, :home
     get "/", HomeController, :index
-    resources "/", HomeController, only: [:index, :show, :new, :create]
+    resources "/", HomeController, only: [:create]
   end
 
   # Other scopes may use custom stacks.
