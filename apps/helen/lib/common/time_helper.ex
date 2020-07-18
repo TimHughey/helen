@@ -183,6 +183,27 @@ defmodule Helen.Time.Helper do
     if is_nil(tz), do: Timex.now("UTC"), else: Timex.now(tz)
   end
 
+  @doc """
+  Calculate the remaining milliseconds given the finish datetime
+  """
+  @doc since: "0.0.27"
+  def remaining(finish_dt) do
+    elapsed(utc_now(), finish_dt)
+  end
+
+  @doc """
+  Calculate the remaining milliseconds given the start datetime and a duration
+  representing the total time.
+  """
+  @doc since: "0.0.27"
+  def remaining(start_at, total_duration) do
+    alias Timex.Duration
+
+    e = elapsed(start_at, utc_now())
+
+    Duration.sub(total_duration, e) |> Duration.abs()
+  end
+
   @doc delegate_to: {Timex.Duration, :scale, 2}
   def scale(d, factor) do
     alias Timex.Duration

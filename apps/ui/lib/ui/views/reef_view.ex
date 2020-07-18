@@ -1,51 +1,108 @@
 defmodule UI.ReefView do
   use UI, :view
 
-  def subsystem_status(system, subsystem, text) do
-    alias Reef.{DisplayTank, MixTank}
+  alias Reef.{DisplayTank, MixTank}
 
-    case {system, subsystem} do
-      {:mixtank, :air} -> render_subsystem_status(MixTank.Air, text)
-      {:mixtank, :pump} -> render_subsystem_status(MixTank.Pump, text)
-      {:mixtank, :rodi} -> render_subsystem_status(MixTank.Rodi, text)
-      {:mixtank, :heat} -> render_subsystem_status(MixTank.Temp, text)
-      {:display_tank, :ato} -> render_ato_subsystem_status(DisplayTank.Ato, text)
-      {:display_tank, :heat} -> render_subsystem_status(DisplayTank.Temp, text)
-    end
-  end
-
-  defp render_subsystem_status(mod, text) do
+  def render_subsystem_status(mod, text) do
     active? = apply(mod, :active?, [])
 
     position = subsystem_position(mod)
 
     cond do
-      active? == true and position == false ->
-        content_tag(:div, text, class: "reef-subsystem-ready")
+      active? == true ->
+        render_subsystem_active_status(mod, text, position)
 
-      active? == true and position == true ->
-        content_tag(:div, text, class: "reef-subsystem-running")
-
-      apply(mod, :active?, []) == false ->
+      active? == false ->
         content_tag(:div, text, class: "reef-subsystem-standby")
+
+      true ->
+        content_tag(:div, text, class: "reef-subsystem-nomatch")
     end
   end
 
-  defp render_ato_subsystem_status(mod, text) do
-    active? = apply(mod, :active?, [])
-
-    position = subsystem_position(mod)
-
+  def render_subsystem_active_status(mod, text, position) do
     cond do
-      active? == true and position == false ->
+      position == false ->
         content_tag(:div, text, class: "reef-subsystem-ready")
 
-      active? == true and position == true ->
+      position == true and mod == DisplayTank.Ato ->
         content_tag(:div, text, class: "reef-subsystem-ato-running")
 
-      apply(mod, :active?, []) == false ->
-        content_tag(:div, text, class: "reef-subsystem-standby")
+      position == true ->
+        content_tag(:div, text, class: "reef-subsystem-running")
+
+      true ->
+        content_tag(:div, text, class: "reef-subsystem-nomatch")
     end
+  end
+
+  def render_worker_modes_status(state) do
+    modes = Reef.available_worker_modes()
+
+    for mode <- modes, {k, %{status: val}} when k == mode <- state do
+      mode_content = render_worker_mode_status(humanize_atom(k), val)
+
+      content_tag(:div, mode_content, class: "column reef-worker-mode-status")
+    end
+  end
+
+  def render_worker_mode_status(mode_str, val) do
+    case val do
+      :ready -> content_tag(:div, mode_str, class: "reef-worker-mode-ready")
+      :running -> content_tag(:div, mode_str, class: "reef-worker-mode-running")
+      :finished -> content_tag(:div, mode_str, class: "reef-worker-mode-finished")
+      _val -> content_tag(:div, mode_str, class: "reef-worker-mode-unknown")
+    end
+  end
+
+  def render_worker_mode_summary(%{worker_mode: mode} = state) do
+    import Helen.Time.Helper, only: [to_binary: 1]
+
+    %{started_at: started_at, elapsed: elapsed, active_step: active_step} = get_in(state, [mode])
+
+    will_finish_by = get_in(state, [mode, :will_finish_by])
+    num_cycles = get_in(state, [mode, :cycles, active_step])
+
+    [
+      content_tag(:div, to_binary(started_at), class: "column"),
+      (will_finish_by && content_tag(:div, to_binary(will_finish_by), class: "column")) ||
+        content_tag(:div, "When Stopped", class: "column"),
+      content_tag(:div, to_binary(elapsed), class: "column"),
+      content_tag(:div, remaining_time(state, mode), class: "column"),
+      content_tag(:div, humanize_atom(active_step), class: "column"),
+      content_tag(:div, Integer.to_string(num_cycles), class: "column")
+    ]
+  end
+
+  defp remaining_time(state, mode) do
+    import Helen.Time.Helper, only: [remaining: 1, to_binary: 1]
+
+    case get_in(state, [mode, :will_finish_by]) do
+      nil -> "Infinity"
+      x when is_struct(x) -> remaining(x) |> to_binary()
+      _x -> "Unknown"
+    end
+  end
+
+  def render_worker_mode_details(%{worker_mode: mode} = state) do
+    import Helen.Time.Helper, only: [to_binary: 1]
+
+    %{steps_to_execute: steps_to_execute, step: step, sub_steps: sub_steps} =
+      get_in(state, [mode])
+
+    [
+      content_tag(:pre, inspect(steps_to_execute), class: "column"),
+      content_tag(:pre, inspect(step, pretty: true), class: "column"),
+      content_tag(:pre, inspect(sub_steps, pretty: true), class: "column")
+    ]
+  end
+
+  def render_worker_mode_steps(%{worker_mode: mode} = state) do
+    %{steps: steps} = get_in(state, [mode])
+
+    [
+      content_tag(:pre, inspect(steps, pretty: true, width: 0), class: "column")
+    ]
   end
 
   defp subsystem_position(mod) do

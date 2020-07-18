@@ -1,6 +1,6 @@
 <section>
   <div class="row reef-banner">
-    <div class="column ">Reef Captain and First Mate Status</div>
+    <div class="column ">Reef Captain and First Mate</div>
 </section>
 
 <section>
@@ -17,52 +17,89 @@
       <div class="column">
         <div class="row reef-subsystem">
           <div class="column">
-            <div class="reef-subsystem-standby">
-              <%= subsystem_status(:mixtank, :pump, "Pump") %>
-            </div>
+            <%= render_subsystem_status(MixTank.Pump, "Pump") %>
           </div>
           <div class="column">
-            <div class="reef-subsystem-standby">
-              <%= subsystem_status(:mixtank, :air, "Air") %>
-            </div>
+            <%= render_subsystem_status(MixTank.Air, "Air") %>
           </div>
           <div class="column">
-            <div class="reef-subsystem-active">
-              <%= subsystem_status(:mixtank, :heat, "Heat") %>
-            </div>
+            <%= render_subsystem_status(MixTank.Rodi, "RODI") %>
           </div>
           <div class="column">
-            <div class="reef-subsystem-running">
-            <%= subsystem_status(:mixtank, :rodi, "RODI") %>
-            </div>
+            <%= render_subsystem_status(MixTank.Temp, "Heat") %>
           </div>
         </div>
       </div>
       <div class="column">
         <div class="row reef-subsystem">
-          <div class="column">
-            <div class="reef-subsystem-standby">
-              <%= subsystem_status(:display_tank, :ato, "ATO") %>
-            </div>
+          <div class="column column-25 column-offset-25">
+              <%= render_subsystem_status(DisplayTank.Ato, "ATO") %>
           </div>
-          <div class="column">
-            <div class="reef-subsystem-running">
-              <%= subsystem_status(:display_tank, :heat, "Heat") %>
-            </div>
+          <div class="column column-25">
+            <%= render_subsystem_status(DisplayTank.Temp, "Heat") %>
           </div>
         </div>
       </div>
+    </div>
+    <div class="row reef-worker-modes">
+      <%= render_worker_modes_status(@reef_state) %>
+    </div>
 
-    </div>
-    <div class="row reef-worker-mode">
-      <%= worker_mode(@reef_state) %>
-    </div>
-    <div class="row reef-state-details">
-      <div class="column">
-          <%= build_reef_state(@reef_state) %>
+    <%= if get_in(@reef_state, [:worker_mode]) == :ready do %>
+      <div class="row reef-worker-mode-summary-headings">
+        <div class="column">
+        </div>
+      </div>
+    <% else %>
+      <div class="row reef-worker-mode-summary-headings">
+        <div class="column">
+          Started At
+        </div>
+        <div class="column">
+          Will Finish By
+        </div>
+        <div class="column">
+          Elapsed Time
+        </div>
+        <div class="column">
+          Remaining Time
+        </div>
+        <div class="column">
+          Active Step
+        </div>
+        <div class="column">
+          Step Cycles
+        </div>
       </div>
 
-    </div>
+      <div class="row reef-worker-mode-summary-details">
+        <%= render_worker_mode_summary(@reef_state) %>
+      </div>
 
+      <div class="row reef-worker-mode-detail-headings">
+        <div class="column">
+          Steps To Execute
+        </div>
+        <div class="column">
+          Step
+        </div>
+        <div class="column">
+          Sub Steps
+        </div>
+
+      </div>
+      <div class="row reef-worker-mode-details">
+        <%= render_worker_mode_details(@reef_state) %>
+      </div>
+
+      <div class="row reef-worker-mode-steps-heading">
+        <div class="column">
+          Steps
+        </div>
+      </div>
+      <div class="row reef-worker-steps-detail">
+        <%= render_worker_mode_steps(@reef_state) %>
+      </div>
+    <% end %>
   </div>
 </section>

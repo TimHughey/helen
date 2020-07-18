@@ -2,13 +2,23 @@
 
 @import "reef";
 
-body, header, button {
+body, header, button, pre {
   color: rgb(238, 247, 237);
   background: rgb(18, 18, 18);
 }
 
 a {
   color: rgb(21, 153, 22);
+}
+
+pre {
+  margin: 0;
+  padding: 0;
+  color: rgb(0, 224, 255);
+  border-style: none;
+  text-align: left;
+  font-family: 'Anonymous Pro', monospace;
+  line-height: 1.8rem;
 }
 
 /* General style */
@@ -22,7 +32,7 @@ a {
 
 .container {
   margin: 0 auto;
-  max-width: 90.0rem;
+  max-width: 90%;
   padding: 0 1.0rem;
   position: relative;
   width: 100%;
