@@ -23,10 +23,7 @@
           <h1 class="i-am">
             <%= link "I am Helen", to: Routes.home_path(@conn, :index) %>
           </h1>
-          <!-- <a href="https://phoenixframework.org/" class="phx-logo">
-            <img src="<%= Routes.static_path(@conn, "/images/phoenix.png") %>" alt="Phoenix Framework Logo"/>
-          </a> -->
-          </div>
+        </div>
         <div class="column">
           <nav role="navigation">
             <ul>
