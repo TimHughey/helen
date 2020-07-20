@@ -1,4 +1,8 @@
 defmodule Reef.Logic do
+  @moduledoc """
+  Logic for Reef Worker Modes
+  """
+
   def available_modes(%{opts: opts} = _state) do
     get_in(opts, [:modes])
     |> Keyword.keys()
@@ -110,29 +114,27 @@ defmodule Reef.Logic do
     # the next step is always the head of :steps_to_execute
     steps_to_execute = get_in(state, [worker_mode, :steps_to_execute])
     # NOTE:  each clause returns the state, even if unchanged
-    cond do
-      steps_to_execute == [] ->
-        # we've reached the end of this mode!
-        state
-        |> finish_mode()
+    if steps_to_execute == [] do
+      # we've reached the end of this mode!
+      state
+      |> finish_mode()
+    else
+      next_step = steps_to_execute |> hd()
 
-      true ->
-        next_step = steps_to_execute |> hd()
+      cmds = get_in(state, [worker_mode, :steps, next_step])
 
-        cmds = get_in(state, [worker_mode, :steps, next_step])
-
-        state
-        # remove the step we're starting
-        |> update_in([worker_mode, :steps_to_execute], fn x -> tl(x) end)
-        |> put_in([worker_mode, :active_step], next_step)
-        # the worker_mode step key contains the control map for the step executing
-        |> put_in([worker_mode, :step, :started_at], utc_now())
-        |> put_in([worker_mode, :step, :elapsed], 0)
-        |> put_in([worker_mode, :step, :run_for], nil)
-        |> put_in([worker_mode, :step, :repeat?], nil)
-        |> put_in([worker_mode, :step, :cmds_to_execute], cmds)
-        |> update_step_cycles()
-        |> start_next_cmd_in_step()
+      state
+      # remove the step we're starting
+      |> update_in([worker_mode, :steps_to_execute], fn x -> tl(x) end)
+      |> put_in([worker_mode, :active_step], next_step)
+      # the worker_mode step key contains the control map for the step executing
+      |> put_in([worker_mode, :step, :started_at], utc_now())
+      |> put_in([worker_mode, :step, :elapsed], 0)
+      |> put_in([worker_mode, :step, :run_for], nil)
+      |> put_in([worker_mode, :step, :repeat?], nil)
+      |> put_in([worker_mode, :step, :cmds_to_execute], cmds)
+      |> update_step_cycles()
+      |> start_next_cmd_in_step()
     end
   end
 
@@ -209,7 +211,7 @@ defmodule Reef.Logic do
   end
 
   def step_device_to_mod(dev) do
-    alias Reef.{MixTank, DisplayTank}
+    alias Reef.{DisplayTank, MixTank}
 
     case dev do
       :handoff -> :handoff
@@ -304,23 +306,21 @@ defmodule Reef.Logic do
       else: state |> put_in([:init_fault], :duration_validation_failed)
   end
 
+  # end of list, just return the accumulator
+  defp validate_duration_r([], acc), do: acc
+  # seen a bad duration, we're done
+  defp validate_duration_r(_, false), do: false
+
+  # process the head (tuple) and the tail (a list or a tuple)
+  defp validate_duration_r([head | tail], acc) do
+    acc && validate_duration_r(head, acc) &&
+      validate_duration_r(tail, acc)
+  end
+
   defp validate_duration_r(opts, acc) do
     import Helen.Time.Helper, only: [valid_ms?: 1]
 
     case {opts, acc} do
-      # end of a list (or all list), simply return the acc
-      {[], acc} ->
-        acc
-
-      # seen a bad duration, we're done
-      {_, false} ->
-        false
-
-      # process the head (tuple) and the tail (a list or a tuple)
-      {[head | tail], acc} ->
-        acc && validate_duration_r(head, acc) &&
-          validate_duration_r(tail, acc)
-
       # keep unfolding
       {{_, v}, acc} when is_list(v) ->
         acc && validate_duration_r(v, acc)
@@ -419,7 +419,7 @@ defmodule Reef.Logic do
 
     state
     |> ensure_sub_steps_off()
-    |> put_in([mode, :status], :completed)
+    |> put_in([mode, :status], :finished)
     |> put_in([mode, :finished_at], now)
     |> put_in([mode, :elapsed], elapsed(started_at, now))
     |> put_in([:worker_mode], :ready)

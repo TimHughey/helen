@@ -8,8 +8,34 @@
   // border-bottom: 1px solid rgb(17, 138, 198);
 }
 
-.reef-state-details {
-  // border-top-style: solid;
+.reef-step-heading {
+  margin-top: 1rem;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.6rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.reef-step-detail-headings {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+
+.reef-step-details {
+  font-family: 'Quicksand', sans-serif;
+  fofont-size: 1vw;
+  font-weight: 300;
+  text-align: center;
+}
+
+ul > li.reef-steps-remaining {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+  text-align: center;
 }
 
 .reef-subsystem-block {
@@ -128,6 +154,6 @@
   text-align: left;
 }
 
-.reef-worker-steps-detail {
-  margin-bottom: 0.5rem;
-}
+// .reef-worker-steps-detail {
+//   margin-bottom: 0.5rem;
+// }

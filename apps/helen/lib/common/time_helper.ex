@@ -199,9 +199,7 @@ defmodule Helen.Time.Helper do
   def remaining(start_at, total_duration) do
     alias Timex.Duration
 
-    e = elapsed(start_at, utc_now())
-
-    Duration.sub(total_duration, e) |> Duration.abs()
+    Duration.sub(total_duration, elapsed(start_at, utc_now())) |> Duration.abs()
   end
 
   @doc delegate_to: {Timex.Duration, :scale, 2}
@@ -293,15 +291,20 @@ defmodule Helen.Time.Helper do
   @doc since: "0.0.27"
   def to_binary(arg) do
     import Timex, only: [to_datetime: 2, format!: 3, format_duration: 2]
-    import Duration, only: [from_seconds: 1]
+    import Duration, only: [from_minutes: 1, from_seconds: 1]
 
     case arg do
       %DateTime{} = x ->
         to_datetime(x, "America/New_York")
         |> format!("%a, %b %e, %Y %H:%M:%S", :strftime)
 
+      %Duration{seconds: secs} = x when secs > 900 ->
+        Duration.to_minutes(x, truncate: true)
+        |> from_minutes()
+        |> format_duration(:humanized)
+
       %Duration{} = x ->
-        Duration.to_seconds(x, :truncate)
+        Duration.to_seconds(x, truncate: true)
         |> from_seconds()
         |> format_duration(:humanized)
 

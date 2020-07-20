@@ -3,6 +3,40 @@ defmodule UI.ReefView do
 
   alias Reef.{DisplayTank, MixTank}
 
+  def render_step_details(%{worker_mode: mode} = state) do
+    import Helen.Time.Helper, only: [remaining: 2, to_binary: 1, to_duration: 1]
+
+    active_step = get_in(state, [mode, :active_step])
+    steps_remaining = get_in(state, [mode, :steps_to_execute])
+    step = get_in(state, [mode, :step])
+    cmd = get_in(step, [:cmd])
+
+    {_cmd, cmd_opts} = get_in(step, [:next_cmd])
+    cmd_for = get_in(cmd_opts, [:for]) |> to_duration()
+
+    cmd_started_at = get_in(step, [:started_at])
+    cmd_remaining = remaining(cmd_started_at, cmd_for)
+
+    cmds_to_execute = get_in(step, [:cmds_to_execute])
+
+    [
+      content_tag(:div, humanize_atom_safe(active_step), class: "column"),
+      content_tag(:div, render_step_name_list(steps_remaining), class: "column"),
+      content_tag(:div, humanize_atom_safe(cmd), class: "column"),
+      content_tag(:div, to_binary(cmd_remaining), class: "column"),
+      content_tag(:div, inspect(cmds_to_execute), class: "column")
+    ]
+  end
+
+  def render_step_name_list(step_names) do
+    step_names_list =
+      for name <- step_names do
+        content_tag(:li, humanize_atom(name), class: "reef-steps-remaining")
+      end
+
+    content_tag(:ul, step_names_list)
+  end
+
   def render_subsystem_status(mod, text) do
     active? = apply(mod, :active?, [])
 
@@ -40,7 +74,7 @@ defmodule UI.ReefView do
     modes = Reef.available_worker_modes()
 
     for mode <- modes, {k, %{status: val}} when k == mode <- state do
-      mode_content = render_worker_mode_status(humanize_atom(k), val)
+      mode_content = render_worker_mode_status(humanize_atom_safe(k), val)
 
       content_tag(:div, mode_content, class: "column reef-worker-mode-status")
     end
@@ -69,7 +103,7 @@ defmodule UI.ReefView do
         content_tag(:div, "When Stopped", class: "column"),
       content_tag(:div, to_binary(elapsed), class: "column"),
       content_tag(:div, remaining_time(state, mode), class: "column"),
-      content_tag(:div, humanize_atom(active_step), class: "column"),
+      content_tag(:div, humanize_atom_safe(active_step), class: "column"),
       content_tag(:div, Integer.to_string(num_cycles), class: "column")
     ]
   end
@@ -84,18 +118,18 @@ defmodule UI.ReefView do
     end
   end
 
-  def render_worker_mode_details(%{worker_mode: mode} = state) do
-    import Helen.Time.Helper, only: [to_binary: 1]
-
-    %{steps_to_execute: steps_to_execute, step: step, sub_steps: sub_steps} =
-      get_in(state, [mode])
-
-    [
-      content_tag(:pre, inspect(steps_to_execute), class: "column"),
-      content_tag(:pre, inspect(step, pretty: true), class: "column"),
-      content_tag(:pre, inspect(sub_steps, pretty: true), class: "column")
-    ]
-  end
+  # def render_worker_mode_details(%{worker_mode: mode} = state) do
+  #   import Helen.Time.Helper, only: [to_binary: 1]
+  #
+  #   %{steps_to_execute: steps_to_execute, step: step, sub_steps: sub_steps} =
+  #     get_in(state, [mode])
+  #
+  #   [
+  #     content_tag(:pre, inspect(steps_to_execute), class: "column"),
+  #     content_tag(:pre, inspect(step, pretty: true), class: "column"),
+  #     content_tag(:pre, inspect(sub_steps, pretty: true), class: "column")
+  #   ]
+  # end
 
   def render_worker_mode_steps(%{worker_mode: mode} = state) do
     %{steps: steps} = get_in(state, [mode])
@@ -114,20 +148,20 @@ defmodule UI.ReefView do
     end
   end
 
-  def build_reef_state(%{worker_mode: mode} = state) do
-    display = get_in(state, [mode]) || %{status: :ready}
-
-    for {k, v} <- Map.drop(display, [:opts, :step_devices]) do
-      content_tag :div, class: "row reef_state_row" do
-        [
-          content_tag(:div, humanize_atom(k) |> html_escape(), class: "column reef_state_key"),
-          content_tag(:div, humanize_value(k, v) |> html_escape(),
-            class: "column reef_state_value"
-          )
-        ]
-      end
-    end
-  end
+  # def build_reef_state(%{worker_mode: mode} = state) do
+  #   display = get_in(state, [mode]) || %{status: :ready}
+  #
+  #   for {k, v} <- Map.drop(display, [:opts, :step_devices]) do
+  #     content_tag :div, class: "row reef_state_row" do
+  #       [
+  #         content_tag(:div, humanize_atom_safe(k) |> html_escape(), class: "column reef_state_key"),
+  #         content_tag(:div, humanize_value(k, v) |> html_escape(),
+  #           class: "column reef_state_value"
+  #         )
+  #       ]
+  #     end
+  #   end
+  # end
 
   defp humanize_atom(a) do
     parts = Atom.to_string(a) |> String.split("_")
@@ -137,36 +171,40 @@ defmodule UI.ReefView do
     end
     |> Enum.join(" ")
     |> IO.iodata_to_binary()
+  end
+
+  defp humanize_atom_safe(a) do
+    humanize_atom(a)
     |> html_escape()
   end
 
-  defp humanize_value(k, v) do
-    import Helen.Time.Helper, only: [to_binary: 1]
-
-    case k do
-      k when k in [:elapsed, :started_at, :will_finish_by] ->
-        to_binary(v)
-
-      :cycles ->
-        content_tag(
-          :ul,
-          for {ck, cv} <- v do
-            content_tag(:li, "#{Atom.to_string(ck)}: #{inspect(cv)}",
-              class: "reef_state_cycle_item"
-            )
-          end,
-          class: "reef_state_cycle_list"
-        )
-
-      _k when is_atom(v) ->
-        Atom.to_string(v)
-
-      _k ->
-        inspect(v)
-    end
-  end
+  # defp humanize_value(k, v) do
+  #   import Helen.Time.Helper, only: [to_binary: 1]
+  #
+  #   case k do
+  #     k when k in [:elapsed, :started_at, :will_finish_by] ->
+  #       to_binary(v)
+  #
+  #     :cycles ->
+  #       content_tag(
+  #         :ul,
+  #         for {ck, cv} <- v do
+  #           content_tag(:li, "#{Atom.to_string(ck)}: #{inspect(cv)}",
+  #             class: "reef_state_cycle_item"
+  #           )
+  #         end,
+  #         class: "reef_state_cycle_list"
+  #       )
+  #
+  #     _k when is_atom(v) ->
+  #       Atom.to_string(v)
+  #
+  #     _k ->
+  #       inspect(v)
+  #   end
+  # end
 
   def worker_mode(%{worker_mode: mode}) do
-    content_tag(:div, humanize_atom(mode), class: "column")
+    content_tag(:div, humanize_atom_safe(mode), class: "column")
   end
 end

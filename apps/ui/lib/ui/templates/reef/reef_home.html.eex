@@ -76,29 +76,26 @@
         <%= render_worker_mode_summary(@reef_state) %>
       </div>
 
-      <div class="row reef-worker-mode-detail-headings">
+      <div class="row reef-worker-mode-summary-headings">
         <div class="column">
-          Steps To Execute
+          Active Step
         </div>
         <div class="column">
-          Step
+          Remaining Steps
         </div>
         <div class="column">
-          Sub Steps
+          Active Command
         </div>
+        <div class="column">
+          Remaining Command Time
+        </div>
+        <div class="column">
+          Remaining Commands
+        </div>
+      </div>
 
-      </div>
-      <div class="row reef-worker-mode-details">
-        <%= render_worker_mode_details(@reef_state) %>
-      </div>
-
-      <div class="row reef-worker-mode-steps-heading">
-        <div class="column">
-          Steps
-        </div>
-      </div>
-      <div class="row reef-worker-steps-detail">
-        <%= render_worker_mode_steps(@reef_state) %>
+      <div class="row reef-step-details">
+        <%= render_step_details(@reef_state) %>
       </div>
     <% end %>
   </div>
