@@ -1,0 +1,12 @@
+<div class="container">
+  <div class="row">
+    <div class="column roost-subsystem-heading">
+
+    </div>
+  </div>
+
+
+  <div class="row roost-worker-modes">
+    <%= render_worker_modes_status(@roost_state) %>
+  </div>
+</div>

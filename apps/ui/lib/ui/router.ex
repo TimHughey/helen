@@ -19,6 +19,7 @@ defmodule UI.Router do
     pipe_through :browser
 
     get "/reef", ReefController, :home
+    get "/roost", RoostController, :home
     get "/", HomeController, :index
     resources "/", HomeController, only: [:create]
   end

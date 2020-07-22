@@ -15,23 +15,53 @@ defmodule UI.HelenChannel do
 
   def handle_in(
         "button_click",
-        %{"value" => value, "id" => id} = _req_payload,
+        %{"value" => value, "id" => id, "active_page" => active_page} = _req_payload,
         socket
       ) do
     alias Phoenix.View
     alias UI.ReefView
+    alias UI.RoostView
 
-    if String.contains?(id, "reef_mode") do
-      rc = handle_worker_mode_button(value)
-      reef_state = Reef.x_state()
-      specifics_html = View.render_to_string(ReefView, "specifics.html", reef_state: reef_state)
+    socket = socket |> assign(:active_page, active_page)
 
-      resp_payload = %{page: "reef", rc: inspect(rc), reef_specifics_html: specifics_html}
+    cond do
+      String.contains?(id, "reef_mode") ->
+        rc = handle_worker_mode_button(value)
+        reef_state = Reef.x_state()
+        specifics_html = View.render_to_string(ReefView, "specifics.html", reef_state: reef_state)
 
-      {:reply, {:ok, resp_payload}, socket}
-    else
-      {:reply, {:error, %{reason: "not a worker"}}, socket}
+        resp_payload = %{section: "reef-specifics", rc: inspect(rc), html: specifics_html}
+
+        {:reply, {:refresh_section, resp_payload}, socket}
+
+      String.contains?(id, "roost_mode") ->
+        rc = handle_roost_worker_mode_button(value)
+        roost_state = Roost.Server.x_state()
+
+        specifics_html =
+          View.render_to_string(RoostView, "specifics.html", roost_state: roost_state)
+
+        resp_payload = %{
+          section: "roost-specifics",
+          rc: inspect(rc),
+          html: specifics_html
+        }
+
+        {:reply, {:refresh_section, resp_payload}, socket}
+
+      true ->
+        {:reply, {:error, %{reason: "not a worker"}}, socket}
     end
+  end
+
+  def handle_in("button_click", _req_payload, socket) do
+    {:reply, {:nop, %{}}, socket}
+  end
+
+  defp handle_roost_worker_mode_button(value) do
+    alias Roost.Server, as: Server
+
+    apply(Server, :worker_mode, [String.to_atom(value), []])
   end
 
   defp handle_worker_mode_button(value) do

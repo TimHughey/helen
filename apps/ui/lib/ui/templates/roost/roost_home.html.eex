@@ -1,0 +1,10 @@
+<script>window.activePage = "roost";</script>
+
+<section id="roost-header">
+  <div class="row roost-banner">
+    <div class="column" id="roost-banner">The Roost at Wiss Landing</div>
+</section>
+
+<section id="roost-specifics">
+  <%= render(UI.RoostView, "specifics.html", roost_state: @roost_state) %>
+</section>

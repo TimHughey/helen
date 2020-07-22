@@ -1,3 +1,5 @@
+<script>window.activePage = "reef";</script>
+
 <section id="reef-header">
   <div class="row reef-banner">
     <div class="column" id="reef-banner">Reef Captain and First Mate</div>

@@ -1,6 +1,11 @@
+<script>window.activePage = "home";</script>
+
 <section>
   <p>
-    <%= link "Reef", to: Routes.reef_path(@conn, :home) %>
+    <%= link "Reef", to: Routes.reef_path(@conn, :home), class: "home-page-links" %>
+  </p>
 
+  <p>
+    <%= link "Roost", to: Routes.roost_path(@conn, :home), class: "home-page-links" %>
   </p>
 </section>

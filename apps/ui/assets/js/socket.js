@@ -79,6 +79,7 @@ document.body.addEventListener("click", function (e) {
     .push(
       "button_click",
       {
+        active_page: window.activePage,
         child: e.target.firstChild.data,
         class: e.target.className,
         value: e.target.value,
@@ -86,10 +87,10 @@ document.body.addEventListener("click", function (e) {
       },
       10000
     )
-    .receive("ok", (msg) => {
-      document.getElementById("reef-specifics").innerHTML =
-        msg.reef_specifics_html;
+    .receive("refresh_section", (msg) => {
+      document.getElementById(msg.section).innerHTML = msg.html;
     })
+    .receive("nop", (msg) => {})
     .receive("error", (reasons) => console.log("error", reasons))
     .receive("timeout", () => console.log("Networking issue..."));
 });
