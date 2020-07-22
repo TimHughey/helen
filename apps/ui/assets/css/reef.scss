@@ -8,25 +8,24 @@
   // border-bottom: 1px solid rgb(17, 138, 198);
 }
 
-.reef-step-heading {
-  margin-top: 1rem;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 1.6rem;
-  font-weight: bold;
-  text-align: center;
-}
+// .reef-step-heading {
+//   margin-top: 1rem;
+//   font-family: 'Montserrat', sans-serif;
+//   font-size: 1.6rem;
+//   font-weight: bold;
+//   text-align: center;
+// }
 
-.reef-step-detail-headings {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 1.4rem;
-  font-weight: bold;
-  text-align: center;
-}
-
+// .reef-step-detail-headings {
+//   font-family: "Montserrat", sans-serif;
+//   font-size: 1.4rem;
+//   font-weight: bold;
+//   text-align: center;
+// }
 
 .reef-step-details {
-  font-family: 'Quicksand', sans-serif;
-  fofont-size: 1vw;
+  font-family: "Quicksand", sans-serif;
+  font-size: 1vw;
   font-weight: 300;
   text-align: center;
 }
@@ -45,55 +44,87 @@ ul > li.reef-steps-remaining {
 }
 
 .reef-subsystem-heading {
-  font-family: 'Montserrat', sans-serif;
+  font-family: "Montserrat", sans-serif;
   font-size: 1.8rem;
   font-weight: 500;
   text-align: center;
 }
 
-.reef-subsystem {
-  font-family: 'Quicksand', sans-serif;
-  font-size: 1.7rem;
+.reef {
+  font-family: "Montserrat", sans-serif;
+  font-variant: normal;
+  font-size: 1.4rem;
   font-weight: 400;
   text-align: center;
+}
+
+div > button {
+  text-transform: none;
+  border-radius: 3px;
+  border: 0;
+  box-sizing: border-box;
+  width: 100%;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+div > button:hover {
+  font-size: 1.6rem;
+  background-color: rgba(0, 194, 255, 0.3);
 }
 
 .reef-subsystem-standby {
   color: rgb(255, 251, 251);
-  background: rgb(111, 111, 111);
+  background-color: rgb(111, 111, 111);
 }
 
 .reef-subsystem-ready {
-  color:  rgb(255, 251, 251);
-  background: rgb(13, 131, 7);
+  color: rgb(255, 251, 251);
+  background-color: rgb(13, 131, 7);
 }
 
 .reef-subsystem-active {
-  color:  rgb(255, 251, 251);
-  background: rgb(13, 131, 7);
+  color: rgb(255, 251, 251);
+  background-color: rgb(13, 131, 7);
 }
 
 .reef-subsystem-running {
   color: rgb(255, 251, 251);
-  background: rgb(195, 0, 0);
+  background-color: rgb(195, 0, 0);
 }
 
 .reef-subsystem-nomatch {
   color: rgb(255, 251, 251);
-  background: rgb(176, 0, 180);
+  background-color: rgb(168, 162, 3);
 }
 
 .reef-subsystem-ato-running {
   color: rgb(255, 251, 251);
-  background: rgb(0, 109, 198);
+  background-color: rgb(0, 109, 198);
 }
 
 .reef-worker-modes {
-  font-family: 'Quicksand', sans-serif;
+  font-family: "Quicksand", sans-serif;
   font-size: 1.6rem;
   font-weight: 400;
   text-align: center;
   margin-bottom: 0.5rem;
+}
+
+.reef-worker-all-stop {
+  color: rgb(255, 251, 251);
+  background-color: rgb(117, 0, 152);
+}
+
+.reef-worker-mode-all-stop {
+  padding: 2rem;
+  font-family: "Quicksand", sans-serif;
+  font-style: normal;
+  font-weight: 200;
+  font-size: 4rem;
+  background: rgb(18, 18, 18);
+  color: rgb(255, 255, 252);
 }
 
 .reef-worker-mode-status {
@@ -101,7 +132,7 @@ ul > li.reef-steps-remaining {
 }
 
 .reef-worker-mode-ready {
-  color:  rgb(255, 251, 251);
+  color: rgb(255, 251, 251);
   background: rgb(13, 131, 7);
 }
 
@@ -112,24 +143,24 @@ ul > li.reef-steps-remaining {
 
 .reef-worker-mode-finished {
   color: rgb(255, 251, 251);
-  background: rgb(209, 49, 164);
+  background: rgb(252, 14, 236);
 }
 
 .reef-worker-mode-unknown {
-  color:  rgb(255, 251, 251);
+  color: rgb(255, 251, 251);
   background: rgb(111, 111, 111);
 }
 
 .reef-worker-mode-summary-headings {
   margin-top: 1rem;
-  font-family: 'Quicksand', sans-serif;
+  font-family: "Quicksand", sans-serif;
   font-size: 1.6rem;
   font-weight: bold;
   text-align: center;
 }
 
 .reef-worker-mode-summary-details {
-  font-family: 'Quicksand', sans-serif;
+  font-family: "Quicksand", sans-serif;
   font-size: 1vw;
   font-weight: 300;
   text-align: center;
@@ -137,7 +168,7 @@ ul > li.reef-steps-remaining {
 }
 
 .reef-worker-mode-detail-headings {
-  font-family: 'Quicksand', sans-serif;
+  font-family: "Quicksand", sans-serif;
   font-size: 1.6rem;
   font-weight: bold;
   text-align: left;
@@ -148,7 +179,7 @@ ul > li.reef-steps-remaining {
 }
 
 .reef-worker-mode-steps-heading {
-  font-family: 'Quicksand', sans-serif;
+  font-family: "Quicksand", sans-serif;
   font-size: 1.6rem;
   font-weight: bold;
   text-align: left;

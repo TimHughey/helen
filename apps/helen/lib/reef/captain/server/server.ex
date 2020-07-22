@@ -6,6 +6,7 @@ defmodule Reef.Captain.Server do
   use GenServer, restart: :transient, shutdown: 7000
   use Helen.Module.Config
 
+  alias Reef.FirstMate.Server, as: FirstMate
   alias Reef.MixTank
   alias Reef.MixTank.{Air, Pump, Rodi}
 
@@ -36,9 +37,10 @@ defmodule Reef.Captain.Server do
     }
 
     # should the server start?
-    cond do
-      state[:server_mode] == :standby -> :ignore
-      true -> {:ok, state, {:continue, :bootstrap}}
+    if state[:server_mode] == :standby do
+      :ignore
+    else
+      {:ok, state, {:continue, :bootstrap}}
     end
   end
 
@@ -182,7 +184,11 @@ defmodule Reef.Captain.Server do
   """
   @doc since: "0.0.27"
   def worker_mode(mode, overrides \\ []) do
-    call_worker_mode(mode, overrides)
+    case mode do
+      :all_stop -> all_stop()
+      :clean -> FirstMate.worker_mode(:clean, [])
+      mode -> call_worker_mode(mode, overrides)
+    end
   end
 
   @doc """
@@ -506,7 +512,7 @@ defmodule Reef.Captain.Server do
     for m <- available_modes(state), reduce: state do
       state -> state |> put_in([m], %{status: :ready})
     end
-    |> put_in([:worker_mode], :ready)
+    |> put_in([:worker_mode], :all_stop)
   end
 
   defp update_last_timeout(state) do

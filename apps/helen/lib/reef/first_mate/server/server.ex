@@ -35,10 +35,9 @@ defmodule Reef.FirstMate.Server do
     }
 
     # should the server start?
-    cond do
-      state[:server_mode] == :standby -> :ignore
-      true -> {:ok, state, {:continue, :bootstrap}}
-    end
+    if state[:server_mode] == :standby,
+      do: :ignore,
+      else: {:ok, state, {:continue, :bootstrap}}
   end
 
   @doc false

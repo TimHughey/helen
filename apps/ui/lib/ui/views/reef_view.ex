@@ -3,6 +3,22 @@ defmodule UI.ReefView do
 
   alias Reef.{DisplayTank, MixTank}
 
+  def render_all_stop do
+    mode = :all_stop
+
+    mode_str = humanize_atom_safe(mode)
+
+    content_tag(:button, mode_str,
+      class: "reef reef-worker-all-stop",
+      id: worker_mode_id(mode),
+      value: Atom.to_string(mode)
+    )
+  end
+
+  def render_step_details(%{worker_mode: :all_stop}) do
+    content_tag(:div, "Answering All Stop", class: "column")
+  end
+
   def render_step_details(%{worker_mode: mode} = state) do
     import Helen.Time.Helper, only: [remaining: 2, to_binary: 1, to_duration: 1]
 
@@ -47,45 +63,106 @@ defmodule UI.ReefView do
         render_subsystem_active_status(mod, text, position)
 
       active? == false ->
-        content_tag(:div, text, class: "reef-subsystem-standby")
+        content_tag(:button, text, class: "reef reef-subsystem-standby")
 
       true ->
-        content_tag(:div, text, class: "reef-subsystem-nomatch")
+        content_tag(:button, text, class: "reef reef-subsystem-nomatch")
     end
   end
 
   def render_subsystem_active_status(mod, text, position) do
     cond do
       position == false ->
-        content_tag(:div, text, class: "reef-subsystem-ready")
+        content_tag(:button, text,
+          class: "reef reef-subsystem-ready",
+          value: mod,
+          id: mod_to_str(mod)
+        )
 
       position == true and mod == DisplayTank.Ato ->
-        content_tag(:div, text, class: "reef-subsystem-ato-running")
+        content_tag(:button, text,
+          class: "reef reef-subsystem-ato-running",
+          value: mod,
+          id: mod_to_str(mod)
+        )
 
       position == true ->
-        content_tag(:div, text, class: "reef-subsystem-running")
+        content_tag(:button, text,
+          class: "reef reef-subsystem-running",
+          value: mod,
+          id: mod_to_str(mod)
+        )
 
       true ->
-        content_tag(:div, text, class: "reef-subsystem-nomatch")
+        content_tag(:button, text,
+          class: "reef reef-subsystem-nomatch",
+          value: mod,
+          id: mod_to_str(mod)
+        )
     end
   end
 
   def render_worker_modes_status(state) do
+    alias Reef.FirstMate.Server, as: FirstMate
+
     modes = Reef.available_worker_modes()
 
     for mode <- modes, {k, %{status: val}} when k == mode <- state do
-      mode_content = render_worker_mode_status(humanize_atom_safe(k), val)
+      if mode == :clean do
+        first_mate_state = FirstMate.x_state()
+        %{status: val} = get_in(first_mate_state, [mode])
 
-      content_tag(:div, mode_content, class: "column reef-worker-mode-status")
+        mode_content = render_worker_mode_status(k, val)
+
+        content_tag(:div, mode_content, class: "column reef-worker-mode-status")
+      else
+        mode_content = render_worker_mode_status(k, val)
+
+        content_tag(:div, mode_content, class: "column reef-worker-mode-status")
+      end
     end
   end
 
-  def render_worker_mode_status(mode_str, val) do
+  def render_worker_mode_status(mode, val) do
+    mode_str = humanize_atom_safe(mode)
+
     case val do
-      :ready -> content_tag(:div, mode_str, class: "reef-worker-mode-ready")
-      :running -> content_tag(:div, mode_str, class: "reef-worker-mode-running")
-      :finished -> content_tag(:div, mode_str, class: "reef-worker-mode-finished")
-      _val -> content_tag(:div, mode_str, class: "reef-worker-mode-unknown")
+      val when val in [:ready, :finished] and mode == :clean ->
+        content_tag(:button, mode_str,
+          class: "reef reef-worker-mode-ready",
+          id: worker_mode_id(mode),
+          value: Atom.to_string(mode)
+        )
+
+      val when val in [:ready, :normal_operations] ->
+        content_tag(:button, mode_str,
+          class: "reef reef-worker-mode-ready",
+          id: worker_mode_id(mode),
+          value: Atom.to_string(mode)
+        )
+
+      :running ->
+        content_tag(:button, mode_str,
+          class: "reef reef-worker-mode-running",
+          id: worker_mode_id(mode),
+          value: Atom.to_string(mode)
+        )
+
+      :finished ->
+        content_tag(:button, mode_str,
+          class: "reef reef-worker-mode-finished",
+          id: worker_mode_id(mode),
+          value: Atom.to_string(mode)
+        )
+
+      val ->
+        IO.puts("worker_mode_status: #{inspect(val)}")
+
+        content_tag(:button, mode_str,
+          class: "reef reef-worker-mode-unknown",
+          id: worker_mode_id(mode),
+          value: Atom.to_string(mode)
+        )
     end
   end
 
@@ -178,6 +255,8 @@ defmodule UI.ReefView do
     |> html_escape()
   end
 
+  defp mod_to_str(mod), do: Module.split(mod) |> Enum.join("_")
+
   # defp humanize_value(k, v) do
   #   import Helen.Time.Helper, only: [to_binary: 1]
   #
@@ -203,6 +282,8 @@ defmodule UI.ReefView do
   #       inspect(v)
   #   end
   # end
+
+  def worker_mode_id(mode), do: ["reef_mode", Atom.to_string(mode)] |> Enum.join("-")
 
   def worker_mode(%{worker_mode: mode}) do
     content_tag(:div, humanize_atom_safe(mode), class: "column")

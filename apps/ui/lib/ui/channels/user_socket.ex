@@ -1,8 +1,8 @@
 defmodule UI.UserSocket do
-  use Phoenix.Socket
+  use Phoenix.Socket, log: false
 
   ## Channels
-  # channel "room:*", UI.RoomChannel
+  channel "helen:*", UI.HelenChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
@@ -17,6 +17,7 @@ defmodule UI.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(_params, socket, _connect_info) do
+    # inspect(connect_info, pretty: true) |> IO.puts()
     {:ok, socket}
   end
 
