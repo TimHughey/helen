@@ -7,12 +7,6 @@
 // from the params if you are not using authentication.
 import { Socket } from "phoenix";
 
-let socket = new Socket("/socket", {
-  params: {
-    token: window.userToken,
-  },
-});
-
 // When you connect, you'll often need to authenticate the client.
 // For example, imagine you have an authentication plug, `MyAuth`,
 // which authenticates the session and assigns a `:current_user`.
@@ -55,44 +49,7 @@ let socket = new Socket("/socket", {
 //     end
 //
 // Finally, connect to the socket:
-socket.connect();
+
 // Now that you are connected, you can join channels with a topic:
-let channel = socket.channel("helen:admin", { data: "initial" });
-channel
-  .join()
-  .receive("ok", (resp) => {
-    window.channelJoined = true;
-    // console.log("Joined successfully", resp);
-  })
-  .receive("error", (resp) => {
-    console.log("Unable to join", resp);
-  });
 
-channel.on("broadcast", (msg) => {
-  console.log("Message: ", msg);
-});
-
-document.body.addEventListener("click", function (e) {
-  // console.log("click: ", e);
-
-  channel
-    .push(
-      "button_click",
-      {
-        active_page: window.activePage,
-        child: e.target.firstChild.data,
-        class: e.target.className,
-        value: e.target.value,
-        id: e.target.id,
-      },
-      10000
-    )
-    .receive("refresh_section", (msg) => {
-      document.getElementById(msg.section).innerHTML = msg.html;
-    })
-    .receive("nop", (msg) => {})
-    .receive("error", (reasons) => console.log("error", reasons))
-    .receive("timeout", () => console.log("Networking issue..."));
-});
-
-export default { socket };
+// export default {socket};

@@ -58,6 +58,24 @@ defmodule UI.HelenChannel do
     {:reply, {:nop, %{}}, socket}
   end
 
+  def handle_in("refresh_page", %{"active_page" => active_page}, socket) do
+    alias Phoenix.View
+    alias UI.{ReefView, RoostView}
+
+    {:reply,
+     {:refresh_section,
+      case active_page do
+        "reef" ->
+          html = View.render_to_string(ReefView, "specifics.html", reef_state: Reef.x_state())
+
+          %{section: "reef-specifics", html: html}
+
+        "roost" ->
+          roost_state = Roost.x_state()
+          View.render_to_string(RoostView, "specifics.html", roost_state: roost_state)
+      end}, socket}
+  end
+
   defp handle_roost_worker_mode_button(value) do
     alias Roost.Server, as: Server
 

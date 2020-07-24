@@ -1,10 +1,16 @@
 <script>window.activePage = "reef";</script>
+<script>
+  let refreshButton = document.getElementById("auto_refresh");
 
-<section id="reef-header">
-  <div class="row reef-banner">
+  refreshButton.className = "auto-refresh-inactive";
+  refreshButton.removeAttribute("disabled");
+</script>
+
+<section class="reef reef-banner" id="reef-header">
+  <div class="row">
     <div class="column" id="reef-banner">Reef Captain and First Mate</div>
 </section>
 
-<section id="reef-specifics">
+<section class="reef" id="reef-specifics">
   <%= render(UI.ReefView, "specifics.html", reef_state: @reef_state) %>
 </section>

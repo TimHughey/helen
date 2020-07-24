@@ -47,7 +47,7 @@ defmodule UI.ReefView do
   def render_step_name_list(step_names) do
     step_names_list =
       for name <- step_names do
-        content_tag(:li, humanize_atom(name), class: "reef-steps-remaining")
+        content_tag(:li, humanize_atom(name))
       end
 
     content_tag(:ul, step_names_list)

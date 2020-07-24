@@ -11,6 +11,10 @@ import "../css/app.scss";
 //    import { Socket } from "phoenix"
 //
 //
-import {Socket} from "phoenix";
-import {socket} from "./socket";
+// import {Socket} from "phoenix";
+// import {socket} from "./socket";
+import { helenWorkLoop } from "./helen";
 import "phoenix_html";
+
+// start the Helen periodic work loop
+helenWorkLoop();

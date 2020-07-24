@@ -1,5 +1,12 @@
 <script>window.activePage = "roost";</script>
 
+<script>
+  let refreshButton = document.getElementById("auto_refresh");
+
+  refreshButton.className = "auto-refresh-inactive";
+  refreshButton.removeAttribute("disabled");
+</script>
+
 <section id="roost-header">
   <div class="row roost-banner">
     <div class="column" id="roost-banner">The Roost at Wiss Landing</div>

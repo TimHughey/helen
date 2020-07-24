@@ -4,12 +4,8 @@ body,
 header,
 button,
 pre {
-  color: rgb(238, 247, 237);
+  color: whitesmoke;
   background: rgb(18, 18, 18);
-}
-
-a {
-  color: rgb(21, 153, 22);
 }
 
 pre {
@@ -46,9 +42,6 @@ header {
   margin-bottom: 1rem;
   margin-right: 5rem;
   margin-left: 5rem;
-  // margin-left: 5rem;
-  // margin-right: 5rem;
-  // background: rgb(18, 18, 18);
   border-spacing: 0;
   border-bottom: 1px solid rgb(238, 70, 70);
 }
@@ -61,12 +54,22 @@ header button {
   border-style: none;
 }
 
-header button.refresh-disabled {
-  color: rgb(255, 255, 255);
+button[disabled]:hover {
+  background-color: inherit;
 }
 
-header button.refresh-enabled {
-  color: rgb(61, 224, 35);
+.auto-refresh {
+  &-disabled {
+    color: slategray;
+  }
+
+  &-active {
+    color: forestgreen;
+  }
+
+  &-inactive {
+    color: silver;
+  }
 }
 
 header div.row {
@@ -106,12 +109,12 @@ header nav ul {
 
 header nav a {
   display: block;
-  color: rgb(21, 153, 22);
+  color: rgb(15, 226, 16);
 }
 
-header h1.i-am {
+.i-am {
   align-self: center;
-  color: rgb(136, 136, 132);
+  color: antiquewhite;
   font-size: 3rem;
   font-weight: 400;
   padding-top: 1rem;
@@ -122,16 +125,16 @@ header h1.i-am {
   font-size: 3rem;
 }
 
-.helen-hero {
-  text-align: center;
-  border-bottom: 1px solid #555454;
-  background: #121212;
-  border-radius: 6px;
-  // padding: 1em 1em 1em;
-  margin-bottom: 0.5rem;
-  font-weight: 200;
-  font-size: 70%;
-}
+// .helen-hero {
+//   text-align: center;
+//   border-bottom: 1px solid #555454;
+//   background: #121212;
+//   border-radius: 6px;
+//   // padding: 1em 1em 1em;
+//   margin-bottom: 0.5rem;
+//   font-weight: 200;
+//   font-size: 70%;
+// }
 
 @media (min-width: 40rem) {
   /* Small devices (landscape phones, 576px and up) */
