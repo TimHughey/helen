@@ -1,0 +1,20 @@
+<section class="ModuleConfig" id="mod-opts-header">
+  <script>window.activePage = "module_opts";</script>
+
+  <div class="row">
+    <div class="column ModuleConfig-banner">
+      Module Options
+    </div>
+  </div>
+
+  <!-- Render the available modules -->
+
+  <div class="row ModuleConfig">
+    <div class="column ModuleConfig-buttons">
+      <%= render_module_buttons(@modules) %>
+    </div>
+    <div class="column">
+      <textarea class="column ModuleConfig" id="module-opts-textarea"></textarea>
+    </div>
+  </div>
+</section>

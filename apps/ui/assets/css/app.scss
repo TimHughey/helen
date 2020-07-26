@@ -5,13 +5,13 @@ header,
 button,
 pre {
   color: whitesmoke;
-  background: rgb(18, 18, 18);
+  background: hsl(0, 100%, 5%);
 }
 
 pre {
   margin: 0;
   padding: 0;
-  color: rgb(0, 224, 255);
+  color: cyan;
   border-style: none;
   text-align: left;
   font-family: "Anonymous Pro", monospace;
@@ -43,7 +43,7 @@ header {
   margin-right: 5rem;
   margin-left: 5rem;
   border-spacing: 0;
-  border-bottom: 1px solid rgb(238, 70, 70);
+  border-bottom: 1px solid red;
 }
 
 header button {
@@ -109,7 +109,7 @@ header nav ul {
 
 header nav a {
   display: block;
-  color: rgb(15, 226, 16);
+  color: wheat;
 }
 
 .i-am {
@@ -121,7 +121,7 @@ header nav a {
 }
 
 .home-page-links {
-  color: rgb(0, 186, 255);
+  color: skyblue;
   font-size: 3rem;
 }
 
@@ -335,5 +335,7 @@ input:checked + .slider:before {
   display: none;
 }
 
+@import "home";
 @import "reef";
 @import "roost";
+@import "module_config";

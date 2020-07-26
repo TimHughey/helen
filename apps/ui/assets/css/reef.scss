@@ -6,7 +6,6 @@
   font-size: 1.4rem;
   font-weight: 400;
   text-align: center;
-  background: rgb(18, 18, 18);
 
   div > button {
     text-transform: none;
@@ -43,7 +42,7 @@
     &-block {
       margin-top: 0.5rem;
       margin-bottom: 1rem;
-      border-bottom: 1px solid rgb(156, 156, 156);
+      border-bottom: 1px solid gainsboro;
     }
 
     &-heading {
@@ -52,27 +51,27 @@
     }
 
     &-standby {
-      background-color: rgb(111, 111, 111);
+      background-color: dimgray;
     }
 
     &-ready {
-      background-color: rgb(13, 131, 7);
+      background-color: darkgreen;
     }
 
     &-active {
-      background-color: rgb(13, 131, 7);
+      background-color: darkgreen;
     }
 
     &-running {
-      background-color: rgb(195, 0, 0);
+      background-color: firebrick;
     }
 
     &-nomatch {
-      background-color: rgb(168, 162, 3);
+      background-color: gold;
     }
 
     &-ato-running {
-      background-color: rgb(0, 109, 198);
+      background-color: royalblue;
     }
   }
 
@@ -84,7 +83,10 @@
     }
 
     &-all-stop {
-      background-color: rgb(117, 0, 152);
+      color: orangered;
+      // background-color: indigo;
+      font-weight: 500;
+      font-size: 1.8rem;
     }
 
     &-mode {
@@ -96,15 +98,15 @@
       }
 
       &-finished {
-        background: rgb(252, 14, 236);
+        background: blue;
       }
 
       &-ready {
-        background: rgb(13, 131, 7);
+        background: darkgreen;
       }
 
       &-running {
-        background: rgb(195, 0, 0);
+        background: firebrick;
       }
 
       &-status {
@@ -127,7 +129,7 @@
       }
 
       &-unknown {
-        background: rgb(111, 111, 111);
+        background: gold;
       }
     }
   }
