@@ -7,7 +7,7 @@
         <img src="images/reef.png">
       </div>
       <div class="content">
-        <%= link "Reef", to: Routes.reef_path(@conn, :home), class: "header" %>
+        <%= link "Reef", to: Routes.reef_path(@conn, :index), class: "header" %>
         <div class="meta">
           <a>Date</a>
           <a>Water, Pumps and Heaters</a>
@@ -36,7 +36,7 @@
         <img src="images/roost.png">
       </div>
       <div class="content">
-        <%= link "Roost", to: Routes.roost_path(@conn, :home), class: "header" %>
+        <%= link "Roost", to: Routes.roost_path(@conn, :index), class: "header" %>
         <div class="meta">
           <a>Date</a>
           <a>Lighting</a>
@@ -60,7 +60,7 @@
         <img src="images/gears1.png">
       </div>
       <div class="content">
-        <%= link "Module Configuration", to: Routes.module_config_path(@conn, :home), class: "header" %>
+        <%= link "Module Configuration", to: Routes.module_config_path(@conn, :index), class: "header" %>
         <div class="meta">
           <a>Date</a>
           <a>System Configuration</a>

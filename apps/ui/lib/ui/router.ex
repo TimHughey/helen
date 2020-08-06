@@ -18,9 +18,9 @@ defmodule UI.Router do
   scope "/", UI do
     pipe_through :browser
 
-    get "/module_opts", ModuleConfigController, :home
-    get "/reef", ReefController, :home
-    get "/roost", RoostController, :home
+    get "/module_opts", ModuleConfigController, :index
+    get "/reef", ReefController, :index
+    get "/roost", RoostController, :index
     get "/", HomeController, :index
     resources "/:next_page", HomeController, only: [:create]
   end
