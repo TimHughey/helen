@@ -190,8 +190,46 @@ defmodule Reef do
 
   """
   @doc since: "0.0.27"
-  # def status, do: Status.msg() |> IO.puts()
-  def status, do: Status.msg()
+  def status, do: Status.msg() |> IO.puts()
+
+  @doc """
+  Return a map of the Reef status
+  """
+  @doc since: "0.0.27"
+  def status_map do
+    %{worker_mode: captain_worker_mode} = Captain.x_state()
+
+    %{
+      captain: %{
+        available: Captain.active?(),
+        step: captain_worker_mode,
+        steps: %{
+          fill: %{active: false, completed: false},
+          keep_fresh: %{active: false, completed: false},
+          add_salt: %{active: false, completed: false},
+          match_conditions: %{active: false, completed: false},
+          dump_water: %{active: false, completed: false},
+          load_water: %{active: false, completed: false},
+          final_check: %{active: false, completed: false}
+        },
+        pump: %{
+          active: MixTank.Pump.active?(),
+          position: MixTank.Pump.value(:simple)
+        },
+        air: %{
+          active: MixTank.Air.active?(),
+          position: MixTank.Air.value(:simple)
+        },
+        rodi: %{
+          active: MixTank.Rodi.active?(),
+          position: MixTank.Rodi.value(:simple)
+        },
+        heater: %{
+          active: MixTank.Temp.active?()
+        }
+      }
+    }
+  end
 
   def standby_reason do
     case x_state(:standby_reason) do

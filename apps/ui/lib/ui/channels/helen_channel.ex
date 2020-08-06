@@ -15,88 +15,79 @@ defmodule UI.HelenChannel do
 
   def handle_in(
         "button_click",
-        %{"value" => value, "id" => id, "active_page" => active_page} = _req_payload,
+        %{"id" => id, "active_page" => active_page} = _req_payload,
         socket
       ) do
-    alias Phoenix.View
-    alias UI.ReefView
-    alias UI.RoostView
-
     socket = socket |> assign(:active_page, active_page)
 
-    cond do
-      String.contains?(id, "reef_mode") ->
-        rc = handle_worker_mode_button(value)
-        reef_state = Reef.x_state()
-        specifics_html = View.render_to_string(ReefView, "specifics.html", reef_state: reef_state)
-
-        resp_payload = %{section: "reef-specifics", rc: inspect(rc), html: specifics_html}
-
-        {:reply, {:refresh_section, resp_payload}, socket}
-
-      String.contains?(id, "roost_mode") ->
-        rc = handle_roost_worker_mode_button(value)
-        roost_state = Roost.Server.x_state()
-
-        specifics_html =
-          View.render_to_string(RoostView, "specifics.html", roost_state: roost_state)
-
-        resp_payload = %{
-          section: "roost-specifics",
-          rc: inspect(rc),
-          html: specifics_html
-        }
-
-        {:reply, {:refresh_section, resp_payload}, socket}
-
-      true ->
-        {:reply, {:error, %{reason: "not a worker"}}, socket}
-    end
+    {:reply, {:refresh_page, %{id: id, active_page: active_page}}, socket}
   end
 
   def handle_in("button_click", _req_payload, socket) do
     {:reply, {:nop, %{}}, socket}
   end
 
-  def handle_in("refresh_page", %{"active_page" => active_page}, socket) do
-    alias Phoenix.View
-    alias UI.{ReefView, RoostView}
+  def handle_in("module_config_selection", %{"mod_str" => mod_str}, socket) do
+    alias Helen.Module.Config
 
-    {:reply,
-     {:refresh_section,
-      case active_page do
-        "reef" ->
-          html = View.render_to_string(ReefView, "specifics.html", reef_state: Reef.x_state())
+    opts =
+      Config.opts(mod_str)
+      |> Keyword.drop([:__available__, :__version__])
+      |> inspect(pretty: true, width: 5)
 
-          %{section: "reef-specifics", html: html}
-
-        "roost" ->
-          roost_state = Roost.x_state()
-          View.render_to_string(RoostView, "specifics.html", roost_state: roost_state)
-      end}, socket}
+    {:reply, {:module_config, %{mod_str: mod_str, opts: opts}}, socket}
   end
 
-  defp handle_roost_worker_mode_button(value) do
-    alias Roost.Server, as: Server
+  def handle_in(msg, %{"active_page" => active_page}, socket)
+      when msg in ["refresh_page", "page_loaded"] do
+    base_resp = %{active_page: active_page}
 
-    apply(Server, :worker_mode, [String.to_atom(value), []])
-  end
-
-  defp handle_worker_mode_button(value) do
-    alias Reef.FirstMate.Server, as: FirstMate
-
-    mode = String.to_atom(value)
-
-    if mode == :clean do
-      %{worker_mode: fm_mode} = FirstMate.x_state()
-
-      case fm_mode do
-        k when k in [:ready, :normal_operations] -> FirstMate.worker_mode(:clean, [])
-        k when k in [:clean, :disable] -> FirstMate.worker_mode(:normal_operations, [])
-        _k -> FirstMate.worker_mode(:normal_operations, [])
-      end
-    else
-      apply(Reef, :worker_mode, [String.to_atom(value)])
+    case active_page do
+      "reef" -> socket |> reply_reef_status_map(base_resp)
+      "roost" -> socket |> reply_roost_status_map(base_resp)
+      "module_config" -> socket |> reply_mod_config_status_map(base_resp)
+      "home" -> socket |> reply_home_status_map(base_resp)
     end
+  end
+
+  def handle_in("roost_click", %{"mode" => mode, "action" => action} = payload, socket)
+      when mode in ["dance", "leaving", "closed"] and action in ["off", "play", "stop"] do
+    alias UI.RoostView
+
+    base_resp = RoostView.button_click(payload)
+
+    socket
+    |> reply_roost_status_map(base_resp)
+  end
+
+  # roost_click unmatched mode / action
+  def handle_in("roost_click", payload, socket),
+    do: {:reply, {:error, %{roost_click: payload}}, socket}
+
+  def handle_in(type, payload, socket) do
+    """
+    handle_in(#{type}, #{inspect(payload, pretty: true)})
+    """
+    |> IO.puts()
+
+    {:reply, {:nop, %{}}, socket}
+  end
+
+  defp reply_home_status_map(socket, base_resp) do
+    {:reply, {:home_status, Map.merge(base_resp, %{})}, socket}
+  end
+
+  defp reply_mod_config_status_map(socket, base_resp) do
+    {:reply, {:module_config_status, Map.merge(base_resp, %{hello: "doctor"})}, socket}
+  end
+
+  defp reply_reef_status_map(socket, base_resp) do
+    {:reply, {:reef_status, Map.merge(base_resp, Reef.status_map())}, socket}
+  end
+
+  defp reply_roost_status_map(socket, base_resp) do
+    alias UI.RoostView
+
+    {:reply, {:roost_status, Map.merge(base_resp, RoostView.status())}, socket}
   end
 end

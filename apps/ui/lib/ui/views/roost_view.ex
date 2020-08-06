@@ -1,72 +1,65 @@
 defmodule UI.RoostView do
   use UI, :view
 
-  alias Roost.Server
+  def button_click(%{"mode" => mode, "action" => action}) do
+    resp = %{
+      button_click: %{
+        mode: mode,
+        action: action
+      }
+    }
 
-  def render_worker_modes_status(state) do
-    modes = Server.available_modes()
+    case button_handle_mode_and_action(mode, action) do
+      {rc, mode} ->
+        resp
+        |> put_in([:button_click, :rc], rc)
+        |> put_in([:button_click, :rc_str], inspect({rc, mode}, pretty: true))
 
-    for mode <- modes, {k, %{status: val}} when k == mode <- state do
-      mode_content = render_worker_mode_status(k, val)
-
-      content_tag(:div, mode_content, class: "column roost-worker-mode-status")
+      rc ->
+        resp |> put_in([:button_click, :rc], rc)
     end
   end
 
-  def render_worker_mode_status(mode, val) do
-    mode_str = humanize_atom_safe(mode)
-
-    case val do
-      val when val in [:ready] ->
-        content_tag(:button, mode_str,
-          class: "roost roost-worker-mode-ready",
-          id: worker_mode_id(mode),
-          value: Atom.to_string(mode)
-        )
-
-      :running ->
-        content_tag(:button, mode_str,
-          class: "reef roost-worker-mode-running",
-          id: worker_mode_id(mode),
-          value: Atom.to_string(mode)
-        )
-
-      :finished ->
-        content_tag(:button, mode_str,
-          class: "reef roost-worker-mode-finished",
-          id: worker_mode_id(mode),
-          value: Atom.to_string(mode)
-        )
-
-      val ->
-        IO.puts("worker_mode_status: #{inspect(val)}")
-
-        content_tag(:button, mode_str,
-          class: "reef roost-worker-mode-unknown",
-          id: worker_mode_id(mode),
-          value: Atom.to_string(mode)
-        )
+  def button_handle_mode_and_action(mode, action) do
+    case {mode, action} do
+      {mode, "play"} -> map_mode(mode) |> Roost.worker_mode([])
+      {_mode, "off"} -> Roost.restart()
+      {_mode, "stop"} -> Roost.all_stop()
     end
   end
 
-  defp humanize_atom(a) do
-    parts = Atom.to_string(a) |> String.split("_")
+  def status do
+    modes = Roost.available_modes()
+    state = Roost.x_state()
 
-    for p <- parts do
-      String.capitalize(p)
+    for mode <- modes, reduce: %{modes: []} do
+      %{modes: modes} = status ->
+        mode_status = %{
+          mode: map_mode(mode),
+          status: get_in(state, [mode, :status]) |> map_mode_status()
+        }
+
+        modes = [modes, [mode_status]] |> List.flatten()
+
+        status |> put_in([:modes], modes)
     end
-    |> Enum.join(" ")
-    |> IO.iodata_to_binary()
   end
 
-  defp humanize_atom_safe(a) do
-    humanize_atom(a)
-    |> html_escape()
+  def map_mode(mode) do
+    case mode do
+      :dance_with_me -> :dance
+      "dance" -> :dance_with_me
+      :leaving -> :leaving
+      :closed -> :closed
+      "closed" -> :closed
+    end
   end
 
-  def worker_mode_id(mode), do: ["roost_mode", Atom.to_string(mode)] |> Enum.join("-")
-
-  def worker_mode(%{worker_mode: mode}) do
-    content_tag(:div, humanize_atom_safe(mode), class: "column")
+  def map_mode_status(status) do
+    case status do
+      :running -> :play
+      :completed -> :stop
+      :ready -> :off
+    end
   end
 end

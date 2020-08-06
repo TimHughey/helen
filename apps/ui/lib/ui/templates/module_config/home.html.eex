@@ -1,20 +1,67 @@
-<section class="ModuleConfig" id="mod-opts-header">
-  <script>window.activePage = "module_opts";</script>
+<script>
+  window.activePage = "module_config";
+</script>
 
-  <div class="row">
-    <div class="column ModuleConfig-banner">
-      Module Options
+<h3 class="ui bottom attached centered block header">
+  Module Configuration
+</h3>
+
+<div class="ui attached segment">
+  <div class="ui grid">
+  <div class="left floated two wide column">
+    <div class="ui vertical menu" id="menu-module-config">
+      <div class="item">
+        <div class="header">Garden</div>
+        <div class="menu">
+          <a class="item" data-mod="Garden.Irrigation.Server">Irrigation</a>
+          <a class="item" data-mod="Garden.Lighting.Server">Lighting</a>
+        </div>
+      </div>
+      <div class="item">
+        <div class="header">Reef</div>
+        <div class="menu">
+          <a class="item" data-mod="Reef.Captain.Server">Captain</a>
+          <a class="item" data-mod="Reef.FirstMate.Server">First Mate</a>
+        </div>
+      </div>
+      <div class="item">
+        <div class="header">Mix Tank</div>
+        <div class="menu">
+          <a class="item" data-mod="Reef.MixTank.Air">Air</a>
+          <a class="item" data-mod="Reef.MixTank.Pump">Pump</a>
+          <a class="item" data-mod="Reef.MixTank.RODI">Fill</a>
+          <a class="item" data-mod="Reef.MixTank.Temp">Temperature</a>
+        </div>
+      </div>
+      <div class="item">
+        <div class="header">Display Tank</div>
+        <div class="menu">
+          <a class="item" data-mod="Reef.DisplayTank.Ato">Auto Top-off</a>
+          <a class="item">Heater</a>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="header">Roost</div>
+        <div class="menu">
+          <a class="item" data-mod="Roost.Server">Server</a>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- Render the available modules -->
-
-  <div class="row ModuleConfig">
-    <div class="column ModuleConfig-buttons">
-      <%= render_module_buttons(@modules) %>
-    </div>
-    <div class="column">
-      <textarea class="column ModuleConfig" id="module-opts-textarea"></textarea>
-    </div>
+  <div class="right floated twelve wide column">
+    <form class="ui form">
+      <div class="disabled field" id="field-module-config">
+        <textarea rows="20" autocapitalize="none" spellcheck="false" id="textarea-module-config" data-mod-str="">
+        </textarea>
+      </div>
+      <div class="ui blue labeled submit icon button" id="button-module-config-save">
+        <i class="icon edit"></i>
+        Save
+      </div>
+    </form>
   </div>
-</section>
+</div>
+</div>

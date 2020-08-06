@@ -1,4 +1,25 @@
 defmodule Roost.Logic do
+  @moduledoc """
+  Logic for Roost server
+  """
+
+  def all_stop(%{worker_mode: :ready} = state) do
+    # if worker mode is :ready then nothing is running
+    # change the token just in case
+    state
+    |> change_token()
+  end
+
+  def all_stop(state) do
+    # there's an active worker mode, stop all it's devices, flag the mode
+    # as finished and change the token
+
+    state
+    |> finish_mode()
+    |> stop_all_devices()
+    |> change_token()
+  end
+
   def available_modes(%{opts: opts} = _state) do
     get_in(opts, [:modes])
     |> Keyword.keys()
@@ -153,26 +174,24 @@ defmodule Roost.Logic do
     # the next step is always the head of :steps_to_execute
     steps_to_execute = get_in(state, [worker_mode, :steps_to_execute])
     # NOTE:  each clause returns the state, even if unchanged
-    cond do
-      steps_to_execute == [] ->
-        # we've reached the end of this mode!
-        state
-        |> finish_mode()
+    if steps_to_execute == [] do
+      # we've reached the end of this mode!
+      state
+      |> finish_mode()
+    else
+      next_step = steps_to_execute |> hd()
 
-      true ->
-        next_step = steps_to_execute |> hd()
+      cmds = get_in(state, [worker_mode, :steps, next_step])
 
-        cmds = get_in(state, [worker_mode, :steps, next_step])
-
-        state
-        # remove the step we're starting
-        |> update_in([worker_mode, :steps_to_execute], fn x -> tl(x) end)
-        |> put_in([worker_mode, :active_step], next_step)
-        # the worker_mode step key contains the control map for the step executing
-        |> put_in([worker_mode, :step, :started_at], utc_now())
-        |> put_in([worker_mode, :step, :elapsed], 0)
-        |> put_in([worker_mode, :step, :cmds_to_execute], cmds)
-        |> start_next_cmd_in_step()
+      state
+      # remove the step we're starting
+      |> update_in([worker_mode, :steps_to_execute], fn x -> tl(x) end)
+      |> put_in([worker_mode, :active_step], next_step)
+      # the worker_mode step key contains the control map for the step executing
+      |> put_in([worker_mode, :step, :started_at], utc_now())
+      |> put_in([worker_mode, :step, :elapsed], 0)
+      |> put_in([worker_mode, :step, :cmds_to_execute], cmds)
+      |> start_next_cmd_in_step()
     end
   end
 
@@ -183,14 +202,12 @@ defmodule Roost.Logic do
     cmds_to_execute = get_in(state, [mode, :step, :cmds_to_execute])
 
     # NOTE:  each clause returns the state, even if unchanged
-    cond do
-      cmds_to_execute == [] ->
-        # we've reached the end of this step, start the next one
-        state
-        |> start_mode_next_step()
-
-      true ->
-        state |> start_next_cmd_and_pop()
+    if cmds_to_execute == [] do
+      # we've reached the end of this step, start the next one
+      state
+      |> start_mode_next_step()
+    else
+      state |> start_next_cmd_and_pop()
     end
   end
 
@@ -410,6 +427,14 @@ defmodule Roost.Logic do
         |> apply_actions({cmd_or_dev, x})
     end
     |> start_next_cmd_and_pop()
+  end
+
+  defp stop_all_devices(%{opts: opts} = state) do
+    devs = get_in(opts, [:devices]) |> Keyword.keys()
+
+    for dev <- devs, reduce: state do
+      state -> state |> apply_action_to_dev(dev, :off, [])
+    end
   end
 
   defp validate_durations(%{init_fault: _} = state), do: state

@@ -7,7 +7,7 @@ defmodule UI.HomeController do
 
     auto_refresh = get_session(conn, :auto_refresh) || false
 
-    render(conn, "index.html", auto_refresh: auto_refresh)
+    render(conn, "index.html", live_update: auto_refresh)
   end
 
   def create(conn, %{"auto_refresh" => auto_refresh}) do
@@ -26,5 +26,13 @@ defmodule UI.HomeController do
     #   ["new auto refresh: ", inspect(new_auto_refresh)] |> IO.iodata_to_binary()
     # )
     |> redirect(external: get_req_header(conn, "referer") |> hd())
+  end
+
+  def create(conn, %{"next_page" => next_page} = params) do
+    IO.puts("conn: #{inspect(conn, pretty: true)} \n params: #{inspect(params, pretty: true)}")
+
+    conn
+    |> put_session(:active_page, next_page)
+    |> redirect(to: "/#{next_page}")
   end
 end

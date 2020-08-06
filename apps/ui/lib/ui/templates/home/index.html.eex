@@ -1,20 +1,83 @@
 <script>window.activePage = "home";</script>
 
-<section class="home">
-  <div class="row">
-    <div class="column">
-      <%= link "Reef", to: Routes.reef_path(@conn, :home), class: "home-page-links" %>
+<div class="ui container">
+  <div class="ui relaxed divided items">
+    <div class="item">
+      <div class="ui small image">
+        <img src="images/reef.png">
+      </div>
+      <div class="content">
+        <%= link "Reef", to: Routes.reef_path(@conn, :home), class: "header" %>
+        <div class="meta">
+          <a>Date</a>
+          <a>Water, Pumps and Heaters</a>
+        </div>
+        <div class="description">
+          <p>
+            Provides control of the Salt Water Mix Tank and Display Tank systems.
+          </p>
+          <p>
+            Use this to mix a fresh batch of salt water, control the display
+            tank auto-top-off and perform water changes.
+          </p>
+        </div>
+        <div class="extra">
+          <%= content = ["Control the Reef", raw("<i class=\"right chevron icon\"></i>")]
+              button(content, to: "/reef", method: :post,
+                      class: "ui right floated icon primary button", id: "home-reef-button") %>
+          <div class="ui red label">
+            This functionality can create damage if used incorrectly
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="item">
+      <div class="ui small image">
+        <img src="images/roost.png">
+      </div>
+      <div class="content">
+        <%= link "Roost", to: Routes.roost_path(@conn, :home), class: "header" %>
+        <div class="meta">
+          <a>Date</a>
+          <a>Lighting</a>
+        </div>
+        <div class="description">
+          Control the Roost systems.
+        </div>
+        <div class="extra">
+            <button class="ui right floated icon primary button" id="home-roost-button">
+                Control the Roost
+                <i class="right chevron icon"></i>
+            </button>
+            <div class="ui green label">
+              Have fun, no damage can be caused adjusting The Roost
+            </div>
+        </div>
+      </div>
+    </div>
+    <div class="item">
+      <div class="ui small image">
+        <img src="images/gears1.png">
+      </div>
+      <div class="content">
+        <%= link "Module Configuration", to: Routes.module_config_path(@conn, :home), class: "header" %>
+        <div class="meta">
+          <a>Date</a>
+          <a>System Configuration</a>
+        </div>
+        <div class="description">
+          Adjust the configuration of Helen modules.
+        </div>
+        <div class="extra">
+          <button class="ui right floated icon primary button" id="home-module-config-button">
+              Adjust Module Configurations
+              <i class="right chevron icon"></i>
+          </button>
+          <div class="ui red label">
+            Use extreme caution when adjusting module configurations.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="row">
-    <div class="column">
-      <%= link "Roost", to: Routes.roost_path(@conn, :home), class: "home-page-links" %>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="column">
-      <%= link "Module Config Opts", to: Routes.module_config_path(@conn, :home), class: "home-page-links" %>
-    </div>
-  </div>
-</section>
+</div>

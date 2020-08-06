@@ -6,7 +6,7 @@ defmodule UI.Endpoint do
   # Set :encryption_salt if you would also like to encrypt it.
   @session_options [
     store: :cookie,
-    key: "_ui_key",
+    key: "_helen_ui_key",
     signing_salt: "FsujWNyL"
   ]
 
@@ -24,7 +24,7 @@ defmodule UI.Endpoint do
     at: "/",
     from: :ui,
     gzip: false,
-    only: ~w(css fonts images js favicon.ico robots.txt)
+    only: ~w(css fonts images js semantic favicon.ico robots.txt)
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

@@ -99,9 +99,8 @@ defmodule Helen.Module.Config do
 
         overrides = [overrides] |> List.flatten()
 
-        with opts when is_list(opts) <- Config.opts(__MODULE__, overrides) do
-          opts
-        else
+        case Config.opts(__MODULE__, overrides) do
+          x when is_list(x) -> x
           _no_config_opts -> overrides
         end
       end

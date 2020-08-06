@@ -37,9 +37,10 @@ defmodule Roost.Server do
     }
 
     # should the server start?
-    cond do
-      state[:server_mode] == :standby -> :ignore
-      true -> {:ok, state, {:continue, :bootstrap}}
+    if state[:server_mode] == :standby do
+      :ignore
+    else
+      {:ok, state, {:continue, :bootstrap}}
     end
   end
 
@@ -246,7 +247,7 @@ defmodule Roost.Server do
     alias Roost.Logic
 
     state
-    |> Logic.change_token()
+    |> Logic.all_stop()
     |> reply(:answering_all_stop)
   end
 

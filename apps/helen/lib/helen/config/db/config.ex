@@ -57,10 +57,9 @@ defmodule Helen.Module.DB.Config do
       opts: opts_binary
     ]
 
-    with {:ok, %Schema{module: mod}} <- upsert(%Schema{}, upsert_opts) do
-      {:ok, binary_to_mod(mod)}
-    else
-      rc -> rc
+    case upsert(%Schema{}, upsert_opts) do
+      {:ok, %Schema{module: mod}} -> {:ok, binary_to_mod(mod)}
+      error -> error
     end
   end
 
@@ -75,8 +74,7 @@ defmodule Helen.Module.DB.Config do
   end
 
   @doc false
-  def eval_opts(mod, overrides)
-      when is_atom(mod) and is_list(overrides) do
+  def eval_opts(mod, overrides) when is_list(overrides) do
     import DeepMerge, only: [deep_merge: 2]
 
     with %Schema{opts: opts, version: vsn} <- find(mod),
@@ -94,6 +92,7 @@ defmodule Helen.Module.DB.Config do
   @doc false
   def find(module_or_id) do
     check_args = fn
+      x when is_binary(x) -> [module: module_or_id]
       x when is_atom(x) -> [module: mod_as_binary(module_or_id)]
       x when is_integer(x) -> [id: x]
       x -> {:bad_args, x}
@@ -146,17 +145,18 @@ defmodule Helen.Module.DB.Config do
 
     cs = changeset(x, p)
 
-    with {:cs_valid, true} <- {:cs_valid, cs.valid?()} do
-      # the keys on_conflict: and conflict_target: indicate the insert
-      # is an "upsert"
-      Repo.insert(cs,
-        on_conflict: on_conflict,
-        returning: true,
-        conflict_target: [:module]
-      )
-    else
-      {:cs_valid, false} -> {:invalid_changes, cs}
-      rc -> {:failed, rc}
+    case {:cs_valid, cs.valid?()} do
+      {:cs_valid, true} ->
+        # the keys on_conflict: and conflict_target: indicate the insert
+        # is an "upsert"
+        Repo.insert(cs,
+          on_conflict: on_conflict,
+          returning: true,
+          conflict_target: [:module]
+        )
+
+      {:cs_valid, rc} ->
+        {:failed, rc}
     end
   end
 

@@ -22,7 +22,7 @@ defmodule UI.Router do
     get "/reef", ReefController, :home
     get "/roost", RoostController, :home
     get "/", HomeController, :index
-    resources "/", HomeController, only: [:create]
+    resources "/:next_page", HomeController, only: [:create]
   end
 
   # Other scopes may use custom stacks.

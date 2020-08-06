@@ -10,6 +10,8 @@ defmodule UI.ReefController do
   def home(conn, _params) do
     reef_state = Reef.x_state()
 
-    render(conn, "reef_home.html", reef_state: reef_state)
+    conn
+    |> put_session(:active_page, "reef")
+    |> render("reef_home.html", reef_state: reef_state, active_page: "reef")
   end
 end

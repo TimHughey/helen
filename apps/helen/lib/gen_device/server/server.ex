@@ -329,6 +329,14 @@ defmodule GenDevice do
           [:cached] ->
             reply(s, s[:last][:value_rc])
 
+          [:simple] ->
+            case position(dev_name) do
+              {:pending, pending} -> pending[:position]
+              {:ok, pos} -> pos
+              _anything -> :error
+            end
+            |> reply(s)
+
           [] ->
             pos_rc = position(dev_name)
 

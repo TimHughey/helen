@@ -18,4 +18,11 @@ defmodule Roost do
   defdelegate timeouts, to: Server
   defdelegate worker_mode(mode, opts \\ []), to: Server
   defdelegate x_state(keys \\ []), to: Server
+
+  def status do
+    %{worker_mode: mode} = x_state()
+
+    # translate the internal state to an abstracted version for external use
+    %{mode: mode}
+  end
 end
