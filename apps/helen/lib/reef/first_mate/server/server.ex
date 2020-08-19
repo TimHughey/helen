@@ -4,7 +4,6 @@ defmodule Reef.FirstMate.Server do
   """
 
   use GenServer, restart: :transient, shutdown: 7000
-  use Helen.Module.Config
 
   alias Reef.DisplayTank.Ato
 
@@ -15,12 +14,11 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def init(args) do
-    import Reef.FirstMate.Opts, only: [create_default_config_if_needed: 1]
+    import Reef.FirstMate.Opts,
+      only: [parsed: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
-
-    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,
@@ -31,7 +29,7 @@ defmodule Reef.FirstMate.Server do
       token_at: nil,
       pending: %{},
       timeouts: %{last: :never, count: 0},
-      opts: config_opts(args)
+      opts: parsed()
     }
 
     # should the server start?
@@ -95,7 +93,7 @@ defmodule Reef.FirstMate.Server do
 
   """
   @doc since: "0.0.27"
-  def available_modes, do: call({:available_modes})
+  def available_modes, do: call({:available_modes, :allow_standby})
 
   @doc """
   Set the FirstMate to a specific mode.
@@ -177,7 +175,7 @@ defmodule Reef.FirstMate.Server do
   """
   @doc since: "0.0.27"
   def server_mode(atom) when atom in [:active, :standby] do
-    call({:server_mode, atom})
+    call({:server_mode, atom, :allow_standby})
   end
 
   @doc """
@@ -229,7 +227,7 @@ defmodule Reef.FirstMate.Server do
   @impl true
   def handle_call({:all_stop}, _from, state) do
     state
-    |> all_stop__()
+    |> __all_stop__()
     |> reply(:answering_all_stop)
   end
 
@@ -412,7 +410,7 @@ defmodule Reef.FirstMate.Server do
   ## PRIVATE
   ##
 
-  defp all_stop__(state) do
+  defp __all_stop__(state) do
     import Reef.Logic, only: [change_token: 1]
 
     state
@@ -515,10 +513,19 @@ defmodule Reef.FirstMate.Server do
   ## GenServer.{call, cast} Helpers
   ##
 
-  defp call(msg) do
+  defp call(msg, call_opts \\ []) do
+    call_opts = [call_opts] |> List.flatten()
+
     cond do
-      server_down?() -> {:failed, :server_down}
-      standby?() -> {:failed, :standby_mode}
+      # when the server is down we can't make call, obviously
+      server_down?() -> :server_down
+      # when the server is up but in standby allow the call if specified
+      # in the call opts
+      call_opts == [:allow_standby] -> GenServer.call(__MODULE__, msg)
+      # when in standby mode and call opts do not include allow standby then
+      # prevent the call
+      standby?() -> :standby_mode
+      # finally, the server is up and active so make the call
       true -> GenServer.call(__MODULE__, msg)
     end
   end

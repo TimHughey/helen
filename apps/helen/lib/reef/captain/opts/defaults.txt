@@ -1,0 +1,112 @@
+# start of reef captain config
+
+base
+  syntax_vsn '2020-0817'
+  timeout PT3M
+  timezone America/New_York
+  first_mode fill
+
+devices
+  air   gen_device
+  pump  gen_device
+  rodi  gen_device
+  mix_heater temp_server
+  reef_heater temp_server
+  first_mate reef_worker
+
+modes
+  fill
+    next_mode keep_fresh
+    sequence at_start main topoff finally
+    steps
+      at_start for PT2H
+        rodi on PT2M10S then off
+        rodi off PT12M
+      main for PT3H
+        rodi on PT2M10S then off
+        air on PT5M then off nowait
+        rodi off PT12M
+      topoff for PT15M
+        air off
+        rodi on PT15M then off
+      finally
+        air off
+        rodi off
+
+  keep_fresh
+    next_mode add_salt
+    sequence init circulate aerate repeat
+    steps
+      init
+        sleep PT30S
+      circulate
+        pump on PT2M then off
+      aerate
+        air on PT3M then off
+      power_save
+        sleep PT10M
+
+  add_salt
+    next_mode match_conditions
+    sequence add mix finally
+    steps
+      add
+        pump on PT20M then off
+      mix for PT30M
+        air on PT3M then off
+        pump on PT5M then off
+      finally
+        air off
+        pump off
+
+  match_conditions
+    next_mode dump_water
+    sequence at_start warm stir repeat
+    steps
+      at_start
+        sleep PT30S
+      warm
+        tell mix_heater match_display_tank
+      stir
+        pump on PT1M then off
+        pump off PT5M
+
+  dump_water
+    next_mode load_water
+    sequence at_start adjust_valves pump_to_sewer
+    steps
+      at_start
+        tell mix_heater standby
+        tell reef_heater standby
+        tell first_mate clean
+      adjust_valves
+        sleep PT30S
+      pump_to_sewer
+        pump on PT2M17S then off
+
+  load_water
+    next_mode final_check
+    sequence at_start adjust_valves pump_to_reef
+    steps
+      at_start
+        tell mix_heater standby
+        tell reef_heater standby
+        tell first_mate clean
+      adjust_valves
+        sleep PT45S
+      pump_to_reef
+        pump on PT2M17S then off
+
+  final_check
+    next_mode fill
+    sequence at_start check normal_operations
+    steps
+      at_start
+        all off
+      check
+        sleep PT30M
+      normal_operations
+        tell reef_heater active
+        tell first_mate clean_finished
+
+# end of config

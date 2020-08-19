@@ -13,46 +13,63 @@ import "../css/app.scss";
 //
 // import {Socket} from "phoenix";
 // import {socket} from "./socket";
-import { helenWorkLoop } from "./helen";
 import "../semantic/dist/semantic";
 import "phoenix_html";
+import {Socket} from "phoenix";
 
-// start the Helen periodic work loop
-helenWorkLoop();
+import {ModuleConfigOptions} from "./module_config_opts";
+import {Reef} from "./reef";
+import {Roost} from "./roost";
 
-// $(document).ready(function() {
-//   var $headers = $("body > h3"),
-//     $header = $headers.first(),
-//     ignoreScroll = false,
-//     timer;
 //
-//   // Preserve example in viewport when resizing browser
-//   $(window).on("resize", function() {
-//     // ignore callbacks from scroll change
-//     clearTimeout(timer);
-//     $headers.visibility("disable callbacks");
+// MAIN CODE
 //
-//     // preserve position
-//     $(document).scrollTop($header.offset().top);
+// Automatically executed when imported.
 //
-//     // allow callbacks in 500ms
-//     timer = setTimeout(function() {
-//       $headers.visibility("enable callbacks");
-//     }, 500);
-//   });
-//   $headers.visibility({
-//     // fire once each time passed
-//     once: false,
-//
-//     // don't refresh position on resize
-//     checkOnRefresh: true,
-//
-//     // lock to this element on resize
-//     onTopPassed: function() {
-//       $header = $(this);
-//     },
-//     onTopPassedReverse: function() {
-//       $header = $(this);
-//     }
-//   });
-// });
+
+// establish the websocket
+let socket = new Socket("/socket", {
+  params: {
+    token: window.userToken
+  }
+});
+
+socket.connect();
+
+let channel = socket.channel("helen:admin", {data: "initial"});
+channel
+  .join()
+  .receive("ok", resp => {
+    // join was a success
+    window.channelJoined = true;
+  })
+  .receive("error", resp => {
+    console.log("Unable to join", resp);
+  });
+
+channel.on("broadcast", msg => {
+  console.log("Message: ", msg);
+});
+
+var module_config = new ModuleConfigOptions(channel);
+var reef = new Reef(channel);
+var roost = new Roost(channel);
+
+// initialize the dropdown menu
+$(".ui.dropdown").dropdown();
+
+// initialize button click callbacks
+// let live_update_button = $("#live-update-button");
+// live_update_button.on("click", setLiveUpdateButton);
+
+// handle page load events
+jQuery("document").ready(function() {
+  let active_page = jQuery(this)
+    .find("div[data-subsystem]")
+    .data("subsystem");
+
+  console.log("document ready", active_page);
+
+  reef.pageLoaded(active_page);
+  module_config.pageLoaded(active_page);
+});

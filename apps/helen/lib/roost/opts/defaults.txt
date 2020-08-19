@@ -1,0 +1,76 @@
+# start of roost config
+
+base
+  syntax_vsn '2020-08-18'
+  timeout PT1M
+  timezone 'America/New_York'
+
+devices
+  disco_ball    'roost disco ball'
+  el_wire       'roost el wire'
+  el_wire_entry 'roost el wire entry'
+  lights_one    'roost lights sound one'
+  lights_two    'roost lights sound two'
+  led_forest    'roost led forest'
+
+cmd_definitions
+  dance_fade
+    name roost dance fade
+    random
+      min 128
+      max 2048
+      primes 35
+      step_ms 55
+      step 13
+      priority 7
+
+  closed_fade
+    name roost closed fade
+    random
+      min 64
+      max 768
+      primes 35
+      step_ms 55
+      step 7
+      priority 7
+
+modes
+  dance_with_me
+    sequence spin_up slow_disco_ball dance
+    next_mode hold
+    steps
+      spin_up
+        led_forest dance_fade random
+        disco_ball duty 0.7
+        el_wire duty 0.5
+        el_wire_entry duty 0.5
+        on lights_one lights_three
+
+      slow_disco_ball
+        sleep PT1M
+
+      dance
+        hold mode
+
+  leaving
+    sequence house_lights exiting closed
+    next_mode closed
+    steps
+      house_lights
+        off disco_ball el_wire lights_one lights_three
+        on led_forest el_wire_entry
+
+      exiting
+        sleep PT10M
+
+  closed
+    sequence house_lights closed
+    next_mode hold
+    steps
+      house_lights
+        off el_wire_entry
+        led_forest random closed_fade
+      closed
+        sleep forever
+      
+# end of roost config

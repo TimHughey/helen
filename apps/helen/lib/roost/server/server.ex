@@ -7,7 +7,6 @@ defmodule Roost.Server do
   use Timex
 
   use GenServer, restart: :transient, shutdown: 5000
-  use Helen.Module.Config
 
   ##
   ## GenServer init and start
@@ -15,12 +14,10 @@ defmodule Roost.Server do
 
   @impl true
   def init(args) do
-    import Roost.Opts, only: [create_default_config_if_needed: 1]
+    import Roost.Opts, only: [parsed: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
-
-    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,
@@ -33,7 +30,7 @@ defmodule Roost.Server do
       token_at: nil,
       pending: %{},
       timeouts: %{last: :never, count: 0},
-      opts: config_opts(args)
+      opts: parsed()
     }
 
     # should the server start?

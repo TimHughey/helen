@@ -3,27 +3,10 @@ defmodule Lighting do
     Lighting Implementation for Wiss Landing
   """
 
-  alias Garden.Lighting.Server
+  alias Garden.Lighting.{Opts, Server}
 
-  @doc delegate_to: {Server, :config_update, 1}
-  defdelegate config_update(function), to: Server
-
-  @doc delegate_to: {Server, :config_opts, 0}
-  defdelegate opts, to: Server, as: :config_opts
-
-  @doc delegate_to: {Server, :config_opts, 1}
-  defdelegate opts(overrides), to: Server, as: :config_opts
-
-  @doc """
-  Reset  options to compile time defaults then restart server.
-  """
-  @doc since: "0.0.27"
-  def reset_opts do
-    alias Garden.Lighting.Opts
-
-    Opts.reset_to_defaults(__MODULE__)
-    restart()
-  end
+  @doc delegate_to: {Opts, :default_opts, 0}
+  defdelegate opts, to: Opts, as: :default_opts
 
   @doc """
   Return a keyword list of the scheduled irrigation jobs scheduled.

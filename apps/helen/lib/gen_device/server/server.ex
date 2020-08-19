@@ -6,7 +6,6 @@ defmodule GenDevice do
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       use GenServer, restart: :transient, shutdown: 7000
-      use Helen.Module.Config
 
       @use_opts use_opts
 

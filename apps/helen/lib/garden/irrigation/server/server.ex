@@ -5,7 +5,6 @@ defmodule Garden.Irrigation.Server do
 
   use Timex
   use GenServer, restart: :transient, shutdown: 7000
-  use Helen.Module.Config
 
   ##
   ## GenServer Start and Initialization
@@ -15,15 +14,13 @@ defmodule Garden.Irrigation.Server do
   @impl true
   def init(args) do
     import Helen.Time.Helper, only: [epoch: 0]
-    import Garden.Irrigation.Opts, only: [create_default_config_if_needed: 1]
-
-    create_default_config_if_needed(__MODULE__)
+    import Garden.Irrigation.Opts, only: [default_opts: 0]
 
     state = %{
       server_mode: args[:server_mode] || :active,
       last_timeout: epoch(),
       timeouts: 0,
-      opts: config_opts(args),
+      opts: default_opts(),
       last_scheduled: nil,
       jobs: %{running: %{}, last_rc: %{}},
       faults: %{}

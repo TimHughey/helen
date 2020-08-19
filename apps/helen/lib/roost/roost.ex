@@ -19,6 +19,13 @@ defmodule Roost do
   defdelegate worker_mode(mode, opts \\ []), to: Server
   defdelegate x_state(keys \\ []), to: Server
 
+  @doc """
+  Translate the internal state of the Roost server to an abstracted
+  version suitable for external use.
+
+  Returns a map
+  """
+  @doc since: "0.0.27"
   def status do
     %{worker_mode: mode} = x_state()
 

@@ -1,30 +1,95 @@
-<script>window.activePage = "roost";</script>
+<div class="ui container" data-subsystem="roost">
 
-<h3 class="ui centered attached block header">
-  The Roost at Wiss Landing
-</h3>
+  <h3 class="ui centered attached block header">
+    The Roost at Wiss Landing
+  </h3>
 
-<!-- Dance with Me! -->
-<div class="ui attached segment" data-subsystem="roost">
-  <div class="ui three raised stackable cards">
-    <div class="card" data-mode="dance">
+  <!-- Dance with Me! -->
+  <div class="ui attached segment">
+    <div class="ui three raised stackable cards">
+      <div class="card" data-mode="dance">
+        <div class="content">
+          <div class="label header">
+            Dance With Me!
+            <div class="right floated ui green label">
+              Ready
+            </div>
+          </div>
+          <div class="meta">
+            <span>Roost Mode</span>
+          </div>
+          <div class="description">
+            Start the disco ball, sound activated club lighting and EL wire to
+            ready The Roost for dancing!
+          </div>
+        </div>
+        <div class="extra content">
+        <div class="center aligned extra content">
+          <div class="raised ui buttons">
+            <button class="ui compact icon button" data-action="off">
+              <i class="power off icon"></i>
+            </button>
+            <button class="ui compact icon button" data-action="play">
+              <i class="play icon"></i>
+            </button>
+            <button class="ui compact icon button" data-action="stop">
+              <i class="stop icon"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      </div>
+
+    <!-- Leaving -->
+    <div class="card" data-mode="leaving">
       <div class="content">
         <div class="label header">
-          Dance With Me!
+          Leaving...
           <div class="right floated ui green label">
             Ready
           </div>
         </div>
-        <div class="meta" id="roost-dance-with-me-metadata">
-          <span>Roost Mode</span>
-          Inactive
+        <div class="meta">
+          Roost Mode
         </div>
         <div class="description">
-          Start the disco ball, sound activated club lighting and EL wire to
-          ready The Roost for dancing!
+          Set the lights to safely leave the Roost and begin the countdown to
+          close The Roost.
         </div>
       </div>
-    <div class="extra content">
+      <div class="extra content">
+        <div class="center aligned extra content">
+          <div class="raised ui buttons" >
+            <button class="ui compact icon button" data-action="off">
+              <i class="power off icon"></i>
+            </button>
+            <button class="ui compact icon button" data-action="play">
+              <i class="play icon"></i>
+            </button>
+            <button class="ui compact icon button" data-action="stop">
+              <i class="stop icon"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Closed -->
+    <div class="card" data-mode="closed">
+      <div class="content">
+        <div class="label header">
+          Closed
+          <div class="right floated ui green label">
+            Ready
+          </div>
+        </div>
+        <div class="meta">
+          Roost Mode
+        </div>
+        <div class="description">
+          Dim the LED forest and place The Roost in a closed state.
+        </div>
+      </div>
       <div class="center aligned extra content">
         <div class="raised ui buttons">
           <button class="ui compact icon button" data-action="off">
@@ -40,71 +105,4 @@
       </div>
     </div>
   </div>
-
-  <!-- Leaving -->
-  <div class="card" data-mode="leaving">
-    <div class="content">
-      <div class="label header">
-        Leaving...
-        <div class="right floated ui green label">
-          Ready
-        </div>
-      </div>
-      <div class="meta">
-        Roost Mode
-      </div>
-      <div class="description">
-        Set the lights to safely leave the Roost and begin the countdown to
-        close The Roost.
-      </div>
-    </div>
-    <div class="extra content">
-      <div class="center aligned extra content">
-        <div class="raised ui buttons" >
-          <button class="ui compact icon button" data-action="off">
-            <i class="power off icon"></i>
-          </button>
-          <button class="ui compact icon button" data-action="play">
-            <i class="play icon"></i>
-          </button>
-          <button class="ui compact icon button" data-action="stop">
-            <i class="stop icon"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-<!-- Closed -->
-  <div class="card" data-mode="closed">
-    <div class="content">
-      <div class="label header">
-        Closed
-        <div class="right floated ui green label">
-          Ready
-        </div>
-      </div>
-      <div class="meta">
-        Roost Mode
-      </div>
-      <div class="description">
-        Dim the LED forest and place The Roost in a closed state.
-      </div>
-    </div>
-    <div class="center aligned extra content">
-      <div class="raised ui buttons">
-        <button class="ui compact icon button" data-action="off">
-          <i class="power off icon"></i>
-        </button>
-        <button class="ui compact icon button" data-action="play">
-          <i class="play icon"></i>
-        </button>
-        <button class="ui compact icon button" data-action="stop">
-          <i class="stop icon"></i>
-        </button>
-      </div>
-    </div>
-  </div>
-
-
 </div>

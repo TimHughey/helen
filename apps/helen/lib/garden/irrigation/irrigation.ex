@@ -3,34 +3,10 @@ defmodule Irrigation do
     Irrigation Implementation for Wiss Landing
   """
 
-  alias Garden.Irrigation.Server
+  alias Garden.Irrigation.{Opts, Server}
 
-  def default_opts do
-    opts = [
-      jobs: [
-        flower_boxes: [
-          device: "irrigation flower boxes",
-          schedule: [am: "PT45S", noon: "PT30S", pm: "PT30S"]
-        ],
-        garden: [device: "irrigation garden", schedule: [am: "PT30M"]]
-      ],
-      power: [device: "irrigation 12v power", power_up_delay: "PT5S"],
-      device_group: "irrigation",
-      timezone: "America/New_York"
-    ]
-
-    config_update(fn _x -> opts end)
-    restart()
-  end
-
-  @doc delegate_to: {Server, :config_opts, 0}
-  defdelegate opts, to: Server, as: :config_opts
-
-  @doc delegate_to: {Server, :config_opts, 1}
-  defdelegate opts(overrides), to: Server, as: :config_opts
-
-  @doc delegate_to: {Server, :config_update, 1}
-  defdelegate config_update(function), to: Server
+  @doc delegate_to: {Opts, :default_opts, 0}
+  defdelegate opts, to: Opts, as: :default_opts
 
   @doc delegate_to: {Server, :start_job, 1}
   defdelegate start_job(job_name, job_atom, tod_atom, duration_list),

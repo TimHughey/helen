@@ -4,7 +4,6 @@ defmodule Garden.Lighting.Server do
   """
 
   use GenServer, restart: :transient, shutdown: 7000
-  use Helen.Module.Config
 
   ##
   ## GenServer Start and Initialization
@@ -13,12 +12,10 @@ defmodule Garden.Lighting.Server do
   @doc false
   @impl true
   def init(args) do
-    import Garden.Lighting.Opts, only: [create_default_config_if_needed: 1]
+    import Garden.Lighting.Opts, only: [default_opts: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
-
-    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,
@@ -29,7 +26,7 @@ defmodule Garden.Lighting.Server do
       token: nil,
       token_at: nil,
       timeouts: %{last: :never, count: 0},
-      opts: config_opts(args)
+      opts: default_opts()
     }
 
     # should the server start?

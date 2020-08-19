@@ -13,7 +13,6 @@ defmodule GenNotify do
       @behaviour GenNotify
 
       use GenServer, restart: :transient, shutdown: 5000
-      use Helen.Module.Config
 
       @doc false
       @impl true
@@ -21,7 +20,7 @@ defmodule GenNotify do
         import Helen.Time.Helper, only: [utc_now: 0]
 
         state =
-          %{last_timeout: utc_now(), opts: config_opts(args), notify_map: %{}}
+          %{last_timeout: utc_now(), opts: args, notify_map: %{}}
           |> loop_put_timeout()
 
         {:ok, state, 100}

@@ -4,7 +4,6 @@ defmodule Reef.Captain.Server do
   """
 
   use GenServer, restart: :transient, shutdown: 7000
-  use Helen.Module.Config
 
   alias Reef.FirstMate.Server, as: FirstMate
   alias Reef.MixTank
@@ -17,12 +16,10 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
-    import Reef.Captain.Opts, only: [create_default_config_if_needed: 1]
+    import Reef.Captain.Opts, only: [parsed: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
-
-    create_default_config_if_needed(__MODULE__)
 
     state = %{
       module: __MODULE__,
@@ -33,7 +30,7 @@ defmodule Reef.Captain.Server do
       pending: %{},
       worker_mode: :ready,
       timeouts: %{last: :never, count: 0},
-      opts: config_opts(args)
+      opts: parsed()
     }
 
     # should the server start?
@@ -99,7 +96,7 @@ defmodule Reef.Captain.Server do
 
   """
   @doc since: "0.0.27"
-  def available_modes, do: call({:available_modes})
+  def available_modes, do: call({:available_modes}, :allow_standby)
 
   @doc since: "0.0.27"
   def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
@@ -175,7 +172,7 @@ defmodule Reef.Captain.Server do
   """
   @doc since: "0.0.27"
   def server_mode(atom) when atom in [:active, :standby] do
-    call({:server_mode, atom})
+    call({:server_mode, atom}, :allow_standby)
   end
 
   @doc """
@@ -240,7 +237,7 @@ defmodule Reef.Captain.Server do
   @impl true
   def handle_call({:all_stop}, _from, state) do
     state
-    |> all_stop__()
+    |> __all_stop__()
     |> reply(:answering_all_stop)
   end
 
@@ -287,8 +284,10 @@ defmodule Reef.Captain.Server do
       # when switching to :standby ensure the switch is off
       :standby ->
         state
+        |> __all_stop__()
         |> change_token()
         |> crew_offline()
+        |> crew_online()
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :api)
         |> reply({:ok, mode})
@@ -415,7 +414,7 @@ defmodule Reef.Captain.Server do
   @impl true
   def terminate(_reason, %{worker_mode: worker_mode} = state) do
     case worker_mode do
-      :keep_fresh -> state |> all_stop__()
+      :keep_fresh -> state |> __all_stop__()
       _nomatch -> state
     end
   end
@@ -424,7 +423,7 @@ defmodule Reef.Captain.Server do
   ## PRIVATE
   ##
 
-  defp all_stop__(state) do
+  defp __all_stop__(state) do
     import Reef.Logic, only: [change_token: 1]
 
     state
@@ -527,10 +526,19 @@ defmodule Reef.Captain.Server do
   ## GenServer.{call, cast} Helpers
   ##
 
-  defp call(msg) do
+  defp call(msg, call_opts \\ []) do
+    call_opts = [call_opts] |> List.flatten()
+
     cond do
-      server_down?() -> {:failed, :server_down}
-      standby?() -> {:failed, :standby_mode}
+      # when the server is down we can't make call, obviously
+      server_down?() -> :server_down
+      # when the server is up but in standby allow the call if specified
+      # in the call opts
+      call_opts == [:allow_standby] -> GenServer.call(__MODULE__, msg)
+      # when in standby mode and call opts do not include allow standby then
+      # prevent the call
+      standby?() -> :standby_mode
+      # finally, the server is up and active so make the call
       true -> GenServer.call(__MODULE__, msg)
     end
   end

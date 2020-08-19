@@ -1,67 +1,78 @@
-<script>
-  window.activePage = "module_config";
-</script>
 
-<h3 class="ui bottom attached centered block header">
-  Module Configuration
-</h3>
+<div class="ui container" data-subsystem="module-config">
 
-<div class="ui attached segment">
-  <div class="ui grid">
-  <div class="left floated two wide column">
-    <div class="ui vertical menu" id="menu-module-config">
-      <div class="item">
-        <div class="header">Garden</div>
-        <div class="menu">
-          <a class="item" data-mod="Garden.Irrigation.Server">Irrigation</a>
-          <a class="item" data-mod="Garden.Lighting.Server">Lighting</a>
-        </div>
-      </div>
-      <div class="item">
-        <div class="header">Reef</div>
-        <div class="menu">
-          <a class="item" data-mod="Reef.Captain.Server">Captain</a>
-          <a class="item" data-mod="Reef.FirstMate.Server">First Mate</a>
-        </div>
-      </div>
-      <div class="item">
-        <div class="header">Mix Tank</div>
-        <div class="menu">
-          <a class="item" data-mod="Reef.MixTank.Air">Air</a>
-          <a class="item" data-mod="Reef.MixTank.Pump">Pump</a>
-          <a class="item" data-mod="Reef.MixTank.RODI">Fill</a>
-          <a class="item" data-mod="Reef.MixTank.Temp">Temperature</a>
-        </div>
-      </div>
-      <div class="item">
-        <div class="header">Display Tank</div>
-        <div class="menu">
-          <a class="item" data-mod="Reef.DisplayTank.Ato">Auto Top-off</a>
-          <a class="item">Heater</a>
-        </div>
-      </div>
+  <h3 class="ui attached centered block header">
+    Module Configuration
+  </h3>
 
-      <div class="item">
-        <div class="header">Roost</div>
-        <div class="menu">
-          <a class="item" data-mod="Roost.Server">Server</a>
+  <div class="ui attached segment">
+    <div class="ui grid">
+    <div class="left floated two wide column">
+      <div class="ui vertical menu">
+        <div class="item">
+          <div class="header">Garden</div>
+          <div class="menu">
+            <a class="item" data-mod="Garden.Irrigation.Server">Irrigation</a>
+            <a class="item" data-mod="Garden.Lighting.Server">Lighting</a>
+          </div>
         </div>
-      </div>
+        <div class="item">
+          <div class="header">Reef</div>
+          <div class="menu">
+            <a class="item" data-mod="Reef.Captain.Server">Captain</a>
+            <a class="item" data-mod="Reef.FirstMate.Server">First Mate</a>
+          </div>
+        </div>
+        <div class="item">
+          <div class="header">Mix Tank</div>
+          <div class="menu">
+            <a class="item" data-mod="Reef.MixTank.Air">Air</a>
+            <a class="item" data-mod="Reef.MixTank.Pump">Pump</a>
+            <a class="item" data-mod="Reef.MixTank.RODI">Fill</a>
+            <a class="item" data-mod="Reef.MixTank.Temp">Temperature</a>
+          </div>
+        </div>
+        <div class="item">
+          <div class="header">Display Tank</div>
+          <div class="menu">
+            <a class="item" data-mod="Reef.DisplayTank.Ato">Auto Top-off</a>
+            <a class="item">Heater</a>
+          </div>
+        </div>
 
+        <div class="item">
+          <div class="header">Roost</div>
+          <div class="menu">
+            <a class="item" data-mod="Roost.Server">Server</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="right floated twelve wide column">
+      <form class="ui form" data-form="module_config">
+        <div class="field">
+
+
+          <div class="ui left corner labeled input">
+            <div class="ui left corner label">
+              <i class="asterisk icon"></i>
+            </div>
+            <textarea rows="20" autocapitalize="none" spellcheck="false" data-input="module_config" data-mod="">
+            </textarea>
+
+          </div>
+        </div>
+        <div class="field">
+          <div class="ui blue labeled submit icon button" data-action="save">
+            <i class="icon edit"></i>
+            Save
+          </div>
+        </div>
+      </form>
     </div>
   </div>
-
-  <div class="right floated twelve wide column">
-    <form class="ui form">
-      <div class="disabled field" id="field-module-config">
-        <textarea rows="20" autocapitalize="none" spellcheck="false" id="textarea-module-config" data-mod-str="">
-        </textarea>
-      </div>
-      <div class="ui blue labeled submit icon button" id="button-module-config-save">
-        <i class="icon edit"></i>
-        Save
-      </div>
-    </form>
   </div>
-</div>
+
 </div>

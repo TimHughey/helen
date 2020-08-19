@@ -22,7 +22,7 @@ defmodule Roost.Logic do
 
   def available_modes(%{opts: opts} = _state) do
     get_in(opts, [:modes])
-    |> Keyword.keys()
+    |> Map.keys()
     |> Enum.sort()
   end
 

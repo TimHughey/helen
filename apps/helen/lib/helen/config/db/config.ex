@@ -48,8 +48,12 @@ defmodule Helen.Module.DB.Config do
 
   @doc false
   def create_or_update(mod, opts, description) do
-    # turn the opts list into a binary to store in the db
-    opts_binary = Enum.into(opts, []) |> inspect()
+    opts_binary =
+      case opts do
+        # turn the opts list into a binary to store in the db
+        opts when is_list(opts) -> Enum.into(opts, []) |> inspect()
+        opts when is_binary(opts) -> opts
+      end
 
     upsert_opts = [
       module: mod_as_binary(mod),
@@ -116,6 +120,21 @@ defmodule Helen.Module.DB.Config do
   @doc since: "0.0.26"
   def opts(module_or_id, overrides) do
     eval_opts(module_or_id, overrides)
+  end
+
+  @doc """
+    Returned a parsed representation of a text configuration.
+  """
+  @doc since: "0.0.27"
+  def parsed(module_or_id) do
+    alias Helen.Config.Parser
+
+    with %Schema{opts: raw, version: vsn} <- find(module_or_id),
+         %{parser: %{syntax: :ok}} = config <- Parser.parse(raw) do
+      put_in(config, [:__available__], true) |> put_in([:__version__], vsn)
+    else
+      _config -> put_in(%{}, [:__available__], false)
+    end
   end
 
   @doc """

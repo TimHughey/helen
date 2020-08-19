@@ -7,7 +7,6 @@ defmodule Reef.Temp.Server do
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       use GenServer, restart: :transient, shutdown: 7000
-      use Helen.Module.Config
 
       ##
       ## GenServer Start and Initialization
@@ -25,7 +24,7 @@ defmodule Reef.Temp.Server do
           server_mode: args[:server_mode] || :active,
           last_timeout: nil,
           timeouts: 0,
-          opts: config_opts(args),
+          opts: args,
           standby_reason: :none,
           ample_msgs: false,
           status: :startup,
@@ -118,13 +117,13 @@ defmodule Reef.Temp.Server do
 
       ## Examples
 
-          iex> Reef.Temp.Control.position()
+          iex> Reef.Temp.Control.position(:simple)
           true
 
       """
       @doc since: "0.0.27"
-      def position do
-        GenServer.call(__MODULE__, :position)
+      def position(opts \\ []) do
+        GenServer.call(__MODULE__, {:position, [opts] |> List.flatten()})
       end
 
       @doc """
@@ -208,8 +207,20 @@ defmodule Reef.Temp.Server do
 
       @doc false
       @impl true
-      def handle_call(:position, _from, %{opts: opts} = state) do
-        dev_value(:switch, state) |> reply(state)
+      def handle_call({:position, opts}, _from, state) do
+        position = dev_value(:switch, state)
+
+        if opts == [:simple] do
+          case position do
+            {:pending, pending} -> pending[:position]
+            {:ok, pos} -> pos
+            :initializing -> :initializing
+            _anything -> :error
+          end
+          |> reply(state)
+        else
+          position |> reply(state)
+        end
       end
 
       @doc false
@@ -251,11 +262,10 @@ defmodule Reef.Temp.Server do
           when dev_type in [:sensor, :switch] do
         import Helen.Time.Helper, only: [utc_now: 0]
         import Sensor, only: [fahrenheit: 2]
-        import Switch, only: [position: 1]
 
         # function to retrieve the value of the device
         value_fn = fn
-          :switch -> position(dev_name)
+          :switch -> Switch.position(dev_name)
           :sensor -> fahrenheit(dev_name, sensor_opts(opts))
         end
 
@@ -452,7 +462,7 @@ defmodule Reef.Temp.Server do
       ##
 
       defp check_pending_cmds_if_needed(state) do
-        import Switch, only: [acked?: 1, position: 1]
+        import Switch, only: [acked?: 1]
 
         for {dev_name, %{control: {:pending, pending_info}}} <- state[:devices],
             reduce: state do
@@ -460,7 +470,7 @@ defmodule Reef.Temp.Server do
             refid = pending_info[:refid]
 
             if acked?(refid) do
-              sw_rc_now = position(dev_name)
+              sw_rc_now = Switch.position(dev_name)
               expected = pending_info[:position]
 
               state

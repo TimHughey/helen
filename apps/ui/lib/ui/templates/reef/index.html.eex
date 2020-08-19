@@ -1,164 +1,169 @@
-<script>
-  window.activePage = "reef";
-</script>
+<div class="ui container" data-subsystem="reef">
 
-<h2 class="ui attached centered block header">
-  The Reef at Wiss Landing
-</h2>
+  <h2 class="ui attached centered block header">
+    The Reef at Wiss Landing
+  </h2>
 
-<div class="ui attached segment">
+  <div class="ui attached segment">
+    <div class="ui two raised stackable cards">
+    <div class="mini card" data-subsystem-worker="captain">
+      <div class="content" data-buttons="controls">
+        <div class="right floated">
+          <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
+            <i class="undo icon"></i>
+          </button>
 
-  <div class="ui two stackable cards">
-  <div class="mini card">
-    <div class="content">
-      <div class="label header">
-        Captain
-        <div class="right floated ui green label">
-          Available
+          <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
+            <i class="stop icon"></i>
+          </button>
+
+          <button class="ui raised tiny icon button" data-action="unlock-steps" data-tooltip="Unlock Steps" data-variation="tiny">
+            <i class="lock icon"></i>
+          </button>
+
+          <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
+            <i class="radiation icon"></i>
+          </button>
+        </div>
+
+
+        <div class="label header">
+          Captain
+        </div>
+
+        <div class="meta">
+          Reef Worker
+        </div>
+
+        <div class="description">
+          <span>
+            Captain controls all aspects of the Mix Tank including filling it with
+            with RODI and controlling the circulation pump, air pump and heater.
+          </span>
         </div>
       </div>
+      <div class="center aligned extra content" data-buttons="devices">
+        <div class="ui large raised icon buttons">
+          <button class="ui button" data-device="water_pump" data-tooltip="Water Pump" data-variation="tiny">
+            <i class="fan icon"></i>
+          </button>
 
-      <div class="meta">
-        Reef Worker
-      </div>
+          <button class="ui button" data-device="air_pump" data-tooltip="Air Pump" data-variation="tiny">
+            <i class="wind icon"></i>
+          </button>
 
-      <div class="description">
-        <p>
-          The Reef Captain controls all aspects of the Mix Tank.  These duties include
-          filling it with RODI, controlling the circulation pump, air pump and heater.
-        </p>
+          <button class="ui button" data-device="rodi_valve" data-tooltip="RODI Valve" data-variation="tiny">
+            <i class="faucet icon"></i>
+          </button>
+
+          <button class="ui button" data-device="heater" data-tooltip="Heater" data-variation="tiny">
+            <i class="thermometer half icon"></i>
+          </button>
+        </div>
       </div>
     </div>
-    <div class="center aligned extra content">
-      <div class="raised ui large buttons">
-        <button class="ui icon button" id="reef-captain-reset" data-tooltip="Reset" data-variation="tiny">
-          <i class="undo icon"></i>
-        </button>
 
-        <button class="ui icon button" id="reef-captain-all-stop" data-tooltip="All Stop" data-variation="tiny">
-          <i class="stop icon"></i>
-        </button>
+    <div class="mini card" data-subsystem-worker="first_mate">
+      <div class="content">
+        <div class="label header">
+          First Mate
+          <div class="right floated ui green label">
+            Available
+          </div>
+        </div>
+        <div class="meta">
+          Reef Worker
+        </div>
+        <div class="description">
+          <span>
+            First Mate is responsible for controlling the auto top off
+            the live reef.
+          </span>
+        </div>
+      </div>
+      <div class="center aligned extra content">
+        <div class="raised ui buttons">
+          <button class="ui compact icon button" data-action="off">
+            <i class="power off icon"></i>
+          </button>
+          <button class="ui compact icon button" data-action="play">
+            <i class="play icon"></i>
+          </button>
+          <button class="ui compact icon button" data-action="stop">
+            <i class="stop icon"></i>
+          </button>
+          <button class="ui compact icon button" data-device="ato">
+            <i class="faucet icon"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+    <div class="ui vertical segment" >
+      <div class="ui seven top attached mini steps">
+        <a class="step" data-step="fill">
+          <i class="faucet icon"></i>
+          <div class="content">
+            <div class="title" data-tooltip="Fill MixTank">Fill</div>
+          </div>
+        </a>
 
-        <button class="ui icon button" id="reef-captain-water-pump" data-tooltip="Water Pump" data-variation="tiny">
+        <a class="step" data-step="keep_fresh">
           <i class="fan icon"></i>
-        </button>
+          <div class="content">
+            <div class="title">Keep Fresh</div>
+          </div>
+        </a>
 
-        <button class="ui icon button" id="reef-captain-air-pump" data-tooltip="Air Pump" data-variation="tiny">
-          <i class="wind icon"></i>
-        </button>
+        <a class="step" data-step="add_salt">
+          <i class="random icon"></i>
+          <div class="content">
+            <div class="title">Add salt</div>
+          </div>
+        </a>
 
-        <button class="ui icon button" id="reef-captain-rodi-valve" data-tooltip="RODI Valve" data-variation="tiny">
-          <i class="faucet icon"></i>
-        </button>
+        <a class="step" data-step="match_conditions">
+          <i class="balance scale icon"></i>
+          <div class="content">
+            <div class="title">Match Conditions</div>
+          </div>
+        </a>
 
-        <button class="ui icon button" id="reef-captain-heater" data-tooltip="Heater" data-variation="tiny">
-          <i class="thermometer half icon"></i>
-        </button>
+        <a class="step" data-step="dump_water">
+          <i class="trash icon"></i>
+          <div class="content">
+            <div class="title">Dump Water</div>
+          </div>
+        </a>
+
+        <a class="step" data-step="load_water">
+          <i class="upload icon"></i>
+          <div class="content">
+            <div class="title">Load Water</div>
+          </div>
+        </a>
+
+        <a class="step" data-step="final_check">
+          <i class="thumbs up outline icon"></i>
+          <div class="content">
+            <div class="title">Final Check</div>
+          </div>
+        </a>
       </div>
-    </div>
-  </div>
 
-  <div class="raised card">
-    <div class="content">
-      <div class="label header">
-        First Mate
-        <div class="right floated ui green label">
-          Available
+      <div class="ui placeholder segment" id="reef-step-details">
+        <div class="ui icon header">
+          <i class="info icon"></i>
+          <span data-step-status>Select Fill to begin a new batch of water.</span>
         </div>
       </div>
-      <div class="meta">
-        Reef Worker
-      </div>
-      <div class="description">
-        The Reef First Mate is responsible for controlling the auto top off
-        the live reef.
-      </div>
-    </div>
-    <div class="center aligned extra content">
-      <div class="raised ui buttons">
-        <button class="ui compact icon button">
-          <i class="power off icon"></i>
-        </button>
-        <button class="ui compact icon green button">
-          <i class="play icon"></i>
-        </button>
-        <button class="ui compact icon button">
-          <i class="stop icon"></i>
-        </button>
-        <button class="ui compact icon button">
-          <i class="faucet icon"></i>
-        </button>
+
+      <div class="ui top attached tiny message">
+        <div class="header">
+          Status
+        </div>
+        <span>This is where important status messages are shown.</span>
       </div>
     </div>
   </div>
-</div>
-
-  <div class="ui vertical segment">
-  <div class="ui seven top attached mini steps">
-    <a class="step" id="reef-captain-step-fill">
-      <i class="faucet icon" id="reef-captain-step-fill"></i>
-      <div class="content">
-        <div class="title" data-tooltip="Fill MixTank">Fill</div>
-      </div>
-    </a>
-
-    <a class="step" id="reef-captain-step-keep-fresh">
-      <i class="fan icon"></i>
-      <div class="content">
-        <div class="title">Keep Fresh</div>
-      </div>
-    </a>
-
-    <a class="step" id="reef-captain-step-add-salt">
-      <i class="random icon"></i>
-      <div class="content">
-        <div class="title">Add salt</div>
-      </div>
-    </a>
-
-    <a class="step" id="reef-captain-step-match-conditions">
-      <i class="balance scale icon"></i>
-      <div class="content">
-        <div class="title">Match Conditions</div>
-      </div>
-    </a>
-
-    <a class="step" id="reef-captain-step-dump-water">
-      <i class="trash icon"></i>
-      <div class="content">
-        <div class="title">Dump Water</div>
-      </div>
-    </a>
-
-    <a class="step" id="reef-captain-step-load-water">
-      <i class="upload icon"></i>
-      <div class="content">
-        <div class="title">Load Water</div>
-      </div>
-    </a>
-
-    <a class="step" id="reef-captain-step-final-check">
-      <i class="thumbs up outline icon"></i>
-      <div class="content">
-        <div class="title">Final Check</div>
-      </div>
-    </a>
-  </div>
-
-  <div class="ui placeholder segment">
-    <div class="ui icon header">
-      <i class="info icon"></i>
-      Select Fill to begin a new batch of water.
-    </div>
-  </div>
-
-
-  <div class="ui top attached tiny message">
-    <div class="header">
-      Status
-    </div>
-    <p>This is where important status messages are shown.</p>
-  </div>
-</div>
-
 </div>

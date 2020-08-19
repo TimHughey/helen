@@ -27,27 +27,41 @@ defmodule UI.HelenChannel do
     {:reply, {:nop, %{}}, socket}
   end
 
-  def handle_in("module_config_selection", %{"mod_str" => mod_str}, socket) do
+  def handle_in("module_config_click", %{"module" => mod_bin}, socket) do
     alias Helen.Module.Config
+    alias Reef.Captain
 
-    opts =
-      Config.opts(mod_str)
-      |> Keyword.drop([:__available__, :__version__])
-      |> inspect(pretty: true, width: 5)
+    case mod_bin do
+      "Reef.Captain.Server" ->
+        {:reply,
+         {:module_config_click_reply, %{module: mod_bin, opts: Captain.Opts.default_opts(:new)}},
+         socket}
 
-    {:reply, {:module_config, %{mod_str: mod_str, opts: opts}}, socket}
+      mod_bin ->
+        {:reply, {:module_config_click_reply, %{module: mod_bin, opts: "not implemented"}},
+         socket}
+    end
   end
 
-  def handle_in(msg, %{"active_page" => active_page}, socket)
+  def handle_in(msg, %{"subsystem" => subsystem}, socket)
       when msg in ["refresh_page", "page_loaded"] do
-    base_resp = %{active_page: active_page}
+    base_resp = %{active_page: subsystem}
 
-    case active_page do
+    case subsystem do
       "reef" -> socket |> reply_reef_status_map(base_resp)
       "roost" -> socket |> reply_roost_status_map(base_resp)
-      "module_config" -> socket |> reply_mod_config_status_map(base_resp)
+      "module-config" -> socket |> reply_mod_config_status_map(base_resp)
       "home" -> socket |> reply_home_status_map(base_resp)
     end
+  end
+
+  def handle_in("reef_click", payload, socket) do
+    alias UI.ReefView
+
+    base_resp = ReefView.button_click(payload)
+
+    socket
+    |> reply_reef_status_map(base_resp)
   end
 
   def handle_in("roost_click", %{"mode" => mode, "action" => action} = payload, socket)
@@ -82,7 +96,12 @@ defmodule UI.HelenChannel do
   end
 
   defp reply_reef_status_map(socket, base_resp) do
-    {:reply, {:reef_status, Map.merge(base_resp, Reef.status_map())}, socket}
+    alias UI.ReefView
+
+    reef_status = ReefView.status()
+    full_resp = Map.merge(base_resp, reef_status)
+
+    {:reply, {:reef_status, full_resp}, socket}
   end
 
   defp reply_roost_status_map(socket, base_resp) do

@@ -61,9 +61,6 @@ defmodule Reef do
   @doc delegate_to: {FirstMate, :all_stop, 0}
   defdelegate firstmate_all_stop, to: FirstMate, as: :all_stop
 
-  @doc delegate_to: {FirstMate, :config_opts, 1}
-  defdelegate firstmate_opts(opts \\ []), to: FirstMate, as: :config_opts
-
   @doc """
   Output the status of FirstMate
   """
@@ -146,9 +143,12 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def opts(server \\ [:captain]) when server in [:captain, :first_mate] do
+    alias Reef.Captain.Opts, as: Captain
+    alias Reef.FirstMate.Opts, as: FirstMate
+
     case server do
-      :captain -> Captain.config_opts()
-      :first_mate -> FirstMate.config_opts()
+      :captain -> Captain.parsed()
+      :first_mate -> FirstMate.parsed()
     end
   end
 
@@ -184,13 +184,55 @@ defmodule Reef do
   end
 
   @doc """
-  Output the Reef status based on the active reef mode.
+  Translate the internal state of the Reef to an abstracted
+  version suitable for external use.
 
-  Outputs message to stdout, returns :ok.
-
+  Returns a map
   """
   @doc since: "0.0.27"
-  def status, do: Status.msg() |> IO.puts()
+  def status do
+    captain_state = Captain.x_state()
+    firstmate_state = FirstMate.x_state()
+
+    base = %{
+      workers: %{
+        captain: %{
+          active: Captain.active?(),
+          mode: get_in(captain_state, [:worker_mode]),
+          steps: [],
+          devices: [
+            %{
+              name: "water_pump",
+              online: MixTank.Pump.active?(),
+              active: MixTank.Pump.value(:simple)
+            },
+            %{
+              name: "air_pump",
+              online: MixTank.Air.active?(),
+              active: MixTank.Air.value(:simple)
+            },
+            %{
+              name: "rodi_valve",
+              online: MixTank.Rodi.active?(),
+              active: MixTank.Rodi.value(:simple)
+            },
+            %{
+              name: "heater",
+              online: MixTank.Temp.active?(),
+              active: MixTank.Temp.position(:simple)
+            }
+          ]
+        },
+        first_mate: %{
+          mode: get_in(firstmate_state, [:worker_mode]),
+          steps: []
+        }
+      }
+    }
+
+    base
+    |> populate_worker_mode_status(captain_state, firstmate_state)
+  end
 
   @doc """
   Return a map of the Reef status
@@ -203,15 +245,6 @@ defmodule Reef do
       captain: %{
         available: Captain.active?(),
         step: captain_worker_mode,
-        steps: %{
-          fill: %{active: false, completed: false},
-          keep_fresh: %{active: false, completed: false},
-          add_salt: %{active: false, completed: false},
-          match_conditions: %{active: false, completed: false},
-          dump_water: %{active: false, completed: false},
-          load_water: %{active: false, completed: false},
-          final_check: %{active: false, completed: false}
-        },
         pump: %{
           active: MixTank.Pump.active?(),
           position: MixTank.Pump.value(:simple)
@@ -255,28 +288,29 @@ defmodule Reef do
     end
   end
 
-  @doc """
-  Set server test opts.
+  # @doc """
+  # Set server test opts.
+  #
+  # Options:
+  # `:captain` | `:first_mate`
+  #
+  # """
 
-  Options:
-  `:captain` | `:first_mate`
-
-  """
-  @doc since: "0.0.27"
-  def test_opts(server) when server in [:captain, :first_mate] do
-    alias Reef.Captain
-    alias Reef.FirstMate
-
-    case server do
-      :captain ->
-        Captain.Opts.test_opts()
-        Captain.Server.restart()
-
-      :first_mate ->
-        FirstMate.Opts.test_opts()
-        FirstMate.Server.restart()
-    end
-  end
+  # @doc since: "0.0.27"
+  # def test_opts(server) when server in [:captain, :first_mate] do
+  #   alias Reef.Captain
+  #   alias Reef.FirstMate
+  #
+  #   case server do
+  #     :captain ->
+  #       Captain.Opts.test_opts()
+  #       Captain.Server.restart()
+  #
+  #     :first_mate ->
+  #       FirstMate.Opts.test_opts()
+  #       FirstMate.Server.restart()
+  #   end
+  # end
 
   @doc """
   Execute the steps required to perform the physical water change.
@@ -320,4 +354,27 @@ defmodule Reef do
 
   @doc delegate_to: {Captain, :worker_mode, 2}
   defdelegate worker_mode(mode, opts \\ []), to: Captain
+
+  defp populate_worker_mode_status(status_map, captain_state, first_mate_state) do
+    worker_states = %{captain: captain_state, first_mate: first_mate_state}
+
+    worker_modes = %{
+      captain: Captain.available_modes(),
+      first_mate: FirstMate.available_modes()
+    }
+
+    for {worker, modes} <- worker_modes, mode <- modes, reduce: status_map do
+      status_map ->
+        mode_status = %{
+          step: mode,
+          status: get_in(worker_states, [worker, mode, :status])
+        }
+
+        steps =
+          [get_in(status_map, [:workers, worker, :steps]), mode_status]
+          |> List.flatten()
+
+        status_map |> put_in([:workers, worker, :steps], steps)
+    end
+  end
 end

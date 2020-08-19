@@ -5,7 +5,7 @@ defmodule Reef.Logic do
 
   def available_modes(%{opts: opts} = _state) do
     get_in(opts, [:modes])
-    |> Keyword.keys()
+    |> Map.keys()
     |> Enum.sort()
   end
 
@@ -27,7 +27,6 @@ defmodule Reef.Logic do
     |> put_in([:pending, worker_mode], %{})
     |> confirm_worker_mode_exists(worker_mode)
     |> assemble_and_put_final_opts(override_opts)
-    |> validate_opts()
     |> validate_durations()
   end
 
@@ -249,6 +248,9 @@ defmodule Reef.Logic do
     api_opts = [overrides] |> List.flatten()
 
     config_opts = get_in(opts, [:modes, worker_mode])
+
+    IO.puts("config_opts: #{worker_mode} #{inspect(config_opts, pretty: true)}")
+
     final_opts = deep_merge(config_opts, api_opts)
 
     state
@@ -334,10 +336,6 @@ defmodule Reef.Logic do
         acc
     end
   end
-
-  defp validate_opts(%{init_fault: _} = state), do: state
-  # TODO implement!!
-  defp validate_opts(state), do: state
 
   defp calculate_will_finish_by_if_needed(%{worker_mode: worker_mode} = state) do
     import Helen.Time.Helper, only: [to_ms: 1, utc_shift: 1]

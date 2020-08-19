@@ -1,5 +1,4 @@
 # This file is responsible for configuring your application
-ˇ
 # and its dependencies with the aid of the Mix.Config module.
 import Config
 
@@ -16,8 +15,7 @@ config :helen, Mqtt.Client,
     client_id: "helen-test",
     user_name: "mqtt",
     password: "mqtt",
-    server:
-      {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
+    server: {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
     keep_alive: 36
   ]
 

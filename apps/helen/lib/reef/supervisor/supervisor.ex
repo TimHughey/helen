@@ -5,11 +5,13 @@ defmodule Reef.Supervisor do
 
   @impl true
   def init(opts) do
+    alias Reef.{DisplayTank, MixTank}
+
     Supervisor.init(
       [
-        {Reef.DisplayTank.Temp, []},
+        {DisplayTank.Temp, DisplayTank.Temp.default_opts()},
         {Reef.DisplayTank.Ato, []},
-        {Reef.MixTank.Temp, [server_mode: :standby]},
+        {MixTank.Temp, MixTank.Temp.default_opts()},
         {Reef.MixTank.Pump, opts},
         {Reef.MixTank.Air, opts},
         {Reef.MixTank.Rodi, opts},
