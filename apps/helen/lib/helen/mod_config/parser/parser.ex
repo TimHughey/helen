@@ -3,6 +3,8 @@ defmodule Helen.Config.Parser do
   Parses configuration text files
   """
 
+  require Logger
+
   alias Helen.Config.Parser
 
   import Helen.Time.Helper, only: [to_duration: 1]
@@ -53,51 +55,12 @@ defmodule Helen.Config.Parser do
         opts
         |> put_in([:parser, :line], line)
         |> update_in([:parser, :line_num], fn x -> x + 1 end)
-        |> debug_opts()
         |> match_line()
-        |> debug_opts()
         |> normalize_captures()
-        |> debug_opts()
-        # |> debug_match()
-        # |> debug_captures()
         |> parse_line()
-        |> debug_opts()
+        |> log_errors()
     end
   end
-
-  def debug_opts(opts) do
-    # IO.puts("debug_opts: #{inspect(opts, pretty: true)}")
-    opts
-  end
-
-  # def debug_match(
-  #       %{
-  #         parser: %{
-  #           match: {_, _, captures} = match,
-  #           line: line,
-  #           line_num: line_num
-  #         }
-  #       } = opts
-  #     ) do
-  #   [
-  #     "line_num: ",
-  #     Integer.to_string(line_num),
-  #     " ",
-  #     inspect(line, pretty: true),
-  #     " ",
-  #     inspect(match, pretty: true)
-  #   ]
-  #   |> IO.puts()
-  #
-  #   opts
-  # end
-
-  def debug_match(opts), do: opts
-
-  # detect, count and track skipped lines
-  #   (e.g. empty, only white space, comments)
-
-  def debug_captures(opts), do: opts
 
   def match_line(%{parser: %{context: context, line: line}} = opts) do
     opts |> put_in([:parser, :match], run_regex(context, line))
@@ -110,7 +73,7 @@ defmodule Helen.Config.Parser do
       :top_level ->
         regex([:top_level, :end_of_list])
 
-      x when x in [:base, :devices, :modes, :steps] ->
+      x when x in [:base, :devices, :cmd_definitions, :modes, :steps] ->
         regex([:top_level, context, :end_of_list])
 
       :actions ->
@@ -153,7 +116,7 @@ defmodule Helen.Config.Parser do
       :top_level -> opts |> handle_top_level(match)
       :base -> opts |> handle_base(match)
       :devices -> opts |> handle_devices(match)
-      :cmds -> opts |> handle_cmd_def(match)
+      :cmd_definitions -> opts |> handle_cmd_def(match)
       :modes -> opts |> handle_mode(match)
       :steps -> opts |> handle_step(match)
       :actions -> opts |> handle_action(match)
@@ -296,25 +259,32 @@ defmodule Helen.Config.Parser do
     opts |> append_action()
   end
 
-  defp handle_cmd_def(opts, {section, :def, %{key: key_atom}})
-       when section == :cmds do
-    opts
-    |> parser_put(:section, key_atom)
-    |> parser_put(section, key_atom)
-    |> config_put([section, key_atom], %{})
-  end
-
   defp handle_cmd_def(
-         %{parser: %{cmds: cmds}} = opts,
-         {section, type, %{key: key_atom, val: val}}
+         %{parser: %{context: parser_ctx, cmd_definitions: cmd_def}} = opts,
+         %{
+           stmt: stmt,
+           context: match_ctx,
+           captures: captures
+         }
        )
-       when section == :cmds do
-    case type do
-      type when type in [:kq, :kv] ->
-        opts |> config_put([section, cmds, key_atom], val)
-
-      _anything ->
+       when parser_ctx == :cmd_definitions and match_ctx == parser_ctx do
+    case stmt do
+      :def ->
         opts
+        |> parser_put(parser_ctx, captures[:key])
+        |> config_put([match_ctx, captures[:key]], %{})
+
+      :generic ->
+        opts
+        |> config_put([match_ctx, cmd_def, captures[:key]], captures[:val])
+
+      :type ->
+        opts
+        |> config_put([match_ctx, cmd_def, :type], captures[:key])
+
+      :key_val ->
+        opts
+        |> config_put_kv([cmd_def], captures)
     end
   end
 
@@ -361,6 +331,10 @@ defmodule Helen.Config.Parser do
     opts |> put_in([:parser, section], nil)
   end
 
+  defp parser_update_captures(opts, func) when is_function(func) do
+    opts |> update_in([:parser, :match, :captures], fn x -> func.(x) end)
+  end
+
   defp append_action(%{parser: %{modes: mode, steps: step, match: match}} = obj) do
     step_path = [:config, :modes, mode, :steps, step, :actions]
 
@@ -389,7 +363,10 @@ defmodule Helen.Config.Parser do
         %{captures[:key] => captures[:val]}
 
       :dev_cmd_basic ->
-        %{device: captures[:key], cmd: captures[:cmd]}
+        %{device: captures[:key], cmd: captures[:cmd], float: captures[:float]}
+
+      :dev_cmd_list ->
+        %{cmd: captures[:cmd], device: captures[:val]}
 
       :dev_cmd_for ->
         %{
@@ -413,34 +390,41 @@ defmodule Helen.Config.Parser do
     end
   end
 
-  defp validate_device(
-         %{parser: %{line_num: line_num}, config: %{devices: devices}} = opts,
-         dev
-       ) do
-    if Map.has_key?(devices, dev) do
-      opts
-    else
-      opts |> record_error(line_num, "device #{dev} is not defined")
-    end
-  end
-
-  defp record_error(opts, line_num, error) do
-    text = "line #{Integer.to_string(line_num)} #{error}"
-
-    opts
-    |> update_in([:parser, :errors], fn x -> [x, text] |> List.flatten() end)
-  end
+  # defp validate_device(
+  #        %{parser: %{line_num: line_num}, config: %{devices: devices}} = opts,
+  #        dev
+  #      ) do
+  #   if Map.has_key?(devices, dev) do
+  #     opts
+  #   else
+  #     opts |> record_error(line_num, "device #{dev} is not defined")
+  #   end
+  # end
+  #
+  # defp record_error(opts, line_num, error) do
+  #   text = "line #{Integer.to_string(line_num)} #{error}"
+  #
+  #   opts
+  #   |> update_in([:parser, :errors], fn x -> [x, text] |> List.flatten() end)
+  # end
 
   defp normalize_captures(
          %{parser: %{match: %{norm: norm, captures: captures}}} = opts
        )
-       when norm in [:key_atom, :key_list, :key_iso8601] do
+       when norm in [:key_atom, :key_integer, :key_list, :key_iso8601] do
+    import String, only: [to_integer: 1]
+
     case norm do
       :key_atom ->
         parser_put_captures(opts, [], atomize_capture_values(captures))
 
       :key_list ->
         parser_put_captures(opts, [:val], atomize_binary_list(captures[:val]))
+        |> parser_update_captures(fn x -> atomize_capture_values(x) end)
+
+      :key_integer ->
+        parser_put_captures(opts, [:val], to_integer(captures[:val]))
+        |> parser_update_captures(fn x -> atomize_capture_values(x) end)
 
       :key_iso8601 ->
         parser_put_captures(opts, [:val], to_duration(captures[:val]))
@@ -460,15 +444,24 @@ defmodule Helen.Config.Parser do
   defp atomize_capture_keys(nil), do: nil
 
   defp atomize_capture_keys(map) do
-    import String, only: [to_atom: 1]
+    import String, only: [to_atom: 1, to_float: 1]
 
     for {key_bin, val} <- map, reduce: map do
       acc ->
         # eliminate the original binary key and insert an atom key
         case key_bin do
           "key" ->
-            # "key" is always atomized
+            # the values of "key" is always atomized
             Map.delete(acc, key_bin) |> put_in([to_atom(key_bin)], to_atom(val))
+
+          # get rid of unspecified optional floats
+          x when x == "float" and val == "" ->
+            Map.delete(acc, key_bin)
+
+          x when x == "float" and val != "" ->
+            # the values of "float" are always converted to floats
+            Map.delete(acc, key_bin)
+            |> put_in([to_atom(key_bin)], to_float(val))
 
           _ ->
             Map.delete(acc, key_bin) |> put_in([to_atom(key_bin)], val)
@@ -477,16 +470,34 @@ defmodule Helen.Config.Parser do
   end
 
   defp atomize_capture_values(map) do
-    import String, only: [to_atom: 1]
+    import String, only: [to_atom: 1, to_float: 1]
 
     for {key, val_bin} when is_binary(val_bin) <- map, reduce: map do
       acc ->
-        if key == :iso8601 do
-          put_in(acc, [key], to_duration(val_bin))
-        else
-          # replace the binary value with an atomized value
-          put_in(acc, [key], to_atom(val_bin))
+        case key do
+          :iso8601 ->
+            put_in(acc, [key], to_duration(val_bin))
+
+          x when x == :float and val_bin != "" ->
+            put_in(acc, [key], to_float(val_bin))
+
+          x when x == :val and is_binary(val_bin) ->
+            put_in(acc, [key], to_atom(val_bin))
+
+          _x ->
+            # replace the binary value with an atomized value
+            put_in(acc, [key], to_atom(val_bin))
         end
     end
+  end
+
+  defp log_errors(%{parser: %{log: false}} = opts), do: opts
+
+  defp log_errors(%{parser: %{unmatched: %{lines: lines}}} = opts) do
+    for {line_num, txt} <- lines do
+      Logger.error(["unmatched: line ", Integer.to_string(line_num), ": ", txt])
+    end
+
+    opts
   end
 end

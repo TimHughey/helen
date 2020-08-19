@@ -7,7 +7,10 @@ defmodule Helen.Config.Parser.Regex do
   def re(what) do
     case what do
       :cmd ->
-        "(?<cmd>(on|off))"
+        "(?<cmd>[a-zA-Z]+[a-zA-Z0-9_]+)"
+
+      :cmd_dev_list ->
+        "(?<cmd>(on|off))\\s+#{re(:list_val)}"
 
       :ident ->
         re(:ident, "ident")
@@ -21,11 +24,14 @@ defmodule Helen.Config.Parser.Regex do
       :key_cmd ->
         "(?<val>on|off)"
 
+      :key_integer ->
+        "#{re(:key)}\\s+(?<val>\\d+)"
+
       :key_iso8601 ->
         "#{re(:key)}\\s+#{re(:iso8601)}"
 
       :key_list ->
-        "#{re(:key)}\\s+#{re(:list)}"
+        "#{re(:key)}\\s+#{re(:list_val)}"
 
       :key_quoted ->
         "#{re(:key)}\\s+#{re(:quoted_val)}"
@@ -37,7 +43,14 @@ defmodule Helen.Config.Parser.Regex do
         "(?:\\s+#{re(:key, :nowait)})?"
 
       :list ->
-        "(?<val>[\\w\\d]+\\s+[\\w\\d\\s]+)"
+        # "(?<val>[\\w\\d]+\\s+[\\w\\d\\s]+)"
+        "(?:[a-zA-Z]+[a-zA-Z0-9_]+\\s?)+"
+
+      :list_val ->
+        "(?<val>#{re(:list)})"
+
+      :optional_float ->
+        "(?:\\s+(?<float>[-+]?[0-9]*\.?[0-9]+))?"
 
       :quoted_val ->
         "\\x27(?<val>[a-zA-Z0-9\\s_\\x2d\\x2f]+)\\x27"
@@ -155,6 +168,36 @@ defmodule Helen.Config.Parser.Regex do
           }
         ]
 
+      :cmd_definitions ->
+        [
+          %{
+            context: :cmd_definitions,
+            stmt: :def,
+            norm: :key,
+            re: Regex.compile!("^\\s{2}#{re(:key)}$")
+          },
+          %{
+            # example:
+            # name 'fade bright'
+            context: :cmd_definitions,
+            stmt: :generic,
+            norm: :key_quoted,
+            re: Regex.compile!("^\\s{4}#{re(:key_quoted)}$")
+          },
+          %{
+            context: :cmd_definitions,
+            stmt: :type,
+            norm: :key,
+            re: Regex.compile!("^\\s{4}#{re(:key)}$")
+          },
+          %{
+            context: :cmd_definitions,
+            stmt: :key_val,
+            norm: :key_integer,
+            re: Regex.compile!("^\\s{6}#{re(:key_integer)}$")
+          }
+        ]
+
       :modes ->
         [
           %{
@@ -231,7 +274,10 @@ defmodule Helen.Config.Parser.Regex do
             context: :actions,
             stmt: :dev_cmd_basic,
             norm: :key_atom,
-            re: Regex.compile!("^\\s{8}#{re(:ident, :key)}\\s+#{re(:cmd)}$")
+            re:
+              Regex.compile!(
+                "^\\s{8}#{re(:ident, :key)}\\s+#{re(:cmd)}#{re(:optional_float)}$"
+              )
           },
           %{
             context: :actions,
@@ -254,24 +300,13 @@ defmodule Helen.Config.Parser.Regex do
                   re(:iso8601, :iso8601)
                 }\\s+then\\s+#{re(:cmd, :then_cmd)}#{re(:nowait)}$"
               )
-          }
-        ]
-
-      :cmd_defs ->
-        [
-          %{
-            context: :cmd_defs,
-            stmt: :def,
-            norm: :key,
-            re: Regex.compile!("^\\s{2}#{re(:key)}$")
           },
           %{
-            # example:
-            # name 'fade bright'
-            context: :cmd_defs,
-            stmt: :generic,
-            norm: :key_quoted,
-            re: Regex.compile!("^\\s{4}#{re(:key_quoted)}$")
+            context: :actions,
+            # must be listed last to avoid matching above cmd statements
+            stmt: :dev_cmd_list,
+            norm: :key_list,
+            re: Regex.compile!("#{re(:cmd_dev_list)}")
           }
         ]
 

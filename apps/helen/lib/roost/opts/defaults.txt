@@ -15,7 +15,7 @@ devices
 
 cmd_definitions
   dance_fade
-    name roost dance fade
+    name 'roost dance fade'
     random
       min 128
       max 2048
@@ -25,7 +25,7 @@ cmd_definitions
       priority 7
 
   closed_fade
-    name roost closed fade
+    name 'roost closed fade'
     random
       min 64
       max 768
@@ -40,7 +40,7 @@ modes
     next_mode hold
     steps
       spin_up
-        led_forest dance_fade random
+        led_forest dance_fade
         disco_ball duty 0.7
         el_wire duty 0.5
         el_wire_entry duty 0.5
@@ -48,9 +48,10 @@ modes
 
       slow_disco_ball
         sleep PT1M
+        disco_ball duty 0.63
 
       dance
-        hold mode
+        sleep PT1M
 
   leaving
     sequence house_lights exiting closed
@@ -69,8 +70,8 @@ modes
     steps
       house_lights
         off el_wire_entry
-        led_forest random closed_fade
+        led_forest closed_fade
       closed
-        sleep forever
-      
+        sleep PT1M
+
 # end of roost config
