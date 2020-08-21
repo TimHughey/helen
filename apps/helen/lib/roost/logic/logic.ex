@@ -60,27 +60,21 @@ defmodule Roost.Logic do
   # not a message we have logic for, just pass through state
   def handle_via_msg(state, _np_match), do: state
 
-  def init_precheck(state, worker_mode, override_opts) do
+  def init_precheck(state, mode) do
     state
     |> Map.drop([:init_fault])
-    # we use the :pending key to build up the next reef command to
-    # avoid conflicts if a reef command is running
-    |> put_in([:pending], %{})
-    |> put_in([:pending, :worker_mode], worker_mode)
-    |> put_in([:pending, worker_mode], %{})
-    |> confirm_worker_mode_exists(worker_mode)
-    |> assemble_and_put_final_opts(override_opts)
-    |> validate_opts()
-    |> validate_durations()
+    # we use the :stage key to build up the next mode to avoid conflicts
+    # if an mode is already running
+    |> stage_put([:mode], mode)
+    |> stage_put([mode], %{})
+    |> confirm_mode_exists(mode)
   end
 
   def init_mode(%{init_fault: _} = state), do: state
 
-  def init_mode(%{pending: %{worker_mode: worker_mode}} = state) do
-    cmd_opts = get_in(state, [:pending, worker_mode, :opts])
-
+  def init_mode(%{stage: %{mode: mode}} = state) do
     state
-    |> put_in([:pending, worker_mode, :steps], cmd_opts[:steps])
+    |> stage_put([mode, :steps], stage_get_opts(state, [:steps]))
     |> note_delay_if_requested()
   end
 
@@ -92,24 +86,22 @@ defmodule Roost.Logic do
 
   # when :delay has a value we send ourself a :timer message
   # when that timer expires the delay value is removed
-  def start_mode(%{pending: %{delay: ms}} = state) do
+  def start_mode(%{stage: %{delay: ms}} = state) do
     import Process, only: [send_after: 3]
     import Helen.Time.Helper, only: [utc_now: 0]
 
     state
-    |> put_in([:pending, :issued_at], utc_now())
-    |> put_in(
-      [:pending, :timer],
+    |> stage_put([:issued_at], utc_now())
+    |> stage_put(
+      [:timer],
       send_after(self(), {:timer, :delayed_cmd}, ms)
     )
   end
 
-  def start_mode(%{pending: %{worker_mode: next_mode}} = state) do
-    next_mode_map = get_in(state, [:pending, next_mode])
-
+  def start_mode(%{stage: %{mode: next_mode} = next_mode_map} = state) do
     state
     # swap the pending reef mode map into the live state
-    |> put_in([next_mode], next_mode_map)
+    |> live_put([next_mode], next_mode_map)
     |> change_worker_mode()
     # :pending is no longer required
     |> Map.drop([:pending])
@@ -211,26 +203,6 @@ defmodule Roost.Logic do
     end
   end
 
-  def validate_all_durations(%{opts: opts} = _state) do
-    validate_duration_r(opts, true)
-  end
-
-  defp assemble_and_put_final_opts(
-         %{pending: %{worker_mode: worker_mode}, opts: opts} = state,
-         overrides
-       ) do
-    import DeepMerge, only: [deep_merge: 2]
-
-    api_opts = [overrides] |> List.flatten()
-
-    config_opts = get_in(opts, [:modes, worker_mode])
-    final_opts = deep_merge(config_opts, api_opts)
-
-    state
-    |> put_in([:pending, worker_mode, :opts], %{})
-    |> put_in([:pending, worker_mode, :opts], final_opts)
-  end
-
   defp calculate_will_finish_by_if_needed(%{worker_mode: worker_mode} = state) do
     import Helen.Time.Helper, only: [to_ms: 1, utc_shift: 1]
 
@@ -291,13 +263,16 @@ defmodule Roost.Logic do
     |> change_token()
   end
 
-  defp confirm_worker_mode_exists(state, worker_mode) do
-    known_worker_mode? = get_in(state, [:opts, :modes, worker_mode]) || false
+  defp confirm_mode_exists(%{opts: opts} = state, mode) do
+    known_mode? = get_in(state, [:opts, :modes, mode]) || false
 
-    if known_worker_mode? do
-      state |> put_in([:pending, :worker_mode], worker_mode)
+    if known_mode? do
+      # make a copy of the opts for use while running the mode
+      # to allow the server opts to be changed without impacting the
+      # running mode
+      state |> put_in([:stage, :opts], opts)
     else
-      state |> put_in([:init_fault], {:unknown_worker_mode, worker_mode})
+      state |> put_in([:init_fault], {:unknown_mode, mode})
     end
   end
 
@@ -326,10 +301,10 @@ defmodule Roost.Logic do
 
   defp note_delay_if_requested(%{init_fault: _} = state), do: state
 
-  defp note_delay_if_requested(%{pending: %{worker_mode: worker_mode}} = state) do
+  defp note_delay_if_requested(%{stage: %{mode: mode}} = state) do
     import Helen.Time.Helper, only: [to_ms: 1, valid_ms?: 1]
 
-    opts = get_in(state, [:pending, worker_mode, :opts])
+    opts = stage_get_opts(state)
 
     case opts[:start_delay] do
       # just fine, no delay requested
@@ -341,9 +316,9 @@ defmodule Roost.Logic do
         if valid_ms?(delay) do
           state
           # store the delay for pattern matching later
-          |> put_in([:pending, :delay], to_ms(delay))
+          |> stage_put([:delay], to_ms(delay))
           # take out of opts to avoid cruf
-          |> update_in([:pending, worker_mode, :opts], fn x ->
+          |> update_in([:stage, mode, :opts], fn x ->
             Keyword.drop(x, [:start_delay])
           end)
         else
@@ -437,51 +412,32 @@ defmodule Roost.Logic do
     end
   end
 
-  defp validate_durations(%{init_fault: _} = state), do: state
+  defp live_get(state, path) do
+    full_path = [:live, path] |> List.flatten()
 
-  # primary entry point for validating durations
-  defp validate_durations(%{pending: %{worker_mode: worker_mode}} = state) do
-    opts = get_in(state, [:pending, worker_mode, :opts])
-
-    # validate the opts with an initial accumulator of true so an empty
-    # list is considered valid
-    if validate_duration_r(opts, true),
-      do: state,
-      else: state |> put_in([:init_fault], :duration_validation_failed)
+    get_in(state, full_path)
   end
 
-  defp validate_duration_r(opts, acc) do
-    import Helen.Time.Helper, only: [valid_ms?: 1]
+  defp live_put(state, path, val) do
+    full_path = [:live, path] |> List.flatten()
 
-    case {opts, acc} do
-      # end of a list (or all list), simply return the acc
-      {[], acc} ->
-        acc
-
-      # seen a bad duration, we're done
-      {_, false} ->
-        false
-
-      # process the head (tuple) and the tail (a list or a tuple)
-      {[head | tail], acc} ->
-        acc && validate_duration_r(head, acc) &&
-          validate_duration_r(tail, acc)
-
-      # keep unfolding
-      {{_, v}, acc} when is_list(v) ->
-        acc && validate_duration_r(v, acc)
-
-      # we have a tuple to check
-      {{k, d}, acc} when k in [:before, :after, :timeout] and is_binary(d) ->
-        acc && valid_ms?(d)
-
-      # not a tuple of interest, keep going
-      {_no_interest, acc} ->
-        acc
-    end
+    put_in(state, full_path, val)
   end
 
-  defp validate_opts(%{init_fault: _} = state), do: state
-  # TODO implement!!
-  defp validate_opts(state), do: state
+  defp stage_get(state, path) do
+    full_path = [:stage, path] |> List.flatten()
+
+    get_in(state, full_path)
+  end
+
+  def stage_get_opts(%{stage: %{mode: mode}} = state, path \\ []) do
+    full_path = [:opts, :modes, mode, path] |> List.flatten()
+    stage_get(state, full_path)
+  end
+
+  defp stage_put(state, path, val) do
+    full_path = [:stage, path] |> List.flatten()
+
+    put_in(state, full_path, val)
+  end
 end

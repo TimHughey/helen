@@ -22,13 +22,14 @@ defmodule Roost.Server do
     state = %{
       module: __MODULE__,
       server_mode: args[:server_mode] || :active,
-      worker_mode: :ready,
+      faults: %{init: :ok},
+      mode: :ready,
       devices: %{},
       dance: :init,
       server_standby_reason: :none,
       token: nil,
       token_at: nil,
-      pending: %{},
+      stage: %{},
       timeouts: %{last: :never, count: 0},
       opts: parsed()
     }
@@ -296,11 +297,11 @@ defmodule Roost.Server do
 
   @doc false
   @impl true
-  def handle_call({:worker_mode, mode, api_opts}, _from, state) do
+  def handle_call({:worker_mode, mode, _api_opts}, _from, state) do
     alias Roost.Logic
 
     state
-    |> Logic.init_precheck(mode, api_opts)
+    |> Logic.init_precheck(mode)
     |> Logic.init_mode()
     |> Logic.start_mode()
     |> check_fault_and_reply()
@@ -316,22 +317,11 @@ defmodule Roost.Server do
   def handle_continue(:bootstrap, state) do
     alias Roost.Logic
 
-    valid_opts? = state |> Logic.validate_all_durations()
-
-    case valid_opts? do
-      true ->
-        state
-        |> Logic.change_token()
-        |> Logic.build_devices_map()
-        |> set_all_modes_ready()
-        |> noreply()
-
-      false ->
-        state
-        |> put_in([:worker_mode], :not_ready)
-        |> put_in([:not_ready_reason], :invalid_opts)
-        |> noreply()
-    end
+    state
+    |> Logic.change_token()
+    |> Logic.build_devices_map()
+    |> set_all_modes_ready()
+    |> noreply()
   end
 
   # handle step via messages
@@ -358,7 +348,7 @@ defmodule Roost.Server do
     alias Roost.Logic
 
     state
-    |> Logic.init_precheck(mode, [])
+    |> Logic.init_precheck(mode)
     |> Logic.init_mode()
     |> Logic.start_mode()
     |> noreply()
