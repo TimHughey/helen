@@ -6,8 +6,8 @@ defmodule PulseWidth do
   require Logger
   use Timex
 
-  alias PulseWidth.DB.{Alias, Command, Device}
   alias PulseWidth.Command.Example
+  alias PulseWidth.DB.{Alias, Command, Device}
   alias PulseWidth.Notify
 
   @doc """
@@ -112,6 +112,9 @@ defmodule PulseWidth do
 
   @doc delegate_to: {Example, :cmd, 2}
   defdelegate example_cmd(type \\ :random, opts \\ []), to: Example, as: :cmd
+
+  @doc delegate_to: {Alias, :exists?, 1}
+  defdelegate exists?(name), to: Alias
 
   @doc """
     Handles all aspects of processing messages for PulseWidth

@@ -122,6 +122,18 @@ defmodule PulseWidth.DB.Alias do
   end
 
   @doc """
+  Is there a PulseWidth device (alias) with this name?
+  """
+
+  @doc since: "0.0.27"
+  def exists?(name_or_id) do
+    case find(name_or_id) do
+      %Schema{} -> true
+      _anything -> false
+    end
+  end
+
+  @doc """
     Get a %PulseWidth.DB.Alias{} by id or name
 
     Same return values as Repo.get_by/2

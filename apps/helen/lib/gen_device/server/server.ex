@@ -42,10 +42,9 @@ defmodule GenDevice do
         opts = state[:opts]
 
         # should the server start?
-        cond do
-          is_nil(state[:device_name]) -> :ignore
-          true -> {:ok, state, {:continue, :bootstrap}}
-        end
+        if is_nil(state[:device_name]),
+          do: :ignore,
+          else: {:ok, state, {:continue, :bootstrap}}
       end
 
       @doc false
@@ -222,12 +221,9 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def standby_reason do
-        s = state()
-
-        with %{server_mode: :standby, standby_reason: reason} <- s do
-          reason
-        else
+        case state() do
           %{server_mode: :active} -> :active
+          %{server_mode: :standby, standby_reason: reason} -> reason
         end
       end
 

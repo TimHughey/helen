@@ -352,6 +352,22 @@ defmodule Reef do
   defdelegate x_which_children, to: Reef.Supervisor, as: :which_children
   defdelegate x_state(opts \\ []), to: Captain
 
+  @doc """
+  Return the module of the reef worker
+  """
+  def worker(name) do
+    alias Reef
+
+    case name do
+      :mixtank_air -> MixTank.Air
+      :mixtank_pump -> MixTank.Pump
+      :mixtank_rodi -> MixTank.Rodi
+      :mixtank_heat -> Mixtank.Temp
+      :displaytank_ato -> DisplayTank.Ato
+      :displaytank_heat -> DisplayTank.Heat
+    end
+  end
+
   @doc delegate_to: {Captain, :worker_mode, 2}
   defdelegate worker_mode(mode, opts \\ []), to: Captain
 
