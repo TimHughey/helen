@@ -306,7 +306,7 @@ defmodule Helen.Config.Parser.Regex do
             # must be listed last to avoid matching above cmd statements
             stmt: :dev_cmd_list,
             norm: :key_list,
-            re: Regex.compile!("#{re(:cmd_dev_list)}")
+            re: Regex.compile!("^\\s{8}#{re(:cmd_dev_list)}$")
           }
         ]
 

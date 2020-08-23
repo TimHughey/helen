@@ -316,7 +316,7 @@ defmodule HelenConfigParserTest do
     assert %_{seconds: 180} = cmd_duration_nowait
   end
 
-  test "can detect and create multiple steps in a mode" do
+  test "can detect and create two steps in a mode" do
     snippet = """
     modes
       fill
@@ -385,6 +385,103 @@ defmodule HelenConfigParserTest do
                          },
                          %{device: :lights, cmd: :duty, float: 0.7},
                          %{device: :lights2, cmd: :dance_fade}
+                       ]
+                     }
+                   }
+                 }
+               }
+             }
+           } = opts
+
+    assert %_{seconds: 7200} = duration
+    assert %_{seconds: 10} = sleep_duration
+    assert %_{seconds: 60} = cmd_duration1
+    assert %_{seconds: 300} = cmd_duration2
+    assert %_{seconds: 180} = cmd_duration_nowait
+  end
+
+  test "can detect and create multiple steps in a mode" do
+    snippet = """
+    modes
+      fill
+        next_mode none
+        steps
+          long_step for PT2H
+            sleep PT10S
+            tell first_mate standby
+            all off
+            on dev1 dev2 dev3
+
+          finally
+            air off
+            pump off PT1M
+            air on PT5M then off
+            pump on PT3M then off nowait
+            lights duty 0.7
+            lights2 dance_fade
+
+          topoff for PT15M
+            air off
+            pump off
+            rodi on PT15M then off
+    """
+
+    opts = Parser.parse(snippet)
+
+    assert %{
+             parser: %{
+               context: :actions,
+               modes: :fill,
+               steps: :topoff,
+               unmatched: %{lines: [], count: 0}
+             },
+             config: %{
+               modes: %{
+                 fill: %{
+                   next_mode: :none,
+                   steps: %{
+                     long_step: %{
+                       run_for: duration,
+                       actions: [
+                         %{sleep: sleep_duration},
+                         %{tell: %{device: :first_mate, msg: :standby}},
+                         %{all: :off},
+                         %{cmd: :on, device: [:dev1, :dev2, :dev3]}
+                       ]
+                     },
+                     finally: %{
+                       actions: [
+                         %{device: :air, cmd: :off, float: nil},
+                         %{
+                           device: :pump,
+                           cmd: :off,
+                           for: cmd_duration1,
+                           wait: true
+                         },
+                         %{
+                           device: :air,
+                           cmd: :on,
+                           for: cmd_duration2,
+                           then_cmd: :off,
+                           wait: true
+                         },
+                         %{
+                           device: :pump,
+                           cmd: :on,
+                           for: cmd_duration_nowait,
+                           then_cmd: :off,
+                           wait: false
+                         },
+                         %{device: :lights, cmd: :duty, float: 0.7},
+                         %{device: :lights2, cmd: :dance_fade}
+                       ]
+                     },
+                     topoff: %{
+                       run_for: _,
+                       actions: [
+                         %{cmd: :off, device: :air},
+                         %{cmd: :off, device: :pump},
+                         %{cmd: :on, device: :rodi, for: _, then_cmd: :off}
                        ]
                      }
                    }

@@ -18,9 +18,10 @@ defmodule Helen.Config.Parser do
 
   defp list_of_lines(raw) do
     for line <- String.split(raw, "\n") do
-      two_spaces = "  "
-
-      String.replace(line, "\t", two_spaces)
+      # two_spaces = "  "
+      #
+      # String.replace(line, "\t", two_spaces)
+      line
     end
   end
 
