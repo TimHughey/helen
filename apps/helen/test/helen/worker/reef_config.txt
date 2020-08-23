@@ -28,6 +28,7 @@ modes
         rodi off PT12M
       topoff for PT15M
         air off
+        pump off
         rodi on PT15M then off
       finally
         air off

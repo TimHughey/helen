@@ -21,17 +21,22 @@ defmodule Roost.Server do
 
     state = %{
       module: __MODULE__,
-      server_mode: args[:server_mode] || :active,
-      faults: %{init: :ok},
-      mode: :ready,
+      server: %{mode: :init, standby_reason: :none},
       devices: %{},
-      dance: :init,
-      server_standby_reason: :none,
-      token: nil,
-      token_at: nil,
+      faults: %{init: :ok},
+      finished_modes: %{},
+      live: %{},
+      opts: parsed(),
       stage: %{},
       timeouts: %{last: :never, count: 0},
-      opts: parsed()
+      token: nil,
+      token_at: nil,
+
+      # deprecated
+      server_mode: args[:server_mode] || :active,
+      mode: :ready,
+      dance: :init,
+      server_standby_reason: :none
     }
 
     # should the server start?
@@ -301,8 +306,7 @@ defmodule Roost.Server do
     alias Roost.Logic
 
     state
-    |> Logic.init_precheck(mode)
-    |> Logic.init_mode()
+    |> Logic.init_mode(mode)
     |> Logic.start_mode()
     |> check_fault_and_reply()
   end
@@ -348,8 +352,7 @@ defmodule Roost.Server do
     alias Roost.Logic
 
     state
-    |> Logic.init_precheck(mode)
-    |> Logic.init_mode()
+    |> Logic.init_mode(mode)
     |> Logic.start_mode()
     |> noreply()
   end

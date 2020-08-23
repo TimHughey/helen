@@ -28,11 +28,15 @@ defmodule WorkerLogicTest do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     base = %{
+      module: __MODULE__,
       server: %{mode: :init, standby_reason: :none},
       devices: %{},
-      stage: %{},
+      faults: %{},
+      finished_modes: %{},
       live: %{},
-      faults: %{init: :ok},
+      opts: %{},
+      stage: %{},
+      timeouts: %{last: :never, count: 0},
       token: make_ref(),
       token_at: utc_now()
     }
@@ -74,28 +78,80 @@ defmodule WorkerLogicTest do
     refute changed_token_at == initial_token_at
   end
 
-  test "can perform the init_precheck" do
-    state = config(:roost) |> Logic.init_precheck(:dance_with_me)
+  test "can confirm a mode exists" do
+    state = config(:roost) |> Logic.confirm_mode_exists(:dance_with_me)
 
-    assert %{stage: %{mode: :dance_with_me, dance_with_me: %{}}} = state
+    assert is_nil(get_in(state, [:faults, :init]))
+  end
+
+  test "can detect a mode does not exist" do
+    state = config(:roost) |> Logic.confirm_mode_exists(:foobar)
+
+    assert get_in(state, [:faults, :init]) == {:unknown_mode, :foobar}
   end
 
   test "can perform init_mode" do
-    state =
+    %{stage: stage} =
+      state =
       config(:reef)
-      |> Logic.init_precheck(:fill)
-      |> Logic.init_mode()
+      |> Logic.init_mode(:fill)
 
-    modes = get_in(state, [:stage, :opts, :modes])
-    mode = get_in(state, [:stage, :mode])
-    actions = get_in(state, [:stage, :fill, :steps, :finally, :actions])
+    assert %{active_mode: :fill, steps: steps} = stage |> Map.drop([:opts])
+    assert %{at_start: %{actions: actions}} = steps
+    assert %{device: :rodi, cmd: :on} = hd(actions)
+    refute get_in(state, [:faults, :init])
+  end
 
-    assert is_map(modes)
-    assert :fill == mode
+  test "can start a mode that does not repeat" do
+    import Helen.Time.Helper, only: [to_duration: 1, to_ms: 1]
 
-    assert [
-             %{cmd: :off, device: :air, float: nil},
-             %{cmd: :off, device: :rodi, float: nil}
-           ] == actions
+    expected_duration = to_duration("PT5H15M")
+    mode = :fill
+
+    state = config(:reef) |> Logic.init_mode(mode) |> Logic.start_mode()
+
+    stage = Logic.stage_get(state, [])
+    live = Logic.live_get(state, [])
+
+    assert is_map(stage) and is_map(live)
+    assert Enum.empty?(stage)
+    assert Logic.live_get(state, :active_mode) == mode
+    assert %DateTime{} = Logic.mode_track_get(state, :started_at)
+    assert Logic.live_get(state, :will_finish_in_ms) == to_ms(expected_duration)
+
+    assert Logic.mode_track_get(state, :steps_to_execute) == [
+             :at_start,
+             :main,
+             :topoff,
+             :finally
+           ]
+  end
+
+  test "can start a mode that repeats" do
+    mode = :keep_fresh
+
+    state = config(:reef) |> Logic.init_mode(mode) |> Logic.start_mode()
+
+    stage = Logic.stage_get(state, [])
+    live = Logic.live_get(state, [])
+
+    assert is_map(stage) and is_map(live)
+    assert Enum.empty?(stage)
+    assert Logic.live_get(state, :active_mode) == mode
+    assert %DateTime{} = Logic.mode_track_get(state, :started_at)
+    assert is_nil(Logic.live_get(state, :will_finish_in_ms))
+    assert is_nil(Logic.live_get(state, :will_finish_by))
+    assert Logic.mode_repeat_until_stopped?(state)
+  end
+
+  test "can get the sequence of the live mode" do
+    state = config(:reef) |> Logic.init_mode(:fill) |> Logic.start_mode()
+
+    assert Logic.live_get_mode_sequence(state) == [
+             :at_start,
+             :main,
+             :topoff,
+             :finally
+           ]
   end
 end
