@@ -30,12 +30,9 @@ defmodule WorkerLogicTest do
     base = %{
       module: __MODULE__,
       server: %{mode: :init, standby_reason: :none},
+      logic: %{},
       devices: %{},
-      faults: %{},
-      finished: %{},
-      live: %{},
       opts: %{},
-      stage: %{},
       timeouts: %{last: :never, count: 0},
       token: make_ref(),
       token_at: utc_now()
@@ -87,11 +84,11 @@ defmodule WorkerLogicTest do
   test "can detect a mode does not exist" do
     state = config(:roost) |> Logic.confirm_mode_exists(:foobar)
 
-    assert get_in(state, [:faults, :init]) == {:unknown_mode, :foobar}
+    assert get_in(state, [:logic, :faults, :init]) == {:unknown_mode, :foobar}
   end
 
   test "can perform init_mode" do
-    %{stage: stage} =
+    %{logic: %{stage: stage}} =
       state =
       config(:reef)
       |> Logic.init_mode(:fill)
@@ -99,7 +96,7 @@ defmodule WorkerLogicTest do
     assert %{active_mode: :fill, steps: steps} = stage |> Map.drop([:opts])
     assert %{at_start: %{actions: actions}} = steps
     assert %{device: :rodi, cmd: :on} = hd(actions)
-    refute get_in(state, [:faults, :init])
+    refute get_in(state, [:logic, :faults, :init])
   end
 
   test "can start a mode that does not repeat" do
@@ -123,12 +120,12 @@ defmodule WorkerLogicTest do
 
     assert %{steps_to_execute: steps_to_execute} =
              state
-             |> get_in([:live, :track])
+             |> get_in([:logic, :live, :track])
 
     assert is_list(steps_to_execute)
 
     assert %{actions_to_execute: actions_to_execute} =
-             get_in(state, [:live, :track])
+             get_in(state, [:logic, :live, :track])
 
     assert is_list(actions_to_execute) and length(actions_to_execute) == 1
 
@@ -191,7 +188,7 @@ defmodule WorkerLogicTest do
 
     # confirm the mode never ends
     for _x <- 1..100, reduce: state do
-      %{live: %{track: %{active_step: _step}}} = state ->
+      %{logic: %{live: %{track: %{active_step: _step}}}} = state ->
         refute Enum.empty?(Logic.track_get(state, :steps_to_execute))
 
         assert Logic.live_get(state, :status) == :running

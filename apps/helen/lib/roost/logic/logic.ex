@@ -61,10 +61,11 @@ defmodule Roost.Logic do
   # not a message we have logic for, just pass through state
   def handle_via_msg(state, _np_match), do: state
 
-  def init_mode(%{faults: %{init: _}} = state, _mode), do: state
+  def init_mode(%{logic: %{faults: %{init: _}}} = state, _mode), do: state
 
   def init_mode(state, mode) do
     state
+    |> build_logic_map()
     # initialize the :stage map with a copy of the opts that will be used
     # when this mode goes live
     |> copy_opts_to_stage()
@@ -79,7 +80,7 @@ defmodule Roost.Logic do
   ## ENTRY POINT FOR STARTING A REEF MODE
   ##  ** only called once per mode change
   ##
-  def start_mode(%{faults: %{init: _}} = state), do: state
+  def start_mode(%{logic: %{faults: %{init: _}}} = state), do: state
 
   # when :delay has a value we send ourself a :timer message
   # when that timer expires the delay value is removed
@@ -109,19 +110,22 @@ defmodule Roost.Logic do
     |> start_mode_next_step()
   end
 
-  def start_mode_next_step(%{live: %{track: %{steps_to_execute: []}}} = state) do
+  def start_mode_next_step(
+        %{logic: %{live: %{track: %{steps_to_execute: []}}}} = state
+      ) do
     state |> finish_mode()
   end
 
   def start_mode_next_step(
-        %{live: %{track: %{steps_to_execute: [:repeat]}}} = state
+        %{logic: %{live: %{track: %{steps_to_execute: [:repeat]}}}} = state
       ) do
     # steps are repeating, copy the sequence into steps to execute and call ourself
     state |> track_copy(:sequence, :steps_to_execute) |> start_mode_next_step()
   end
 
   def start_mode_next_step(
-        %{live: %{track: %{steps_to_execute: [next_step | _tail]}}} = state
+        %{logic: %{live: %{track: %{steps_to_execute: [next_step | _tail]}}}} =
+          state
       ) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
@@ -142,9 +146,11 @@ defmodule Roost.Logic do
 
   def next_action(
         %{
-          live: %{
-            track: %{
-              actions_to_execute: []
+          logic: %{
+            live: %{
+              track: %{
+                actions_to_execute: []
+              }
             }
           }
         } = state
@@ -154,9 +160,11 @@ defmodule Roost.Logic do
 
   def next_action(
         %{
-          live: %{
-            track: %{
-              actions_to_execute: [next_action | _tail]
+          logic: %{
+            live: %{
+              track: %{
+                actions_to_execute: [next_action | _tail]
+              }
             }
           }
         } = state
@@ -164,6 +172,19 @@ defmodule Roost.Logic do
     state
     |> actions_to_execute_update(fn x -> tl(x) end)
     |> track_action_execute_put(next_action)
+  end
+
+  def build_logic_map(state) do
+    import Map, only: [put_new: 3]
+
+    put_new(state, :logic, %{})
+    |> update_in([:logic], fn logic_map ->
+      logic_map
+      |> put_new(:faults, %{})
+      |> put_new(:finished, %{})
+      |> put_new(:live, %{})
+      |> put_new(:stage, %{})
+    end)
   end
 
   def calculate_step_duration(%{run_for: run_for}), do: run_for
@@ -194,7 +215,9 @@ defmodule Roost.Logic do
     end
   end
 
-  def calculate_will_finish_by(%{live: %{repeat_until_stopped?: true}} = state) do
+  def calculate_will_finish_by(
+        %{logic: %{live: %{repeat_until_stopped?: true}}} = state
+      ) do
     state
     |> live_put(:will_finish_in_ms, nil)
     |> live_put(:will_finish_by, nil)
@@ -202,11 +225,13 @@ defmodule Roost.Logic do
 
   def calculate_will_finish_by(
         %{
-          live: %{
-            repeat_until_stopped?: false,
-            track: %{
-              calculated_durations: step_durations,
-              started_at: started_at
+          logic: %{
+            live: %{
+              repeat_until_stopped?: false,
+              track: %{
+                calculated_durations: step_durations,
+                started_at: started_at
+              }
             }
           }
         } = state
@@ -241,12 +266,17 @@ defmodule Roost.Logic do
 
   def finish_mode_if_needed(state) do
     case state do
-      %{live: %{active_mode: mode}} when is_atom(mode) -> finish_mode(state)
-      _live -> state
+      %{logic: %{live: %{active_mode: mode}}} when is_atom(mode) ->
+        finish_mode(state)
+
+      _live ->
+        state
     end
   end
 
-  def move_live_to_finished(%{live: %{active_mode: mode} = live} = state) do
+  def move_live_to_finished(
+        %{logic: %{live: %{active_mode: mode} = live}} = state
+      ) do
     state
     # remove :active_mode to avoid cruf
     |> live_update([], fn x -> Map.drop(x, [:active_mode]) end)
@@ -256,8 +286,8 @@ defmodule Roost.Logic do
     |> live_put([], %{})
   end
 
-  def move_stage_to_live(%{stage: stage} = state) do
-    state |> put_in([:live], stage) |> put_in([:stage], %{})
+  def move_stage_to_live(%{logic: %{stage: stage}} = state) do
+    state |> put_in([:logic, :live], stage) |> put_in([:logic, :stage], %{})
   end
 
   def note_delay_if_requested(state) do
@@ -353,21 +383,28 @@ defmodule Roost.Logic do
     do: track_update(state, [:actions_to_execute], func)
 
   def finished_get(state, path),
-    do: get_in(state, [:finished, [path]] |> List.flatten())
+    do: get_in(state, [:logic, :finished, [path]] |> List.flatten())
 
   def finished_put_mode(state, mode, mode_map)
       when is_atom(mode) and is_map(mode_map),
-      do: put_in(state, [:finished, mode], mode_map)
+      do: put_in(state, [:logic, :finished, mode], mode_map)
 
   def live_get(state, path),
-    do: get_in(state, [:live, [path]] |> List.flatten())
+    do: get_in(state, [:logic, :live, [path]] |> List.flatten())
 
-  def live_get_mode_opt(%{live: %{active_mode: active_mode}} = state, path),
-    do: live_get(state, [:opts, :modes, active_mode, [path]] |> List.flatten())
+  def live_get_mode_opt(
+        %{logic: %{live: %{active_mode: active_mode}}} = state,
+        path
+      ),
+      do:
+        live_get(state, [:opts, :modes, active_mode, [path]] |> List.flatten())
 
   def live_get_mode_sequence(state), do: live_get_mode_opt(state, :sequence)
 
-  def live_get_step_for(%{live: %{active_mode: active_mode}} = state, step)
+  def live_get_step_for(
+        %{logic: %{live: %{active_mode: active_mode}}} = state,
+        step
+      )
       when is_atom(step) do
     live_get(state, [:opts, :modes, active_mode, [step]] |> List.flatten())
   end
@@ -377,10 +414,10 @@ defmodule Roost.Logic do
 
   def live_get_steps(state), do: live_get(state, [:steps])
 
-  def live_steps_to_execute(%{live: %{steps_to_execute: x}}), do: x
+  def live_steps_to_execute(%{logic: %{live: %{steps_to_execute: x}}}), do: x
 
   def live_put(state, path, val) do
-    put_in(state, [:live, [path]] |> List.flatten(), val)
+    put_in(state, [:logic, :live, [path]] |> List.flatten(), val)
   end
 
   def live_put_status(state, status) do
@@ -395,7 +432,7 @@ defmodule Roost.Logic do
   end
 
   def live_update(state, path, func) when is_function(func, 1),
-    do: state |> update_in(List.flatten([:live, path]), func)
+    do: state |> update_in(List.flatten([:logic, :live, path]), func)
 
   def detect_sequence_repeats(state) do
     live_put(
@@ -405,11 +442,8 @@ defmodule Roost.Logic do
     )
   end
 
-  def stage_get(state, path) do
-    full_path = [:stage, path] |> List.flatten()
-
-    get_in(state, full_path)
-  end
+  def stage_get(state, path),
+    do: get_in(state, List.flatten([:logic, :stage, path]))
 
   def stage_initialize_steps(state) do
     state |> stage_put(:steps, stage_get_mode_opts(state, :steps))
@@ -426,13 +460,8 @@ defmodule Roost.Logic do
     )
   end
 
-  def stage_put(state, path, val) do
-    # we use the :stage key to build up the next mode to avoid conflicts
-    # if a mode is already running
-    full_path = [:stage, path] |> List.flatten()
-
-    state |> put_in(full_path, val)
-  end
+  def stage_put(state, path, val),
+    do: state |> put_in(List.flatten([:logic, :stage, path]), val)
 
   def stage_put_active_mode(state, mode) do
     state |> stage_put(:active_mode, mode)
@@ -455,11 +484,13 @@ defmodule Roost.Logic do
   end
 
   def init_fault_put(state, val) do
-    state |> put_in([:faults, :init], val)
+    state |> build_logic_map() |> put_in([:logic, :faults, :init], val)
   end
 
   def init_fault_clear(state) do
-    state |> update_in([:faults], fn x -> Map.drop(x, [:init]) end)
+    state
+    |> build_logic_map()
+    |> update_in([:logic, :faults], fn x -> Map.drop(x, [:init]) end)
   end
 
   def mode_repeat_until_stopped?(state),
@@ -469,9 +500,8 @@ defmodule Roost.Logic do
     state |> live_put([:status], status)
   end
 
-  def step_actions_get(%{live: %{steps: steps}}, step_name) do
-    get_in(steps, [step_name, :actions])
-  end
+  def step_actions_get(state, step_name),
+    do: live_get(state, [:steps, step_name, :actions])
 
   def steps_to_execute_update(state, func) do
     track_update(state, :steps_to_execute, func)
@@ -497,7 +527,7 @@ defmodule Roost.Logic do
   end
 
   def track_update(state, what \\ [], func) when is_function(func) do
-    state |> update_in(List.flatten([:live, :track, [what]]), func)
+    state |> update_in(List.flatten([:logic, :live, :track, [what]]), func)
   end
 
   def track_put(state, what, val \\ nil) do
@@ -525,7 +555,12 @@ defmodule Roost.Logic do
 
   def track_action_execute_put(
         %{
-          live: %{active_mode: active_mode, track: %{active_step: active_step}},
+          logic: %{
+            live: %{
+              active_mode: active_mode,
+              track: %{active_step: active_step}
+            }
+          },
           token: token
         } = state,
         action
@@ -542,7 +577,7 @@ defmodule Roost.Logic do
   end
 
   def track_step_get(
-        %{live: %{track: %{active_step: active_step}}} = state,
+        %{logic: %{live: %{track: %{active_step: active_step}}}} = state,
         what
       ) do
     state
@@ -550,13 +585,15 @@ defmodule Roost.Logic do
   end
 
   def track_step_put(
-        %{live: %{track: %{active_step: active_step}}} = state,
+        %{logic: %{live: %{track: %{active_step: active_step}}}} = state,
         what,
         val
       ) do
     state
-    |> update_in([:live, :track], fn x -> Map.put_new(x, :steps, %{}) end)
-    |> update_in([:live, :track, :steps], fn x ->
+    |> update_in([:logic, :live, :track], fn x ->
+      Map.put_new(x, :steps, %{})
+    end)
+    |> update_in([:logic, :live, :track, :steps], fn x ->
       Map.put_new(x, active_step, %{})
     end)
     |> track_put([:steps, active_step, what], val)
