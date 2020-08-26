@@ -32,7 +32,7 @@ defmodule WorkerLogicTest do
       server: %{mode: :init, standby_reason: :none},
       devices: %{},
       faults: %{},
-      finished_modes: %{},
+      finished: %{},
       live: %{},
       opts: %{},
       stage: %{},
@@ -116,15 +116,57 @@ defmodule WorkerLogicTest do
     assert is_map(stage) and is_map(live)
     assert Enum.empty?(stage)
     assert Logic.live_get(state, :active_mode) == mode
-    assert %DateTime{} = Logic.mode_track_get(state, :started_at)
+    assert %DateTime{} = Logic.track_get(state, :started_at)
     assert Logic.live_get(state, :will_finish_in_ms) == to_ms(expected_duration)
+    assert %DateTime{} = Logic.track_step_get(state, :started_at)
+    assert %Duration{} = Logic.track_step_get(state, :elapsed)
 
-    assert Logic.mode_track_get(state, :steps_to_execute) == [
+    assert %{steps_to_execute: steps_to_execute} =
+             state
+             |> get_in([:live, :track])
+
+    assert is_list(steps_to_execute)
+
+    assert %{actions_to_execute: actions_to_execute} =
+             get_in(state, [:live, :track])
+
+    assert is_list(actions_to_execute) and length(actions_to_execute) == 1
+
+    assert Logic.track_get(state, :sequence) == [
              :at_start,
              :main,
              :topoff,
              :finally
            ]
+
+    assert Logic.track_get(state, :steps_to_execute) == [
+             :main,
+             :topoff,
+             :finally
+           ]
+
+    assert Logic.action_to_execute?(state)
+
+    state = state |> Logic.action_complete() |> Logic.action_complete()
+
+    assert Logic.track_get(state, :steps_to_execute) == [
+             :topoff,
+             :finally
+           ]
+
+    # confirm the mode finishes
+    token = get_in(state, [:token])
+
+    state =
+      for _x <- 1..100, reduce: state do
+        %{token: state_token} = state when state_token == token ->
+          state |> Logic.action_complete()
+
+        state ->
+          state
+      end
+
+    assert Logic.finished?(state, mode)
   end
 
   test "can start a mode that repeats" do
@@ -138,10 +180,24 @@ defmodule WorkerLogicTest do
     assert is_map(stage) and is_map(live)
     assert Enum.empty?(stage)
     assert Logic.live_get(state, :active_mode) == mode
-    assert %DateTime{} = Logic.mode_track_get(state, :started_at)
+    assert %DateTime{} = Logic.track_get(state, :started_at)
     assert is_nil(Logic.live_get(state, :will_finish_in_ms))
     assert is_nil(Logic.live_get(state, :will_finish_by))
     assert Logic.mode_repeat_until_stopped?(state)
+    assert Logic.action_to_execute?(state)
+
+    state = Logic.action_complete(state)
+    assert Logic.action_to_execute?(state)
+
+    # confirm the mode never ends
+    for _x <- 1..100, reduce: state do
+      %{live: %{track: %{active_step: _step}}} = state ->
+        refute Enum.empty?(Logic.track_get(state, :steps_to_execute))
+
+        assert Logic.live_get(state, :status) == :running
+
+        state |> Logic.action_complete()
+    end
   end
 
   test "can get the sequence of the live mode" do
