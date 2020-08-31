@@ -77,6 +77,15 @@ defmodule Helen.Time.Helper do
   end
 
   @doc """
+  Compare the sum of the list (durations or integers representing milliseconds)
+  is equal to or exceeds the specified maxiumum.
+  """
+  @doc since: "0.0.27"
+  def elapsed?(%Duration{} = max, check) when is_list(check) do
+    to_ms(max) <= to_ms(add_list(check))
+  end
+
+  @doc """
   Determines if duration (second argument) has elapsed
   relative to the reference datatime (first argument)
 
@@ -88,7 +97,7 @@ defmodule Helen.Time.Helper do
 
   """
   @doc since: "0.0.27"
-  def elapsed?(reference, duration) do
+  def elapsed?(%DateTime{} = reference, %Duration{} = duration) do
     import Timex, only: [after?: 2, shift: 2]
 
     end_dt = shift(reference, milliseconds: to_ms(duration))
@@ -109,7 +118,7 @@ defmodule Helen.Time.Helper do
 
     This is the inverse of current?/3.
 
-    Useful to determining if a DateTime is stale, deteriming if caching/ttl
+    Useful to determining if a DateTime is stale, determining if caching/ttl
     are expired.
   """
   @doc since: "0.0.26"

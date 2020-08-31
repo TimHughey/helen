@@ -3,44 +3,47 @@ defmodule Reef.FirstMate.Server do
   Provides support to Reef.FirstMate.Server, specificially reef clean mode.
   """
 
-  use GenServer, restart: :transient, shutdown: 7000
+  use Timex
 
-  alias Reef.DisplayTank.Ato
+  use GenServer, restart: :transient, shutdown: 5000
+  use Helen.Worker.Logic
 
   ##
-  ## GenServer Start and Initialization
+  ## GenServer init and start
   ##
 
   @doc false
   @impl true
   def init(args) do
-    import Reef.FirstMate.Opts,
-      only: [parsed: 0]
+    import Reef.FirstMate.Opts, only: [parsed: 0]
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
+    opts = parsed()
 
     state = %{
       module: __MODULE__,
-      server_mode: args[:server_mode] || :active,
-      worker_mode: :ready,
-      server_standby_reason: :none,
-      token: nil,
-      token_at: nil,
-      pending: %{},
+      server: %{
+        mode: args[:server_mode] || :active,
+        standby_reason: :none,
+        faults: %{}
+      },
+      opts: opts,
       timeouts: %{last: :never, count: 0},
-      opts: parsed()
+      token: nil,
+      token_at: nil
     }
 
     # should the server start?
-    if state[:server_mode] == :standby,
-      do: :ignore,
-      else: {:ok, state, {:continue, :bootstrap}}
+    if state[:server][:mode] == :standby do
+      :ignore
+    else
+      {:ok, state, {:continue, :bootstrap}}
+    end
   end
 
-  @doc false
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   ##
@@ -61,8 +64,7 @@ defmodule Reef.FirstMate.Server do
   @doc since: "0.0.27"
   def active? do
     case x_state() do
-      %{server_mode: :standby, worker_mode: _} -> false
-      %{server_mode: _, worker_mode: :not_ready} -> false
+      %{server: %{mode: :standby}} -> false
       _else -> true
     end
   end
@@ -93,13 +95,7 @@ defmodule Reef.FirstMate.Server do
 
   """
   @doc since: "0.0.27"
-  def available_modes, do: call({:available_modes, :allow_standby})
-
-  @doc """
-  Set the FirstMate to a specific mode.
-  """
-  @doc since: "0.0.27"
-  def worker_mode(mode, opts), do: call({:worker_mode, mode, opts})
+  def available_modes, do: call({:available_modes})
 
   @doc since: "0.0.27"
   def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
@@ -110,14 +106,21 @@ defmodule Reef.FirstMate.Server do
   @doc since: "0.0.27"
   def last_timeout do
     import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
+    tz = runtime_opts() |> get_in([:timezone]) || "America/New_York"
 
     with last <- x_state(:last_timeout),
          d when d > 0 <- Timex.diff(last, epoch()) do
-      Timex.to_datetime(last, "America/New_York")
+      Timex.to_datetime(last, tz)
     else
       _epoch -> epoch()
     end
   end
+
+  @doc """
+  Set the Roost to a specific mode.
+  """
+  @doc since: "0.0.27"
+  def mode(mode, opts), do: call({:mode, mode, opts})
 
   @doc """
   Return the server runtime options.
@@ -175,7 +178,7 @@ defmodule Reef.FirstMate.Server do
   """
   @doc since: "0.0.27"
   def server_mode(atom) when atom in [:active, :standby] do
-    call({:server_mode, atom, :allow_standby})
+    call({:server_mode, atom})
   end
 
   @doc """
@@ -212,38 +215,33 @@ defmodule Reef.FirstMate.Server do
   @doc since: "0.0.27"
   def timeouts, do: x_state() |> get_in([:timeouts])
 
-  ##
-  ## GenServer handle_* callbacks
-  ##
-
   @doc false
   @impl true
   def handle_call(:state, _from, state) do
-    state = update_elapsed(state)
-    reply(state, state)
+    import Helen.Worker.Logic, only: [update_elapsed: 1]
+
+    state |> update_elapsed() |> reply(state)
   end
 
   @doc false
   @impl true
   def handle_call({:all_stop}, _from, state) do
+    alias Helen.Worker.Logic
+
     state
-    |> __all_stop__()
+    |> Logic.all_stop()
     |> reply(:answering_all_stop)
   end
 
   @doc false
   @impl true
   def handle_call({:available_modes}, _from, state) do
-    import Reef.Logic, only: [available_modes: 1]
-
-    reply(state, state |> available_modes())
+    reply(state, state |> available_modes_get())
   end
 
   @doc false
   @impl true
   def handle_call({:cancel_delayed_cmd}, _from, state) do
-    import Reef.Logic, only: [change_token: 1]
-
     timer = get_in(state, [:pending, :delayed])
 
     if is_reference(timer), do: Process.cancel_timer(timer)
@@ -256,138 +254,80 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def handle_call({:server_mode, mode}, _from, state) do
-    import Reef.Logic, only: [change_token: 1]
-
     case mode do
       # when switching to :standby ensure the switch is off
       :standby ->
         state
         |> change_token()
-        |> crew_offline()
-        |> put_in([:server_mode], mode)
-        |> put_in([:server_standby_reason], :api)
+        |> put_in([:server, :mode], mode)
+        |> put_in([:server, :standby_reason], :api)
         |> reply({:ok, mode})
 
       # no action when switching to :active, the server will take control
       :active ->
         state
         |> change_token()
-        |> crew_online()
-        |> put_in([:server_mode], mode)
-        |> put_in([:server_standby_reason], :none)
+        |> put_in([:server, :mode], mode)
+        |> put_in([:server, :standby_reason], :none)
         |> reply({:ok, mode})
     end
   end
 
   @doc false
   @impl true
-  def handle_call({:worker_mode, mode, api_opts}, _from, state) do
-    # import Reef.Logic, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
-
+  def handle_call({:mode, mode, _api_opts}, _from, state) do
     state
-    |> Reef.Logic.init_precheck(mode, api_opts)
-    |> Reef.Logic.init_mode()
-    |> Reef.Logic.start_mode()
+    |> init_mode(mode)
+    |> start_mode()
     |> check_fault_and_reply()
   end
 
   @doc false
   @impl true
   def handle_call(msg, _from, state),
-    do: state |> msg_puts(msg) |> reply({:unmatched})
-
-  @doc false
-  @impl true
-  def handle_cast({:msg, {:handoff, worker_mode}}, state) do
-    import Reef.Logic, only: [init_precheck: 3, init_mode: 1, start_mode: 1]
-
-    state
-    |> init_precheck(worker_mode, [])
-    |> init_mode()
-    |> start_mode()
-    |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_cast({:msg, _cmd} = msg, state),
-    do: state |> msg_puts(msg) |> noreply()
+    do: state |> msg_puts(msg) |> reply({:unmatched_msg, msg})
 
   @doc false
   @impl true
   def handle_continue(:bootstrap, state) do
-    import Reef.Logic, only: [change_token: 1, validate_all_durations: 1]
-    valid_opts? = state |> validate_all_durations()
-
-    case valid_opts? do
-      true ->
-        state
-        |> change_token()
-        |> crew_online()
-        |> set_all_modes_ready()
-        |> noreply()
-
-      false ->
-        state
-        |> put_in([:worker_mode], :not_ready)
-        |> put_in([:not_ready_reason], :invalid_opts)
-        |> noreply()
-    end
+    state
+    |> change_token()
+    |> Logic.build_devices_map()
+    |> noreply()
   end
 
-  @doc false
   @impl true
   def handle_info(
-        {:gen_device, %{token: msg_token, mod: mod, at: at, cmd: cmd}},
-        %{
-          worker_mode: worker_mode,
-          token: token
-        } = state
+        {:msg, {:mode, mode}, msg_token},
+        %{token: token} = state
       )
       when msg_token == token do
-    import Helen.Time.Helper, only: [utc_now: 0]
-    import Reef.Logic, only: [start_next_cmd_in_step: 1, step_device_to_mod: 1]
-
-    # for all messages we want capture when they were received and update
-    # the elapsed time
-    state =
-      put_in(state, [worker_mode, :device_last_cmds, mod, cmd, at], utc_now())
-      |> update_elapsed()
-
-    # we only want to process :at_finish messages from step_devices
-    # associated to steps and not sub steps
-    active_step = get_in(state, [worker_mode, :active_step])
-
-    expected_mod =
-      get_in(state, [worker_mode, :step_devices, active_step])
-      |> step_device_to_mod()
-
-    if expected_mod == mod and at == :at_finish,
-      do: state |> start_next_cmd_in_step() |> noreply(),
-      else: state |> noreply()
+    state
+    |> init_mode(mode)
+    |> start_mode()
+    |> noreply()
   end
 
   @doc false
   @impl true
-  # quietly drop gen_device messages that do not match the current token
-  def handle_info({:gen_device, %{token: msg_token}}, %{token: token} = state)
+  def handle_info({:msg, _msg, msg_token}, %{token: token} = state)
       when msg_token != token,
-      do: noreply(state)
+      do: state |> noreply()
 
   @doc false
   @impl true
-  def handle_info({:gen_device, _payload} = msg, state),
-    do: state |> msg_puts(msg) |> noreply()
+  def handle_info({:timer, _cmd, msg_token}, %{token: token} = state)
+      when msg_token == token do
+    state |> noreply()
+  end
 
+  # NOTE:  when the msg_token does not match the state token then
+  #        a change has occurred and this message should be ignored
   @doc false
   @impl true
-  def handle_info({:timer, :delayed_cmd}, state) do
-    import Reef.Logic, only: [start_mode: 1]
-
-    state
-    |> update_in([:pending], fn x -> Map.drop(x, [:delay, :timer]) end)
-    |> start_mode()
-    |> noreply()
+  def handle_info({:timer, _msg, msg_token}, %{token: token} = state)
+      when msg_token != token do
+    state |> noreply()
   end
 
   @doc false
@@ -400,53 +340,11 @@ defmodule Reef.FirstMate.Server do
 
   @doc false
   @impl true
-  def terminate(_reason, %{worker_mode: worker_mode} = state) do
-    case worker_mode do
-      _nomatch -> state
-    end
-  end
+  def terminate(_reason, state), do: state
 
   ##
   ## PRIVATE
   ##
-
-  defp __all_stop__(state) do
-    import Reef.Logic, only: [change_token: 1]
-
-    state
-    # prevent processing of any lingering messages
-    |> change_token()
-    # the safest way to stop everything is to take all the crew offline
-    |> crew_offline()
-    # bring them back online so they're ready for whatever comes next
-    |> crew_online()
-    |> set_all_modes_ready()
-  end
-
-  defp crew_list, do: [Ato]
-  defp crew_list_no_heat, do: [Ato]
-
-  # NOTE:  state is unchanged however is parameter for use in pipelines
-  defp crew_offline(state) do
-    for crew_member <- crew_list() do
-      apply(crew_member, :mode, [:standby])
-    end
-
-    state
-  end
-
-  # NOTE:  state is unchanged however is parameter for use in pipelines
-  defp crew_online(state) do
-    # NOTE:  we NEVER bring MixTank.Temp online unless explictly requested
-    #        in a mode step/cmd
-    for crew_member <- crew_list_no_heat() do
-      apply(crew_member, :mode, [:active])
-    end
-
-    state
-  end
-
-  def ensure_worker_mode_map(state, mode), do: state |> Map.put_new(mode, %{})
 
   defp msg_puts(state, msg) do
     """
@@ -456,22 +354,6 @@ defmodule Reef.FirstMate.Server do
     |> IO.puts()
 
     state
-  end
-
-  defp update_elapsed(%{worker_mode: mode} = state) do
-    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
-
-    if get_in(state, [mode, :status]) do
-      now = utc_now()
-      started_at = get_in(state, [mode, :started_at])
-      step_started_at = get_in(state, [mode, :step, :started_at])
-
-      state
-      |> put_in([mode, :elapsed], elapsed(started_at, now))
-      |> put_in([mode, :step, :elapsed], elapsed(step_started_at, now))
-    else
-      state
-    end
   end
 
   ##
@@ -492,15 +374,6 @@ defmodule Reef.FirstMate.Server do
     to_ms(opts[:timeout], "PT30.0S")
   end
 
-  defp set_all_modes_ready(state) do
-    import Reef.Logic, only: [available_modes: 1]
-
-    for m <- available_modes(state), reduce: state do
-      state -> state |> put_in([m], %{status: :ready})
-    end
-    |> put_in([:worker_mode], :ready)
-  end
-
   defp update_last_timeout(state) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
@@ -513,19 +386,10 @@ defmodule Reef.FirstMate.Server do
   ## GenServer.{call, cast} Helpers
   ##
 
-  defp call(msg, call_opts \\ []) do
-    call_opts = [call_opts] |> List.flatten()
-
+  defp call(msg) do
     cond do
-      # when the server is down we can't make call, obviously
-      server_down?() -> :server_down
-      # when the server is up but in standby allow the call if specified
-      # in the call opts
-      call_opts == [:allow_standby] -> GenServer.call(__MODULE__, msg)
-      # when in standby mode and call opts do not include allow standby then
-      # prevent the call
-      standby?() -> :standby_mode
-      # finally, the server is up and active so make the call
+      server_down?() -> {:failed, :server_down}
+      standby?() -> {:failed, :standby_mode}
       true -> GenServer.call(__MODULE__, msg)
     end
   end
@@ -536,8 +400,8 @@ defmodule Reef.FirstMate.Server do
 
   defp standby? do
     case x_state() do
-      %{server_mode: :standby} -> true
-      %{server_mode: :active} -> false
+      %{server: %{mode: :standby}} -> true
+      %{server: %{mode: :active}} -> false
       _state -> true
     end
   end
@@ -546,16 +410,21 @@ defmodule Reef.FirstMate.Server do
   ## handle_* return helpers
   ##
 
-  defp check_fault_and_reply(%{fault: fault} = state) do
-    {:reply, {:fault, fault}, state, loop_timeout(state)}
+  defp check_fault_and_reply(state) do
+    alias Helen.Worker.Logic
+
+    if Logic.faults?(state) do
+      {:reply, {:fault, Logic.faults_get(state, [])}, state,
+       loop_timeout(state)}
+    else
+      {:reply, {:ok, Logic.active_mode(state)}, state, loop_timeout(state)}
+    end
   end
 
-  defp check_fault_and_reply(%{worker_mode: worker_mode} = state) do
-    {:reply, {:ok, worker_mode}, state, loop_timeout(state)}
-  end
+  @impl true
+  def noreply(s), do: {:noreply, s, loop_timeout(s)}
 
-  defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-
-  defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
-  defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
+  @impl true
+  def reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
+  def reply(val, s), do: {:reply, val, s, loop_timeout(s)}
 end

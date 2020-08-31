@@ -24,7 +24,7 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def clean(opts \\ []) do
-    FirstMate.worker_mode(:clean, opts)
+    FirstMate.mode(:clean, opts)
   end
 
   @doc """
@@ -41,7 +41,7 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def fill(opts \\ []) do
-    Captain.worker_mode(:fill, opts)
+    Captain.mode(:fill, opts)
   end
 
   @doc """
@@ -88,7 +88,7 @@ defmodule Reef do
   of water.
   """
   @doc since: "0.0.27"
-  def keep_fresh(opts \\ []), do: Captain.worker_mode(:keep_fresh, opts)
+  def keep_fresh(opts \\ []), do: Captain.mode(:keep_fresh, opts)
 
   @doc """
   Reef mode Keep Fresh status.
@@ -119,7 +119,7 @@ defmodule Reef do
 
   """
   @doc since: "0.0.27"
-  def mix_salt(opts \\ []), do: Captain.worker_mode(:mix_salt, opts)
+  def mix_salt(opts \\ []), do: Captain.mode(:mix_salt, opts)
 
   @doc """
   Reef mode Mix Salt status.
@@ -136,7 +136,7 @@ defmodule Reef do
   def mix_salt_status, do: Status.msg(:salt_mix) |> IO.puts()
 
   @doc delegate_to: {Captain, :server_mode, 1}
-  defdelegate mode(opts), to: Captain, as: :server_mode
+  defdelegate server_mode(opts), to: Captain, as: :server_mode
 
   @doc """
   Output the server options stored in the database.
@@ -159,7 +159,7 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def prep_for_change(opts \\ []),
-    do: Captain.worker_mode(:prep_for_change, opts)
+    do: Captain.mode(:prep_for_change, opts)
 
   defdelegate pump_off(opts \\ []), to: MixTank.Pump, as: :off
   defdelegate pump_on(opts \\ []), to: MixTank.Pump, as: :on
@@ -323,8 +323,8 @@ defmodule Reef do
 
     if temp_ok?(opts) do
       [
-        captain: Captain.worker_mode(:water_change, []),
-        first_mate: FirstMate.worker_mode(:water_change_start, []),
+        captain: Captain.mode(:water_change, []),
+        first_mate: FirstMate.mode(:water_change_start, []),
         display_tank: DisplayTank.mode(:standby)
       ]
     else
@@ -343,7 +343,7 @@ defmodule Reef do
 
     [
       captain: all_stop(),
-      first_mate: FirstMate.worker_mode(:water_change_finish, []),
+      first_mate: FirstMate.mode(:water_change_finish, []),
       display_tank: DisplayTank.mode(:active),
       mixtank: MixTank.mode(:standby)
     ]
@@ -368,8 +368,8 @@ defmodule Reef do
     end
   end
 
-  @doc delegate_to: {Captain, :worker_mode, 2}
-  defdelegate worker_mode(mode, opts \\ []), to: Captain
+  @doc delegate_to: {Captain, :mode, 2}
+  defdelegate mode(mode, opts \\ []), to: Captain
 
   defp populate_worker_mode_status(status_map, captain_state, first_mate_state) do
     worker_states = %{captain: captain_state, first_mate: first_mate_state}

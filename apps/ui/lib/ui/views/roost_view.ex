@@ -22,7 +22,7 @@ defmodule UI.RoostView do
 
   def button_handle_mode_and_action(mode, action) do
     case {mode, action} do
-      {mode, "play"} -> map_mode(mode) |> Roost.worker_mode([])
+      {mode, "play"} -> map_mode(mode) |> Roost.mode([])
       {_mode, "off"} -> Roost.restart()
       {_mode, "stop"} -> Roost.all_stop()
     end

@@ -7,6 +7,7 @@ defmodule Roost.Server do
   use Timex
 
   use GenServer, restart: :transient, shutdown: 5000
+  use Helen.Worker.Logic
 
   ##
   ## GenServer init and start
@@ -18,29 +19,23 @@ defmodule Roost.Server do
 
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
+    opts = parsed()
 
     state = %{
       module: __MODULE__,
-      server: %{mode: :init, standby_reason: :none},
-      devices: %{},
-      faults: %{init: :ok},
-      finished_modes: %{},
-      live: %{},
-      opts: parsed(),
-      stage: %{},
+      server: %{
+        mode: args[:server_mode] || :active,
+        standby_reason: :none,
+        faults: %{}
+      },
+      opts: opts,
       timeouts: %{last: :never, count: 0},
       token: nil,
-      token_at: nil,
-
-      # deprecated
-      server_mode: args[:server_mode] || :active,
-      mode: :ready,
-      dance: :init,
-      server_standby_reason: :none
+      token_at: nil
     }
 
     # should the server start?
-    if state[:server_mode] == :standby do
+    if state[:server][:mode] == :standby do
       :ignore
     else
       {:ok, state, {:continue, :bootstrap}}
@@ -69,8 +64,7 @@ defmodule Roost.Server do
   @doc since: "0.0.27"
   def active? do
     case x_state() do
-      %{server_mode: :standby, worker_mode: _} -> false
-      %{server_mode: _, worker_mode: :not_ready} -> false
+      %{server: %{mode: :standby}} -> false
       _else -> true
     end
   end
@@ -103,26 +97,8 @@ defmodule Roost.Server do
   @doc since: "0.0.27"
   def available_modes, do: call({:available_modes})
 
-  @doc """
-  Set the FirstMate to a specific mode.
-  """
-  @doc since: "0.0.27"
-  def worker_mode(mode, opts), do: call({:worker_mode, mode, opts})
-
   @doc since: "0.0.27"
   def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
-
-  @doc """
-  Set the Roost for dancing
-  """
-  @doc since: "0.0.27"
-  def dance_with_me, do: call({:dance})
-
-  @doc """
-      Set the Roost to leaving (dancing is over but exit lighting remains)
-  """
-  @doc since: "0.0.27"
-  def leaving(opts \\ "PT10M0.0S"), do: call({:leaving, opts})
 
   @doc """
   Return the DateTime of the last GenServer timeout.
@@ -141,6 +117,12 @@ defmodule Roost.Server do
   end
 
   @doc """
+  Set the Roost to a specific mode.
+  """
+  @doc since: "0.0.27"
+  def mode(mode, opts), do: call({:mode, mode, opts})
+
+  @doc """
   Return the server runtime options.
   """
   @doc since: "0.0.27"
@@ -157,7 +139,7 @@ defmodule Roost.Server do
 
   ## Examples
 
-      iex> Reef.Temp.Control.restart([])
+      iex> Roost.Server.restart([])
       :ok
 
   """
@@ -202,7 +184,7 @@ defmodule Roost.Server do
   @doc """
   Return the GenServer state.
 
-  A single key (e.g. :server_mode) or a list of keys (e.g. :worker_mode, :server_mode)
+  A single key (e.g. :server_mode) or a list of keys (e.g. :logic, :server_mode)
   can be specified and only those keys are returned.
   """
   @doc since: "0.0.27"
@@ -233,21 +215,18 @@ defmodule Roost.Server do
   @doc since: "0.0.27"
   def timeouts, do: x_state() |> get_in([:timeouts])
 
-  ##
-  ## Roost Public API
-  ##
-
   @doc false
   @impl true
   def handle_call(:state, _from, state) do
-    state = state |> update_elapsed()
+    import Helen.Worker.Logic, only: [update_elapsed: 1]
 
-    state |> reply(state)
+    state |> update_elapsed() |> reply(state)
   end
 
+  @doc false
   @impl true
   def handle_call({:all_stop}, _from, state) do
-    alias Roost.Logic
+    alias Helen.Worker.Logic
 
     state
     |> Logic.all_stop()
@@ -257,16 +236,12 @@ defmodule Roost.Server do
   @doc false
   @impl true
   def handle_call({:available_modes}, _from, state) do
-    import Roost.Logic, only: [available_modes: 1]
-
-    reply(state, state |> available_modes())
+    reply(state, state |> available_modes_get())
   end
 
   @doc false
   @impl true
   def handle_call({:cancel_delayed_cmd}, _from, state) do
-    import Roost.Logic, only: [change_token: 1]
-
     timer = get_in(state, [:pending, :delayed])
 
     if is_reference(timer), do: Process.cancel_timer(timer)
@@ -279,35 +254,31 @@ defmodule Roost.Server do
   @doc false
   @impl true
   def handle_call({:server_mode, mode}, _from, state) do
-    import Roost.Logic, only: [change_token: 1]
-
     case mode do
       # when switching to :standby ensure the switch is off
       :standby ->
         state
         |> change_token()
-        |> put_in([:server_mode], mode)
-        |> put_in([:server_standby_reason], :api)
+        |> put_in([:server, :mode], mode)
+        |> put_in([:server, :standby_reason], :api)
         |> reply({:ok, mode})
 
       # no action when switching to :active, the server will take control
       :active ->
         state
         |> change_token()
-        |> put_in([:server_mode], mode)
-        |> put_in([:server_standby_reason], :none)
+        |> put_in([:server, :mode], mode)
+        |> put_in([:server, :standby_reason], :none)
         |> reply({:ok, mode})
     end
   end
 
   @doc false
   @impl true
-  def handle_call({:worker_mode, mode, _api_opts}, _from, state) do
-    alias Roost.Logic
-
+  def handle_call({:mode, mode, _api_opts}, _from, state) do
     state
-    |> Logic.init_mode(mode)
-    |> Logic.start_mode()
+    |> init_mode(mode)
+    |> start_mode()
     |> check_fault_and_reply()
   end
 
@@ -319,49 +290,31 @@ defmodule Roost.Server do
   @doc false
   @impl true
   def handle_continue(:bootstrap, state) do
-    alias Roost.Logic
-
     state
-    |> Logic.change_token()
+    |> change_token()
     |> Logic.build_devices_map()
-    |> set_all_modes_ready()
     |> noreply()
   end
 
-  # handle step via messages
   @impl true
   def handle_info(
-        {:msg, {:via_msg, _step}, msg_token} = msg,
+        {:msg, {:mode, mode}, msg_token},
         %{token: token} = state
       )
       when msg_token == token do
-    alias Roost.Logic
-
     state
-    |> Logic.handle_via_msg(msg)
+    |> init_mode(mode)
+    |> start_mode()
     |> noreply()
   end
 
-  # handle step via messages
-  @impl true
-  def handle_info(
-        {:msg, {:worker_mode, mode}, msg_token},
-        %{token: token} = state
-      )
-      when msg_token == token do
-    alias Roost.Logic
-
-    state
-    |> Logic.init_mode(mode)
-    |> Logic.start_mode()
-    |> noreply()
-  end
-
+  @doc false
   @impl true
   def handle_info({:msg, _msg, msg_token}, %{token: token} = state)
       when msg_token != token,
       do: state |> noreply()
 
+  @doc false
   @impl true
   def handle_info({:timer, _cmd, msg_token}, %{token: token} = state)
       when msg_token == token do
@@ -370,6 +323,7 @@ defmodule Roost.Server do
 
   # NOTE:  when the msg_token does not match the state token then
   #        a change has occurred and this message should be ignored
+  @doc false
   @impl true
   def handle_info({:timer, _msg, msg_token}, %{token: token} = state)
       when msg_token != token do
@@ -386,14 +340,10 @@ defmodule Roost.Server do
 
   @doc false
   @impl true
-  def terminate(_reason, %{worker_mode: worker_mode} = state) do
-    case worker_mode do
-      _nomatch -> state
-    end
-  end
+  def terminate(_reason, state), do: state
 
   ##
-  ## Private
+  ## PRIVATE
   ##
 
   defp msg_puts(state, msg) do
@@ -404,22 +354,6 @@ defmodule Roost.Server do
     |> IO.puts()
 
     state
-  end
-
-  defp update_elapsed(%{worker_mode: mode} = state) do
-    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
-
-    if get_in(state, [mode, :status]) do
-      now = utc_now()
-      started_at = get_in(state, [mode, :started_at])
-      step_started_at = get_in(state, [mode, :step, :started_at])
-
-      state
-      |> put_in([mode, :elapsed], elapsed(started_at, now))
-      |> put_in([mode, :step, :elapsed], elapsed(step_started_at, now))
-    else
-      state
-    end
   end
 
   ##
@@ -438,15 +372,6 @@ defmodule Roost.Server do
     import Helen.Time.Helper, only: [to_ms: 2]
 
     to_ms(opts[:timeout], "PT30.0S")
-  end
-
-  defp set_all_modes_ready(state) do
-    import Roost.Logic, only: [available_modes: 1]
-
-    for m <- available_modes(state), reduce: state do
-      state -> state |> put_in([m], %{status: :ready})
-    end
-    |> put_in([:worker_mode], :ready)
   end
 
   defp update_last_timeout(state) do
@@ -475,8 +400,8 @@ defmodule Roost.Server do
 
   defp standby? do
     case x_state() do
-      %{server_mode: :standby} -> true
-      %{server_mode: :active} -> false
+      %{server: %{mode: :standby}} -> true
+      %{server: %{mode: :active}} -> false
       _state -> true
     end
   end
@@ -485,16 +410,21 @@ defmodule Roost.Server do
   ## handle_* return helpers
   ##
 
-  defp check_fault_and_reply(%{fault: fault} = state) do
-    {:reply, {:fault, fault}, state, loop_timeout(state)}
+  defp check_fault_and_reply(state) do
+    alias Helen.Worker.Logic
+
+    if Logic.faults?(state) do
+      {:reply, {:fault, Logic.faults_get(state, [])}, state,
+       loop_timeout(state)}
+    else
+      {:reply, {:ok, Logic.active_mode(state)}, state, loop_timeout(state)}
+    end
   end
 
-  defp check_fault_and_reply(%{worker_mode: worker_mode} = state) do
-    {:reply, {:ok, worker_mode}, state, loop_timeout(state)}
-  end
+  @impl true
+  def noreply(s), do: {:noreply, s, loop_timeout(s)}
 
-  defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-
-  defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
-  defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
+  @impl true
+  def reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
+  def reply(val, s), do: {:reply, val, s, loop_timeout(s)}
 end

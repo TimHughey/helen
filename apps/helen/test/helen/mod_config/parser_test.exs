@@ -121,9 +121,9 @@ defmodule HelenConfigParserTest do
     assert is_struct(timeout)
   end
 
-  test "cam parse devices" do
+  test "cam parse workers" do
     snippet = """
-    devices
+    workers
       mixtank_air       gen_device
       mixtank_pump      gen_device
       mixtank_heat      temp_server
@@ -135,9 +135,9 @@ defmodule HelenConfigParserTest do
     opts = Parser.parse(snippet)
 
     assert %{
-             parser: %{context: :devices, unmatched: %{lines: [], count: 0}},
+             parser: %{context: :workers, unmatched: %{lines: [], count: 0}},
              config: %{
-               devices: %{
+               workers: %{
                  mixtank_air: :gen_device,
                  mixtank_pump: :gen_device,
                  mixtank_heat: :temp_server,
@@ -277,25 +277,25 @@ defmodule HelenConfigParserTest do
                      long_step: %{
                        run_for: duration,
                        actions: [
-                         %{sleep: sleep_duration},
-                         %{tell: %{device: :first_mate, msg: :standby}},
-                         %{all: :off},
-                         %{device: :air, cmd: :off},
+                         %{cmd: :sleep, worker: :self, args: sleep_duration},
+                         %{cmd: :tell, worker: :first_mate, msg: :standby},
+                         %{cmd: :all, worker: :self, args: :off},
+                         %{worker: :air, cmd: :off},
                          %{
-                           device: :pump,
+                           worker: :pump,
                            cmd: :off,
                            for: cmd_duration1,
                            wait: true
                          },
                          %{
-                           device: :air,
+                           worker: :air,
                            cmd: :on,
                            for: cmd_duration2,
                            then_cmd: :off,
                            wait: true
                          },
                          %{
-                           device: :pump,
+                           worker: :pump,
                            cmd: :on,
                            for: cmd_duration_nowait,
                            then_cmd: :off,
@@ -354,37 +354,37 @@ defmodule HelenConfigParserTest do
                      long_step: %{
                        run_for: duration,
                        actions: [
-                         %{sleep: sleep_duration},
-                         %{tell: %{device: :first_mate, msg: :standby}},
-                         %{all: :off},
-                         %{cmd: :on, device: [:dev1, :dev2, :dev3]}
+                         %{cmd: :sleep, worker: :self, args: sleep_duration},
+                         %{cmd: :tell, worker: :first_mate, msg: :standby},
+                         %{cmd: :all, worker: :self, args: :off},
+                         %{cmd: :on, worker: [:dev1, :dev2, :dev3]}
                        ]
                      },
                      finally: %{
                        actions: [
-                         %{device: :air, cmd: :off, float: nil},
+                         %{worker: :air, cmd: :off, float: nil},
                          %{
-                           device: :pump,
+                           worker: :pump,
                            cmd: :off,
                            for: cmd_duration1,
                            wait: true
                          },
                          %{
-                           device: :air,
+                           worker: :air,
                            cmd: :on,
                            for: cmd_duration2,
                            then_cmd: :off,
                            wait: true
                          },
                          %{
-                           device: :pump,
+                           worker: :pump,
                            cmd: :on,
                            for: cmd_duration_nowait,
                            then_cmd: :off,
                            wait: false
                          },
-                         %{device: :lights, cmd: :duty, float: 0.7},
-                         %{device: :lights2, cmd: :dance_fade}
+                         %{worker: :lights, cmd: :duty, float: 0.7},
+                         %{worker: :lights2, cmd: :dance_fade}
                        ]
                      }
                    }
@@ -443,45 +443,45 @@ defmodule HelenConfigParserTest do
                      long_step: %{
                        run_for: duration,
                        actions: [
-                         %{sleep: sleep_duration},
-                         %{tell: %{device: :first_mate, msg: :standby}},
-                         %{all: :off},
-                         %{cmd: :on, device: [:dev1, :dev2, :dev3]}
+                         %{cmd: :sleep, worker: :self, args: sleep_duration},
+                         %{cmd: :tell, worker: :first_mate, msg: :standby},
+                         %{cmd: :all, worker: :self, args: :off},
+                         %{cmd: :on, worker: [:dev1, :dev2, :dev3]}
                        ]
                      },
                      finally: %{
                        actions: [
-                         %{device: :air, cmd: :off, float: nil},
+                         %{worker: :air, cmd: :off, float: nil},
                          %{
-                           device: :pump,
+                           worker: :pump,
                            cmd: :off,
                            for: cmd_duration1,
                            wait: true
                          },
                          %{
-                           device: :air,
+                           worker: :air,
                            cmd: :on,
                            for: cmd_duration2,
                            then_cmd: :off,
                            wait: true
                          },
                          %{
-                           device: :pump,
+                           worker: :pump,
                            cmd: :on,
                            for: cmd_duration_nowait,
                            then_cmd: :off,
                            wait: false
                          },
-                         %{device: :lights, cmd: :duty, float: 0.7},
-                         %{device: :lights2, cmd: :dance_fade}
+                         %{worker: :lights, cmd: :duty, float: 0.7},
+                         %{worker: :lights2, cmd: :dance_fade}
                        ]
                      },
                      topoff: %{
                        run_for: _,
                        actions: [
-                         %{cmd: :off, device: :air},
-                         %{cmd: :off, device: :pump},
-                         %{cmd: :on, device: :rodi, for: _, then_cmd: :off}
+                         %{cmd: :off, worker: :air},
+                         %{cmd: :off, worker: :pump},
+                         %{cmd: :on, worker: :rodi, for: _, then_cmd: :off}
                        ]
                      }
                    }
@@ -539,6 +539,8 @@ defmodule HelenConfigParserTest do
                }
              }
            } = opts
+
+    assert Parser.syntax_ok?(opts)
   end
 
   test "can get actions regex" do

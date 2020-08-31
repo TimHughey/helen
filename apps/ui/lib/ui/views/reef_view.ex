@@ -62,7 +62,7 @@ defmodule UI.ReefView do
 
   def button_handle_worker_and_device(worker, device, payload) do
     alias Reef.MixTank.{Air, Pump, Rodi}
-    alias Reef.MixTank.Temp, as: Heater
+    # alias Reef.MixTank.Temp, as: Heater
 
     case {worker, device} do
       {"captain", "water_pump"} -> Pump.toggle()

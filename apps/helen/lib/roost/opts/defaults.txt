@@ -5,12 +5,12 @@ base
   timeout PT1M
   timezone 'America/New_York'
 
-devices
+workers
   disco_ball    'roost disco ball'
   el_wire       'roost el wire'
   el_wire_entry 'roost el wire entry'
   lights_one    'roost lights sound one'
-  lights_two    'roost lights sound two'
+  lights_three  'roost lights sound three'
   led_forest    'roost led forest'
 
 cmd_definitions
@@ -54,7 +54,7 @@ modes
         sleep PT1M
 
   leaving
-    sequence house_lights exiting closed
+    sequence house_lights exiting
     next_mode closed
     steps
       house_lights

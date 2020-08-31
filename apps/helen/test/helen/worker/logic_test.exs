@@ -5,17 +5,14 @@ defmodule WorkerLogicTest do
   use ExUnit.Case
 
   alias Helen.Config.Parser
-  alias Roost.Logic
+  alias Helen.Worker.Logic
+  alias Helen.Workers
 
-  @reef_config_txt Path.join([__DIR__, "reef_config.txt"]) |> File.read!()
-  @roost_config_txt Path.join([__DIR__, "roost_config.txt"]) |> File.read!()
+  @test_file Path.join([__DIR__, "test_config.txt"]) |> Path.expand()
+  @test_config_txt File.read!(@test_file)
 
-  def config(what) do
-    parsed =
-      case what do
-        :reef -> Parser.parse(@reef_config_txt)
-        :roost -> Parser.parse(@roost_config_txt)
-      end
+  def config(:test) do
+    parsed = Parser.parse(@test_config_txt)
 
     make_state(%{
       opts: get_in(parsed, [:config]),
@@ -48,21 +45,11 @@ defmodule WorkerLogicTest do
     assert %DateTime{} = token_at
   end
 
-  test "can parse test configs" do
-    config_txt = [@reef_config_txt, @roost_config_txt]
-
-    for txt <- config_txt do
-      state = Parser.parse(txt)
-
-      assert %{parser: %{unmatched: %{lines: [], count: 0}}} = state
-    end
-  end
-
   test "can get available modes" do
-    for x <- [config(:reef), config(:roost)] do
-      modes = Logic.available_modes(x)
-      assert is_list(modes) and length(modes) > 2
-    end
+    state = config(:test)
+
+    # NOTE:  available_modes/1 always returns a sorted list
+    assert Logic.available_modes(state) == [:alpha, :beta, :gamma]
   end
 
   test "can change the token" do
@@ -76,36 +63,38 @@ defmodule WorkerLogicTest do
   end
 
   test "can confirm a mode exists" do
-    state = config(:roost) |> Logic.confirm_mode_exists(:dance_with_me)
+    state = config(:test) |> Logic.confirm_mode_exists(:beta)
 
-    assert is_nil(get_in(state, [:faults, :init]))
+    refute Logic.faults?(state)
   end
 
   test "can detect a mode does not exist" do
-    state = config(:roost) |> Logic.confirm_mode_exists(:foobar)
+    state = config(:test) |> Logic.confirm_mode_exists(:foobar)
 
-    assert get_in(state, [:logic, :faults, :init]) == {:unknown_mode, :foobar}
+    refute Logic.faults?(state)
+    assert Logic.faults_get(state, :init) == {:unknown_mode, :foobar}
   end
 
   test "can perform init_mode" do
     %{logic: %{stage: stage}} =
       state =
-      config(:reef)
-      |> Logic.init_mode(:fill)
+      config(:test)
+      |> Logic.init_mode(:alpha)
 
-    assert %{active_mode: :fill, steps: steps} = stage |> Map.drop([:opts])
+    refute Logic.faults?(state)
+    assert %{active_mode: :alpha, steps: steps} = stage |> Map.drop([:opts])
     assert %{at_start: %{actions: actions}} = steps
-    assert %{device: :rodi, cmd: :on} = hd(actions)
-    refute get_in(state, [:logic, :faults, :init])
+    assert %{worker: :air, cmd: :on} = hd(actions)
+    assert state[:workers] |> is_map()
   end
 
-  test "can start a mode that does not repeat" do
+  test "can start a mode that does not repeat and has next mode defined" do
     import Helen.Time.Helper, only: [to_duration: 1, to_ms: 1]
 
-    expected_duration = to_duration("PT5H15M")
-    mode = :fill
+    expected_duration = to_duration("PT2S")
+    mode = :alpha
 
-    state = config(:reef) |> Logic.init_mode(mode) |> Logic.start_mode()
+    state = config(:test) |> Logic.init_mode(mode) |> Logic.start_mode()
 
     stage = Logic.stage_get(state, [])
     live = Logic.live_get(state, [])
@@ -127,29 +116,20 @@ defmodule WorkerLogicTest do
     assert %{actions_to_execute: actions_to_execute} =
              get_in(state, [:logic, :live, :track])
 
-    assert is_list(actions_to_execute) and length(actions_to_execute) == 1
+    assert is_list(actions_to_execute) and actions_to_execute == []
 
     assert Logic.track_get(state, :sequence) == [
              :at_start,
-             :main,
-             :topoff,
+             :middle,
              :finally
            ]
 
-    assert Logic.track_get(state, :steps_to_execute) == [
-             :main,
-             :topoff,
-             :finally
-           ]
+    assert Logic.track_get(state, :steps_to_execute) == [:middle, :finally]
 
-    assert Logic.action_to_execute?(state)
+    state =
+      Logic.next_action(state) |> Logic.next_action() |> Logic.next_action()
 
-    state = state |> Logic.action_complete() |> Logic.action_complete()
-
-    assert Logic.track_get(state, :steps_to_execute) == [
-             :topoff,
-             :finally
-           ]
+    assert Logic.track_get(state, :steps_to_execute) == [:finally]
 
     # confirm the mode finishes
     token = get_in(state, [:token])
@@ -157,19 +137,21 @@ defmodule WorkerLogicTest do
     state =
       for _x <- 1..100, reduce: state do
         %{token: state_token} = state when state_token == token ->
-          state |> Logic.action_complete()
+          state |> Logic.next_action()
 
         state ->
           state
       end
 
     assert Logic.finished?(state, mode)
+    # has live been populated with the next mode?
+    assert Logic.active_mode(state) == :beta
   end
 
   test "can start a mode that repeats" do
-    mode = :keep_fresh
+    mode = :beta
 
-    state = config(:reef) |> Logic.init_mode(mode) |> Logic.start_mode()
+    state = config(:test) |> Logic.init_mode(mode) |> Logic.start_mode()
 
     stage = Logic.stage_get(state, [])
     live = Logic.live_get(state, [])
@@ -181,10 +163,17 @@ defmodule WorkerLogicTest do
     assert is_nil(Logic.live_get(state, :will_finish_in_ms))
     assert is_nil(Logic.live_get(state, :will_finish_by))
     assert Logic.mode_repeat_until_stopped?(state)
-    assert Logic.action_to_execute?(state)
 
-    state = Logic.action_complete(state)
-    assert Logic.action_to_execute?(state)
+    # confirm the pending acfion has been populated
+    assert %{msg_type: msg_type, reply_to: reply_to} =
+             Logic.pending_action_get(state)
+
+    assert msg_type == :logic
+    assert is_pid(reply_to)
+    assert reply_to == self()
+
+    state = Logic.next_action(state)
+    assert %{} = Logic.update_elapsed(state)
 
     # confirm the mode never ends
     for _x <- 1..100, reduce: state do
@@ -193,18 +182,38 @@ defmodule WorkerLogicTest do
 
         assert Logic.live_get(state, :status) == :running
 
-        state |> Logic.action_complete()
+        state |> Logic.next_action()
     end
   end
 
-  test "can get the sequence of the live mode" do
-    state = config(:reef) |> Logic.init_mode(:fill) |> Logic.start_mode()
+  test "can start a mode that holds" do
+    mode = :gamma
 
-    assert Logic.live_get_mode_sequence(state) == [
-             :at_start,
-             :main,
-             :topoff,
-             :finally
-           ]
+    state = config(:test) |> Logic.init_mode(mode) |> Logic.start_mode()
+
+    assert Workers.module_cache_complete?(get_in(state, [:workers]))
+
+    assert Logic.active_mode(state) == mode
+
+    # execute (consume) all the actions
+    state = consume_actions(state, 9)
+
+    # original mode should still be active
+    assert Logic.active_mode(state) == mode
+
+    # mode should be marked as holding
+    assert Logic.holding?(state)
+  end
+
+  test "can get the sequence of the live mode" do
+    state = config(:test) |> Logic.init_mode(:alpha) |> Logic.start_mode()
+
+    assert Logic.live_get_mode_sequence(state) == [:at_start, :middle, :finally]
+  end
+
+  defp consume_actions(state, count) do
+    for _x <- 1..count, reduce: state do
+      state -> Logic.next_action(state)
+    end
   end
 end

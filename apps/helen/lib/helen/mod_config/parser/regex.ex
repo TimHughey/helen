@@ -9,7 +9,7 @@ defmodule Helen.Config.Parser.Regex do
       :cmd ->
         "(?<cmd>[a-zA-Z]+[a-zA-Z0-9_]+)"
 
-      :cmd_dev_list ->
+      :cmd_list ->
         "(?<cmd>(on|off))\\s+#{re(:list_val)}"
 
       :ident ->
@@ -149,19 +149,25 @@ defmodule Helen.Config.Parser.Regex do
             stmt: :generic,
             norm: :key_atom,
             re: Regex.compile!("^\\s{2}#{re(:kv)}$")
+          },
+          %{
+            context: :base,
+            stmt: :generic,
+            norm: :key_quoted,
+            re: Regex.compile!("^\\s{2}#{re(:key_quoted)}$")
           }
         ]
 
-      :devices ->
+      :workers ->
         [
           %{
-            context: :devices,
+            context: :workers,
             stmt: :def_quoted,
             norm: :key_quoted,
             re: Regex.compile!("^\\s{2}#{re(:key_quoted)}$")
           },
           %{
-            context: :devices,
+            context: :workers,
             stmt: :def_atom,
             norm: :key_atom,
             re: Regex.compile!("^\\s{2}#{re(:kv)}$")
@@ -256,7 +262,7 @@ defmodule Helen.Config.Parser.Regex do
             norm: :key_atom,
             re:
               Regex.compile!(
-                "^\\s{8}#{re(:key_match, :tell)}\\s+#{re(:key, :device)}\\s+#{
+                "^\\s{8}#{re(:key_match, :tell)}\\s+#{re(:key, :worker)}\\s+#{
                   re(:key, :msg)
                 }$"
               )
@@ -272,7 +278,7 @@ defmodule Helen.Config.Parser.Regex do
           },
           %{
             context: :actions,
-            stmt: :dev_cmd_basic,
+            stmt: :cmd_basic,
             norm: :key_atom,
             re:
               Regex.compile!(
@@ -281,7 +287,7 @@ defmodule Helen.Config.Parser.Regex do
           },
           %{
             context: :actions,
-            stmt: :dev_cmd_for,
+            stmt: :cmd_for,
             norm: :key_atom,
             re:
               Regex.compile!(
@@ -292,7 +298,7 @@ defmodule Helen.Config.Parser.Regex do
           },
           %{
             context: :actions,
-            stmt: :dev_cmd_for_then,
+            stmt: :cmd_for_then,
             norm: :key_atom,
             re:
               Regex.compile!(
@@ -304,9 +310,9 @@ defmodule Helen.Config.Parser.Regex do
           %{
             context: :actions,
             # must be listed last to avoid matching above cmd statements
-            stmt: :dev_cmd_list,
+            stmt: :cmd_list,
             norm: :key_list,
-            re: Regex.compile!("^\\s{8}#{re(:cmd_dev_list)}$")
+            re: Regex.compile!("^\\s{8}#{re(:cmd_list)}$")
           }
         ]
 
@@ -323,15 +329,4 @@ defmodule Helen.Config.Parser.Regex do
   end
 
   defp ident(ident), do: "(?<#{ident}>[a-zA-Z]+[a-zA-Z0-9_]+)"
-
-  # def regex(:action) do
-  #   dev_cmd_then = "#{dev_cmd_for}\\s+then\\s+(?<then_cmd>(on|off))"
-  #   dev_cmd_nowait = "#{dev_cmd_then}\\s+nowait"
-  #
-  #   [
-  #     {:action, :dev_cmd_then, Regex.compile!("#{dev_cmd_then}$")},
-  #     {:action, :dev_cmd_nowait, Regex.compile!("#{dev_cmd_nowait}$")}
-  #   ]
-  # end
-  #
 end

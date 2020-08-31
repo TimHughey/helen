@@ -59,9 +59,13 @@ defmodule Helen.Config.Parser do
         |> match_line()
         |> normalize_captures()
         |> parse_line()
-        |> log_errors()
     end
+    |> validate_syntax()
+    |> log_errors()
   end
+
+  def syntax_ok?(%{parser: %{syntax: :ok}}), do: true
+  def syntax_ok?(_state), do: false
 
   def match_line(%{parser: %{context: context, line: line}} = opts) do
     opts |> put_in([:parser, :match], run_regex(context, line))
@@ -74,7 +78,7 @@ defmodule Helen.Config.Parser do
       :top_level ->
         regex([:top_level, :end_of_list])
 
-      x when x in [:base, :devices, :cmd_definitions, :modes, :steps] ->
+      x when x in [:base, :workers, :cmd_definitions, :modes, :steps] ->
         regex([:top_level, context, :end_of_list])
 
       :actions ->
@@ -116,7 +120,7 @@ defmodule Helen.Config.Parser do
     case context do
       :top_level -> opts |> handle_top_level(match)
       :base -> opts |> handle_base(match)
-      :devices -> opts |> handle_devices(match)
+      :workers -> opts |> handle_workers(match)
       :cmd_definitions -> opts |> handle_cmd_def(match)
       :modes -> opts |> handle_mode(match)
       :steps -> opts |> handle_step(match)
@@ -178,13 +182,13 @@ defmodule Helen.Config.Parser do
     end
   end
 
-  # handle devices section
+  # handle workers section
   # NOTE - new
-  defp handle_devices(%{parser: %{context: parse_ctx}} = opts, %{
+  defp handle_workers(%{parser: %{context: parse_ctx}} = opts, %{
          context: match_ctx,
          captures: captures
        })
-       when parse_ctx == :devices and parse_ctx == match_ctx do
+       when parse_ctx == :workers and parse_ctx == match_ctx do
     opts |> config_put_kv([], captures)
   end
 
@@ -361,25 +365,25 @@ defmodule Helen.Config.Parser do
     case stmt do
       stmt when stmt in [:all, :sleep] ->
         # example: %{sleep: %Duration{}}
-        %{captures[:key] => captures[:val]}
+        %{cmd: captures[:key], worker: :self, args: captures[:val]}
 
-      :dev_cmd_basic ->
-        %{device: captures[:key], cmd: captures[:cmd], float: captures[:float]}
+      :cmd_basic ->
+        %{worker: captures[:key], cmd: captures[:cmd], float: captures[:float]}
 
-      :dev_cmd_list ->
-        %{cmd: captures[:cmd], device: captures[:val]}
+      :cmd_list ->
+        %{cmd: captures[:cmd], worker: captures[:val]}
 
-      :dev_cmd_for ->
+      :cmd_for ->
         %{
-          device: captures[:key],
+          worker: captures[:key],
           cmd: captures[:cmd],
           for: captures[:iso8601],
           wait: captures[:nowait] != :nowait
         }
 
-      x when x in [:dev_cmd_for_then] ->
+      x when x in [:cmd_for_then] ->
         %{
-          device: captures[:key],
+          worker: captures[:key],
           cmd: captures[:cmd],
           for: captures[:iso8601],
           then_cmd: captures[:then_cmd],
@@ -387,27 +391,9 @@ defmodule Helen.Config.Parser do
         }
 
       :tell ->
-        %{captures[:key] => %{device: captures[:device], msg: captures[:msg]}}
+        %{cmd: captures[:key], worker: captures[:worker], msg: captures[:msg]}
     end
   end
-
-  # defp validate_device(
-  #        %{parser: %{line_num: line_num}, config: %{devices: devices}} = opts,
-  #        dev
-  #      ) do
-  #   if Map.has_key?(devices, dev) do
-  #     opts
-  #   else
-  #     opts |> record_error(line_num, "device #{dev} is not defined")
-  #   end
-  # end
-  #
-  # defp record_error(opts, line_num, error) do
-  #   text = "line #{Integer.to_string(line_num)} #{error}"
-  #
-  #   opts
-  #   |> update_in([:parser, :errors], fn x -> [x, text] |> List.flatten() end)
-  # end
 
   defp normalize_captures(
          %{parser: %{match: %{norm: norm, captures: captures}}} = opts
@@ -489,6 +475,13 @@ defmodule Helen.Config.Parser do
             # replace the binary value with an atomized value
             put_in(acc, [key], to_atom(val_bin))
         end
+    end
+  end
+
+  defp validate_syntax(%{parser: %{unmatched: unmatched}} = state) do
+    case unmatched do
+      %{lines: [], count: 0} -> put_in(state, [:syntax], :ok)
+      _anything_else -> put_in(state, [:syntax], :error)
     end
   end
 

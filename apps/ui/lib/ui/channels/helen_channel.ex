@@ -28,13 +28,12 @@ defmodule UI.HelenChannel do
   end
 
   def handle_in("module_config_click", %{"module" => mod_bin}, socket) do
-    alias Helen.Module.Config
     alias Reef.Captain
 
     case mod_bin do
       "Reef.Captain.Server" ->
         {:reply,
-         {:module_config_click_reply, %{module: mod_bin, opts: Captain.Opts.default_opts(:new)}},
+         {:module_config_click_reply, %{module: mod_bin, opts: Captain.Opts.default_opts()}},
          socket}
 
       mod_bin ->

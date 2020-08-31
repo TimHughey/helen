@@ -15,7 +15,7 @@ config :helen, Mqtt.Client,
     client_id: "helen-test",
     user_name: "mqtt",
     password: "mqtt",
-    server: {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
+    server: {Tortoise.Transport.Tcp, host: "mqtt.live.wisslanding.com", port: 1883},
     keep_alive: 36
   ]
 

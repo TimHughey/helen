@@ -74,6 +74,26 @@ defmodule Reef.Temp.Server do
         end
       end
 
+      @doc """
+      Return a map of the device name managed by this GenDevice and the module
+      manading the device.
+
+      Useful for creating a map of known "devices" when working with many
+      GenDevice managed devices.
+
+      Returns a map.
+
+      ## Examples
+
+          iex> GenDevice.device_module_map
+          %{name: "device name", module: Module}
+
+      """
+      @doc since: "0.0.27"
+      def device_module_map do
+        %{name: get_in(state(:opts), [:switch, :name]), module: __MODULE__}
+      end
+
       def last_timeout do
         import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 

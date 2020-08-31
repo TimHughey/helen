@@ -5,8 +5,8 @@ base
   timeout PT3M
   timezone 'America/New_York'
 
-devices
-  ato gen_device
+workers
+  ato 'display tank ato'
 
 modes
   clean

@@ -87,11 +87,13 @@ defmodule GenDevice do
       ## Examples
 
           iex> GenDevice.device_module_map
-          %{"device name" => __MODULE__}
+          %{name: "device name", module: Module}
 
       """
       @doc since: "0.0.27"
-      def device_module_map, do: Map.put(%{}, state(:device_name), __MODULE__)
+      def device_module_map do
+        %{name: state(:device_name), module: __MODULE__}
+      end
 
       def last_timeout do
         import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
