@@ -11,6 +11,17 @@ workers
   air   'mixtank air'
   pump  'mixtank pump'
 
+cmd_definitions
+  cmd_alpha
+    name 'fade1'
+    random
+      min 128
+      max 2048
+      primes 35
+      step_ms 55
+      step 13
+      priority 7
+
 modes
   alpha
     next_mode beta

@@ -5,7 +5,7 @@ defmodule WorkerLogicTest do
   use ExUnit.Case
 
   alias Helen.Config.Parser
-  alias Helen.Worker.Logic
+  alias Helen.Worker.{Logic, State}
   alias Helen.Workers
 
   @test_file Path.join([__DIR__, "test_config.txt"]) |> Path.expand()
@@ -56,7 +56,7 @@ defmodule WorkerLogicTest do
     %{token: initial_token, token_at: initial_token_at} = state = make_state()
 
     %{token: changed_token, token_at: changed_token_at} =
-      Logic.change_token(state)
+      State.change_token(state)
 
     refute changed_token == initial_token
     refute changed_token_at == initial_token_at
@@ -72,14 +72,14 @@ defmodule WorkerLogicTest do
     state = config(:test) |> Logic.confirm_mode_exists(:foobar)
 
     refute Logic.faults?(state)
-    assert Logic.faults_get(state, :init) == {:unknown_mode, :foobar}
+    assert Logic.faults(state, :init) == {:unknown_mode, :foobar}
   end
 
-  test "can perform init_mode" do
+  test "can perform init" do
     %{logic: %{stage: stage}} =
       state =
       config(:test)
-      |> Logic.init_mode(:alpha)
+      |> Logic.init(:alpha)
 
     refute Logic.faults?(state)
     assert %{active_mode: :alpha, steps: steps} = stage |> Map.drop([:opts])
@@ -94,18 +94,18 @@ defmodule WorkerLogicTest do
     expected_duration = to_duration("PT2S")
     mode = :alpha
 
-    state = config(:test) |> Logic.init_mode(mode) |> Logic.start_mode()
+    state = config(:test) |> Logic.init(mode) |> Logic.start()
 
-    stage = Logic.stage_get(state, [])
-    live = Logic.live_get(state, [])
+    stage = State.stage_get(state, [])
+    live = State.live_get(state, [])
 
     assert is_map(stage) and is_map(live)
     assert Enum.empty?(stage)
-    assert Logic.live_get(state, :active_mode) == mode
-    assert %DateTime{} = Logic.track_get(state, :started_at)
-    assert Logic.live_get(state, :will_finish_in_ms) == to_ms(expected_duration)
-    assert %DateTime{} = Logic.track_step_get(state, :started_at)
-    assert %Duration{} = Logic.track_step_get(state, :elapsed)
+    assert State.live_get(state, :active_mode) == mode
+    assert %DateTime{} = State.track_get(state, :started_at)
+    assert State.live_get(state, :will_finish_in_ms) == to_ms(expected_duration)
+    assert %DateTime{} = State.track_step_get(state, :started_at)
+    assert %Duration{} = State.track_step_get(state, :elapsed)
 
     assert %{steps_to_execute: steps_to_execute} =
              state
@@ -118,18 +118,18 @@ defmodule WorkerLogicTest do
 
     assert is_list(actions_to_execute) and actions_to_execute == []
 
-    assert Logic.track_get(state, :sequence) == [
+    assert State.track_get(state, :sequence) == [
              :at_start,
              :middle,
              :finally
            ]
 
-    assert Logic.track_get(state, :steps_to_execute) == [:middle, :finally]
+    assert State.track_get(state, :steps_to_execute) == [:middle, :finally]
 
     state =
       Logic.next_action(state) |> Logic.next_action() |> Logic.next_action()
 
-    assert Logic.track_get(state, :steps_to_execute) == [:finally]
+    assert State.track_get(state, :steps_to_execute) == [:finally]
 
     # confirm the mode finishes
     token = get_in(state, [:token])
@@ -145,42 +145,42 @@ defmodule WorkerLogicTest do
 
     assert Logic.finished?(state, mode)
     # has live been populated with the next mode?
-    assert Logic.active_mode(state) == :beta
+    assert State.active_mode(state) == :beta
   end
 
   test "can start a mode that repeats" do
     mode = :beta
 
-    state = config(:test) |> Logic.init_mode(mode) |> Logic.start_mode()
+    state = config(:test) |> Logic.init(mode) |> Logic.start()
 
-    stage = Logic.stage_get(state, [])
-    live = Logic.live_get(state, [])
+    stage = State.stage_get(state, [])
+    live = State.live_get(state, [])
 
     assert is_map(stage) and is_map(live)
     assert Enum.empty?(stage)
-    assert Logic.live_get(state, :active_mode) == mode
-    assert %DateTime{} = Logic.track_get(state, :started_at)
-    assert is_nil(Logic.live_get(state, :will_finish_in_ms))
-    assert is_nil(Logic.live_get(state, :will_finish_by))
-    assert Logic.mode_repeat_until_stopped?(state)
+    assert State.active_mode(state) == mode
+    assert %DateTime{} = State.track_get(state, :started_at)
+    assert is_nil(State.live_get(state, :will_finish_in_ms))
+    assert is_nil(State.live_get(state, :will_finish_by))
+    assert State.mode_repeat_until_stopped?(state)
 
     # confirm the pending acfion has been populated
     assert %{msg_type: msg_type, reply_to: reply_to} =
-             Logic.pending_action_get(state)
+             State.pending_action(state)
 
     assert msg_type == :logic
     assert is_pid(reply_to)
     assert reply_to == self()
 
     state = Logic.next_action(state)
-    assert %{} = Logic.update_elapsed(state)
+    assert %{} = State.update_elapsed(state)
 
     # confirm the mode never ends
     for _x <- 1..100, reduce: state do
       %{logic: %{live: %{track: %{active_step: _step}}}} = state ->
-        refute Enum.empty?(Logic.track_get(state, :steps_to_execute))
+        refute Enum.empty?(State.track_get(state, :steps_to_execute))
 
-        assert Logic.live_get(state, :status) == :running
+        assert State.live_get(state, :status) == :running
 
         state |> Logic.next_action()
     end
@@ -189,26 +189,36 @@ defmodule WorkerLogicTest do
   test "can start a mode that holds" do
     mode = :gamma
 
-    state = config(:test) |> Logic.init_mode(mode) |> Logic.start_mode()
+    state = config(:test) |> Logic.init(mode) |> Logic.start()
 
     assert Workers.module_cache_complete?(get_in(state, [:workers]))
 
-    assert Logic.active_mode(state) == mode
+    assert State.active_mode(state) == mode
 
     # execute (consume) all the actions
     state = consume_actions(state, 9)
 
     # original mode should still be active
-    assert Logic.active_mode(state) == mode
+    assert State.active_mode(state) == mode
 
     # mode should be marked as holding
     assert Logic.holding?(state)
   end
 
   test "can get the sequence of the live mode" do
-    state = config(:test) |> Logic.init_mode(:alpha) |> Logic.start_mode()
+    state = config(:test) |> Logic.init(:alpha) |> Logic.start()
 
-    assert Logic.live_get_mode_sequence(state) == [:at_start, :middle, :finally]
+    assert State.live_get_mode_sequence(state) == [:at_start, :middle, :finally]
+  end
+
+  test "can get command definitions" do
+    mode = :alpha
+
+    state = config(:test) |> Logic.init(mode) |> Logic.start()
+
+    cmd = State.cmd_definition(state, :cmd_alpha)
+
+    assert is_map(cmd)
   end
 
   defp consume_actions(state, count) do

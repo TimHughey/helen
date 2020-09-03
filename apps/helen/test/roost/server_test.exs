@@ -68,6 +68,13 @@ defmodule RoostServerTest do
              Server.handle_info({:logic, msg}, state)
   end
 
+  test "roost server can change modes" do
+    {rc, mode} = Roost.mode(:dance_with_me)
+
+    assert rc == :ok
+    assert mode == :dance_with_me
+  end
+
   test "the truth will set you free" do
     assert true
   end

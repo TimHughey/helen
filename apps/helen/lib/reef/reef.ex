@@ -9,7 +9,7 @@ defmodule Reef do
   alias Reef.FirstMate.Server, as: FirstMate
   alias Reef.MixTank
 
-  defdelegate active?, to: Captain
+  defdelegate ready?, to: Captain
   defdelegate air_off(opts \\ []), to: MixTank.Air, as: :off
   defdelegate air_on(opts \\ []), to: MixTank.Air, as: :on
   defdelegate air_toggle, to: MixTank.Air, as: :toggle
@@ -197,28 +197,28 @@ defmodule Reef do
     base = %{
       workers: %{
         captain: %{
-          active: Captain.active?(),
+          active: Captain.ready?(),
           mode: get_in(captain_state, [:worker_mode]),
           steps: [],
           devices: [
             %{
               name: "water_pump",
-              online: MixTank.Pump.active?(),
+              online: MixTank.Pump.ready?(),
               active: MixTank.Pump.value(:simple)
             },
             %{
               name: "air_pump",
-              online: MixTank.Air.active?(),
+              online: MixTank.Air.ready?(),
               active: MixTank.Air.value(:simple)
             },
             %{
               name: "rodi_valve",
-              online: MixTank.Rodi.active?(),
+              online: MixTank.Rodi.ready?(),
               active: MixTank.Rodi.value(:simple)
             },
             %{
               name: "heater",
-              online: MixTank.Temp.active?(),
+              online: MixTank.Temp.ready?(),
               active: MixTank.Temp.position(:simple)
             }
           ]
@@ -243,22 +243,22 @@ defmodule Reef do
 
     %{
       captain: %{
-        available: Captain.active?(),
+        available: Captain.ready?(),
         step: captain_worker_mode,
         pump: %{
-          active: MixTank.Pump.active?(),
+          active: MixTank.Pump.ready?(),
           position: MixTank.Pump.value(:simple)
         },
         air: %{
-          active: MixTank.Air.active?(),
+          active: MixTank.Air.ready?(),
           position: MixTank.Air.value(:simple)
         },
         rodi: %{
-          active: MixTank.Rodi.active?(),
+          active: MixTank.Rodi.ready?(),
           position: MixTank.Rodi.value(:simple)
         },
         heater: %{
-          active: MixTank.Temp.active?()
+          active: MixTank.Temp.ready?()
         }
       }
     }

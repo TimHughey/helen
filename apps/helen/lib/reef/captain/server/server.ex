@@ -53,137 +53,6 @@ defmodule Reef.Captain.Server do
   ##
 
   @doc """
-  Is the server active?
-
-  Returns a boolean.
-
-  ## Examples
-
-      iex> Reef.Captain.Server.active?
-      true
-
-  """
-  @doc since: "0.0.27"
-  def active? do
-    case x_state() do
-      %{server: %{mode: :standby}} -> false
-      _else -> true
-    end
-  end
-
-  @doc """
-  Bring all reef activities to a stop.
-
-  Returns :ok
-
-  ## Examples
-
-      iex> Reef.Captain.Server.all_stop
-      :ok
-
-  """
-  @doc since: "0.0.27"
-  def all_stop, do: call({:all_stop})
-
-  @doc """
-  Return a list of available reef modes.
-
-  Returns a list.
-
-  ## Examples
-
-      iex> Reef.Captain.Server.available_modes()
-      [:keep_fresh, :prep_for_change]
-
-  """
-  @doc since: "0.0.27"
-  def available_modes, do: call({:available_modes})
-
-  @doc since: "0.0.27"
-  def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
-
-  @doc """
-  Return the DateTime of the last GenServer timeout.
-  """
-  @doc since: "0.0.27"
-  def last_timeout do
-    import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
-    tz = runtime_opts() |> get_in([:timezone]) || "America/New_York"
-
-    with last <- x_state(:last_timeout),
-         d when d > 0 <- Timex.diff(last, epoch()) do
-      Timex.to_datetime(last, tz)
-    else
-      _epoch -> epoch()
-    end
-  end
-
-  @doc """
-  Set the Roost to a specific mode.
-  """
-  @doc since: "0.0.27"
-  def mode(mode, opts), do: call({:mode, mode, opts})
-
-  @doc """
-  Return the server runtime options.
-  """
-  @doc since: "0.0.27"
-  def runtime_opts do
-    if is_nil(GenServer.whereis(__MODULE__)) do
-      []
-    else
-      GenServer.call(__MODULE__, :state) |> get_in([:opts])
-    end
-  end
-
-  @doc """
-  Restarts the server via the Supervisor
-
-  ## Examples
-
-      iex> Reef.Captain.Server.restart([])
-      :ok
-
-  """
-  @doc since: "0.0.27"
-  def restart(opts \\ []) do
-    # the Supervisor is the base of the module name with Supervisor appended
-    [sup_base | _tail] = Module.split(__MODULE__)
-
-    sup_mod = Module.concat([sup_base, "Supervisor"])
-
-    if GenServer.whereis(__MODULE__) do
-      Supervisor.terminate_child(sup_mod, __MODULE__)
-    end
-
-    Supervisor.delete_child(sup_mod, __MODULE__)
-    Supervisor.start_child(sup_mod, {__MODULE__, opts})
-  end
-
-  @doc """
-  Set the mode of the server.
-
-  ## Modes
-  When set to `:active` (normal mode) the server is ready for reef commands.
-
-  If set to `:standby` the server will:
-    1. Take all crew members offline
-    2. Denies all reef command mode requeests
-
-  Returns {:ok, new_mode}
-
-  ## Examples
-
-      iex> Reef.Captain.Server(:standby)
-      {:ok, :standby}
-
-  """
-  @doc since: "0.0.27"
-  def server_mode(atom) when atom in [:active, :standby] do
-    call({:server_mode, atom})
-  end
-
-  @doc """
   Return the GenServer state.
 
   A single key (e.g. :server_mode) or a list of keys (e.g. :worker_mode, :server_mode)
@@ -211,23 +80,9 @@ defmodule Reef.Captain.Server do
     end
   end
 
-  @doc """
-  Retrieve the number of GenServer timeouts that have occurred.
-  """
-  @doc since: "0.0.27"
-  def timeouts, do: x_state() |> get_in([:timeouts])
-
   ##
   ## GenServer handle_* callbacks
   ##
-
-  @doc false
-  @impl true
-  def handle_call(:state, _from, state) do
-    import Helen.Worker.Logic, only: [update_elapsed: 1]
-
-    state |> update_elapsed() |> reply(state)
-  end
 
   @doc false
   @impl true
@@ -237,12 +92,6 @@ defmodule Reef.Captain.Server do
     state
     |> Logic.all_stop()
     |> reply(:answering_all_stop)
-  end
-
-  @doc false
-  @impl true
-  def handle_call({:available_modes}, _from, state) do
-    reply(state, state |> available_modes_get())
   end
 
   @doc false
@@ -284,8 +133,7 @@ defmodule Reef.Captain.Server do
   @impl true
   def handle_call({:mode, mode, _api_opts}, _from, state) do
     state
-    |> init_mode(mode)
-    |> start_mode()
+    |> change_mode(mode)
     |> check_fault_and_reply()
   end
 
@@ -294,16 +142,6 @@ defmodule Reef.Captain.Server do
   def handle_call(msg, _from, state),
     do: state |> msg_puts(msg) |> reply({:unmatched_msg, msg})
 
-  @doc false
-  @impl true
-  def handle_continue(:bootstrap, state) do
-    state
-    |> change_token()
-    # |> crew_online()
-    |> Logic.build_devices_map()
-    |> noreply()
-  end
-
   @impl true
   def handle_info(
         {:msg, {:mode, mode}, msg_token},
@@ -311,8 +149,7 @@ defmodule Reef.Captain.Server do
       )
       when msg_token == token do
     state
-    |> init_mode(mode)
-    |> start_mode()
+    |> change_mode(mode)
     |> noreply()
   end
 
@@ -336,26 +173,6 @@ defmodule Reef.Captain.Server do
   def handle_info({:timer, _msg, msg_token}, %{token: token} = state)
       when msg_token != token do
     state |> noreply()
-  end
-
-  @doc false
-  @impl true
-  def handle_info(:timeout, state) do
-    state
-    |> update_last_timeout()
-    |> timeout_hook()
-  end
-
-  @doc false
-  @impl true
-  def terminate(_reason, state) do
-    # if Logic.active_mode() == :keep_fresh do
-    #   state |> __all_stop__()
-    # else
-    #   state
-    # end
-
-    state
   end
 
   ##
@@ -407,76 +224,4 @@ defmodule Reef.Captain.Server do
 
     state
   end
-
-  ##
-  ## GenServer Receive Loop Hooks
-  ##
-
-  defp timeout_hook(state) do
-    noreply(state)
-  end
-
-  ##
-  ## State Helpers
-  ##
-
-  defp loop_timeout(%{opts: opts}) do
-    import Helen.Time.Helper, only: [to_ms: 2]
-
-    to_ms(opts[:timeout], "PT30.0S")
-  end
-
-  defp update_last_timeout(state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> put_in([:timeouts, :last], utc_now())
-    |> update_in([:timeouts, :count], fn x -> x + 1 end)
-  end
-
-  ##
-  ## GenServer.{call, cast} Helpers
-  ##
-
-  defp call(msg) do
-    cond do
-      server_down?() -> {:failed, :server_down}
-      standby?() -> {:failed, :standby_mode}
-      true -> GenServer.call(__MODULE__, msg)
-    end
-  end
-
-  defp server_down? do
-    GenServer.whereis(__MODULE__) |> is_nil()
-  end
-
-  defp standby? do
-    case x_state() do
-      %{server: %{mode: :standby}} -> true
-      %{server: %{mode: :active}} -> false
-      _state -> true
-    end
-  end
-
-  ##
-  ## handle_* return helpers
-  ##
-
-  defp check_fault_and_reply(state) do
-    alias Helen.Worker.Logic
-
-    if Logic.faults?(state) do
-      {:reply, {:fault, Logic.faults_get(state, [])}, state,
-       loop_timeout(state)}
-    else
-      {:reply, {:ok, Logic.active_mode(state)}, state, loop_timeout(state)}
-    end
-  end
-
-  @impl true
-  def noreply(s), do: {:noreply, s, loop_timeout(s)}
-
-  @impl true
-  def reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
-  def reply(val, s), do: {:reply, val, s, loop_timeout(s)}
 end

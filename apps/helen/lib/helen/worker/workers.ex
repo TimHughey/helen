@@ -8,6 +8,8 @@ defmodule Helen.Workers do
     c. a simple device (e.g. Switch, PulseWidth)
   """
 
+  import Helen.Worker.State
+
   def all do
     alias Reef.{DisplayTank, MixTank}
 
@@ -48,8 +50,13 @@ defmodule Helen.Workers do
     end
   end
 
-  def execute(action) do
-    action
+  # def execute(%{cmd: :sleep, for: duration, reply_to: pid, token: token})
+
+  def execute(state) do
+    case pending_action(state) do
+      _action ->
+        cmd_rc_put(state, %{via_msg: true})
+    end
   end
 
   def make_action(

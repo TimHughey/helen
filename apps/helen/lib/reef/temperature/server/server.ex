@@ -56,18 +56,18 @@ defmodule Reef.Temp.Server do
       ##
 
       @doc """
-      Is the server active?
+      Is the server ready?
 
       Returns a boolean.
 
       ## Examples
 
-          iex> Reef.Temp.Control.active?
+          iex> Reef.Temp.Control.ready?
           true
 
       """
       @doc since: "0.0.27"
-      def active? do
+      def ready? do
         case state(:server_mode) do
           :active -> true
           :standby -> false

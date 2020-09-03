@@ -3,24 +3,91 @@ defmodule Helen.Worker.Logic do
   Logic for Roost server
   """
 
-  @callback available_modes_get(map()) :: map()
+  @callback active_mode(map()) :: atom()
+  @callback active_step(map()) :: atom()
+  @callback available_modes :: map()
   @callback change_token(map()) :: map()
-  @callback init_mode(map(), atom()) :: map()
-  @callback start_mode(map()) :: map()
-
+  @callback change_mode(map(), atom()) :: map()
+  @callback check_fault_and_reply(map()) :: {atom(), tuple()}
+  @callback faults(map(), atom() | list()) :: term()
+  @callback faults?(map()) :: boolean()
+  @callback init(map(), atom()) :: map()
   @callback noreply(map()) :: any()
   @callback reply(any(), map()) :: any()
+  @callback status(map()) :: atom()
+  @callback token(map()) :: reference()
 
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       @behaviour Helen.Worker.Logic
 
-      alias Helen.Worker.Logic
+      alias Helen.Worker.{Logic, State}
 
-      def available_modes_get(state), do: Logic.available_modes(state)
-      def change_token(state), do: Logic.change_token(state)
-      def init_mode(state, mode), do: Logic.init_mode(state, mode)
-      def start_mode(state), do: Logic.start_mode(state)
+      def active_mode(state), do: State.live_get(state, :active_mode) || :none
+      def active_step(state), do: State.track_get(state, :active_step) || :none
+
+      @doc """
+      Bring all Workers activities to a stop.
+
+      Returns :ok
+      """
+      @doc since: "0.0.27"
+      def all_stop, do: call({:all_stop})
+
+      @doc """
+      Return a list of available Worker modes.
+
+      Returns a list.
+      """
+      @doc since: "0.0.27"
+      def available_modes, do: call({:inquiry, :available_modes})
+
+      def call(msg) do
+        if server_down?() do
+          {:failed, :server_down}
+        else
+          GenServer.call(__MODULE__, msg)
+        end
+      end
+
+      @doc since: "0.0.27"
+      def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
+
+      def change_token(state), do: State.change_token(state)
+
+      def change_mode(state, mode) do
+        Logic.init(state, mode)
+        |> Logic.start()
+        |> Logic.execute()
+      end
+
+      def check_fault_and_reply(state) do
+        import Helen.Worker.State, only: [loop_timeout: 1]
+
+        if faults?(state) do
+          {:reply, {:fault, faults(state, [])}, state, loop_timeout(state)}
+        else
+          {:reply, {:ok, active_mode(state)}, state, loop_timeout(state)}
+        end
+      end
+
+      def faults(state, what), do: Logic.faults(state, what)
+      def faults?(state), do: Logic.faults?(state)
+
+      def init(state, mode), do: Logic.init(state, mode)
+
+      @doc false
+      @impl true
+      def handle_call({:inquiry, what}, _from, state),
+        do: Logic.handle_inquiry(state, what) |> reply(state)
+
+      @doc false
+      @impl true
+      def handle_call(:state, _from, state) do
+        import Helen.Worker.State, only: [update_elapsed: 1]
+
+        state |> update_elapsed() |> reply(state)
+      end
 
       # call messages for :logic are quietly ignored if the msg token
       # does not match the current token
@@ -28,6 +95,14 @@ defmodule Helen.Worker.Logic do
       def handle_cast({:logic, %{token: msg_token}}, %{token: token} = state)
           when msg_token != token,
           do: noreply(state)
+
+      @doc false
+      @impl true
+      def handle_continue(:bootstrap, state) do
+        state
+        |> change_token()
+        |> noreply()
+      end
 
       # info messages for :logic are quietly ignored if the msg token
       # does not match the current token
@@ -59,18 +134,112 @@ defmodule Helen.Worker.Logic do
         noreply(state)
       end
 
-      def token(state), do: Logic.token(state)
+      @doc false
+      @impl true
+      def handle_info(:timeout, state) do
+        state
+        |> State.update_last_timeout()
+        |> timeout_hook()
+      end
+
+      @doc """
+      Return the DateTime of the last Worker timeout
+      """
+      @doc since: "0.0.27"
+      def last_timeout, do: call({:inquiry, :last_timeout})
+
+      @doc """
+      Set the Worker to a specific mode.
+      """
+      @doc since: "0.0.27"
+      def mode(mode, opts), do: call({:mode, mode, opts})
+
+      def noreply(s), do: Logic.noreply(s)
+
+      @doc """
+      Is the server ready?
+
+      Returns true if server is ready, false if server is in standby mode.
+      """
+      @doc since: "0.0.27"
+      def ready?, do: call({:inquiry, :ready?})
+
+      def reply(s, val) when is_map(s), do: Logic.reply(s, val)
+      def reply(val, s) when is_map(s), do: Logic.reply(val, s)
+
+      @doc """
+      Restarts the server via the Supervisor
+
+      ## Examples
+
+          iex> Roost.Server.restart([])
+          :ok
+
+      """
+      @doc since: "0.0.27"
+      def restart(opts \\ []), do: Logic.restart(__MODULE__, opts)
+
+      @doc """
+      Return the worker runtime options.
+      """
+      @doc since: "0.0.27"
+      def runtime_opts, do: call({:inquiry, :runtime_opts})
+
+      def server_down? do
+        GenServer.whereis(__MODULE__) |> is_nil()
+      end
+
+      @doc """
+      Set the Worker to ready or standbyy.
+
+      ## Modes
+      When set to `:ready` (normal mode) the Worker is ready to start a mode.
+
+      If set to `:standby` the Worker:
+        1. Stops all mode activities (aka full stop)
+        2. Denies all change mode requests.
+
+      Returns {:ok, new_mode}
+
+      """
+      @doc since: "0.0.27"
+      def server_mode(atom) when atom in [:ready, :standby] do
+        call({:server_mode, atom})
+      end
+
+      def status(state), do: Logic.status(state)
+
+      def standby?, do: call({:inquiry, :standby?})
+
+      @doc """
+      Retrieve the number of GenServer timeouts that have occurred.
+      """
+      @doc since: "0.0.27"
+      def timeouts, do: call({:inquiry, :timeouts})
+
+      def timeout_hook(state) do
+        noreply(state)
+      end
+
+      @doc false
+      @impl true
+      def terminate(_reason, state), do: state
+
+      def token(state), do: State.token(state)
+
+      defoverridable Helen.Worker.Logic
     end
   end
 
-  ## END OF USING ##
   ##
-  ## START OF MODULE ##
+  ## END OF USING
+  ##
 
-  import List, only: [flatten: 1]
+  ##
+  ## START OF MODULE
+  ##
 
-  def active_mode(state), do: live_get(state, :active_mode) || :none
-  def active_step(state), do: track_get(state, :active_step) || :none
+  import Helen.Worker.State
 
   def all_stop(state) do
     state
@@ -84,15 +253,6 @@ defmodule Helen.Worker.Logic do
     |> Enum.sort()
   end
 
-  def build_devices_map(%{opts: opts} = state) do
-    for {dev_key, dev_name} when is_binary(dev_name) <- opts[:devices] || [],
-        reduce: state do
-      state ->
-        state
-        |> put_in([:devices, dev_key], %{name: dev_name, lasts: %{}})
-    end
-  end
-
   def cache_worker_modules(%{opts: %{workers: workers}} = state) do
     alias Helen.Workers
 
@@ -100,14 +260,6 @@ defmodule Helen.Worker.Logic do
   end
 
   def cached_workers(state), do: get_in(state, [:workers])
-
-  def change_token(state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> update_in([:token], fn _x -> make_ref() end)
-    |> update_in([:token_at], fn _x -> utc_now() end)
-  end
 
   def confirm_mode_exists(state, mode) do
     known_mode? = get_in(state, [:opts, :modes, mode]) || false
@@ -120,6 +272,8 @@ defmodule Helen.Worker.Logic do
     end
   end
 
+  def faults(state, what), do: faults_get(state, what)
+
   def faults?(state) do
     case get_in(state, [:logic, :faults]) do
       %{init: %{}} -> true
@@ -127,11 +281,58 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def faults_get(state, what) do
-    get_in(state, flatten([:logic, :faults, what]))
+  def finished?(state, mode) do
+    case finished_get(state, [mode, :status]) do
+      :finished -> true
+      _other_status -> false
+    end
   end
 
-  def handle_logic_msg(_logic_msg, state), do: state
+  def finish_mode(state) do
+    import Helen.Time.Helper, only: [utc_now: 0]
+
+    state
+    |> update_elapsed()
+    |> live_put(:status, :finished)
+    |> live_put(:finished_at, utc_now())
+    |> move_live_to_finished()
+    |> change_token()
+  end
+
+  def finish_mode_if_needed(state) do
+    case active_mode(state) do
+      :none -> state
+      _active_mode -> finish_mode(state)
+    end
+  end
+
+  def handle_inquiry(state, what) do
+    case what do
+      :available_modes ->
+        available_modes(state)
+
+      :last_timeout ->
+        last_timeout(state)
+
+      :live_opts ->
+        opts(state, :live)
+
+      :ready? ->
+        ready?(state)
+
+      :runtime_opts ->
+        opts(state, :runtime)
+
+      :standby? ->
+        not ready?(state)
+
+      :timeouts ->
+        timeouts(state)
+        # {:x_state, keys} when is_list(keys) -> x_state(state, keys)
+    end
+  end
+
+  def handle_logic_msg(_logic_msg, state), do: next_action(state)
 
   # TODO
   def handle_via_msg(
@@ -151,9 +352,17 @@ defmodule Helen.Worker.Logic do
   # not a message we have logic for, just pass through state
   def handle_via_msg(state, _no_match), do: state
 
-  def init_mode(%{logic: %{faults: %{init: _}}} = state, _mode), do: state
+  def holding?(state), do: status_get(state) == :holding
 
-  def init_mode(state, mode) do
+  def hold_mode(state) do
+    state
+    |> update_elapsed()
+    |> status_put(:holding)
+  end
+
+  def init(%{logic: %{faults: %{init: _}}} = state, _mode), do: state
+
+  def init(state, mode) do
     state
     |> build_logic_map()
     |> cache_worker_modules()
@@ -167,15 +376,70 @@ defmodule Helen.Worker.Logic do
     |> live_put_status(:initialized)
   end
 
+  def next_action(state) do
+    import Helen.Workers, only: [make_action: 4]
+
+    state = update_elapsed(state)
+    workers = cached_workers(state)
+
+    case actions_to_execute_get(state) do
+      [] ->
+        step_repeat_or_next(state)
+
+      [action | rest] ->
+        actions_to_execute_update(state, fn _x -> rest end)
+        |> pending_action_put(fn ->
+          make_action(:logic, workers, action, token(state))
+        end)
+    end
+  end
+
+  def next_mode(state) do
+    case live_next_mode(state) do
+      :none -> finish_mode(state)
+      :hold -> hold_mode(state)
+      # there's a next mode defined
+      next_mode -> finish_mode(state) |> init(next_mode) |> start()
+    end
+  end
+
+  def noreply(s), do: {:noreply, s, loop_timeout(s)}
+
+  def repeat_step(state) do
+    state
+    |> actions_to_execute_put(step_actions_get(state, active_step(state)))
+    |> next_action()
+  end
+
+  def reply(s, val) when is_map(s),
+    do: {:reply, val, update_elapsed(s), loop_timeout(s)}
+
+  def reply(val, s) when is_map(s),
+    do: {:reply, val, update_elapsed(s), loop_timeout(s)}
+
+  def restart(mod, opts) do
+    # the Supervisor is the base of the module name with Supervisor appended
+    [sup_base | _tail] = Module.split(mod)
+
+    sup_mod = Module.concat([sup_base, "Supervisor"])
+
+    if GenServer.whereis(mod) do
+      Supervisor.terminate_child(sup_mod, mod)
+    end
+
+    Supervisor.delete_child(sup_mod, mod)
+    Supervisor.start_child(sup_mod, {mod, opts})
+  end
+
   ##
   ## ENTRY POINT FOR STARTING A REEF MODE
   ##  ** only called once per mode change
   ##
-  def start_mode(%{logic: %{faults: %{init: _}}} = state), do: state
+  def start(%{logic: %{faults: %{init: _}}} = state), do: state
 
   # when :delay has a value we send ourself a :timer message
   # when that timer expires the delay value is removed
-  def start_mode(%{stage: %{delay: ms}} = state) do
+  def start(%{stage: %{delay: ms}} = state) do
     import Process, only: [send_after: 3]
     import Helen.Time.Helper, only: [utc_now: 0]
 
@@ -187,7 +451,7 @@ defmodule Helen.Worker.Logic do
     )
   end
 
-  def start_mode(state) do
+  def start(state) do
     state
     |> finish_mode_if_needed()
     |> move_stage_to_live()
@@ -222,137 +486,6 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def repeat_step(state) do
-    state
-    |> actions_to_execute_put(step_actions_get(state, active_step(state)))
-    |> next_action()
-  end
-
-  def next_action(state) do
-    import Helen.Workers, only: [make_action: 4]
-
-    state = update_elapsed(state)
-    workers = cached_workers(state)
-
-    case actions_to_execute_get(state) do
-      [] ->
-        step_repeat_or_next(state)
-
-      [action | rest] ->
-        actions_to_execute_update(state, fn _x -> rest end)
-        |> pending_action_put(fn ->
-          make_action(:logic, workers, action, token(state))
-        end)
-        |> execute_pending_action()
-    end
-  end
-
-  def build_logic_map(state) do
-    import Map, only: [put_new: 3]
-
-    put_new(state, :logic, %{})
-    |> update_in([:logic], fn logic_map ->
-      for x <- [:faults, :finished, :live, :stage], reduce: logic_map do
-        logic_map -> put_new(logic_map, x, %{})
-      end
-    end)
-  end
-
-  def calculate_step_duration(%{run_for: run_for}), do: run_for
-
-  def calculate_step_duration(%{actions: actions}) do
-    import Helen.Time.Helper, only: [add_list: 1, zero: 0]
-
-    for action <- actions, reduce: zero() do
-      duration ->
-        case action do
-          %{for: run_for, wait: true} ->
-            add_list([duration, run_for])
-
-          _other_cmds ->
-            duration
-        end
-    end
-  end
-
-  def calculate_steps_durations(state) do
-    for x <- live_get_mode_sequence(state),
-        {step_name, details} when x == step_name <- live_get_steps(state),
-        reduce: state do
-      state ->
-        duration = calculate_step_duration(details)
-
-        track_calculated_step_duration_put(state, step_name, duration)
-    end
-  end
-
-  def calculate_will_finish_by(
-        %{logic: %{live: %{repeat_until_stopped?: true}}} = state
-      ) do
-    state
-    |> live_put(:will_finish_in_ms, nil)
-    |> live_put(:will_finish_by, nil)
-  end
-
-  def calculate_will_finish_by(
-        %{
-          logic: %{
-            live: %{
-              repeat_until_stopped?: false,
-              track: %{
-                calculated_durations: step_durations,
-                started_at: started_at
-              }
-            }
-          }
-        } = state
-      ) do
-    import Helen.Time.Helper, only: [shift_future: 2, to_ms: 1]
-
-    # initialize will_finish_by to started_at then shift into the future
-    # each duration
-    for {_step_name, duration} <- step_durations,
-        reduce: live_put(state, :will_finish_by, started_at) do
-      state ->
-        state
-        |> live_update(:will_finish_in_ms, fn x -> x + to_ms(duration) end)
-        |> live_update(:will_finish_by, fn x -> shift_future(x, duration) end)
-    end
-  end
-
-  def finish_mode(state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> update_elapsed()
-    |> live_put(:status, :finished)
-    |> live_put(:finished_at, utc_now())
-    |> move_live_to_finished()
-    |> change_token()
-  end
-
-  def finish_mode_if_needed(state) do
-    case active_mode(state) do
-      :none -> state
-      _active_mode -> finish_mode(state)
-    end
-  end
-
-  def hold_mode(state) do
-    state
-    |> update_elapsed()
-    |> status_put(:holding)
-  end
-
-  def next_mode(state) do
-    case live_next_mode(state) do
-      :none -> finish_mode(state)
-      :hold -> hold_mode(state)
-      # there's a next mode defined
-      next_mode -> finish_mode(state) |> init_mode(next_mode) |> start_mode()
-    end
-  end
-
   def step_repeat_or_next(state) do
     import Helen.Time.Helper, only: [elapsed?: 2]
 
@@ -372,355 +505,25 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def move_live_to_finished(
-        %{logic: %{live: %{active_mode: mode} = live}} = state
-      ) do
-    state
-    # remove :active_mode to avoid cruf
-    |> live_update([], fn x -> Map.drop(x, [:active_mode]) end)
-    # place a copy of live into finished
-    |> finished_mode_put(mode, live)
-    # clear live
-    |> live_put([], %{})
-  end
+  def status(state), do: status_get(state)
 
-  def move_stage_to_live(%{logic: %{stage: stage}} = state) do
-    state |> put_in([:logic, :live], stage) |> put_in([:logic, :stage], %{})
-  end
+  def execute(state) do
+    alias Helen.Workers
 
-  def note_delay_if_requested(state) do
-    import Helen.Time.Helper, only: [to_ms: 1, valid_ms?: 1]
+    state = Workers.execute(state)
 
-    opts = stage_get_opts(state)
-
-    case opts[:start_delay] do
-      # just fine, no delay requested
-      delay when is_nil(delay) ->
-        state
-
-      # delay requested, validate it then store if valid
-      delay ->
-        if valid_ms?(delay) do
-          state
-          # store the delay for pattern matching later
-          |> stage_put([:delay], to_ms(delay))
-        else
-          state |> init_fault_put({:invalid_delay, delay})
-        end
+    case cmd_rc(state) do
+      # if this action is processed via a message and a message is expected
+      # upon completion then we do not advance to the next action.  the next
+      # action is advanced upon receipt and processing of the command complete
+      # message.
+      %{cmd_rc: %{via_msg: true}} -> state
+      # a fault occurred while processing the action, store in the state for
+      # handling downstream
+      %{cmd_rd: %{fault: fault}} -> action_fault_put(state, fault)
+      # no match above indicates the command was processed and there should be
+      # no delay prior to the next action
+      _nomatch -> next_action(state)
     end
   end
-
-  def send_cmd_msg(%{worker_mode: mode, token: msg_token} = state, msg_details) do
-    import Helen.Time.Helper, only: [to_ms: 1]
-
-    # trick to ensure :after (if included) is first in the list
-    msg_details = Enum.sort(msg_details)
-
-    for {key, val} when key in [:after, :msg] <- msg_details, reduce: state do
-      state ->
-        case {key, val} do
-          {:after, iso_bin} ->
-            # temporarily store the send after milliseconds in the state
-            state |> put_in([mode, :step, :send_after_ms], to_ms(iso_bin))
-
-          {:msg, msg} ->
-            after_ms = get_in(state, [mode, :step, :send_after_ms]) || 0
-
-            Process.send_after(self(), {:msg, msg, msg_token}, after_ms)
-            # remove send after milliseconds if it was placed in the state
-            state
-            |> update_in([mode, :step], fn x ->
-              Map.drop(x, [:send_after_ms])
-            end)
-        end
-    end
-  end
-
-  def stop_all_devices(%{opts: opts} = state) do
-    devs = get_in(opts, [:devices]) |> Keyword.keys()
-
-    for dev <- devs, reduce: state do
-      state -> state |> apply_action_to_dev(dev, :off, [])
-    end
-  end
-
-  def actions_to_execute_get(state), do: track_get(state, [:actions_to_execute])
-
-  def actions_to_execute_put(state, actions),
-    do: track_put(state, [:actions_to_execute], actions)
-
-  def actions_to_execute_update(state, func) when is_function(func, 1),
-    do: track_update(state, [:actions_to_execute], func)
-
-  def finished_get(state, path),
-    do: get_in(state, flatten([:logic, :finished, path]))
-
-  def finished_mode_put(state, mode, mode_map)
-      when is_atom(mode) and is_map(mode_map),
-      do: put_in(state, [:logic, :finished, mode], mode_map)
-
-  def live_get(state, path),
-    do: get_in(state, flatten([:logic, :live, path]))
-
-  def live_get_mode_opt(state, path),
-    do: live_get(state, flatten([:opts, :modes, active_mode(state), path]))
-
-  def live_get_mode_sequence(state), do: live_get_mode_opt(state, :sequence)
-
-  def live_next_mode(state), do: live_get_mode_opt(state, :next_mode) || :none
-
-  def live_get_step_for(state, step) when is_atom(step),
-    do: live_get(state, flatten([:opts, :modes, active_mode(state), step]))
-
-  def live_get_step(state, step_name),
-    do: live_get_steps(state) |> get_in([step_name])
-
-  def live_get_steps(state), do: live_get(state, [:steps])
-
-  def live_put(state, path, val),
-    do: put_in(state, [:logic, :live, [path]] |> flatten(), val)
-
-  def live_put_status(state, status), do: state |> live_put([:status], status)
-
-  def finished?(state, mode) do
-    case finished_get(state, [mode, :status]) do
-      :finished -> true
-      _other_status -> false
-    end
-  end
-
-  def holding?(state), do: status_get(state) == :holding
-
-  def live_update(state, path, func) when is_function(func, 1),
-    do: state |> update_in(flatten([:logic, :live, path]), func)
-
-  def detect_sequence_repeats(state),
-    do:
-      live_put(
-        state,
-        :repeat_until_stopped?,
-        Enum.member?(live_get_mode_sequence(state), :repeat)
-      )
-
-  def stage_get(state, path),
-    do: get_in(state, flatten([:logic, :stage, path]))
-
-  def stage_initialize_steps(state),
-    do: state |> stage_put(:steps, stage_get_mode_opts(state, :steps))
-
-  def stage_get_opts(state, path \\ []),
-    do: state |> stage_get(flatten([:opts, path]))
-
-  def stage_get_mode_opts(state, path \\ []) do
-    stage_get_opts(
-      state,
-      flatten([:modes, stage_get(state, :active_mode), path])
-    )
-  end
-
-  def stage_put(state, path, val),
-    do: state |> put_in(flatten([:logic, :stage, path]), val)
-
-  def stage_put_active_mode(state, mode),
-    do: state |> stage_put(:active_mode, mode)
-
-  def copy_opts_to_stage(%{opts: opts} = state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> stage_put([], %{
-      active_mode: nil,
-      active_step: nil,
-      opts: opts,
-      steps: %{},
-      track: %{},
-      temp: %{},
-      will_finish_in_ms: 0,
-      will_finish_by: nil
-    })
-  end
-
-  def init_fault_put(state, val),
-    do: state |> build_logic_map() |> put_in([:logic, :faults, :init], val)
-
-  def init_fault_clear(state),
-    do:
-      state
-      |> build_logic_map()
-      |> update_in([:logic, :faults], fn x -> Map.drop(x, [:init]) end)
-
-  def mode_repeat_until_stopped?(state),
-    do: live_get(state, :repeat_until_stopped?)
-
-  def status_get(state), do: live_get(state, [:status])
-  def status_put(state, status), do: state |> live_put([:status], status)
-
-  def step_actions_get(state, step_name),
-    do: live_get(state, [:steps, step_name, :actions])
-
-  def step_run_for(state),
-    do: live_get(state, [:steps, active_step(state), :for])
-
-  def steps_to_execute(%{logic: %{live: %{track: %{steps_to_execute: x}}}}),
-    do: x
-
-  def steps_to_execute_update(state, func),
-    do: track_update(state, :steps_to_execute, func)
-
-  def track_calculated_step_duration_get(state, step_name),
-    do:
-      state
-      |> track_get([:calculated_durations, step_name])
-
-  def track_calculated_step_duration_put(state, step_name, duration),
-    do:
-      state
-      |> track_update([], fn x -> Map.put_new(x, :calculated_durations, %{}) end)
-      |> track_put([:calculated_durations, step_name], duration)
-
-  def track_copy(state, from, to),
-    do: state |> track_put(to, track_get(state, from))
-
-  def track_get(state, what), do: state |> live_get([:track, what])
-
-  def track_update(state, what \\ [], func) when is_function(func),
-    do: state |> update_in(flatten([:logic, :live, :track, [what]]), func)
-
-  def track_put(state, what, val \\ nil) do
-    import Helen.Time.Helper, only: [utc_now: 0, zero: 0]
-
-    case what do
-      :started_at ->
-        state
-        |> live_put([:track, :started_at], utc_now())
-        |> live_put([:track, :elapsed], zero())
-
-      _anything_else ->
-        state |> live_put([:track, what], val)
-    end
-  end
-
-  def track_step_elapsed_get(state), do: track_step_get(state, :elapsed)
-
-  def track_step_get(
-        %{logic: %{live: %{track: %{active_step: active_step}}}} = state,
-        what
-      ) do
-    state
-    |> track_get([:steps, active_step, what])
-  end
-
-  def track_step_put(
-        %{logic: %{live: %{track: %{active_step: active_step}}}} = state,
-        what,
-        val
-      ) do
-    state
-    |> update_in([:logic, :live, :track], fn x ->
-      Map.put_new(x, :steps, %{})
-    end)
-    |> update_in([:logic, :live, :track, :steps], fn x ->
-      Map.put_new(x, active_step, %{})
-    end)
-    |> track_put([:steps, active_step, what], val)
-  end
-
-  def track_step_update(state, what, func) when is_function(func, 1),
-    do: track_update(state, flatten([:steps, active_step(state), what]), func)
-
-  def track_step_started(state) do
-    import Helen.Time.Helper, only: [utc_now: 0, zero: 0]
-
-    state
-    |> track_step_put(:started_at, utc_now())
-    |> track_step_put(:elapsed, zero())
-  end
-
-  def track_step_cycles_increment(state) do
-    state
-    |> track_step_update(:cycles, fn
-      nil -> 1
-      x when is_integer(x) -> x + 1
-    end)
-  end
-
-  def update_elapsed(
-        %{logic: %{live: %{track: %{started_at: started_at}}}} = state
-      ) do
-    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
-
-    now = utc_now()
-
-    state
-    |> live_update(:elapsed, fn _x -> elapsed(started_at, now) end)
-    |> track_step_update(:elapsed, fn _x ->
-      elapsed(track_step_get(state, :started_at), now)
-    end)
-  end
-
-  # allow update_elapsed/1 calls when there isn't a mode running
-  def update_elapsed(state), do: state
-
-  def pending_action_get(state) do
-    track_get(state, :pending_action)
-  end
-
-  def pending_action_put(state, func) do
-    track_put(state, :pending_action, func.())
-  end
-
-  def execute_pending_action(state) do
-    state
-  end
-
-  # support calls where the action is tuple by wrapping it in a list
-  def apply_actions(state, action) when is_tuple(action),
-    do: apply_actions(state, [action])
-
-  def apply_actions(%{opts: opts} = state, actions) do
-    # wrap and flatten the actions parameter to handle either a tuple or
-    # list of tuples from the caller
-    for {cmd_or_dev, details} <- actions, reduce: state do
-      state ->
-        case {cmd_or_dev, details} do
-          # simple on/off for a list of devices
-          {cmd, devs} when cmd in [:on, :off] ->
-            for dev when is_atom(dev) <- devs, reduce: state do
-              state ->
-                state
-                # the function to execute is the cmd (:on or :off) and
-                # no additional options
-                |> apply_action_to_dev(dev, cmd, [])
-            end
-
-          {dev, [{func, x}]} when func == :random and is_atom(x) ->
-            cmd_map = get_in(opts, [:cmd_definitions, x])
-
-            state
-            |> apply_action_to_dev(dev, func, cmd_map)
-
-          # a specific device, function and function opts
-          {dev, [{func, func_opt}]} ->
-            state
-            |> apply_action_to_dev(dev, func, func_opt)
-        end
-    end
-  end
-
-  def apply_action_to_dev(state, dev, func, func_opt) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    dev_name = get_in(state, [:devices, dev, :name])
-
-    # here is where the actual device is changed
-    # List.flatten/1 is used to ensure a wrapped list of options
-    rc = apply(PulseWidth, func, flatten([dev_name, func_opt]))
-
-    state
-    |> put_in([:devices, dev, :lasts, :rc], rc)
-    |> put_in([:devices, dev, :lasts, :at], utc_now())
-    |> put_in([:devices, dev, :lasts, :cmd], {func, func_opt})
-  end
-
-  def token(%{token: token}), do: token
 end
