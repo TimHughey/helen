@@ -103,6 +103,18 @@ defmodule Switch do
   @doc since: "0.0.21"
   defdelegate delete(name_or_id), to: Alias, as: :delete
 
+  @doc """
+    Execute an action
+  """
+  @doc since: "0.0.27"
+  def execute_action(%{worker_cmd: cmd, worker: %{name: name}}) do
+    case cmd do
+      :on -> on(name)
+      :off -> off(name)
+      _cmd -> :invalid_action
+    end
+  end
+
   @doc delegate_to: {Alias, :exists?, 1}
   @doc since: "0.0.27"
   defdelegate exists?(name_or_id), to: Alias, as: :exists?
