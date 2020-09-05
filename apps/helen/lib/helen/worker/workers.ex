@@ -9,21 +9,9 @@ defmodule Helen.Workers do
   """
 
   import Helen.Worker.State
+  import Helen.Workers.ModCache, only: [module: 2]
 
-  def all do
-    alias Reef.{DisplayTank, MixTank}
-
-    for mod <- [
-          MixTank.Air,
-          MixTank.Pump,
-          MixTank.Rodi,
-          MixTank.Temp,
-          DisplayTank.Ato,
-          DisplayTank.Temp
-        ] do
-      mod.device_module_map()
-    end
-  end
+  def add_via_msg(action), do: put_in(action, [:via_msg], true)
 
   def build_module_cache(nil), do: %{}
 
@@ -40,105 +28,129 @@ defmodule Helen.Workers do
     end
   end
 
-  def craft_response(%{find: {ident, name}, module: mod, type: type}) do
-    base = %{ident: ident, name: name, module: mod, type: type}
-
-    case mod do
-      nil -> put_in(base, [:found?], false)
-      x when is_atom(x) -> put_in(base, [:found?], true)
-      _ -> put_in(base, [:found?], false)
-    end
-  end
-
-  # def execute(%{cmd: :sleep, for: duration, reply_to: pid, token: token})
-
   def execute(state) do
-    case pending_action(state) do
-      _action ->
-        cmd_rc_put(state, %{via_msg: true})
-    end
+    action = pending_action(state)
+    result = execute_action(action)
+
+    cmd_rc_put(state, result)
   end
 
-  def make_action(
-        msg_type,
-        worker_cache,
-        %{worker: worker_ref} = action,
-        token
+  # NOTE: has test case
+  @doc false
+  def execute_action(%{stmt: :sleep, args: duration, reply_to: pid} = action) do
+    import Helen.Time.Helper, only: [to_ms: 1]
+
+    action
+    |> add_via_msg()
+    |> execute_result(fn ->
+      Process.send_after(pid, make_msg(action), to_ms(duration))
+    end)
+  end
+
+  def execute_action(%{stmt: :tell, worker: worker, msg: msg} = action) do
+    action
+    |> execute_result(fn -> worker.mode(msg) end)
+  end
+
+  # NOTE: has test case
+  @doc false
+  def execute_action(
+        %{stmt: :all, args: worker_list, worker_cache: wc} = action
       ) do
+    workers = resolve_worker(wc, worker_list)
+
+    action
+    |> execute_result(fn ->
+      for %{module: mod, ident: ident} = worker <- workers, into: %{} do
+        # add the worker to the action for matching by the executing module
+        action = put_in(action, [:worker], worker)
+        {ident, mod.execute_action(action)}
+      end
+    end)
+  end
+
+  def execute_action(%{stmt: :cmd_basic, worker: %{module: mod}} = action) do
+    action
+    |> add_via_msg()
+    |> execute_result(fn -> mod.execute_action(action) end)
+  end
+
+  def execute_action(%{stmt: stmt, worker: %{module: mod}} = action)
+      when stmt in [:cmd_for, :cmd_for_then] do
+    action
+    |> add_via_msg()
+    |> execute_result(fn -> mod.execute_action(action) end)
+  end
+
+  # def execute_action(%{stmt: cmd, worker: %{module: mod}} = action)
+  #     when is_atom(cmd) and is_atom(mod) do
+  #   %{
+  #     cmd: :basic,
+  #     basic_rc: mod.execute_action(action)
+  #   }
+  # end
+
+  def execute_action(_action), do: %{via_msg: true}
+
+  def make_action(msg_type, worker_cache, action, %{token: token} = state) do
     Map.merge(action, %{
       msg_type: msg_type,
-      worker: get_in(worker_cache, [worker_ref]),
+      worker_cache: worker_cache,
+      worker: resolve_worker(worker_cache, action[:worker]),
       reply_to: self(),
-      ref: make_ref(),
+      action_ref: make_ref(),
       token: token
     })
+    |> make_action_specific(state)
   end
 
-  def module(ident, name) do
-    %{find: {ident, name}, module: nil, type: nil}
-    |> search(:workers)
-    |> search(:reef_workers)
-    |> search(:simple_devices)
-    |> craft_response()
+  def make_action_specific(%{cmd: cmd} = action, state) do
+    case cmd do
+      :all ->
+        worker_cmd_put(action, action[:args])
+
+      :tell ->
+        worker_cmd_put(action, :mode) |> put_in([:mode], action[:msg])
+
+      :sleep ->
+        action
+
+      cmd when cmd in [:on, :off, :duty] ->
+        worker_cmd_put(action, cmd)
+
+      cmd_def ->
+        worker_cmd_put(action, :custom)
+        |> put_in([:custom], cmd_definition(state, cmd_def))
+    end
   end
 
-  #
-  # Search Reef Workers (e.g. FirstMate)
-  #
+  def make_msg(%{msg_type: type} = action),
+    do: {type, action}
 
-  # only one Reef Worker that can be used in a worker config exists
-  def search(
-        %{find: {:first_mate, :reef_worker}, module: nil} = acc,
-        :reef_workers
-      ),
-      do:
-        put_in(acc, [:module], Reef.FirstMate) |> put_in([:type], :reef_worker)
+  def execute_result(%{stmt: _, cmd: _} = action, func),
+    do: put_in(action, [:result], func.())
 
-  # already found?  then do nothing
-  def search(%{find: _, module: mod} = acc, :reef_workers) when is_atom(mod),
-    do: acc
+  @doc false
+  # resolve the worker ident to the internal module details
+  def resolve_worker(cache, worker_ident) do
+    case worker_ident do
+      nil ->
+        nil
 
-  # no match, pass through the accumulator
-  def search(acc, :reef_workers), do: acc
+      :self ->
+        :self
 
-  #
-  # Search Simple Devices (e.g. Switch, PulseWidth)
-  #
+      # deak with the case when the worker is a simple atom
+      ident when is_atom(ident) ->
+        get_in(cache, [ident])
 
-  #
-  # Search Simple Devices (e.g. Switch, PulseWidth)
-  #
-  # nothing found yet, search all simple devices
-  def search(%{find: {_ident, name}, module: nil} = acc, :simple_devices) do
-    for x <- [PulseWidth, Switch], reduce: acc do
-      %{module: nil} = acc ->
-        if x.exists?(name) do
-          put_in(acc, [:module], x) |> put_in([:type], :simple_device)
-        else
-          acc
+      # deal with the case when the "worker" is a list of workers
+      idents when is_list(idents) ->
+        for ident <- idents do
+          get_in(cache, [ident])
         end
-
-      acc ->
-        acc
     end
   end
 
-  # already found?  then do nothing
-  def search(acc, :simple_devices), do: acc
-
-  #
-  # Search Workers (e.g. GenDevice based modules)
-  #
-  # not found?  then search through all workers for a matching name
-  def search(%{find: {_ident, name}, module: nil} = acc, :workers) do
-    for %{name: x, module: mod} when x == name <- all(), reduce: acc do
-      acc -> put_in(acc, [:module], mod) |> put_in([:type], :gen_device)
-    end
-  end
-
-  #
-  # Search Workers (e.g. GenDevice based modules)
-  #
-  # already found?  then do nothing
-  def search(acc, :workers), do: acc
+  def worker_cmd_put(action, val), do: put_in(action, [:worker_cmd], val)
 end

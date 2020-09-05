@@ -70,7 +70,7 @@ defmodule GenDevice do
       @doc since: "0.0.27"
       def ready? do
         case state(:server_mode) do
-          :active -> true
+          mode when mode in [:active, :ready] -> true
           :standby -> false
         end
       end
@@ -95,6 +95,18 @@ defmodule GenDevice do
         %{name: state(:device_name), module: __MODULE__}
       end
 
+      @doc """
+        Execute an action
+      """
+      @doc since: "0.0.27"
+      def execute_action(%{worker_cmd: cmd, worker: %{module: __MODULE__}}) do
+        case cmd do
+          :on -> on()
+          :off -> off()
+          _cmd -> :invalid_cmd
+        end
+      end
+
       def last_timeout do
         import Helen.Time.Helper, only: [epoch: 0, utc_now: 0]
 
@@ -110,8 +122,8 @@ defmodule GenDevice do
       Set the mode of the server.
 
       ## Modes
-      When set to `:active` (normal mode) the server will actively control
-      the temperature based on the readings of the configured sensor by
+      When set to `:active` or :ready (normal mode) the server will actively
+      control the temperature based on the readings of the configured sensor by
       turning on and off the switch.
 
       If set to `:standby` the server will:
@@ -128,7 +140,7 @@ defmodule GenDevice do
 
       """
       @doc since: "0.0.27"
-      def mode(atom) when atom in [:active, :standby] do
+      def mode(atom) when atom in [:active, :ready, :standby] do
         GenServer.call(__MODULE__, {:server_mode, atom})
       end
 
@@ -225,6 +237,7 @@ defmodule GenDevice do
       def standby_reason do
         case state() do
           %{server_mode: :active} -> :active
+          %{server_mode: :ready} -> :ready
           %{server_mode: :standby, standby_reason: reason} -> reason
         end
       end
@@ -292,9 +305,9 @@ defmodule GenDevice do
       @impl true
       def handle_call({:server_mode, mode}, _from, state) do
         case mode do
-          # the GenDevice is being made ready for commands when set :active,
-          # don't adjust the device
-          :active ->
+          # the GenDevice is being readied for commands when set :activ
+          # or :reqdy, don't adjust the device
+          mode when mode in [:active, :ready] ->
             put_in(state, [:standby_reason], :none)
 
           # when going to :standby ensure the device is off

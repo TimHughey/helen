@@ -108,29 +108,6 @@ defmodule Reef.Captain.Server do
 
   @doc false
   @impl true
-  def handle_call({:server_mode, mode}, _from, state) do
-    case mode do
-      # when switching to :standby ensure the switch is off
-      :standby ->
-        state
-        |> change_token()
-        |> put_in([:server, :mode], mode)
-        |> put_in([:server, :standby_reason], :api)
-        |> reply({:ok, mode})
-
-      # no action when switching to :active, the server will take control
-      :active ->
-        state
-        |> change_token()
-        # |> crew_online()
-        |> put_in([:server, :mode], mode)
-        |> put_in([:server, :standby_reason], :none)
-        |> reply({:ok, mode})
-    end
-  end
-
-  @doc false
-  @impl true
   def handle_call({:mode, mode, _api_opts}, _from, state) do
     state
     |> change_mode(mode)

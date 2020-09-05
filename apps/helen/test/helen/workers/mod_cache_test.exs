@@ -1,13 +1,13 @@
-defmodule HelenWorkersTest do
+defmodule HelenWorkersModCacheTest do
   @moduledoc false
 
   use Timex
   use ExUnit.Case
 
-  alias Helen.Workers
+  alias Helen.Workers.ModCache
 
   test "can find module for a pwm simple device?" do
-    res = Workers.module(:front_leds, "front leds evergreen")
+    res = ModCache.module(:front_leds, "front leds evergreen")
 
     assert PulseWidth.exists?("front leds evergreen")
     assert get_in(res, [:found?])
@@ -15,7 +15,7 @@ defmodule HelenWorkersTest do
   end
 
   test "can find module for a switch simple device?" do
-    res = Workers.module(:irrigation_12v, "irrigation 12v power")
+    res = ModCache.module(:irrigation_12v, "irrigation 12v power")
 
     assert Switch.exists?("irrigation 12v power")
     assert get_in(res, [:found?])
@@ -23,7 +23,7 @@ defmodule HelenWorkersTest do
   end
 
   test "can find module for a reef worker?" do
-    res = Workers.module(:first_mate, :reef_worker)
+    res = ModCache.module(:first_mate, :reef_worker)
 
     assert is_map(res)
     assert res[:found?]
@@ -32,7 +32,7 @@ defmodule HelenWorkersTest do
   end
 
   test "can find module for a generic worker?" do
-    res = Workers.module(:air, "mixtank air")
+    res = ModCache.module(:air, "mixtank air")
 
     assert is_map(res)
     assert res[:found?]
@@ -40,31 +40,8 @@ defmodule HelenWorkersTest do
     assert res[:module] == Reef.MixTank.Air
   end
 
-  test "can build workers module cache from a map of workers" do
-    dev_map = %{
-      air: "mixtank air",
-      pump: "mixtank pump",
-      mixtank_temp: "mixtank heater",
-      foobar: "foo bar"
-    }
-
-    res = Workers.build_module_cache(dev_map)
-
-    assert is_map(res)
-
-    for ident <- [:air, :pump, :mixtank_temp] do
-      assert res[ident][:found?]
-    end
-
-    assert res[:air][:type] == :gen_device
-
-    refute res[:foobar][:found?]
-
-    refute Workers.module_cache_complete?(res)
-  end
-
   test "can get the device module maps for all workers" do
-    worker_list = Workers.all()
+    worker_list = ModCache.all()
 
     assert is_list(worker_list)
     assert %{name: _, module: Reef.MixTank.Air} = hd(worker_list)

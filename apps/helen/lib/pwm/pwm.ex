@@ -113,6 +113,19 @@ defmodule PulseWidth do
   @doc delegate_to: {Example, :cmd, 2}
   defdelegate example_cmd(type \\ :random, opts \\ []), to: Example, as: :cmd
 
+  @doc """
+    Execute an action
+  """
+  @doc since: "0.0.27"
+  def execute_action(%{worker_cmd: cmd, worker: %{name: name}} = action) do
+    case cmd do
+      :on -> on(name)
+      :off -> off(name)
+      :duty -> duty(name, action[:float])
+      _cmd -> random(name, action[:custom])
+    end
+  end
+
   @doc delegate_to: {Alias, :exists?, 1}
   defdelegate exists?(name), to: Alias
 

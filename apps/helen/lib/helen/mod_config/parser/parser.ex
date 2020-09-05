@@ -368,23 +368,23 @@ defmodule Helen.Config.Parser do
         %{cmd: captures[:key], worker: :self, args: captures[:val]}
 
       :cmd_basic ->
-        %{worker: captures[:key], cmd: captures[:cmd], float: captures[:float]}
+        %{cmd: captures[:cmd], worker: captures[:key], float: captures[:float]}
 
       :cmd_list ->
         %{cmd: captures[:cmd], worker: captures[:val]}
 
       :cmd_for ->
         %{
-          worker: captures[:key],
           cmd: captures[:cmd],
+          worker: captures[:key],
           for: captures[:iso8601],
           wait: captures[:nowait] != :nowait
         }
 
       x when x in [:cmd_for_then] ->
         %{
-          worker: captures[:key],
           cmd: captures[:cmd],
+          worker: captures[:key],
           for: captures[:iso8601],
           then_cmd: captures[:then_cmd],
           wait: captures[:nowait] != :nowait
@@ -393,6 +393,7 @@ defmodule Helen.Config.Parser do
       :tell ->
         %{cmd: captures[:key], worker: captures[:worker], msg: captures[:msg]}
     end
+    |> put_in([:stmt], stmt)
   end
 
   defp normalize_captures(
