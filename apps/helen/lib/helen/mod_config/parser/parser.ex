@@ -386,7 +386,7 @@ defmodule Helen.Config.Parser do
           cmd: captures[:cmd],
           worker: captures[:key],
           for: captures[:iso8601],
-          then_cmd: captures[:then_cmd],
+          at_cmd_finish: captures[:then_cmd],
           wait: captures[:nowait] != :nowait
         }
 

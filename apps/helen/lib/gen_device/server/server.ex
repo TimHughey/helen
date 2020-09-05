@@ -99,10 +99,14 @@ defmodule GenDevice do
         Execute an action
       """
       @doc since: "0.0.27"
-      def execute_action(%{worker_cmd: cmd, worker: %{module: __MODULE__}}) do
+      def execute_action(
+            %{worker_cmd: cmd, worker: %{module: __MODULE__}} = action
+          ) do
+        opts = Map.take(action, [:for, :at_cmd_finish]) |> Enum.into([])
+
         case cmd do
-          :on -> on()
-          :off -> off()
+          :on -> on(opts)
+          :off -> off(opts)
           _cmd -> :invalid_cmd
         end
       end

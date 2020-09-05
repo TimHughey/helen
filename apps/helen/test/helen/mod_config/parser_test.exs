@@ -291,14 +291,14 @@ defmodule HelenConfigParserTest do
                            worker: :air,
                            cmd: :on,
                            for: cmd_duration2,
-                           then_cmd: :off,
+                           at_cmd_finish: :off,
                            wait: true
                          },
                          %{
                            worker: :pump,
                            cmd: :on,
                            for: cmd_duration_nowait,
-                           then_cmd: :off,
+                           at_cmd_finish: :off,
                            wait: false
                          }
                        ]
@@ -373,14 +373,14 @@ defmodule HelenConfigParserTest do
                            worker: :air,
                            cmd: :on,
                            for: cmd_duration2,
-                           then_cmd: :off,
+                           at_cmd_finish: :off,
                            wait: true
                          },
                          %{
                            worker: :pump,
                            cmd: :on,
                            for: cmd_duration_nowait,
-                           then_cmd: :off,
+                           at_cmd_finish: :off,
                            wait: false
                          },
                          %{worker: :lights, cmd: :duty, float: 0.7},
@@ -462,14 +462,14 @@ defmodule HelenConfigParserTest do
                            worker: :air,
                            cmd: :on,
                            for: cmd_duration2,
-                           then_cmd: :off,
+                           at_cmd_finish: :off,
                            wait: true
                          },
                          %{
                            worker: :pump,
                            cmd: :on,
                            for: cmd_duration_nowait,
-                           then_cmd: :off,
+                           at_cmd_finish: :off,
                            wait: false
                          },
                          %{worker: :lights, cmd: :duty, float: 0.7},
@@ -481,7 +481,7 @@ defmodule HelenConfigParserTest do
                        actions: [
                          %{cmd: :off, worker: :air},
                          %{cmd: :off, worker: :pump},
-                         %{cmd: :on, worker: :rodi, for: _, then_cmd: :off}
+                         %{cmd: :on, worker: :rodi, for: _, at_cmd_finish: :off}
                        ]
                      }
                    }
