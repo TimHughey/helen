@@ -35,6 +35,13 @@ cmd_definitions
       priority 7
 
 modes
+  all_stop
+    sequence all_stop
+    next_mode hold
+    steps
+      all_stop
+        all off
+
   dance_with_me
     sequence spin_up slow_disco_ball dance
     next_mode hold

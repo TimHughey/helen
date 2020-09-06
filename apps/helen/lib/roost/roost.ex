@@ -6,18 +6,14 @@ defmodule Roost do
   alias Roost.Server
 
   defdelegate ready?, to: Server
-  defdelegate all_stop, to: Server
   defdelegate available_modes, to: Server
   defdelegate cancel_delayed_cmd, to: Server
-  def dance_with_me, do: mode(:dance_with_me)
   defdelegate last_timeout, to: Server
-  def leaving, do: mode(:leaving)
   defdelegate restart(opts \\ []), to: Server
   defdelegate runtime_opts, to: Server
   defdelegate server_mode(mode_atom), to: Server
   defdelegate timeouts, to: Server
   defdelegate mode(mode, opts \\ []), to: Server
-  defdelegate x_state(keys \\ []), to: Server
 
   @doc """
   Translate the internal state of the Roost server to an abstracted
@@ -27,9 +23,7 @@ defmodule Roost do
   """
   @doc since: "0.0.27"
   def status do
-    state = x_state()
-
     # translate the internal state to an abstracted version for external use
-    %{mode: Server.active_mode(state)}
+    %{mode: Server.active_mode()}
   end
 end

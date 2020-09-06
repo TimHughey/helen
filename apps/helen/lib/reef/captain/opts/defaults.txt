@@ -16,6 +16,13 @@ workers
   first_mate reef_worker
 
 modes
+  all_stop
+    sequence all_stop
+    next_mode hold
+    steps
+      all_stop
+        all off
+
   fill
     next_mode keep_fresh
     sequence at_start main topoff finally

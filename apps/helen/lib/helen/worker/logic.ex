@@ -3,19 +3,22 @@ defmodule Helen.Worker.Logic do
   Logic for Roost server
   """
 
-  @callback active_mode(map()) :: atom()
-  @callback active_step(map()) :: atom()
+  @callback active_mode :: atom()
+  @callback active_step :: atom()
+  @callback all_stop :: term()
   @callback available_modes :: map()
-  @callback change_token(map()) :: map()
-  @callback change_mode(map(), atom()) :: map()
-  @callback check_fault_and_reply(map()) :: {atom(), tuple()}
-  @callback faults(map(), atom() | list()) :: term()
-  @callback faults?(map()) :: boolean()
-  @callback init(map(), atom()) :: map()
-  @callback noreply(map()) :: any()
-  @callback reply(any(), map()) :: any()
-  @callback status(map()) :: atom()
-  @callback token(map()) :: reference()
+  @callback change_mode(atom()) :: map()
+  @callback faults(term() | list()) :: term()
+  @callback faults? :: boolean()
+  @callback last_timeout :: term()
+  @callback mode(atom(), list()) :: term()
+  @callback ready? :: boolean()
+  @callback restart(list()) :: term()
+  @callback runtime_opts :: map()
+  @callback server_mode(atom()) :: atom()
+  @callback status :: map()
+  @callback standby? :: boolean()
+  @callback timeout_hook(map()) :: map()
 
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
@@ -23,8 +26,8 @@ defmodule Helen.Worker.Logic do
 
       alias Helen.Worker.{Logic, State}
 
-      def active_mode(state), do: State.live_get(state, :active_mode) || :none
-      def active_step(state), do: State.track_get(state, :active_step) || :none
+      def active_mode, do: call({:inquiry, :active_mode})
+      def active_step, do: call({:inquiry, :active_step})
 
       @doc """
       Bring all Workers activities to a stop.
@@ -32,7 +35,7 @@ defmodule Helen.Worker.Logic do
       Returns :ok
       """
       @doc since: "0.0.27"
-      def all_stop, do: call({:all_stop})
+      def all_stop, do: change_mode(:all_stop)
 
       @doc """
       Return a list of available Worker modes.
@@ -42,6 +45,7 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def available_modes, do: call({:inquiry, :available_modes})
 
+      @doc false
       def call(msg) do
         if server_down?() do
           {:failed, :server_down}
@@ -53,16 +57,12 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
 
-      def change_token(state), do: State.change_token(state)
+      def change_mode(mode), do: call({:mode, mode})
 
-      def change_mode(state, mode), do: Logic.change_mode(state, mode)
+      def faults(what), do: call({:inquiry, {:faults, what}})
+      def faults?, do: call({:inquiry, :faults?})
 
-      def check_fault_and_reply(state), do: Logic.check_fault_and_reply(state)
-
-      def faults(state, what), do: Logic.faults(state, what)
-      def faults?(state), do: Logic.faults?(state)
-
-      def init(state, mode), do: Logic.init(state, mode)
+      # def init(state, mode), do: Logic.init(state, mode)
 
       @doc false
       @impl true
@@ -70,25 +70,38 @@ defmodule Helen.Worker.Logic do
           when call in [:inquiry, :server_mode, :state],
           do: Logic.handle_call(msg, state)
 
+      @doc false
+      @impl true
+      def handle_call({:mode, mode, _api_opts}, _from, state) do
+        state
+        |> Logic.change_mode(mode)
+        |> Logic.check_fault_and_reply()
+      end
+
+      @doc false
+      @impl true
+      def handle_call(msg, _from, state),
+        do: state |> Logic.msg_puts(msg) |> Logic.reply({:unmatched_msg, msg})
+
       # call messages for :logic are quietly ignored if the msg token
       # does not match the current token
       @impl true
       def handle_cast({:logic, msg}, state),
-        do: Logic.handle_logic_msg(msg, state) |> noreply()
+        do: Logic.handle_logic_msg(msg, state) |> Logic.noreply()
 
       @doc false
       @impl true
       def handle_continue(:bootstrap, state) do
         state
-        |> change_token()
-        |> noreply()
+        |> State.change_token()
+        |> Logic.noreply()
       end
 
       # info messages for :logic are quietly ignored if the msg token
       # does not match the current token
       @impl true
       def handle_info({:logic, msg}, state),
-        do: Logic.handle_logic_msg(msg, state) |> noreply()
+        do: Logic.handle_logic_msg(msg, state) |> Logic.noreply()
 
       @doc false
       @impl true
@@ -110,7 +123,7 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def mode(mode, opts), do: call({:mode, mode, opts})
 
-      def noreply(s), do: Logic.noreply(s)
+      # defdelegate noreply(state), to: Logic
 
       @doc """
       Is the server ready?
@@ -120,8 +133,7 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def ready?, do: call({:inquiry, :ready?})
 
-      def reply(s, val) when is_map(s), do: Logic.reply(s, val)
-      def reply(val, s) when is_map(s), do: Logic.reply(val, s)
+      # defdelegate reply(x, y), to: Logic
 
       @doc """
       Restarts the server via the Supervisor
@@ -160,7 +172,7 @@ defmodule Helen.Worker.Logic do
       def server_mode(atom) when atom in [:ready, :standby],
         do: call({:server_mode, atom})
 
-      def status(state), do: Logic.status(state)
+      def status, do: call({:inquiry, :status})
 
       def standby?, do: call({:inquiry, :standby?})
 
@@ -171,14 +183,12 @@ defmodule Helen.Worker.Logic do
       def timeouts, do: call({:inquiry, :timeouts})
 
       def timeout_hook(state) do
-        noreply(state)
+        Logic.noreply(state)
       end
 
       @doc false
       @impl true
       def terminate(_reason, state), do: state
-
-      def token(state), do: State.token(state)
 
       defoverridable Helen.Worker.Logic
     end
@@ -273,32 +283,45 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def handle_inquiry(what, state) do
-    case what do
-      :available_modes ->
-        available_modes(state)
-
-      :last_timeout ->
-        last_timeout(state)
-
-      :live_opts ->
-        opts(state, :live)
-
-      :ready? ->
-        ready?(state)
-
-      :runtime_opts ->
-        opts(state, :runtime)
-
-      :standby? ->
-        not ready?(state)
-
-      :timeouts ->
-        timeouts(state)
-        # {:x_state, keys} when is_list(keys) -> x_state(state, keys)
+  def handle_inquiry(x, state)
+      when x in [:active_mode, :active_step, :status] do
+    case x do
+      :active_mode -> active_mode(state) || :none
+      :active_step -> active_step(state) || :none
+      :status -> status(state)
     end
     |> reply(state)
   end
+
+  def handle_inquiry(x, state) when x in [:faults?, :ready?, :standby?] do
+    case x do
+      :faults? -> faults?(state)
+      :ready? -> ready?(state)
+      :standby? -> not ready?(state)
+    end
+    |> reply(state)
+  end
+
+  def handle_inquiry(x, state)
+      when x in [:available_modes, :last_timeout, :timeouts] do
+    case x do
+      :available_modes -> available_modes(state)
+      :last_timeout -> last_timeout(state)
+      :timeouts -> timeouts(state)
+    end
+    |> reply(state)
+  end
+
+  def handle_inquiry(x, state) when x in [:live_opts, :runtime_opts] do
+    case x do
+      :live_opts -> opts(state, :live)
+      :runtime_opts -> opts(state, :runtime)
+    end
+    |> reply(state)
+  end
+
+  def handle_inquiry({:inquiry, {:faults, what}}, state),
+    do: faults(state, what)
 
   def handle_logic_msg(%{token: msg_token} = msg, %{token: token} = state)
       when msg_token == token do
@@ -410,10 +433,10 @@ defmodule Helen.Worker.Logic do
     |> next_action()
   end
 
-  def reply(s, val) when is_map(s),
+  def reply(%{token: _} = s, val),
     do: {:reply, val, update_elapsed(s), loop_timeout(s)}
 
-  def reply(val, s) when is_map(s),
+  def reply(val, %{token: _} = s),
     do: {:reply, val, update_elapsed(s), loop_timeout(s)}
 
   def restart(mod, opts) do
@@ -504,7 +527,9 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def status(state), do: status_get(state)
+  def status(state) do
+    %{active: %{mode: active_mode(state), step: active_step(state)}}
+  end
 
   def execute(state) do
     alias Helen.Workers
@@ -524,5 +549,15 @@ defmodule Helen.Worker.Logic do
       # no delay prior to the next action
       _nomatch -> next_action(state)
     end
+  end
+
+  def msg_puts(state, msg) do
+    """
+     ==> #{inspect(msg)}
+
+    """
+    |> IO.puts()
+
+    state
   end
 end

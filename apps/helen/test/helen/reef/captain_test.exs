@@ -39,6 +39,7 @@ defmodule ReefCaptainTest do
 
     assert modes == [
              :add_salt,
+             :all_stop,
              :dump_water,
              :fill,
              :final_check,
@@ -56,12 +57,18 @@ defmodule ReefCaptainTest do
              Captain.handle_cast({:logic, msg}, state)
   end
 
-  test "roost server ignores logic info messages when the token != state token" do
+  test "reef Captain ignores logic info messages when the token != state token" do
     msg = %{token: make_ref()}
     {:ok, state, _} = Captain.init([])
 
     assert {:noreply, %{token: _}, _timeout} =
              Captain.handle_info({:logic, msg}, state)
+  end
+
+  test "can get overall reef Captain status" do
+    status = Captain.status()
+
+    assert status == %{active: %{mode: :none, step: :none}}
   end
 
   test "the truth will set you free" do

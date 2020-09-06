@@ -9,6 +9,13 @@ workers
   ato 'display tank ato'
 
 modes
+  all_stop
+    sequence all_stop
+    next_mode hold
+    steps
+      all_stop
+        all off
+
   clean
     sequence ato_disable ato_enable
     steps

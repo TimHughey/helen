@@ -49,7 +49,7 @@ defmodule RoostServerTest do
   test "can get Roost available modes" do
     modes = Roost.available_modes()
     assert is_list(modes)
-    assert modes == [:closed, :dance_with_me, :leaving]
+    assert modes == [:all_stop, :closed, :dance_with_me, :leaving]
   end
 
   test "roost server ignores logic cast messages when msg token != state token" do

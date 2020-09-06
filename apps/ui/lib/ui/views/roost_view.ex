@@ -24,25 +24,25 @@ defmodule UI.RoostView do
     case {mode, action} do
       {mode, "play"} -> map_mode(mode) |> Roost.mode([])
       {_mode, "off"} -> Roost.restart()
-      {_mode, "stop"} -> Roost.all_stop()
+      {_mode, "stop"} -> Roost.mode(:all_stop)
     end
   end
 
   def status do
-    modes = Roost.available_modes()
-    state = Roost.x_state()
-
-    for mode <- modes, reduce: %{modes: []} do
-      %{modes: modes} = status ->
-        mode_status = %{
-          mode: map_mode(mode),
-          status: get_in(state, [mode, :status]) |> map_mode_status()
-        }
-
-        modes = [modes, [mode_status]] |> List.flatten()
-
-        status |> put_in([:modes], modes)
-    end
+    # modes = Roost.available_modes()
+    # state = Roost.x_state()
+    #
+    # for mode <- modes, reduce: %{modes: []} do
+    #   %{modes: modes} = status ->
+    #     mode_status = %{
+    #       mode: map_mode(mode),
+    #       status: get_in(state, [mode, :status]) |> map_mode_status()
+    #     }
+    #
+    #     modes = [modes, [mode_status]] |> List.flatten()
+    #
+    #     status |> put_in([:modes], modes)
+    %{}
   end
 
   def map_mode(mode) do

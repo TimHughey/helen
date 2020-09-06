@@ -18,7 +18,7 @@ defmodule UI.ReefView do
 
   def button_click(%{"subsystem" => "reef", "step" => step}) do
     resp = %{button_click: %{step: step}}
-    rc = Reef.worker_mode(String.to_atom(step))
+    rc = Reef.mode(String.to_atom(step))
 
     resp |> populate_click_rc(rc)
   end

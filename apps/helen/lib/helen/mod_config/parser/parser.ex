@@ -368,7 +368,11 @@ defmodule Helen.Config.Parser do
         %{cmd: captures[:key], worker: :self, args: captures[:val]}
 
       :cmd_basic ->
-        %{cmd: captures[:cmd], worker: captures[:key], float: captures[:float]}
+        %{
+          cmd: captures[:cmd],
+          worker: captures[:key],
+          num_bin: captures[:number]
+        }
 
       :cmd_list ->
         %{cmd: captures[:cmd], worker: captures[:val]}
@@ -432,7 +436,7 @@ defmodule Helen.Config.Parser do
   defp atomize_capture_keys(nil), do: nil
 
   defp atomize_capture_keys(map) do
-    import String, only: [to_atom: 1, to_float: 1]
+    import String, only: [to_atom: 1]
 
     for {key_bin, val} <- map, reduce: map do
       acc ->
@@ -442,15 +446,6 @@ defmodule Helen.Config.Parser do
             # the values of "key" is always atomized
             Map.delete(acc, key_bin) |> put_in([to_atom(key_bin)], to_atom(val))
 
-          # get rid of unspecified optional floats
-          x when x == "float" and val == "" ->
-            Map.delete(acc, key_bin)
-
-          x when x == "float" and val != "" ->
-            # the values of "float" are always converted to floats
-            Map.delete(acc, key_bin)
-            |> put_in([to_atom(key_bin)], to_float(val))
-
           _ ->
             Map.delete(acc, key_bin) |> put_in([to_atom(key_bin)], val)
         end
@@ -458,23 +453,30 @@ defmodule Helen.Config.Parser do
   end
 
   defp atomize_capture_values(map) do
-    import String, only: [to_atom: 1, to_float: 1]
+    import String, only: [to_atom: 1]
 
     for {key, val_bin} when is_binary(val_bin) <- map, reduce: map do
       acc ->
-        case key do
-          :iso8601 ->
+        cond do
+          # any empty binaries (optional) are converted to nil
+          val_bin == "" ->
+            put_in(acc, [key], nil)
+
+          # convert duration strings to internal %Duration{}
+          key == :iso8601 ->
             put_in(acc, [key], to_duration(val_bin))
 
-          x when x == :float and val_bin != "" ->
-            put_in(acc, [key], to_float(val_bin))
+          # leave numbers (in binary form) unchanged
+          key == :number ->
+            acc
 
-          x when x == :val and is_binary(val_bin) ->
-            put_in(acc, [key], to_atom(val_bin))
-
-          _x ->
+          is_binary(val_bin) ->
             # replace the binary value with an atomized value
             put_in(acc, [key], to_atom(val_bin))
+
+          # anything else, do not attempt to atomize
+          true ->
+            acc
         end
     end
   end

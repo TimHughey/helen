@@ -49,8 +49,8 @@ defmodule Helen.Config.Parser.Regex do
       :list_val ->
         "(?<val>#{re(:list)})"
 
-      :optional_float ->
-        "(?:\\s+(?<float>[-+]?[0-9]*\.?[0-9]+))?"
+      :optional_number ->
+        "(?:\\s+(?<number>[-+]?[0-9]*\.?[0-9]+))?"
 
       :quoted_val ->
         "\\x27(?<val>[a-zA-Z0-9\\s_\\x2d\\x2f]+)\\x27"
@@ -282,7 +282,9 @@ defmodule Helen.Config.Parser.Regex do
             norm: :key_atom,
             re:
               Regex.compile!(
-                "^\\s{8}#{re(:ident, :key)}\\s+#{re(:cmd)}#{re(:optional_float)}$"
+                "^\\s{8}#{re(:ident, :key)}\\s+#{re(:cmd)}#{
+                  re(:optional_number)
+                }$"
               )
           },
           %{

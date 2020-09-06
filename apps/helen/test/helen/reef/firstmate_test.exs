@@ -38,6 +38,7 @@ defmodule ReefFirstMateTest do
     assert is_list(modes)
 
     assert modes == [
+             :all_stop,
              :clean,
              :normal_operations,
              :water_change_finish,

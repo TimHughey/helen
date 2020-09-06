@@ -362,7 +362,7 @@ defmodule HelenConfigParserTest do
                      },
                      finally: %{
                        actions: [
-                         %{worker: :air, cmd: :off, float: nil},
+                         %{worker: :air, cmd: :off, num_bin: nil},
                          %{
                            worker: :pump,
                            cmd: :off,
@@ -383,7 +383,7 @@ defmodule HelenConfigParserTest do
                            at_cmd_finish: :off,
                            wait: false
                          },
-                         %{worker: :lights, cmd: :duty, float: 0.7},
+                         %{worker: :lights, cmd: :duty, num_bin: "0.7"},
                          %{worker: :lights2, cmd: :dance_fade}
                        ]
                      }
@@ -451,7 +451,7 @@ defmodule HelenConfigParserTest do
                      },
                      finally: %{
                        actions: [
-                         %{worker: :air, cmd: :off, float: nil},
+                         %{worker: :air, cmd: :off, num_bin: nil},
                          %{
                            worker: :pump,
                            cmd: :off,
@@ -472,7 +472,7 @@ defmodule HelenConfigParserTest do
                            at_cmd_finish: :off,
                            wait: false
                          },
-                         %{worker: :lights, cmd: :duty, float: 0.7},
+                         %{worker: :lights, cmd: :duty, num_bin: "0.7"},
                          %{worker: :lights2, cmd: :dance_fade}
                        ]
                      },
