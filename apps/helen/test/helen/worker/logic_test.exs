@@ -49,7 +49,7 @@ defmodule WorkerLogicTest do
     state = config(:test)
 
     # NOTE:  available_modes/1 always returns a sorted list
-    assert Logic.available_modes(state) == [:alpha, :beta, :gamma]
+    assert Logic.available_modes(state) == [:all_stop, :alpha, :beta, :gamma]
   end
 
   test "can change the token" do
@@ -65,14 +65,14 @@ defmodule WorkerLogicTest do
   test "can confirm a mode exists" do
     state = config(:test) |> Logic.confirm_mode_exists(:beta)
 
-    refute Logic.faults?(state)
+    refute State.faults?(state)
   end
 
   test "can detect a mode does not exist" do
     state = config(:test) |> Logic.confirm_mode_exists(:foobar)
 
-    refute Logic.faults?(state)
-    assert Logic.faults(state, :init) == {:unknown_mode, :foobar}
+    refute State.faults?(state)
+    assert State.faults_get(state, :init) == {:unknown_mode, :foobar}
   end
 
   test "can perform init" do
@@ -81,7 +81,7 @@ defmodule WorkerLogicTest do
       config(:test)
       |> Logic.init(:alpha)
 
-    refute Logic.faults?(state)
+    refute State.faults?(state)
     assert %{active_mode: :alpha, steps: steps} = stage |> Map.drop([:opts])
     assert %{at_start: %{actions: actions}} = steps
     assert %{worker: :air, cmd: :on} = hd(actions)
@@ -116,7 +116,7 @@ defmodule WorkerLogicTest do
     assert %{actions_to_execute: actions_to_execute} =
              get_in(state, [:logic, :live, :track])
 
-    assert is_list(actions_to_execute) and actions_to_execute == []
+    assert actions_to_execute == []
 
     assert State.track_get(state, :sequence) == [
              :at_start,

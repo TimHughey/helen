@@ -15,7 +15,7 @@ defmodule Helen.Worker.Logic do
   @callback ready? :: boolean()
   @callback restart(list()) :: term()
   @callback runtime_opts :: map()
-  @callback server_mode(atom()) :: atom()
+  @callback server(atom()) :: atom()
   @callback status :: map()
   @callback standby? :: boolean()
   @callback timeout_hook(map()) :: map()
@@ -57,12 +57,12 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def cancel_delayed_cmd, do: call({:cancel_delayed_cmd})
 
-      def change_mode(mode), do: call({:mode, mode})
+      def change_mode(mode), do: call({:mode, mode, []})
+
+      def execute_action(action), do: action
 
       def faults(what), do: call({:inquiry, {:faults, what}})
       def faults?, do: call({:inquiry, :faults?})
-
-      # def init(state, mode), do: Logic.init(state, mode)
 
       @doc false
       @impl true
@@ -110,6 +110,12 @@ defmodule Helen.Worker.Logic do
         |> State.update_last_timeout()
         |> timeout_hook()
       end
+
+      @doc """
+      Is the worker holding on a mode?
+      """
+      @doc since: "0.0.27"
+      def holding?, do: call({:inquiry, :holding?})
 
       @doc """
       Return the DateTime of the last Worker timeout
@@ -169,7 +175,7 @@ defmodule Helen.Worker.Logic do
 
       """
       @doc since: "0.0.27"
-      def server_mode(atom) when atom in [:ready, :standby],
+      def server(atom) when atom in [:ready, :standby],
         do: call({:server_mode, atom})
 
       def status, do: call({:inquiry, :status})
@@ -225,14 +231,19 @@ defmodule Helen.Worker.Logic do
   def cached_workers(state), do: get_in(state, [:workers])
 
   def change_mode(state, mode) do
-    init(state, mode)
-    |> start()
-    |> execute()
+    if ready?(state) do
+      init(state, mode)
+      # flad that actions should be executed
+      |> execute_actions(true)
+      |> start()
+    else
+      init_fault_put(state, %{server: :standby})
+    end
   end
 
   def check_fault_and_reply(state) do
     if faults?(state) do
-      {:reply, {:fault, faults(state, [])}, state, loop_timeout(state)}
+      {:reply, {:fault, faults_map(state)}, state, loop_timeout(state)}
     else
       {:reply, {:ok, active_mode(state)}, state, loop_timeout(state)}
     end
@@ -249,13 +260,33 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def faults(state, what), do: faults_get(state, what)
+  def execute(state) do
+    alias Helen.Workers
 
-  def faults?(state) do
-    case get_in(state, [:logic, :faults]) do
-      %{init: %{}} -> true
-      _x -> false
+    state = Workers.execute(state)
+
+    case cmd_rc(state) do
+      # if this action is processed via a message and a message is expected
+      # upon completion then we do not advance to the next action.  the next
+      # action is advanced upon receipt and processing of the command complete
+      # message.
+      %{cmd_rc: %{via_msg: true}} ->
+        state
+
+      # a fault occurred while processing the action, store in the state for
+      # handling downstream
+      %{cmd_rc: %{fault: fault}} ->
+        action_fault_put(state, fault)
+
+      # no match above indicates the command was processed and there should be
+      # no delay prior to the next action
+      _nomatch ->
+        next_action(state)
     end
+  end
+
+  def execute_actions_if_needed(state) do
+    if execute_actions?(state), do: execute(state), else: state
   end
 
   def finished?(state, mode) do
@@ -293,9 +324,11 @@ defmodule Helen.Worker.Logic do
     |> reply(state)
   end
 
-  def handle_inquiry(x, state) when x in [:faults?, :ready?, :standby?] do
+  def handle_inquiry(x, state)
+      when x in [:faults?, :ready?, :standby?, :holding?] do
     case x do
       :faults? -> faults?(state)
+      :holding? -> holding?(state)
       :ready? -> ready?(state)
       :standby? -> not ready?(state)
     end
@@ -321,7 +354,7 @@ defmodule Helen.Worker.Logic do
   end
 
   def handle_inquiry({:inquiry, {:faults, what}}, state),
-    do: faults(state, what)
+    do: faults_get(state, what)
 
   def handle_logic_msg(%{token: msg_token} = msg, %{token: token} = state)
       when msg_token == token do
@@ -344,22 +377,17 @@ defmodule Helen.Worker.Logic do
   end
 
   def handle_server_mode(mode, state) do
-    case mode do
-      # when switching to :standby ensure the switch is off
-      :standby ->
+    case {server_mode(state), mode} do
+      # quietly ignore changes to the same mode
+      {current, requested} when current == requested ->
         state
-        |> change_token()
-        |> put_in([:server, :mode], mode)
-        |> put_in([:server, :standby_reason], :api)
-        |> reply({:ok, mode})
 
-      # no action when switching to :active, the server will take control
-      :active ->
+      # when switching to :standby ensure the switch is off
+      {_current, requested} when requested in [:ready, :standby] ->
         state
         |> change_token()
-        # |> crew_online()
-        |> put_in([:server, :mode], mode)
-        |> put_in([:server, :standby_reason], :none)
+        |> server_mode(requested)
+        |> standby_reason_set(:api)
         |> reply({:ok, mode})
     end
   end
@@ -395,7 +423,34 @@ defmodule Helen.Worker.Logic do
     |> stage_put_active_mode(mode)
     |> stage_initialize_steps()
     |> note_delay_if_requested()
-    |> live_put_status(:initialized)
+  end
+
+  def init_server(mod, args, opts, base_state \\ %{})
+      when is_atom(mod) and is_list(args) and is_map(opts) and
+             is_map(base_state) do
+    state =
+      Map.merge(base_state, %{
+        module: mod,
+        opts: opts,
+        timeouts: %{last: :never, count: 0},
+        token: nil,
+        token_at: nil
+      })
+
+    # initial server mode order of precedence:
+    #  1. args passed to Worker server
+    #  2. defined in configuratin base section
+    #  3. defaults to ready
+    server_mode = args[:server_mode] || opts(state, :server_mode) || :ready
+
+    state = server_mode(state, server_mode)
+
+    # should the server start?
+    if server_mode(state) == :standby do
+      :ignore
+    else
+      {:ok, state, {:continue, :bootstrap}}
+    end
   end
 
   def next_action(state) do
@@ -408,11 +463,12 @@ defmodule Helen.Worker.Logic do
       [] ->
         step_repeat_or_next(state)
 
-      [action | rest] ->
-        actions_to_execute_update(state, fn _x -> rest end)
+      [action | _rest] ->
+        actions_to_execute_update(state, fn x -> tl(x) end)
         |> pending_action_put(fn ->
           make_action(:logic, workers, action, state)
         end)
+        |> execute_actions_if_needed()
     end
   end
 
@@ -477,7 +533,7 @@ defmodule Helen.Worker.Logic do
     state
     |> finish_mode_if_needed()
     |> move_stage_to_live()
-    |> status_put(:started)
+    |> status_put(:running)
     |> track_put(:started_at)
     |> calculate_steps_durations()
     |> detect_sequence_repeats()
@@ -499,7 +555,6 @@ defmodule Helen.Worker.Logic do
 
       [next_step | _] ->
         state
-        |> status_put(:running)
         |> track_put(:active_step, next_step)
         |> steps_to_execute_update(fn x -> tl(x) end)
         |> actions_to_execute_put(step_actions_get(state, next_step))
@@ -528,27 +583,10 @@ defmodule Helen.Worker.Logic do
   end
 
   def status(state) do
-    %{active: %{mode: active_mode(state), step: active_step(state)}}
-  end
-
-  def execute(state) do
-    alias Helen.Workers
-
-    state = Workers.execute(state)
-
-    case cmd_rc(state) do
-      # if this action is processed via a message and a message is expected
-      # upon completion then we do not advance to the next action.  the next
-      # action is advanced upon receipt and processing of the command complete
-      # message.
-      %{cmd_rc: %{via_msg: true}} -> state
-      # a fault occurred while processing the action, store in the state for
-      # handling downstream
-      %{cmd_rd: %{fault: fault}} -> action_fault_put(state, fault)
-      # no match above indicates the command was processed and there should be
-      # no delay prior to the next action
-      _nomatch -> next_action(state)
-    end
+    %{
+      status: status_get(state),
+      active: %{mode: active_mode(state), step: active_step(state)}
+    }
   end
 
   def msg_puts(state, msg) do

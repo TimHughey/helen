@@ -23,100 +23,10 @@ defmodule Reef.Captain.Server do
     args = Enum.into(args, [])
     opts = parsed()
 
-    state = %{
-      module: __MODULE__,
-      server: %{
-        mode: args[:server_mode] || :active,
-        standby_reason: :none,
-        faults: %{}
-      },
-      opts: opts,
-      timeouts: %{last: :never, count: 0},
-      token: nil,
-      token_at: nil
-    }
-
-    # should the server start?
-    if state[:server][:mode] == :standby do
-      :ignore
-    else
-      {:ok, state, {:continue, :bootstrap}}
-    end
+    Logic.init_server(__MODULE__, args, opts)
   end
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
-
-  ##
-  ## Public API
-  ##
-
-  # @doc """
-  # Return the GenServer state.
-  #
-  # A single key (e.g. :server_mode) or a list of keys (e.g. :worker_mode, :server_mode)
-  # can be specified and only those keys are returned.
-  # """
-  # @doc since: "0.0.27"
-  # def x_state(keys \\ []) do
-  #   import Helen.Time.Helper, only: [utc_now: 0]
-  #
-  #   if is_nil(GenServer.whereis(__MODULE__)) do
-  #     :DOWN
-  #   else
-  #     keys = [keys] |> List.flatten()
-  #
-  #     state =
-  #       GenServer.call(__MODULE__, :state)
-  #       |> Map.drop([:opts])
-  #       |> put_in([:state_at], utc_now())
-  #
-  #     case keys do
-  #       [] -> state
-  #       [x] -> Map.get(state, x)
-  #       x -> Map.take(state, [x] |> List.flatten())
-  #     end
-  #   end
-  # end
-
-  ##
-  ## PRIVATE
-  ##
-
-  # defp __all_stop__(state) do
-  #   import Reef.Logic, only: [change_token: 1]
-  #
-  #   state
-  #   # prevent processing of any lingering messages
-  #   |> change_token()
-  #   # the safest way to stop everything is to take all the crew offline
-  #   |> crew_offline()
-  #   # bring them back online so they're ready for whatever comes next
-  #   |> crew_online()
-  #   |> set_all_modes_ready()
-  # end
-
-  # defp crew_list, do: [Air, Pump, Rodi, MixTank.Temp]
-  # defp crew_list_no_heat, do: [Air, Pump, Rodi]
-  #
-  # # NOTE:  state is unchanged however is parameter for use in pipelines
-  # defp crew_offline(state) do
-  #   for crew_member <- crew_list() do
-  #     apply(crew_member, :mode, [:standby])
-  #   end
-  #
-  #   state
-  # end
-  #
-  # # NOTE:  state is unchanged however is parameter for use in pipelines
-  # defp crew_online(state) do
-  #   # NOTE:  we NEVER bring MixTank.Temp online unless explictly requested
-  #   #        in a mode step/cmd
-  #   for crew_member <- crew_list_no_heat() do
-  #     apply(crew_member, :mode, [:active])
-  #   end
-  #
-  #   state
-  # end
 end

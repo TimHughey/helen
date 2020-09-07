@@ -23,6 +23,15 @@ cmd_definitions
       priority 7
 
 modes
+  all_stop
+    next_mode hold
+    sequence at_start finally
+    steps
+      at_start
+        all off
+      finally
+        all off
+        
   alpha
     next_mode beta
     sequence at_start middle finally

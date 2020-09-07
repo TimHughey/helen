@@ -135,6 +135,20 @@ defmodule Helen.Worker.State do
         Enum.member?(live_get_mode_sequence(state), :repeat)
       )
 
+  def execute_actions?(state), do: live_get(state, :execute_actions) || false
+  # flag that we want actions to be executed.  used in production.  not used
+  # during testing to avoid inifinite loops with repeating steps
+  def execute_actions(state, flag), do: stage_put(state, :execute_actions, flag)
+
+  def faults_map(state), do: faults_get(state, [])
+
+  def faults?(state) do
+    case faults_get(state, []) do
+      %{init: %{}} -> true
+      _x -> false
+    end
+  end
+
   def faults_get(state, what) do
     get_in(state, flatten([:logic, :faults, what]))
   end
@@ -187,7 +201,7 @@ defmodule Helen.Worker.State do
   def live_put(state, path, val),
     do: put_in(state, [:logic, :live, [path]] |> flatten(), val)
 
-  def live_put_status(state, status), do: state |> live_put([:status], status)
+  # def live_put_status(state, status), do: state |> live_put([:status], status)
 
   def live_update(state, path, func) when is_function(func, 1),
     do: state |> update_in(flatten([:logic, :live, path]), func)
@@ -243,6 +257,7 @@ defmodule Helen.Worker.State do
     case what do
       :runtime -> get_in(state, [:opts])
       :live -> live_get(state, :opts)
+      :server_mode -> get_in(state, [:opts, :base, :server_mode])
       what -> live_get(state, [:opts, what])
     end
   end
@@ -253,7 +268,28 @@ defmodule Helen.Worker.State do
     track_put(state, :pending_action, func.())
   end
 
-  def ready?(state), do: get_in(state, [:server_mode]) == :ready
+  def ready?(state), do: server_mode(state) == :ready
+
+  def server_get(state, what), do: get_in(state, flatten([:server, what]))
+
+  def server_mode(state, mode \\ nil) do
+    # ensure the server map exists in the state
+    state =
+      Map.put_new(state, :server, %{
+        mode: :ready,
+        standby_reason: :none,
+        faults: %{}
+      })
+
+    case mode do
+      nil -> server_get(state, :mode)
+      mode when mode in [:ready, :standby] -> server_put(state, :mode, mode)
+      _unmatched -> state
+    end
+  end
+
+  def server_put(state, what, val),
+    do: put_in(state, flatten([:server, what]), val)
 
   def stage_get(state, path),
     do: get_in(state, flatten([:logic, :stage, path]))
@@ -277,8 +313,21 @@ defmodule Helen.Worker.State do
   def stage_put_active_mode(state, mode),
     do: state |> stage_put(:active_mode, mode)
 
-  def status_get(state), do: live_get(state, [:status])
-  def status_put(state, status), do: state |> live_put([:status], status)
+  def standby_reason(state), do: server_mode(state)
+
+  def standby_reason_set(state, reason) do
+    case standby_reason(state) do
+      :standby -> server_put(state, :standby_reason, reason)
+      :active -> server_put(state, :standby_reason, :none)
+      _unmatched -> server_put(state, :standby_reason, :unknown)
+    end
+  end
+
+  def status_get(state), do: live_get(state, :status) || :none
+
+  def status_put(state, status) do
+    state |> live_put(:status, status)
+  end
 
   def step_actions_get(state, step_name),
     do: live_get(state, [:steps, step_name, :actions])

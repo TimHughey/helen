@@ -105,16 +105,12 @@ defmodule PulseWidth do
   def duty(name, opts \\ [])
 
   def duty(name, val_bin) when is_binary(name) and is_binary(val_bin) do
-    case Integer.parse(val_bin) do
-      :error ->
-        :bad_value
-
-      {int_part, ""} ->
-        duty(name, int_part)
-
-      {int_part, float_bin} ->
-        {float_part, _} = Float.parse(float_bin)
-        duty(name, int_part + float_part)
+    if String.contains?(val_bin, ".") do
+      {float_part, _} = Float.parse(val_bin)
+      duty(name, float_part)
+    else
+      {int_part, _} = Integer.parse(val_bin)
+      duty(name, int_part)
     end
   end
 

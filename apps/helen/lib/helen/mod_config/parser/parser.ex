@@ -345,7 +345,7 @@ defmodule Helen.Config.Parser do
 
     obj
     |> update_in(step_path, fn x ->
-      [x, make_action(match)] |> List.flatten()
+      [x, [make_action(match)]] |> List.flatten()
     end)
   end
 

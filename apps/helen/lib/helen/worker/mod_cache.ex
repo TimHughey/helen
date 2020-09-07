@@ -45,7 +45,8 @@ defmodule Helen.Workers.ModCache do
          :reef_workers
        ),
        do:
-         put_in(acc, [:module], Reef.FirstMate) |> put_in([:type], :reef_worker)
+         put_in(acc, [:module], Reef.FirstMate.Server)
+         |> put_in([:type], :reef_worker)
 
   # already found?  then do nothing
   defp search(%{find: _, module: mod} = acc, :reef_workers) when is_atom(mod),
@@ -84,8 +85,9 @@ defmodule Helen.Workers.ModCache do
   #
   # not found?  then search through all workers for a matching name
   defp search(%{find: {_ident, name}, module: nil} = acc, :workers) do
-    for %{name: x, module: mod} when x == name <- all(), reduce: acc do
-      acc -> put_in(acc, [:module], mod) |> put_in([:type], :gen_device)
+    for %{name: x, module: mod, type: type} when x == name <- all(),
+        reduce: acc do
+      acc -> put_in(acc, [:module], mod) |> put_in([:type], type)
     end
   end
 

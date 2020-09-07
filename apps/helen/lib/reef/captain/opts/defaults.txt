@@ -17,10 +17,12 @@ workers
 
 modes
   all_stop
-    sequence all_stop
     next_mode hold
+    sequence at_start finally
     steps
-      all_stop
+      at_start
+        all off
+      finally
         all off
 
   fill

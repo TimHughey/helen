@@ -28,7 +28,7 @@ defmodule HelenWorkersModCacheTest do
     assert is_map(res)
     assert res[:found?]
     assert res[:name] == :reef_worker
-    assert res[:module] == Reef.FirstMate
+    assert res[:module] == Reef.FirstMate.Server
   end
 
   test "can find module for a generic worker?" do

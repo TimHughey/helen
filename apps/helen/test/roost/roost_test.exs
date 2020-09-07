@@ -1,7 +1,7 @@
 defmodule RoostServerTest do
   @moduledoc false
 
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   alias Helen.Config.Parser
   alias Roost.Server
@@ -26,6 +26,11 @@ defmodule RoostServerTest do
           List.flatten([x, PulseWidth.alias_create(pwm_dev, pwm_alias)])
         end)
     end
+  end
+
+  setup context do
+    {:ok, _pid} = Roost.restart()
+    context
   end
 
   test "roost server creates the server state via init/1" do
@@ -68,11 +73,15 @@ defmodule RoostServerTest do
              Server.handle_info({:logic, msg}, state)
   end
 
-  test "roost server can change modes" do
-    {rc, mode} = Roost.mode(:dance_with_me)
+  test "roost server can be set to all stop" do
+    assert {:ok, :all_stop} == Server.change_mode(:all_stop)
 
-    assert rc == :ok
-    assert mode == :dance_with_me
+    assert :all_stop == Server.active_mode()
+    assert Server.holding?()
+  end
+
+  test "roost server can change modes" do
+    assert {:ok, :dance_with_me} == Roost.mode(:dance_with_me)
   end
 
   test "the truth will set you free" do

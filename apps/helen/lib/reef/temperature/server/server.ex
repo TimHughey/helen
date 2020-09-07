@@ -91,7 +91,11 @@ defmodule Reef.Temp.Server do
       """
       @doc since: "0.0.27"
       def device_module_map do
-        %{name: get_in(state(:opts), [:switch, :name]), module: __MODULE__}
+        %{
+          name: get_in(state(:opts), [:switch, :name]),
+          module: __MODULE__,
+          type: :temp_server
+        }
       end
 
       def last_timeout do

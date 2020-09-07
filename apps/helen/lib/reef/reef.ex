@@ -17,7 +17,7 @@ defmodule Reef do
   defdelegate available_modes, to: Captain, as: :available_modes
 
   @doc delegate_to: {Captain, :server_mode, 1}
-  defdelegate server_mode(opts), to: Captain, as: :server_mode
+  defdelegate server(mode), to: Captain, as: :server
 
   @doc """
   Output the server options stored in the database.

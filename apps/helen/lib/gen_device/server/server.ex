@@ -92,7 +92,7 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def device_module_map do
-        %{name: state(:device_name), module: __MODULE__}
+        %{name: state(:device_name), module: __MODULE__, type: :gen_device}
       end
 
       @doc """

@@ -21,25 +21,7 @@ defmodule Reef.FirstMate.Server do
     args = Enum.into(args, [])
     opts = parsed()
 
-    state = %{
-      module: __MODULE__,
-      server: %{
-        mode: args[:server_mode] || :active,
-        standby_reason: :none,
-        faults: %{}
-      },
-      opts: opts,
-      timeouts: %{last: :never, count: 0},
-      token: nil,
-      token_at: nil
-    }
-
-    # should the server start?
-    if state[:server][:mode] == :standby do
-      :ignore
-    else
-      {:ok, state, {:continue, :bootstrap}}
-    end
+    Logic.init_server(__MODULE__, args, opts)
   end
 
   def start_link(args) do

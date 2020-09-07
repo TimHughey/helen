@@ -1,7 +1,7 @@
 defmodule ReefCaptainTest do
   @moduledoc false
 
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   alias Helen.Config.Parser
   alias Reef.Captain.Server, as: Captain
@@ -13,6 +13,16 @@ defmodule ReefCaptainTest do
 
   setup_all do
     %{}
+  end
+
+  setup context do
+    restart_rc = Captain.restart()
+
+    assert {rc, pid} = restart_rc
+    assert rc == :ok
+    assert is_pid(pid)
+
+    context
   end
 
   test "reef Captain creates the server state via init/1" do
@@ -68,40 +78,40 @@ defmodule ReefCaptainTest do
   test "can get overall reef Captain status" do
     status = Captain.status()
 
-    assert status == %{active: %{mode: :none, step: :none}}
+    assert status == %{status: :none, active: %{mode: :none, step: :none}}
   end
+
+  test "reef Captain can be restarted, set to ready and standby" do
+    res = Captain.server(:standby)
+
+    assert res == {:ok, :standby}
+
+    is_ready? = Captain.ready?()
+
+    refute is_ready?
+  end
+
+  test "Captain prevents changing modes while server is in standby" do
+    Captain.server(:standby)
+
+    res = Captain.change_mode(:fill)
+
+    assert {:fault, %{init: %{server: :standby}}} == res
+  end
+
+  @tag special: true
+  test "Captain can be set to all stop" do
+    assert {:ok, :all_stop} == Captain.change_mode(:all_stop)
+
+    assert %{status: :holding, active: %{mode: :all_stop, step: :finally}} ==
+             Captain.status()
+  end
+
+  # test "Captian can be set to all stop" do
+  #   assert {:ok, :all_stop} == Captain.all_stop()
+  # end
 
   test "the truth will set you free" do
     assert true
   end
-
-  # def config(what) do
-  #   parsed =
-  #     case what do
-  #       :roost -> Parser.parse(@config_txt)
-  #     end
-  #
-  #   make_state(%{
-  #     opts: get_in(parsed, [:config]),
-  #     parser: get_in(parsed, [:parser])
-  #   })
-  # end
-  #
-  # def make_state(map \\ %{}) do
-  #   import DeepMerge, only: [deep_merge: 2]
-  #   import Helen.Time.Helper, only: [utc_now: 0]
-  #
-  #   base = %{
-  #     module: __MODULE__,
-  #     server: %{mode: :init, standby_reason: :none},
-  #     logic: %{},
-  #     devices: %{},
-  #     opts: %{},
-  #     timeouts: %{last: :never, count: 0},
-  #     token: make_ref(),
-  #     token_at: utc_now()
-  #   }
-  #
-  #   deep_merge(base, map)
-  # end
 end
