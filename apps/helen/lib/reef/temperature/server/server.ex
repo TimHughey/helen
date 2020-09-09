@@ -5,6 +5,7 @@ defmodule Reef.Temp.Server do
   """
 
   defmacro __using__(use_opts) do
+    # credo:disable-for-next-line
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       use GenServer, restart: :transient, shutdown: 7000
 
@@ -75,18 +76,13 @@ defmodule Reef.Temp.Server do
       end
 
       @doc """
-      Return a map of the device name managed by this GenDevice and the module
+      Return a map of the device name managed by this worker and the module
       manading the device.
 
       Useful for creating a map of known "devices" when working with many
-      GenDevice managed devices.
+      worker managed devices.
 
       Returns a map.
-
-      ## Examples
-
-          iex> GenDevice.device_module_map
-          %{name: "device name", module: Module}
 
       """
       @doc since: "0.0.27"
