@@ -10,7 +10,7 @@ defmodule Helen.Config.Parser.Regex do
         "(?<cmd>[a-zA-Z]+[a-zA-Z0-9_]+)"
 
       :cmd_list ->
-        "(?<cmd>(on|off))\\s+#{re(:list_val)}"
+        "#{re(:cmd)}\\s+#{re(:list_val)}"
 
       :ident ->
         re(:ident, "ident")
@@ -214,15 +214,19 @@ defmodule Helen.Config.Parser.Regex do
           },
           %{
             context: :modes,
-            stmt: :generic,
-            norm: :key_atom,
-            re: Regex.compile!("^\\s{4}#{re(:kv)}$")
+            stmt: :sequence,
+            norm: :key_list,
+            re:
+              Regex.compile!(
+                "^\\s{4}#{re(:key_match, :sequence)}\\s+#{re(:list_val)}$"
+              )
+            # re: Regex.compile!("^\\s{4}#{re(:key_list)}$")
           },
           %{
             context: :modes,
-            stmt: :sequence,
-            norm: :key_list,
-            re: Regex.compile!("^\\s{4}#{re(:key_list)}$")
+            stmt: :generic,
+            norm: :key_atom,
+            re: Regex.compile!("^\\s{4}#{re(:kv)}$")
           },
           %{
             context: :modes,

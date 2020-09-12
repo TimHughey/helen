@@ -11,7 +11,7 @@ defmodule UI.ReefView do
 
     server_mode = if manual_control, do: :standby, else: :active
 
-    rc = Captain.server_mode(server_mode)
+    rc = Captain.server(server_mode)
 
     %{button_click: %{action: "manual_control"}} |> populate_click_rc(rc)
   end
@@ -55,7 +55,7 @@ defmodule UI.ReefView do
       {"captain", "unlock-steps"} -> {:noted, :unlock_steps}
       {"captain", "lock-steps"} -> {:noted, :lock_steps}
       {"first_mate", "reset"} -> FirstMate.restart()
-      {"first_mate", "off"} -> FirstMate.server_mode(:standby)
+      {"first_mate", "off"} -> FirstMate.server(:standby)
       _x -> {:unhandled_worker_action, payload}
     end
   end

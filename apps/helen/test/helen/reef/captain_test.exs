@@ -78,7 +78,10 @@ defmodule ReefCaptainTest do
   test "can get overall reef Captain status" do
     status = Captain.status()
 
-    assert status == %{status: :none, active: %{mode: :none, step: :none}}
+    assert status == %{
+             status: :none,
+             active: %{mode: :none, step: :none, action: :none}
+           }
   end
 
   test "reef Captain can be restarted, set to ready and standby" do
@@ -103,8 +106,10 @@ defmodule ReefCaptainTest do
   test "Captain can be set to all stop" do
     assert {:ok, :all_stop} == Captain.change_mode(:all_stop)
 
-    assert %{status: :holding, active: %{mode: :all_stop, step: :finally}} ==
-             Captain.status()
+    status = Captain.status()
+
+    assert %{status: :holding, active: %{mode: :all_stop, step: :all_stop}} ==
+             update_in(status, [:active], fn x -> Map.drop(x, [:action]) end)
   end
 
   # test "Captian can be set to all stop" do

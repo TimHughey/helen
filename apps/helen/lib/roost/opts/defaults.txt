@@ -78,9 +78,9 @@ modes
     next_mode hold
     steps
       house_lights
-        off el_wire_entry
+        el_wire_entry off
         led_forest closed_fade
       closed
-        sleep PT1M
+        sleep PT1S
 
 # end of roost config

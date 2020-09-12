@@ -10,6 +10,8 @@ defmodule Helen.Config.Parser do
   import Helen.Time.Helper, only: [to_duration: 1]
   import Parser.Regex, only: [regex: 1]
 
+  @two_spaces "  "
+
   def parse(raw) when is_binary(raw) do
     raw
     |> list_of_lines()
@@ -18,10 +20,7 @@ defmodule Helen.Config.Parser do
 
   defp list_of_lines(raw) do
     for line <- String.split(raw, "\n") do
-      # two_spaces = "  "
-      #
-      # String.replace(line, "\t", two_spaces)
-      line
+      String.replace(line, "\t", @two_spaces)
     end
   end
 

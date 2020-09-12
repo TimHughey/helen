@@ -21,10 +21,12 @@ defmodule Helen.Worker.Logic do
   @callback timeout_hook(map()) :: map()
 
   defmacro __using__(use_opts) do
+    # credo:disable-for-next-line
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       @behaviour Helen.Worker.Logic
 
       alias Helen.Worker.{Logic, State}
+      alias Helen.Worker.State.Common
 
       def active_mode, do: call({:inquiry, :active_mode})
       def active_step, do: call({:inquiry, :active_step})
@@ -93,7 +95,7 @@ defmodule Helen.Worker.Logic do
       @impl true
       def handle_continue(:bootstrap, state) do
         state
-        |> State.change_token()
+        |> Common.change_token()
         |> Logic.noreply()
       end
 
@@ -107,7 +109,7 @@ defmodule Helen.Worker.Logic do
       @impl true
       def handle_info(:timeout, state) do
         state
-        |> State.update_last_timeout()
+        |> Common.update_last_timeout()
         |> timeout_hook()
       end
 
@@ -129,8 +131,6 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def mode(mode, opts), do: call({:mode, mode, opts})
 
-      # defdelegate noreply(state), to: Logic
-
       @doc """
       Is the server ready?
 
@@ -138,8 +138,6 @@ defmodule Helen.Worker.Logic do
       """
       @doc since: "0.0.27"
       def ready?, do: call({:inquiry, :ready?})
-
-      # defdelegate reply(x, y), to: Logic
 
       @doc """
       Restarts the server via the Supervisor
@@ -208,6 +206,7 @@ defmodule Helen.Worker.Logic do
   ## START OF MODULE
   ##
 
+  import Helen.Worker.State.Common
   import Helen.Worker.State
 
   def all_stop(state) do
@@ -265,23 +264,26 @@ defmodule Helen.Worker.Logic do
 
     state = Workers.execute(state)
 
+    # IO.puts("execute cmd_rc: #{inspect(cmd_rc(state), pretty: true)}")
+
     case cmd_rc(state) do
       # if this action is processed via a message and a message is expected
       # upon completion then we do not advance to the next action.  the next
       # action is advanced upon receipt and processing of the command complete
       # message.
-      %{cmd_rc: %{via_msg: true}} ->
+      %{wait: true} ->
         state
 
       # a fault occurred while processing the action, store in the state for
       # handling downstream
-      %{cmd_rc: %{fault: fault}} ->
+      %{fault: fault} ->
         action_fault_put(state, fault)
 
       # no match above indicates the command was processed and there should be
       # no delay prior to the next action
-      _nomatch ->
-        next_action(state)
+      cmd_rc ->
+        # since the action was executed it is no longer pending
+        pending_action_drop(state) |> next_action()
     end
   end
 
@@ -314,60 +316,6 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def handle_inquiry(x, state)
-      when x in [:active_mode, :active_step, :status] do
-    case x do
-      :active_mode -> active_mode(state) || :none
-      :active_step -> active_step(state) || :none
-      :status -> status(state)
-    end
-    |> reply(state)
-  end
-
-  def handle_inquiry(x, state)
-      when x in [:faults?, :ready?, :standby?, :holding?] do
-    case x do
-      :faults? -> faults?(state)
-      :holding? -> holding?(state)
-      :ready? -> ready?(state)
-      :standby? -> not ready?(state)
-    end
-    |> reply(state)
-  end
-
-  def handle_inquiry(x, state)
-      when x in [:available_modes, :last_timeout, :timeouts] do
-    case x do
-      :available_modes -> available_modes(state)
-      :last_timeout -> last_timeout(state)
-      :timeouts -> timeouts(state)
-    end
-    |> reply(state)
-  end
-
-  def handle_inquiry(x, state) when x in [:live_opts, :runtime_opts] do
-    case x do
-      :live_opts -> opts(state, :live)
-      :runtime_opts -> opts(state, :runtime)
-    end
-    |> reply(state)
-  end
-
-  def handle_inquiry({:inquiry, {:faults, what}}, state),
-    do: faults_get(state, what)
-
-  def handle_logic_msg(%{token: msg_token} = msg, %{token: token} = state)
-      when msg_token == token do
-    case msg do
-      %{via_msg: true} = msg -> handle_via_msg(msg, state)
-      _unmatched -> next_action(state)
-    end
-  end
-
-  def handle_logic_msg(%{token: msg_token}, %{token: token} = state)
-      when msg_token != token,
-      do: state
-
   def handle_call(msg, state) do
     case msg do
       {:inquiry, what} -> handle_inquiry(what, state)
@@ -375,6 +323,57 @@ defmodule Helen.Worker.Logic do
       {:state, _} -> state |> update_elapsed() |> reply(state)
     end
   end
+
+  def handle_inquiry({:inquiry, {:faults, what}}, state),
+    do: faults_get(state, what)
+
+  # credo:disable-for-next-line
+  def handle_inquiry(x, state) do
+    case x do
+      :active_mode -> active_mode(state) || :none
+      :active_step -> active_step(state) || :none
+      :available_modes -> available_modes(state)
+      :faults? -> faults?(state)
+      :holding? -> holding?(state)
+      :last_timeout -> last_timeout(state)
+      :live_opts -> opts(state, :live)
+      :ready? -> ready?(state)
+      :runtime_opts -> opts(state, :runtime)
+      :status -> status(state)
+      :standby? -> not ready?(state)
+      :timeouts -> timeouts(state)
+    end
+    |> reply(state)
+  end
+
+  def handle_logic_msg(%{token: msg_token} = msg, %{token: token} = state)
+      when msg_token == token do
+    # IO.puts("++++++++++++++++\n")
+    # IO.puts(inspect(Map.drop(msg, [:worker_cache]), pretty: true))
+    # IO.puts("\n----------------")
+
+    case msg do
+      %{via_msg: true, via_msg_at: :at_start} ->
+        state
+
+      %{via_msg: true, via_msg_at: :at_finish} ->
+        pending_action_drop(state) |> next_action()
+
+      %{via_msg: true} ->
+        pending_action_drop(state) |> next_action()
+
+      msg ->
+        IO.puts(
+          "handle_logic_msg unmatched msg:\n#{inspect(msg, pretty: true)}"
+        )
+
+        next_action(state)
+    end
+  end
+
+  def handle_logic_msg(%{token: msg_token}, %{token: token} = state)
+      when msg_token != token,
+      do: state
 
   def handle_server_mode(mode, state) do
     case {server_mode(state), mode} do
@@ -391,16 +390,6 @@ defmodule Helen.Worker.Logic do
         |> reply({:ok, mode})
     end
   end
-
-  # TODO
-  def handle_via_msg(msg, %{logic: _logic} = state) do
-    IO.puts("handle_via_msg: #{inspect(msg, pretty: true)}")
-
-    state
-  end
-
-  # not a message we have logic for, just pass through state
-  def handle_via_msg(_msg, state), do: state
 
   def holding?(state), do: status_get(state) == :holding
 
@@ -454,7 +443,7 @@ defmodule Helen.Worker.Logic do
   end
 
   def next_action(state) do
-    import Helen.Workers, only: [make_action: 4]
+    alias Helen.Workers
 
     state = update_elapsed(state)
     workers = cached_workers(state)
@@ -465,9 +454,9 @@ defmodule Helen.Worker.Logic do
 
       [action | _rest] ->
         actions_to_execute_update(state, fn x -> tl(x) end)
-        |> pending_action_put(fn ->
-          make_action(:logic, workers, action, state)
-        end)
+        |> pending_action_put(
+          Workers.make_action(:logic, workers, action, state)
+        )
         |> execute_actions_if_needed()
     end
   end
@@ -583,9 +572,18 @@ defmodule Helen.Worker.Logic do
   end
 
   def status(state) do
+    clean_action = fn
+      :none -> :none
+      %{} = x -> Map.drop(x, [:worker_cache])
+    end
+
     %{
       status: status_get(state),
-      active: %{mode: active_mode(state), step: active_step(state)}
+      active: %{
+        mode: active_mode(state),
+        step: active_step(state),
+        action: pending_action(state) |> clean_action.()
+      }
     }
   end
 

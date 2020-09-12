@@ -6,6 +6,7 @@ defmodule WorkerLogicTest do
 
   alias Helen.Config.Parser
   alias Helen.Worker.{Logic, State}
+  alias Helen.Worker.State.Common
   alias Helen.Workers
 
   @test_file Path.join([__DIR__, "test_config.txt"]) |> Path.expand()
@@ -56,7 +57,7 @@ defmodule WorkerLogicTest do
     %{token: initial_token, token_at: initial_token_at} = state = make_state()
 
     %{token: changed_token, token_at: changed_token_at} =
-      State.change_token(state)
+      Common.change_token(state)
 
     refute changed_token == initial_token
     refute changed_token_at == initial_token_at
@@ -65,14 +66,14 @@ defmodule WorkerLogicTest do
   test "can confirm a mode exists" do
     state = config(:test) |> Logic.confirm_mode_exists(:beta)
 
-    refute State.faults?(state)
+    refute Common.faults?(state)
   end
 
   test "can detect a mode does not exist" do
     state = config(:test) |> Logic.confirm_mode_exists(:foobar)
 
-    refute State.faults?(state)
-    assert State.faults_get(state, :init) == {:unknown_mode, :foobar}
+    refute Common.faults?(state)
+    assert Common.faults_get(state, :init) == {:unknown_mode, :foobar}
   end
 
   test "can perform init" do
@@ -81,7 +82,7 @@ defmodule WorkerLogicTest do
       config(:test)
       |> Logic.init(:alpha)
 
-    refute State.faults?(state)
+    refute Common.faults?(state)
     assert %{active_mode: :alpha, steps: steps} = stage |> Map.drop([:opts])
     assert %{at_start: %{actions: actions}} = steps
     assert %{worker: :air, cmd: :on} = hd(actions)

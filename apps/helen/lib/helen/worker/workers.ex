@@ -11,7 +11,8 @@ defmodule Helen.Workers do
   import Helen.Worker.State
   import Helen.Workers.ModCache, only: [module: 2]
 
-  def add_via_msg(action), do: put_in(action, [:via_msg], true)
+  def add_via_msg(action),
+    do: put_in(action, [:via_msg], true) |> put_in([:wait], true)
 
   def build_module_cache(nil), do: %{}
 
@@ -33,6 +34,16 @@ defmodule Helen.Workers do
     result = execute_action(action)
 
     cmd_rc_put(state, result)
+  rescue
+    anything ->
+      IO.puts(inspect(anything, pretty: true))
+      IO.puts(inspect(__STACKTRACE__, pretty: true))
+
+      IO.puts(
+        inspect(pending_action(state) |> Map.drop([:worker_cache]), pretty: true)
+      )
+
+      state
   end
 
   # NOTE: has test case
@@ -40,9 +51,7 @@ defmodule Helen.Workers do
   def execute_action(%{stmt: :sleep, args: duration, reply_to: pid} = action) do
     import Helen.Time.Helper, only: [to_ms: 1]
 
-    action
-    |> add_via_msg()
-    |> execute_result(fn ->
+    execute_result(action, fn ->
       Process.send_after(pid, make_msg(action), to_ms(duration))
     end)
   end
@@ -69,28 +78,31 @@ defmodule Helen.Workers do
     end)
   end
 
-  def execute_action(%{stmt: :cmd_basic, worker: %{module: mod}} = action) do
+  def execute_action(%{stmt: :cmd_list, cmd: cmd, worker: workers} = action) do
+    # IO.puts("all action: #{inspect(action, pretty: true)}")
+
     action
-    |> add_via_msg()
-    |> execute_result(fn -> mod.execute_action(action) end)
+    |> execute_result(fn ->
+      for {ident, %{module: mod, found?: true, type: type} = worker}
+          when type in [:simple_device, :gen_device] <- workers,
+          into: %{} do
+        # add the worker to the action for matching by the executing module
+        action = worker_cmd_put(action, cmd) |> put_in([:worker], worker)
+        {ident, mod.execute_action(action)}
+      end
+    end)
+  end
+
+  def execute_action(%{stmt: :cmd_basic, worker: %{module: mod}} = action) do
+    execute_result(action, fn -> mod.execute_action(action) end)
   end
 
   def execute_action(%{stmt: stmt, worker: %{module: mod}} = action)
       when stmt in [:cmd_for, :cmd_for_then] do
-    action
-    |> add_via_msg()
-    |> execute_result(fn -> mod.execute_action(action) end)
+    action = add_via_msg(action)
+
+    execute_result(action, fn -> mod.execute_action(action) end)
   end
-
-  # def execute_action(%{stmt: cmd, worker: %{module: mod}} = action)
-  #     when is_atom(cmd) and is_atom(mod) do
-  #   %{
-  #     cmd: :basic,
-  #     basic_rc: mod.execute_action(action)
-  #   }
-  # end
-
-  def execute_action(_action), do: %{via_msg: true}
 
   def make_action(msg_type, worker_cache, action, %{token: token} = state) do
     Map.merge(action, %{
@@ -113,7 +125,7 @@ defmodule Helen.Workers do
         worker_cmd_put(action, :mode) |> put_in([:mode], action[:msg])
 
       :sleep ->
-        action
+        add_via_msg(action)
 
       cmd when cmd in [:on, :off, :duty] ->
         worker_cmd_put(action, cmd)
@@ -150,6 +162,11 @@ defmodule Helen.Workers do
           get_in(cache, [ident])
         end
     end
+  end
+
+  def worker_cmd_put(%{for: _} = action, val) do
+    put_in(action, [:worker_cmd], val)
+    |> put_in([:notify], %{at_start: true, at_finish: true})
   end
 
   def worker_cmd_put(action, val), do: put_in(action, [:worker_cmd], val)

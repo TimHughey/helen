@@ -68,29 +68,6 @@ defmodule HelenWorkersTest do
     assert_receive {:test, %{cmd: :sleep, token: ^token}}, 100
   end
 
-  # test "can execute the 'all' action", %{wc: wc, token: token} do
-  #   alias Reef.MixTank.Air, as: Air
-  #   alias Reef.MixTank.Pump, as: Pump
-  #
-  #   Air.mode(:ready)
-  #   Pump.mode(:ready)
-  #
-  #   action =
-  #     Workers.make_action(
-  #       :test,
-  #       wc,
-  #       %{stmt: :all, cmd: :on, args: [:air, :pump]},
-  #       %{token: token}
-  #     )
-  #
-  #   res = Workers.execute_action(action)
-  #
-  #   assert res[:stmt] == :all
-  #   assert res[:cmd] == :on
-  #   assert Map.keys(res[:result]) == [:air, :pump]
-  #   assert res[:result] == %{air: :ok, pump: :ok}
-  # end
-
   # test "can execute the 'tell' action", %{wc: wc, token:} do
   #   alias Reef.Captain.Server, as: Captain
   #

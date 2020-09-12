@@ -4,7 +4,7 @@ defmodule Helen.Worker.State do
   import List, only: [flatten: 1]
 
   def action_fault_put(state, val),
-    do: state |> put_in([:logic, :faults, :action], val)
+    do: put_in(state, [:logic, :faults, :action], val)
 
   def actions_to_execute_get(state), do: track_get(state, [:actions_to_execute])
 
@@ -90,14 +90,6 @@ defmodule Helen.Worker.State do
     end
   end
 
-  def change_token(state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> update_in([:token], fn _x -> make_ref() end)
-    |> update_in([:token_at], fn _x -> utc_now() end)
-  end
-
   def cmd_definition(state, what),
     do: live_get(state, [:opts, :cmd_definitions, what])
 
@@ -140,19 +132,6 @@ defmodule Helen.Worker.State do
   # during testing to avoid inifinite loops with repeating steps
   def execute_actions(state, flag), do: stage_put(state, :execute_actions, flag)
 
-  def faults_map(state), do: faults_get(state, [])
-
-  def faults?(state) do
-    case faults_get(state, []) do
-      %{init: %{}} -> true
-      _x -> false
-    end
-  end
-
-  def faults_get(state, what) do
-    get_in(state, flatten([:logic, :faults, what]))
-  end
-
   def finished_get(state, path),
     do: get_in(state, flatten([:logic, :finished, path]))
 
@@ -169,15 +148,8 @@ defmodule Helen.Worker.State do
       |> build_logic_map()
       |> update_in([:logic, :faults], fn x -> Map.drop(x, [:init]) end)
 
-  def last_timeout(%{lasts: %{timeout: last_timeout}} = state) do
-    tz = opts(state, :timezone) || "America/New_York"
-
-    case last_timeout do
-      :never -> :never
-      %DateTime{} = last_timeout -> Timex.to_datetime(last_timeout, tz)
-      _unmatched -> :unknown
-    end
-  end
+  def lasts_put(state, what, val),
+    do: put_in(state, flatten([:lasts, what]), val)
 
   def live_get(state, path),
     do: get_in(state, flatten([:logic, :live, path]))
@@ -205,12 +177,6 @@ defmodule Helen.Worker.State do
 
   def live_update(state, path, func) when is_function(func, 1),
     do: state |> update_in(flatten([:logic, :live, path]), func)
-
-  def loop_timeout(%{opts: opts}) do
-    import Helen.Time.Helper, only: [to_ms: 2]
-
-    to_ms(opts[:timeout], "PT30.0S")
-  end
 
   def mode_repeat_until_stopped?(state),
     do: live_get(state, :repeat_until_stopped?)
@@ -253,43 +219,14 @@ defmodule Helen.Worker.State do
     end
   end
 
-  def opts(state, what) when is_atom(what) or is_binary(what) do
-    case what do
-      :runtime -> get_in(state, [:opts])
-      :live -> live_get(state, :opts)
-      :server_mode -> get_in(state, [:opts, :base, :server_mode])
-      what -> live_get(state, [:opts, what])
-    end
+  def pending_action(state), do: track_get(state, :pending_action) || :none
+
+  def pending_action_put(state, val) do
+    track_put(state, :pending_action, val)
   end
 
-  def pending_action(state), do: track_get(state, :pending_action)
-
-  def pending_action_put(state, func) do
-    track_put(state, :pending_action, func.())
-  end
-
-  def ready?(state), do: server_mode(state) == :ready
-
-  def server_get(state, what), do: get_in(state, flatten([:server, what]))
-
-  def server_mode(state, mode \\ nil) do
-    # ensure the server map exists in the state
-    state =
-      Map.put_new(state, :server, %{
-        mode: :ready,
-        standby_reason: :none,
-        faults: %{}
-      })
-
-    case mode do
-      nil -> server_get(state, :mode)
-      mode when mode in [:ready, :standby] -> server_put(state, :mode, mode)
-      _unmatched -> state
-    end
-  end
-
-  def server_put(state, what, val),
-    do: put_in(state, flatten([:server, what]), val)
+  def pending_action_drop(state),
+    do: track_update(state, [], fn x -> Map.drop(x, [:pending_action]) end)
 
   def stage_get(state, path),
     do: get_in(state, flatten([:logic, :stage, path]))
@@ -313,15 +250,7 @@ defmodule Helen.Worker.State do
   def stage_put_active_mode(state, mode),
     do: state |> stage_put(:active_mode, mode)
 
-  def standby_reason(state), do: server_mode(state)
-
-  def standby_reason_set(state, reason) do
-    case standby_reason(state) do
-      :standby -> server_put(state, :standby_reason, reason)
-      :active -> server_put(state, :standby_reason, :none)
-      _unmatched -> server_put(state, :standby_reason, :unknown)
-    end
-  end
+  def state_put(state, what, val), do: put_in(state, flatten([what]), val)
 
   def status_get(state), do: live_get(state, :status) || :none
 
@@ -340,10 +269,6 @@ defmodule Helen.Worker.State do
 
   def steps_to_execute_update(state, func),
     do: track_update(state, :steps_to_execute, func)
-
-  def timeouts(%{timeouts: %{count: count}}), do: count
-
-  def token(%{token: token}), do: token
 
   def track_calculated_step_duration_get(state, step_name),
     do:
@@ -438,12 +363,4 @@ defmodule Helen.Worker.State do
 
   # allow update_elapsed/1 calls when there isn't a mode running
   def update_elapsed(state), do: state
-
-  def update_last_timeout(state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> put_in([:timeouts, :last], utc_now())
-    |> update_in([:timeouts, :count], fn x -> x + 1 end)
-  end
 end
