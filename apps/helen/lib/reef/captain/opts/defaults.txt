@@ -20,16 +20,14 @@ modes
     next_mode hold
     sequence all_stop
     steps
-      at_start
-        all off
       all_stop
         all off
-
+        
   fill
     next_mode keep_fresh
-    sequence at_start main topoff finally
+    sequence initial main topoff finally
     steps
-      at_start for PT2H
+      initial for PT2H
         rodi on PT2M10S then off
         rodi off PT12M
       main for PT3H
@@ -40,8 +38,7 @@ modes
         air off
         rodi on PT15M then off
       finally
-        air off
-        rodi off
+        off air rodi
 
   keep_fresh
     next_mode hold

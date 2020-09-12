@@ -37,11 +37,9 @@ cmd_definitions
 modes
   all_stop
     next_mode hold
-    sequence at_start finally
+    sequence all_stop finally
     steps
-      at_start
-        all off
-      finally
+      all_stop
         all off
 
   dance_with_me

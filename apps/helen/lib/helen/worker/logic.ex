@@ -281,7 +281,7 @@ defmodule Helen.Worker.Logic do
 
       # no match above indicates the command was processed and there should be
       # no delay prior to the next action
-      cmd_rc ->
+      _cmd_rc ->
         # since the action was executed it is no longer pending
         pending_action_drop(state) |> next_action()
     end
@@ -574,7 +574,7 @@ defmodule Helen.Worker.Logic do
   def status(state) do
     clean_action = fn
       :none -> :none
-      %{} = x -> Map.drop(x, [:worker_cache])
+      %{} = x -> Map.take(x, [:cmd, :worker_cmd, :stmt])
     end
 
     %{
