@@ -1,23 +1,9 @@
 class Reef {
   constructor(channel) {
     this.channel = channel;
-    this.stepsLocked = true;
+    this.modesLocked = true;
     this.manualControl = false;
   }
-
-  // allStop(steps) {
-  //   for (const step of steps) {
-  //     // when the captain is answering all stop then only Fill is available
-  //     switch ($(step).data("step")) {
-  //       case "fill":
-  //         $(step).removeClass("active disabled completed");
-  //         break;
-  //
-  //       default:
-  //         $(step).removeClass("active completed").addClass("disabled");
-  //     }
-  //   }
-  // }
 
   channel() {
     return this.channel;
@@ -32,11 +18,11 @@ class Reef {
     }
 
     switch (action) {
-      case "unlock-steps":
-        if (this.stepsLocked) {
-          this.stepsLock(false);
+      case "unlock-modes":
+        if (this.modesLocked) {
+          this.modesLock(false);
         } else {
-          this.stepsLock(true);
+          this.modesLock(true);
           this.pushMessage(payload);
         }
         break;
@@ -45,8 +31,13 @@ class Reef {
         this.handleManualControl(payload);
         break;
 
+      case "reset":
+      case "stop":
+        this.pushMessage(payload);
+        break;
+
       default:
-        console.log("handleActionClick() not implemented: ", payload);
+        console.log("clickAtion() not implemented: ", payload);
     }
   }
 
@@ -61,10 +52,10 @@ class Reef {
     console.log("clickDevice: ", payload);
   }
 
-  clickStep(payload) {
-    let {step: step = null} = payload;
+  clickMode(payload) {
+    let {mode: mode = null} = payload;
 
-    if (step === null) {
+    if (mode === null) {
       // this was not a step click
       return;
     }
@@ -82,12 +73,12 @@ class Reef {
       subsystem: "reef",
       action: jQuery(target).data("action"),
       device: jQuery(target).data("device"),
-      step: jQuery(target).data("step")
+      mode: jQuery(target).data("mode")
     };
 
     // the click functions determine if the payload should be handled
     this.clickDevice(payload);
-    this.clickStep(payload);
+    this.clickMode(payload);
     this.clickAction(payload);
   }
 
@@ -97,14 +88,27 @@ class Reef {
     const {
       workers: {
         captain: {
-          mode: captain_mode = null,
-          devices: captain_devices = [],
-          active: captain_active = false
+          active: {
+            mode: captain_mode = null,
+            step: captain_step = null,
+            action: {
+              cmd: captain_cmd = null,
+              stmt: captain_stmt = null,
+              worker_cmd: captain_worker_cmd = null
+            },
+            status: captain_status = null,
+            ready: captain_ready
+          }
         }
       }
     } = msg;
 
-    if (captain_active == false) {
+    console.log(`captain ready: ${captain_ready}`);
+    console.log(`captain mode: ${captain_mode}`);
+
+    this.updateStopButton(captain_mode);
+
+    if (captain_ready == false) {
       this.workerStandbyMode("captain", true);
     } else if (typeof captain_mode == "string") {
       // if the captain mode was specified then update steps
@@ -112,10 +116,10 @@ class Reef {
 
       switch (captain_mode) {
         case "all_stop":
-        case "ready":
-          let fill = jQuery(steps).filter("[data-step='fill']");
+        case "none":
+          let fill = jQuery(steps).filter("[data-mode='fill']");
           let fill_icon = jQuery(steps).find(".icon");
-          let rest = jQuery(steps).filter("[data-step!='fill']");
+          let rest = jQuery(steps).filter("[data-mode!='fill']");
 
           if (this.manualControl == false) {
             this.modeActive(fill);
@@ -128,9 +132,9 @@ class Reef {
           break;
 
         default:
-          const active_filter = `[data-step='${captain_mode}']`;
-          const disabled_filter = `[data-step!='${captain_mode}']`;
-          const current_step = jQuery(steps).filter("a.active");
+          const active_filter = `[data-mode='${captain_mode}']`;
+          const disabled_filter = `[data-mode!='${captain_mode}']`;
+          const current_mode = jQuery(steps).filter("a.active");
 
           const active = jQuery(steps).filter(active_filter);
           const disabled = jQuery(steps).filter(disabled_filter);
@@ -139,8 +143,8 @@ class Reef {
           this.modeDisabled(disabled);
       }
     }
-    this.handleStepStatus(msg);
-    this.updateDevices("captain", captain_devices);
+    this.handleModeStatus(msg);
+    this.handleCaptainWorkerStatus(msg);
   }
 
   handleManualControl(payload) {
@@ -174,28 +178,28 @@ class Reef {
       button_click: {action: action, step: step = "none"}
     } = msg;
 
-    if (action == "unlock-steps") {
+    if (action == "unlock-modes") {
       const steps = this.selectSteps();
     } else if (step != "none") {
-      this.selectButtonIcon("captain", "unlock-steps").removeClass("open");
+      this.selectButtonIcon("captain", "unlock-modes").removeClass("open");
     }
   }
 
-  handleStepStatus(msg) {
+  handleModeStatus(msg) {
     const {
       workers: {
-        captain: {steps: captain_steps},
-        first_mate: {steps: first_mate_steps}
+        captain: {modes: captain_modes},
+        first_mate: {modes: first_mate_modes}
       }
     } = msg;
 
     const captain_sel = "div[data-subsystem='reef'] .steps";
 
-    for (const {step: step_name, status: step_status} of captain_steps) {
-      let step = jQuery(`${captain_sel} a[data-step="${step_name}"]`);
+    for (const {mode: mode_name, status: mode_status} of captain_modes) {
+      let step = jQuery(`${captain_sel} a[data-mode="${mode_name}"]`);
 
       if (step) {
-        switch (step_status) {
+        switch (mode_status) {
           case "running":
             step.addClass("active");
             break;
@@ -247,7 +251,7 @@ class Reef {
       this.handleClick(e);
     });
 
-    const reef_links = $("div[data-subsystem='reef'] a[data-step]");
+    const reef_links = $("div[data-subsystem='reef'] a[data-mode]");
     reef_links.on("click", e => {
       this.handleClick(e);
     });
@@ -267,6 +271,8 @@ class Reef {
   pushMessage(payload) {
     const channel = this.channel;
 
+    console.log("pushing payload: ", payload);
+
     channel
       .push("reef_click", payload)
       .receive("reef_status", msg => {
@@ -277,6 +283,16 @@ class Reef {
       .receive("timeout", () => console.log("Networking issue..."));
   }
 
+  selectButton(worker, action) {
+    const selector = `div[data-subsystem-worker='${worker}'] button[data-action='${action}']`;
+
+    const button = jQuery(selector);
+
+    console.log("selected button: ");
+    console.log(button);
+    return button;
+  }
+
   selectButtonIcon(worker, action) {
     const selector = `div[data-subsystem-worker='${worker}'] button[data-action='${action}'] .icon`;
 
@@ -285,8 +301,8 @@ class Reef {
     return icon;
   }
 
-  selectDevices(worker) {
-    const selector = `div[data-subsystem-worker='${worker}'] div[data-buttons="devices"] .buttons`;
+  selectWorkers(subsystem) {
+    const selector = `div[data-subsystem-worker='${subsystem}'] div[data-buttons="workers"] .buttons`;
 
     const buttons = jQuery(selector);
 
@@ -294,25 +310,25 @@ class Reef {
   }
 
   selectSteps() {
-    return jQuery("div[data-subsystem='reef'] .steps a[data-step]");
+    return jQuery("div[data-subsystem='reef'] .steps a[data-mode]");
   }
 
-  stepsLock(lock) {
+  modesLock(lock) {
     const steps = this.selectSteps();
-    const icon = this.selectButtonIcon("captain", "unlock-steps");
+    const icon = this.selectButtonIcon("captain", "unlock-modes");
 
     if (lock) {
       // NOTE
       //  updating the disabled class when locking is handled via a
       //  reef status message from the server
       icon.removeClass("open");
-      this.stepsLocked = true;
+      this.modesLocked = true;
     } else {
       // unlocking the steps (remving the disabled class) is handled
       // within the brower and without server interaction
       steps.removeClass("disabled");
       icon.addClass("open");
-      this.stepsLocked = false;
+      this.modesLocked = false;
     }
   }
 
@@ -320,22 +336,42 @@ class Reef {
     return "reef";
   }
 
-  updateDevices(worker, devices_status) {
-    const buttons = this.selectDevices(worker);
-    for (let {online: online, active: active, name: name} of devices_status) {
-      const dev_button = jQuery(buttons).find(`[data-device='${name}']`);
+  handleCaptainWorkerStatus(msg) {
+    const {
+      workers: {
+        captain: {workers: workers}
+      }
+    } = msg;
 
-      if (online && active) {
+    const buttons = this.selectWorkers("captain");
+    for (let {status: status, ready: ready, name: name} of workers) {
+      const dev_button = jQuery(buttons).find(`[data-worker='${name}']`);
+
+      if (ready && status) {
         dev_button.removeClass("black");
         dev_button.addClass("blue");
-      } else if (online && !active) {
+      } else if (ready && !status) {
         // device is online and not running
         dev_button.removeClass("blue black");
-      } else if (!online) {
+      } else if (!ready) {
         // device is offline
         dev_button.removeClass("blue");
         dev_button.addClass("black");
       }
+    }
+  }
+
+  updateStopButton(mode) {
+    let stop_button = this.selectButton("captain", "stop");
+
+    switch (mode) {
+      case "all_stop":
+        stop_button.addClass("red");
+        break;
+
+      default:
+        stop_button.removeClass("red");
+        break;
     }
   }
 
@@ -345,7 +381,7 @@ class Reef {
         const steps = this.selectSteps();
         steps.removeClass("active green").addClass("disabled");
 
-        const devices = this.selectDevices();
+        const devices = this.selectDevices("captain");
         devices.removeClass("disabled");
     }
   }

@@ -116,72 +116,7 @@ defmodule GenDevice do
 
       """
       @doc since: "0.0.27"
-      def value(opts \\ []), do: call({:inquiry, {:value, opts}})
-
-      # @doc false
-      # @impl true
-      # # handle the case when the msg_token matches the current state.
-      # def handle_info(
-      #       {:timer, %{inflight: %{token: msg_token} = action}},
-      #       %{token: token} = state
-      #     )
-      #     when msg_token == token do
-      #   state
-      #   |> inflight_status(:finished)
-      #   |> send_at_timer_msg_if_needed(action)
-      #   |> adjust_device_if_needed(action)
-      #   |> put_in([:active_cmd], :none)
-      #   |> noreply()
-      # end
-      #
-      # # NOTE:  when the msg_token does not match the state token then
-      # #        a change has occurred so ignore this timer message
-      # def handle_info({:timer, _msg, _msg_token}, s) do
-      #   noreply(s)
-      # end
-
-      ##
-      ## PRIVATE
-      ##
-
-      #
-      # # this function matches the call from :at_end
-      # defp send_at_timer_msg_if_needed(
-      #        state,
-      #        # orignal cmd message
-      #        {cmd, cmd_opts, reply_pid},
-      #        category
-      #      ) do
-      #   # if the matching ':at' option was specified
-      #   for {:notify, notify_opts} <- cmd_opts,
-      #       at_opt when at_opt == category <- notify_opts do
-      #     # extract the token from the opts, if included.
-      #     # since the notifiy opts are a mix of atoms and keywords
-      #     # let's use a for loop, with an accumulator starting with nil
-      #     # if this for loop finds [token: term] then term is the result
-      #     token =
-      #       for {:token, v} <- notify_opts, reduce: nil do
-      #         token -> v
-      #       end
-      #
-      #     # assemble the payload map that is always sent regardless if
-      #     # the token opt is passed
-      #     payload = %{
-      #       mod: __MODULE__,
-      #       cmd: cmd,
-      #       at: category,
-      #       ref: state[:lasts][:reference],
-      #       token: token
-      #     }
-      #
-      #     msg = {:gen_device, payload}
-      #
-      #     send(reply_pid, msg)
-      #   end
-      #
-      #   state
-      # end
-      #
+      def value(opts \\ [:simple]), do: call({:inquiry, {:value, opts}})
     end
   end
 

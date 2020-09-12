@@ -17,7 +17,7 @@
             <i class="stop icon"></i>
           </button>
 
-          <button class="ui raised tiny icon button" data-action="unlock-steps" data-tooltip="Unlock Steps" data-variation="tiny">
+          <button class="ui raised tiny icon button" data-action="unlock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
             <i class="lock icon"></i>
           </button>
 
@@ -42,21 +42,21 @@
           </span>
         </div>
       </div>
-      <div class="center aligned extra content" data-buttons="devices">
+      <div class="center aligned extra content" data-buttons="workers">
         <div class="ui large raised icon buttons">
-          <button class="ui button" data-device="water_pump" data-tooltip="Water Pump" data-variation="tiny">
+          <button class="ui button" data-worker="pump" data-tooltip="Water Pump" data-variation="tiny">
             <i class="fan icon"></i>
           </button>
 
-          <button class="ui button" data-device="air_pump" data-tooltip="Air Pump" data-variation="tiny">
+          <button class="ui button" data-worker="air" data-tooltip="Air Pump" data-variation="tiny">
             <i class="wind icon"></i>
           </button>
 
-          <button class="ui button" data-device="rodi_valve" data-tooltip="RODI Valve" data-variation="tiny">
+          <button class="ui button" data-worker="rodi" data-tooltip="RODI Valve" data-variation="tiny">
             <i class="faucet icon"></i>
           </button>
 
-          <button class="ui button" data-device="heater" data-tooltip="Heater" data-variation="tiny">
+          <button class="ui button" data-worker="mix_heater" data-tooltip="Heater" data-variation="tiny">
             <i class="thermometer half icon"></i>
           </button>
         </div>
@@ -92,7 +92,7 @@
           <button class="ui compact icon button" data-action="stop">
             <i class="stop icon"></i>
           </button>
-          <button class="ui compact icon button" data-device="ato">
+          <button class="ui compact icon button" data-worker="ato">
             <i class="faucet icon"></i>
           </button>
         </div>
@@ -101,49 +101,49 @@
   </div>
     <div class="ui vertical segment" >
       <div class="ui seven top attached mini steps">
-        <a class="step" data-step="fill">
+        <a class="step disabled" data-mode="fill">
           <i class="faucet icon"></i>
           <div class="content">
             <div class="title" data-tooltip="Fill MixTank">Fill</div>
           </div>
         </a>
 
-        <a class="step" data-step="keep_fresh">
+        <a class="step disabled" data-mode="keep_fresh">
           <i class="fan icon"></i>
           <div class="content">
             <div class="title">Keep Fresh</div>
           </div>
         </a>
 
-        <a class="step" data-step="add_salt">
+        <a class="step disabled" data-mode="add_salt">
           <i class="random icon"></i>
           <div class="content">
             <div class="title">Add salt</div>
           </div>
         </a>
 
-        <a class="step" data-step="match_conditions">
+        <a class="step disabled" data-mode="match_conditions">
           <i class="balance scale icon"></i>
           <div class="content">
             <div class="title">Match Conditions</div>
           </div>
         </a>
 
-        <a class="step" data-step="dump_water">
+        <a class="step disabled" data-mode="dump_water">
           <i class="trash icon"></i>
           <div class="content">
             <div class="title">Dump Water</div>
           </div>
         </a>
 
-        <a class="step" data-step="load_water">
+        <a class="step disabled" data-mode="load_water">
           <i class="upload icon"></i>
           <div class="content">
             <div class="title">Load Water</div>
           </div>
         </a>
 
-        <a class="step" data-step="final_check">
+        <a class="step disabled" data-mode="final_check">
           <i class="thumbs up outline icon"></i>
           <div class="content">
             <div class="title">Final Check</div>
@@ -151,10 +151,10 @@
         </a>
       </div>
 
-      <div class="ui placeholder segment" id="reef-step-details">
+      <div class="ui placeholder segment" id="reef-mode-details">
         <div class="ui icon header">
           <i class="info icon"></i>
-          <span data-step-status>Select Fill to begin a new batch of water.</span>
+          <span data-mode-status>Select Fill to begin a new batch of water.</span>
         </div>
       </div>
 

@@ -63,7 +63,7 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def status do
-    %{captain: Captain.status()}
+    %{workers: %{captain: Captain.status(), first_mate: FirstMate.status()}}
   end
 
   #   base = %{

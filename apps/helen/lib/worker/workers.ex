@@ -56,9 +56,17 @@ defmodule Helen.Workers do
     end)
   end
 
-  def execute_action(%{stmt: :tell, worker: worker, msg: msg} = action) do
+  def execute_action(
+        %{
+          stmt: :tell,
+          worker: %{type: worker_type, module: mod},
+          worker_cmd: worker_cmd,
+          msg: msg
+        } = action
+      )
+      when worker_type in [:temp_server, :reef_worker] do
     action
-    |> execute_result(fn -> worker.mode(msg) end)
+    |> execute_result(fn -> apply(mod, worker_cmd, [msg]) end)
   end
 
   # NOTE: has test case

@@ -96,6 +96,7 @@ defmodule Helen.Worker.Logic do
       def handle_continue(:bootstrap, state) do
         state
         |> Common.change_token()
+        |> Logic.cache_worker_modules()
         |> Logic.noreply()
       end
 
@@ -129,7 +130,7 @@ defmodule Helen.Worker.Logic do
       Set the Worker to a specific mode.
       """
       @doc since: "0.0.27"
-      def mode(mode, opts), do: call({:mode, mode, opts})
+      def mode(mode, opts \\ []), do: call({:mode, mode, opts})
 
       @doc """
       Is the server ready?
@@ -226,8 +227,6 @@ defmodule Helen.Worker.Logic do
 
     put_in(state, [:workers], Workers.build_module_cache(workers))
   end
-
-  def cached_workers(state), do: get_in(state, [:workers])
 
   def change_mode(state, mode) do
     if ready?(state) do
@@ -571,21 +570,7 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def status(state) do
-    clean_action = fn
-      :none -> :none
-      %{} = x -> Map.take(x, [:cmd, :worker_cmd, :stmt])
-    end
-
-    %{
-      status: status_get(state),
-      active: %{
-        mode: active_mode(state),
-        step: active_step(state),
-        action: pending_action(state) |> clean_action.()
-      }
-    }
-  end
+  defdelegate status(state), to: Helen.Worker.Status
 
   def msg_puts(state, msg) do
     """

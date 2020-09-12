@@ -28,6 +28,8 @@ defmodule Helen.Worker.State do
     end)
   end
 
+  def cached_workers(state), do: get_in(state, [:workers])
+
   def calculate_step_duration(%{run_for: run_for}), do: run_for
 
   def calculate_step_duration(%{actions: actions}) do
@@ -135,6 +137,8 @@ defmodule Helen.Worker.State do
   def finished_get(state, path),
     do: get_in(state, flatten([:logic, :finished, path]))
 
+  def finished_mode?(state, mode), do: finished_get(state, mode) || false
+
   def finished_mode_put(state, mode, mode_map)
       when is_atom(mode) and is_map(mode_map),
       do: put_in(state, [:logic, :finished, mode], mode_map)
@@ -169,6 +173,9 @@ defmodule Helen.Worker.State do
     do: live_get_steps(state) |> get_in([step_name])
 
   def live_get_steps(state), do: live_get(state, [:steps])
+
+  def live_opts_get(state, what \\ []),
+    do: live_get(state, flatten([:opts, what]))
 
   def live_put(state, path, val),
     do: put_in(state, [:logic, :live, [path]] |> flatten(), val)
@@ -218,6 +225,9 @@ defmodule Helen.Worker.State do
         end
     end
   end
+
+  def opts_get(state, what \\ []), do: get_in(state, flatten([:opts, what]))
+  def opts_mode_names(state), do: opts_get(state, :modes) |> Map.keys()
 
   def pending_action(state), do: track_get(state, :pending_action) || :none
 

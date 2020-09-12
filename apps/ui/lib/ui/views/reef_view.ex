@@ -9,16 +9,16 @@ defmodule UI.ReefView do
       }) do
     alias Reef.Captain.Server, as: Captain
 
-    server_mode = if manual_control, do: :standby, else: :active
+    server_mode = if manual_control, do: :standby, else: :ready
 
     rc = Captain.server(server_mode)
 
     %{button_click: %{action: "manual_control"}} |> populate_click_rc(rc)
   end
 
-  def button_click(%{"subsystem" => "reef", "step" => step}) do
-    resp = %{button_click: %{step: step}}
-    rc = Reef.mode(String.to_atom(step))
+  def button_click(%{"subsystem" => "reef", "mode" => mode}) do
+    resp = %{button_click: %{mode: mode}}
+    rc = Reef.mode(String.to_atom(mode), [])
 
     resp |> populate_click_rc(rc)
   end
@@ -49,9 +49,11 @@ defmodule UI.ReefView do
     alias Reef.Captain.Server, as: Captain
     alias Reef.FirstMate.Server, as: FirstMate
 
+    IO.puts("button click: #{inspect(worker)} #{inspect(action)}")
+
     case {worker, action} do
       {"captain", "reset"} -> Captain.restart()
-      {"captain", "stop"} -> Captain.all_stop()
+      {"captain", "stop"} -> Captain.mode(:all_stop, [])
       {"captain", "unlock-steps"} -> {:noted, :unlock_steps}
       {"captain", "lock-steps"} -> {:noted, :lock_steps}
       {"first_mate", "reset"} -> FirstMate.restart()

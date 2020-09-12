@@ -425,35 +425,23 @@ defmodule GenDevice.Logic do
     end
   end
 
-  def value(_state, _opts) do
-    # def handle_call({:value, opts}, _from, %{device_name: dev_name} = s) do
-    #   import Switch, only: [position: 1]
-    #
-    #   case opts do
-    #     [:cached] ->
-    #       reply(s, s[:lasts][:value_rc])
-    #
-    #     [:simple] ->
-    #       case position(dev_name) do
-    #         {:pending, pending} -> pending[:position]
-    #         {:ok, pos} -> pos
-    #         _anything -> :error
-    #       end
-    #       |> reply(s)
-    #
-    #     [] ->
-    #       pos_rc = position(dev_name)
-    #
-    #       s
-    #       |> put_in([:lasts, :value_rc], pos_rc)
-    #       |> reply(pos_rc)
-    #
-    #     opts ->
-    #       reply(s, {:bad_args, opts})
-    #   end
-    # end
+  def value(state, opts) do
+    import Switch, only: [position: 1]
 
-    true
+    case opts do
+      [:simple] ->
+        case position(device_name(state)) do
+          {:pending, pending} -> pending[:position]
+          {:ok, pos} -> pos
+          _anything -> :error
+        end
+
+      [] ->
+        position(device_name(state))
+
+      opts ->
+        {:bad_args, opts}
+    end
   end
 
   def msg_puts(state, msg) do
