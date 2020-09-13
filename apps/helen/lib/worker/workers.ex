@@ -72,10 +72,7 @@ defmodule Helen.Workers do
   # NOTE: has test case
   @doc false
   def execute_action(%{stmt: :all, args: cmd, worker_cache: wc} = action) do
-    # IO.puts("all action: #{inspect(action, pretty: true)}")
-
-    action
-    |> execute_result(fn ->
+    execute_result(action, fn ->
       for {ident, %{module: mod, found?: true, type: type} = worker}
           when type in [:simple_device, :gen_device] <- wc,
           into: %{} do
@@ -87,15 +84,13 @@ defmodule Helen.Workers do
   end
 
   def execute_action(%{stmt: :cmd_list, cmd: cmd, worker: workers} = action) do
-    IO.puts("cmd list: #{inspect(cmd)} #{inspect(workers, pretty: true)}")
-
-    action
-    |> execute_result(fn ->
-      for {ident, %{module: mod, found?: true, type: type} = worker}
+    execute_result(action, fn ->
+      for %{ident: ident, module: mod, found?: true, type: type} = worker
           when type in [:simple_device, :gen_device] <- workers,
           into: %{} do
         # add the worker to the action for matching by the executing module
         action = worker_cmd_put(action, cmd) |> put_in([:worker], worker)
+
         {ident, mod.execute_action(action)}
       end
     end)
