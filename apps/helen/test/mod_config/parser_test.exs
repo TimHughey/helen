@@ -326,7 +326,7 @@ defmodule HelenConfigParserTest do
             sleep PT10S
             tell first_mate standby
             all off
-            on dev1 dev2 dev3
+            on dev_one dev_two dev3
 
           finally
             air off
@@ -357,7 +357,7 @@ defmodule HelenConfigParserTest do
                          %{cmd: :sleep, worker: :self, args: sleep_duration},
                          %{cmd: :tell, worker: :first_mate, msg: :standby},
                          %{cmd: :all, worker: :self, args: :off},
-                         %{cmd: :on, worker: [:dev1, :dev2, :dev3]}
+                         %{cmd: :on, worker: [:dev_one, :dev_two, :dev3]}
                        ]
                      },
                      finally: %{
