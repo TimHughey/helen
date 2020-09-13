@@ -6,7 +6,7 @@ defmodule ReefFirstMateTest do
   alias Helen.Config.Parser
   alias Reef.FirstMate.Server, as: FirstMate
 
-  @lib_path Path.join([__DIR__, "..", "..", "..", "lib"]) |> Path.expand()
+  @lib_path Path.join([__DIR__, "..", "..", "lib"]) |> Path.expand()
   @config_path Path.join([@lib_path, "reef", "first_mate", "opts"])
   @config_file Path.join([@config_path, "defaults.txt"])
   @config_txt File.read!(@config_file)

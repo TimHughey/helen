@@ -23,6 +23,15 @@ defmodule UI.ReefView do
     resp |> populate_click_rc(rc)
   end
 
+  def button_click(%{"subsystem" => "reef", "action" => action} = payload)
+      when action == "live-update" do
+    resp = %{button_click: %{action: action}}
+
+    rc = {:live_update_engaged}
+
+    resp |> populate_click_rc(rc)
+  end
+
   def button_click(%{"subsystem" => "reef", "action" => action} = payload) do
     resp = %{button_click: %{action: action}}
 
@@ -42,14 +51,14 @@ defmodule UI.ReefView do
   def button_click(catchall) do
     resp = %{button_click: %{catchall: catchall}}
 
+    IO.puts(inspect(resp, pretty: true))
+
     resp |> populate_click_rc(:error)
   end
 
   def button_handle_worker_and_action(worker, action, payload) do
     alias Reef.Captain.Server, as: Captain
     alias Reef.FirstMate.Server, as: FirstMate
-
-    IO.puts("button click: #{inspect(worker)} #{inspect(action)}")
 
     case {worker, action} do
       {"captain", "reset"} -> Captain.restart()

@@ -15,11 +15,11 @@ import "../css/app.scss";
 // import {socket} from "./socket";
 import "../semantic/dist/semantic";
 import "phoenix_html";
-import {Socket} from "phoenix";
+import { Socket } from "phoenix";
 
-import {ModuleConfigOptions} from "./module_config_opts";
-import {Reef} from "./reef";
-import {Roost} from "./roost";
+import { ModuleConfigOptions } from "./module_config_opts";
+import { Reef } from "./reef";
+import { Roost } from "./roost";
 
 //
 // MAIN CODE
@@ -30,29 +30,29 @@ import {Roost} from "./roost";
 // establish the websocket
 let socket = new Socket("/socket", {
   params: {
-    token: window.userToken
-  }
+    token: window.userToken,
+  },
 });
 
 socket.connect();
 
-let channel = socket.channel("helen:admin", {data: "initial"});
+let channel = socket.channel("helen:admin", { data: "initial" });
 channel
   .join()
-  .receive("ok", resp => {
+  .receive("ok", (resp) => {
     // join was a success
     window.channelJoined = true;
   })
-  .receive("error", resp => {
+  .receive("error", (resp) => {
     console.log("Unable to join", resp);
   });
 
-channel.on("broadcast", msg => {
+channel.on("broadcast", (msg) => {
   console.log("Message: ", msg);
 });
 
 var module_config = new ModuleConfigOptions(channel);
-var reef = new Reef(channel);
+var reef = new Reef(socket);
 var roost = new Roost(channel);
 
 // initialize the dropdown menu
@@ -63,10 +63,8 @@ $(".ui.dropdown").dropdown();
 // live_update_button.on("click", setLiveUpdateButton);
 
 // handle page load events
-jQuery("document").ready(function() {
-  let active_page = jQuery(this)
-    .find("div[data-subsystem]")
-    .data("subsystem");
+jQuery("document").ready(function () {
+  let active_page = jQuery(this).find("div[data-subsystem]").data("subsystem");
 
   console.log("document ready", active_page);
 

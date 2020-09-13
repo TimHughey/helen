@@ -27,7 +27,7 @@
     <!-- <header class="ui container"> -->
       <div class="ui stackable container menu">
         <div class="item">
-          <h2 class="ui header">
+          <h2 class="ui header" data-buttons="header">
             <%= link "I am Helen", to: Routes.home_path(@conn, :index) %>
           </h2>
         </div>
@@ -46,7 +46,7 @@
             <i class="settings icon"></i>
           </div>
           <div class="item">
-            <button id="live-update-button" class="disabled ui center aligned button">
+            <button id="live-update-button" class="disabled ui center aligned button" data-action="live-update">
               Live Update
             </button>
           </div>

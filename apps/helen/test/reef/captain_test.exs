@@ -6,7 +6,7 @@ defmodule ReefCaptainTest do
   alias Helen.Config.Parser
   alias Reef.Captain.Server, as: Captain
 
-  @lib_path Path.join([__DIR__, "..", "..", "..", "lib"]) |> Path.expand()
+  @lib_path Path.join([__DIR__, "..", "..", "lib"]) |> Path.expand()
   @config_path Path.join([@lib_path, "reef", "captain", "opts"])
   @config_file Path.join([@config_path, "defaults.txt"])
   @config_txt File.read!(@config_file)
@@ -78,10 +78,19 @@ defmodule ReefCaptainTest do
   test "can get overall reef Captain status" do
     status = Captain.status()
 
-    assert status == %{
-             status: :none,
-             active: %{mode: :none, step: :none, action: :none}
-           }
+    assert is_map(status)
+
+    assert %{
+             status: status,
+             active: %{mode: :none, step: :none, action: :none},
+             modes: modes,
+             ready: true,
+             workers: workers
+           } = status
+
+    assert status in [:none, :initializing]
+    assert is_list(modes)
+    assert is_list(workers)
   end
 
   test "reef Captain can be restarted, set to ready and standby" do
@@ -108,8 +117,13 @@ defmodule ReefCaptainTest do
 
     status = Captain.status()
 
-    assert %{status: :holding, active: %{mode: :all_stop, step: :all_stop}} ==
-             update_in(status, [:active], fn x -> Map.drop(x, [:action]) end)
+    assert %{
+             status: :holding,
+             active: %{mode: :all_stop, step: :all_stop, action: _action},
+             ready: true,
+             modes: _modes,
+             workers: _workers
+           } = status
   end
 
   # test "Captian can be set to all stop" do

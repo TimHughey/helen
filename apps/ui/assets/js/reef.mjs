@@ -1,5 +1,21 @@
 class Reef {
-  constructor(channel) {
+  constructor(socket) {
+    let channel = socket.channel("helen:reef", { data: "initial" });
+
+    channel
+      .join()
+      .receive("ok", (resp) => {
+        // join was a success
+        window.channelJoined = true;
+      })
+      .receive("error", (resp) => {
+        console.log("Unable to join", resp);
+      });
+
+    channel.on("broadcast", (msg) => {
+      this.handleMessage(msg);
+    });
+
     this.channel = channel;
     this.modesLocked = true;
     this.manualControl = false;
@@ -10,7 +26,7 @@ class Reef {
   }
 
   clickAction(payload) {
-    let {action: action = null} = payload;
+    let { action: action = null } = payload;
 
     if (action == null) {
       // this was not an action click
@@ -33,6 +49,7 @@ class Reef {
 
       case "reset":
       case "stop":
+      case "live-update":
         this.pushMessage(payload);
         break;
 
@@ -42,7 +59,7 @@ class Reef {
   }
 
   clickDevice(payload) {
-    let {device: device = null} = payload;
+    let { device: device = null } = payload;
 
     if (device === null || this.manualControl == false) {
       // this was not a device click or manualControl hasn't been actived, do nothing
@@ -53,7 +70,7 @@ class Reef {
   }
 
   clickMode(payload) {
-    let {mode: mode = null} = payload;
+    let { mode: mode = null } = payload;
 
     if (mode === null) {
       // this was not a step click
@@ -67,13 +84,11 @@ class Reef {
     const target = e.currentTarget;
     const channel = this.channel;
 
-    console.log("reef click: ", target);
-
     var payload = {
       subsystem: "reef",
       action: jQuery(target).data("action"),
       device: jQuery(target).data("device"),
-      mode: jQuery(target).data("mode")
+      mode: jQuery(target).data("mode"),
     };
 
     // the click functions determine if the payload should be handled
@@ -94,17 +109,14 @@ class Reef {
             action: {
               cmd: captain_cmd = null,
               stmt: captain_stmt = null,
-              worker_cmd: captain_worker_cmd = null
+              worker_cmd: captain_worker_cmd = null,
             },
-            status: captain_status = null,
-            ready: captain_ready
-          }
-        }
-      }
+          },
+          ready: captain_ready = false,
+          status: captain_status = null,
+        },
+      },
     } = msg;
-
-    console.log(`captain ready: ${captain_ready}`);
-    console.log(`captain mode: ${captain_mode}`);
 
     this.updateStopButton(captain_mode);
 
@@ -175,7 +187,7 @@ class Reef {
     }
 
     const {
-      button_click: {action: action, step: step = "none"}
+      button_click: { action: action, step: step = "none" },
     } = msg;
 
     if (action == "unlock-modes") {
@@ -188,14 +200,14 @@ class Reef {
   handleModeStatus(msg) {
     const {
       workers: {
-        captain: {modes: captain_modes},
-        first_mate: {modes: first_mate_modes}
-      }
+        captain: { modes: captain_modes },
+        first_mate: { modes: first_mate_modes },
+      },
     } = msg;
 
     const captain_sel = "div[data-subsystem='reef'] .steps";
 
-    for (const {mode: mode_name, status: mode_status} of captain_modes) {
+    for (const { mode: mode_name, status: mode_status } of captain_modes) {
       let step = jQuery(`${captain_sel} a[data-mode="${mode_name}"]`);
 
       if (step) {
@@ -219,9 +231,7 @@ class Reef {
     const remove = "completed disabled";
     const add = "active";
 
-    jQuery(step)
-      .addClass(add)
-      .removeClass(remove);
+    jQuery(step).addClass(add).removeClass(remove);
 
     let icon = jQuery(step).children(".icon");
     icon.addClass("green");
@@ -231,9 +241,7 @@ class Reef {
     const remove = "completed active";
     const add = "disabled";
 
-    jQuery(step)
-      .removeClass(remove)
-      .addClass(add);
+    jQuery(step).removeClass(remove).addClass(add);
 
     let icon = jQuery(step).children(".icon");
     icon.removeClass("green");
@@ -247,24 +255,29 @@ class Reef {
     const channel = this.channel;
 
     const reef_buttons = $("[data-subsystem='reef'] .button");
-    reef_buttons.on("click", e => {
+    reef_buttons.on("click", (e) => {
       this.handleClick(e);
     });
 
     const reef_links = $("div[data-subsystem='reef'] a[data-mode]");
-    reef_links.on("click", e => {
+    reef_links.on("click", (e) => {
       this.handleClick(e);
     });
 
-    jQuery("#live-update-button").removeClass("disabled");
+    const live_update = jQuery("#live-update-button");
+    live_update.removeClass("disabled");
+
+    live_update.on("click", (e) => {
+      this.handleClick(e);
+    });
 
     channel
-      .push("page_loaded", {subsystem: "reef"})
-      .receive("reef_status", msg => {
+      .push("page_loaded", { subsystem: "reef" })
+      .receive("reef_status", (msg) => {
         this.handleMessage(msg);
       })
-      .receive("nop", msg => {})
-      .receive("error", reasons => console.log("error", reasons))
+      .receive("nop", (msg) => {})
+      .receive("error", (reasons) => console.log("error", reasons))
       .receive("timeout", () => console.log("Networking issue..."));
   }
 
@@ -275,11 +288,11 @@ class Reef {
 
     channel
       .push("reef_click", payload)
-      .receive("reef_status", msg => {
+      .receive("reef_status", (msg) => {
         this.handleMessage(msg);
       })
-      .receive("nop", msg => {})
-      .receive("error", reasons => console.log("error", reasons))
+      .receive("nop", (msg) => {})
+      .receive("error", (reasons) => console.log("error", reasons))
       .receive("timeout", () => console.log("Networking issue..."));
   }
 
@@ -287,9 +300,6 @@ class Reef {
     const selector = `div[data-subsystem-worker='${worker}'] button[data-action='${action}']`;
 
     const button = jQuery(selector);
-
-    console.log("selected button: ");
-    console.log(button);
     return button;
   }
 
@@ -339,12 +349,12 @@ class Reef {
   handleCaptainWorkerStatus(msg) {
     const {
       workers: {
-        captain: {workers: workers}
-      }
+        captain: { workers: workers },
+      },
     } = msg;
 
     const buttons = this.selectWorkers("captain");
-    for (let {status: status, ready: ready, name: name} of workers) {
+    for (let { status: status, ready: ready, name: name } of workers) {
       const dev_button = jQuery(buttons).find(`[data-worker='${name}']`);
 
       if (ready && status) {
@@ -387,4 +397,4 @@ class Reef {
   }
 }
 
-export {Reef};
+export { Reef };

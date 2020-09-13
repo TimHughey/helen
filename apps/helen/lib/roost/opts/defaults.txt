@@ -37,7 +37,7 @@ cmd_definitions
 modes
   all_stop
     next_mode hold
-    sequence all_stop finally
+    sequence all_stop
     steps
       all_stop
         all off
@@ -51,7 +51,8 @@ modes
         disco_ball duty 0.7
         el_wire duty 0.5
         el_wire_entry duty 0.5
-        on lights_one lights_three
+        lights_one on
+        lights_three on
 
       slow_disco_ball
         sleep PT1M

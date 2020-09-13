@@ -9,6 +9,13 @@ defmodule UI.HelenChannel do
     {:ok, socket}
   end
 
+  def join("helen:reef", message, socket) do
+    IO.puts("join helen:reef #{inspect(message)}")
+    IO.puts("socket: #{inspect(socket, pretty: true)}")
+
+    {:ok, assign(socket, :live_update, false)}
+  end
+
   def join("room:" <> _private_room_id, _params, _socket) do
     {:error, %{reason: "unauthorized"}}
   end
@@ -54,8 +61,11 @@ defmodule UI.HelenChannel do
     end
   end
 
-  def handle_in("reef_click", payload, socket) do
+  def handle_in("reef_click", payload, %{assigns: assigns} = socket) do
     alias UI.ReefView
+
+    (assigns[:debug] || payload["debug"]) &&
+      IO.puts("reef_click socket: #{inspect(socket, pretty: true)}")
 
     base_resp = ReefView.button_click(payload)
 

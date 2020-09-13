@@ -132,7 +132,7 @@ defmodule PulseWidth do
       :on -> on(name)
       :off -> off(name)
       :duty -> duty(name, action[:num_bin])
-      _cmd -> random(name, action[:custom])
+      _cmd -> Alias.cmd_direct(name, action[:custom], [])
     end
   end
 

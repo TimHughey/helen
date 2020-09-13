@@ -87,7 +87,7 @@ defmodule Helen.Workers do
   end
 
   def execute_action(%{stmt: :cmd_list, cmd: cmd, worker: workers} = action) do
-    # IO.puts("all action: #{inspect(action, pretty: true)}")
+    IO.puts("cmd list: #{inspect(cmd)} #{inspect(workers, pretty: true)}")
 
     action
     |> execute_result(fn ->
