@@ -73,14 +73,11 @@ modes
         sleep PT10M
 
   closed
-    sequence led_forest_dim closed
+    sequence closed
     next_mode hold
     steps
-      led_forest_dim
-        off disco_ball el_wire el_wire_entry lights_one lights_three
-        led_forest closed_fade
-        
       closed
-        sleep PT1S
+        all off
+        led_forest closed_fade
 
 # end of roost config
