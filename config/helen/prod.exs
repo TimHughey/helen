@@ -5,6 +5,7 @@ import Config
 config :logger,
   # level: :debug
   # level: :warn
+  console: [format: "$date $time $message\n"],
   level: :info
 
 config :helen,

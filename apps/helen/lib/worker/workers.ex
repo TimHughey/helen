@@ -8,6 +8,8 @@ defmodule Helen.Workers do
     c. a simple device (e.g. Switch, PulseWidth)
   """
 
+  require Logger
+
   import Helen.Worker.State
   import Helen.Workers.ModCache, only: [module: 2]
 
@@ -36,12 +38,15 @@ defmodule Helen.Workers do
     cmd_rc_put(state, result)
   rescue
     anything ->
-      IO.puts(inspect(anything, pretty: true))
-      IO.puts(inspect(__STACKTRACE__, pretty: true))
+      Logger.warn("""
+      rescued: #{inspect(anything, pretty: true)}
 
-      IO.puts(
+      #{inspect(__STACKTRACE__, pretty: true)}
+
+      #{
         inspect(pending_action(state) |> Map.drop([:worker_cache]), pretty: true)
-      )
+      }
+      """)
 
       state
   end
@@ -72,7 +77,7 @@ defmodule Helen.Workers do
   # NOTE: has test case
   @doc false
   def execute_action(%{stmt: :all, args: cmd, worker_cache: wc} = action) do
-    IO.puts("stmt all, worker_cache: #{inspect(wc, pretty: true)}")
+    Logger.info("stmt all, worker_cache: #{inspect(wc, pretty: true)}")
 
     execute_result(action, fn ->
       for {ident, %{module: mod, found?: true, type: type} = worker}
@@ -81,7 +86,7 @@ defmodule Helen.Workers do
         # add the worker to the action for matching by the executing module
         action = worker_cmd_put(action, cmd) |> put_in([:worker], worker)
 
-        IO.puts(
+        Logger.info(
           "all execute_action() action: #{
             inspect(Map.drop(action, [:worker_cache]), pretty: true)
           }"
@@ -122,6 +127,10 @@ defmodule Helen.Workers do
       worker_cache: worker_cache,
       worker: resolve_worker(worker_cache, action[:worker]),
       reply_to: self(),
+      # default to instant processing of the action (e.g. immeidately call
+      # next_action/1).  the default can be overriden by calling add_via_msg/1.
+      via_msg: false,
+      wait: false,
       action_ref: make_ref(),
       token: token
     })

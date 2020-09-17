@@ -207,6 +207,8 @@ defmodule Helen.Worker.Logic do
   ## START OF MODULE
   ##
 
+  require Logger
+
   import Helen.Worker.State.Common
   import Helen.Worker.State
 
@@ -356,17 +358,24 @@ defmodule Helen.Worker.Logic do
         pending_action_drop(state) |> next_action()
 
       msg ->
-        IO.puts(
-          "handle_logic_msg unmatched msg:\n#{inspect(msg, pretty: true)}"
-        )
+        Logger.info("""
+        handle_logic_msg/2
+        unmatched msg: #{inspect(Map.drop(msg, [:worker_cache]), pretty: true)}
+        """)
 
         next_action(state)
     end
   end
 
-  def handle_logic_msg(%{token: msg_token}, %{token: token} = state)
-      when msg_token != token,
-      do: state
+  def handle_logic_msg(%{token: msg_token} = action, %{token: token} = state)
+      when msg_token != token do
+    Logger.info("""
+    handle_logic_msg/2
+    token mismatch: #{inspect(Map.drop(action, [:worker_cache]), pretty: true)}
+    """)
+
+    state
+  end
 
   def handle_server_mode(mode, state) do
     case {server_mode(state), mode} do
@@ -443,11 +452,10 @@ defmodule Helen.Worker.Logic do
 
     if worker_name(state) == "roost",
       do:
-        IO.puts(
-          "roost next_action called.  status: #{
-            inspect(status(state), pretty: true)
-          }"
-        )
+        Logger.info("""
+        roost next_action/1 entry status:
+        status: #{inspect(status(state), pretty: true)}
+        """)
 
     case actions_to_execute_get(state) do
       [] ->
@@ -575,11 +583,10 @@ defmodule Helen.Worker.Logic do
   defdelegate status(state), to: Helen.Worker.Status
 
   def msg_puts(state, msg) do
-    """
-     ==> #{inspect(msg)}
+    Logger.info("""
+     msg_puts #{inspect(msg)}
 
-    """
-    |> IO.puts()
+    """)
 
     state
   end

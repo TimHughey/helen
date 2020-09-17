@@ -1,6 +1,7 @@
 defmodule Helen.Worker.State do
   @moduledoc false
 
+  require Logger
   import List, only: [flatten: 1]
 
   def action_fault_put(state, val),
@@ -234,11 +235,10 @@ defmodule Helen.Worker.State do
   def pending_action_put(state, val) do
     if worker_name(state) == "roost",
       do:
-        IO.puts(
-          "subsystem: #{worker_name(state)} pending_action: #{
-            inspect(Map.drop(val, [:worker_cache]), pretty: true)
-          }"
-        )
+        Logger.info("""
+        subsystem: #{worker_name(state)}
+        pending_action: #{inspect(Map.drop(val, [:worker_cache]), pretty: true)}
+        """)
 
     track_put(state, :pending_action, val)
   end
