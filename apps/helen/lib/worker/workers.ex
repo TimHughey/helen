@@ -78,6 +78,13 @@ defmodule Helen.Workers do
           into: %{} do
         # add the worker to the action for matching by the executing module
         action = worker_cmd_put(action, cmd) |> put_in([:worker], worker)
+
+        IO.puts(
+          "all execute_action() action: #{
+            inspect(Map.drop(action, [:worker_cache]), pretty: true)
+          }"
+        )
+
         {ident, mod.execute_action(action)}
       end
     end)

@@ -81,16 +81,17 @@ defmodule ReefCaptainTest do
     assert is_map(status)
 
     assert %{
+             name: "captain",
              status: status,
              active: %{mode: :none, step: :none, action: :none},
              modes: modes,
              ready: true,
-             workers: workers
+             sub_workers: sub_workers
            } = status
 
     assert status in [:none, :initializing]
     assert is_list(modes)
-    assert is_list(workers)
+    assert is_list(sub_workers)
   end
 
   test "reef Captain can be restarted, set to ready and standby" do
@@ -122,7 +123,7 @@ defmodule ReefCaptainTest do
              active: %{mode: :all_stop, step: :all_stop, action: _action},
              ready: true,
              modes: _modes,
-             workers: _workers
+             sub_workers: _workers
            } = status
   end
 

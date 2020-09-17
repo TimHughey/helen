@@ -210,12 +210,6 @@ defmodule Helen.Worker.Logic do
   import Helen.Worker.State.Common
   import Helen.Worker.State
 
-  def all_stop(state) do
-    state
-    |> finish_mode_if_needed()
-    |> change_token()
-  end
-
   def available_modes(%{opts: opts} = _state) do
     get_in(opts, [:modes])
     |> Map.keys()
