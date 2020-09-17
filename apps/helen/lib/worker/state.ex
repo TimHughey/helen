@@ -234,7 +234,7 @@ defmodule Helen.Worker.State do
   def pending_action_put(state, val) do
     IO.puts(
       "subsystem: #{worker_name(state)} pending_action: #{
-        inspect(val, pretty: true)
+        inspect(Map.drop(val, [:worker_cache]), pretty: true)
       }"
     )
 
