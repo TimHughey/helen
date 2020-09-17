@@ -475,7 +475,7 @@ defmodule Helen.Worker.Logic do
       :none -> finish_mode(state)
       :hold -> hold_mode(state)
       # there's a next mode defined
-      next_mode -> finish_mode(state) |> init(next_mode) |> start()
+      next_mode -> finish_mode(state) |> init(next_mode) |> start() |> execute()
     end
   end
 
