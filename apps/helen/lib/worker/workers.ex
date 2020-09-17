@@ -72,6 +72,8 @@ defmodule Helen.Workers do
   # NOTE: has test case
   @doc false
   def execute_action(%{stmt: :all, args: cmd, worker_cache: wc} = action) do
+    IO.puts("stmt all, worker_cache: #{inspect(wc, pretty: true)}")
+
     execute_result(action, fn ->
       for {ident, %{module: mod, found?: true, type: type} = worker}
           when type in [:simple_device, :gen_device] <- wc,
