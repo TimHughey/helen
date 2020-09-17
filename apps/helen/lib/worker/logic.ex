@@ -227,7 +227,7 @@ defmodule Helen.Worker.Logic do
   def change_mode(state, mode) do
     if ready?(state) do
       init(state, mode)
-      # flad that actions should be executed
+      # flag that actions should be executed
       |> execute_actions(true)
       |> start()
     else
@@ -450,12 +450,12 @@ defmodule Helen.Worker.Logic do
     state = update_elapsed(state)
     workers = cached_workers(state)
 
-    if worker_name(state) == "roost",
-      do:
-        Logger.info("""
-        roost next_action/1 entry status:
-        status: #{inspect(status(state), pretty: true)}
-        """)
+    # if worker_name(state) == "roost",
+    #   do:
+    #     Logger.info("""
+    #     roost next_action/1 entry status:
+    #     status: #{inspect(status(state), pretty: true)}
+    #     """)
 
     case actions_to_execute_get(state) do
       [] ->
@@ -472,10 +472,15 @@ defmodule Helen.Worker.Logic do
 
   def next_mode(state) do
     case live_next_mode(state) do
-      :none -> finish_mode(state)
-      :hold -> hold_mode(state)
+      :none ->
+        finish_mode(state)
+
+      :hold ->
+        hold_mode(state)
+
       # there's a next mode defined
-      next_mode -> finish_mode(state) |> init(next_mode) |> start() |> execute()
+      next_mode ->
+        change_mode(state, next_mode)
     end
   end
 

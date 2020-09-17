@@ -46,7 +46,7 @@ modes
     sequence init circulate aerate repeat
     steps
       init
-        sleep PT30S
+        sleep PT5.3S
       circulate
         pump on PT2M then off
       aerate
