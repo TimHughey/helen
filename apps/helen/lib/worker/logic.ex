@@ -447,6 +447,10 @@ defmodule Helen.Worker.Logic do
     state = update_elapsed(state)
     workers = cached_workers(state)
 
+    if worker_name(state) == "roost",
+      do:
+        IO.puts("roost next_action called.  status: #{inspect(status(state))}")
+
     case actions_to_execute_get(state) do
       [] ->
         step_repeat_or_next(state)

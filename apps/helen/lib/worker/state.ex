@@ -232,11 +232,13 @@ defmodule Helen.Worker.State do
   def pending_action(state), do: track_get(state, :pending_action) || :none
 
   def pending_action_put(state, val) do
-    IO.puts(
-      "subsystem: #{worker_name(state)} pending_action: #{
-        inspect(Map.drop(val, [:worker_cache]), pretty: true)
-      }"
-    )
+    if worker_name(state) == "roost",
+      do:
+        IO.puts(
+          "subsystem: #{worker_name(state)} pending_action: #{
+            inspect(Map.drop(val, [:worker_cache]), pretty: true)
+          }"
+        )
 
     track_put(state, :pending_action, val)
   end
