@@ -62,14 +62,12 @@ modes
         sleep PT1M
 
   leaving
-    sequence house_lights_only exiting
+    sequence house_lights
     next_mode closed
     steps
-      house_lights_only
+      house_lights
         off disco_ball el_wire lights_one lights_three
         on led_forest el_wire_entry
-
-      exiting
         sleep PT10M
 
   closed

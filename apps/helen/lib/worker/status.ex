@@ -42,6 +42,7 @@ defmodule Helen.Worker.Status do
     end
 
     %{
+      name: worker_name(state),
       ready: ready?(state),
       status: status_get(state),
       active: %{
@@ -50,7 +51,7 @@ defmodule Helen.Worker.Status do
         action: pending_action(state) |> clean_action.()
       },
       modes: all_modes_status(state),
-      workers: all_workers_status(state)
+      sub_workers: all_workers_status(state)
     }
   end
 end

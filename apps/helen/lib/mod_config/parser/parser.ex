@@ -173,7 +173,7 @@ defmodule Helen.Config.Parser do
        })
        when parse_ctx == :base and parse_ctx == match_ctx do
     case stmt do
-      x when x in [:syntax_vsn, :timezone] ->
+      x when x in [:syntax_vsn, :timezone, :worker_name] ->
         opts |> update_in([:config, :base], fn x -> Map.merge(x, captures) end)
 
       _x ->

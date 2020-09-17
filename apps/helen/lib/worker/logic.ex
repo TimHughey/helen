@@ -158,8 +158,6 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def runtime_opts, do: call({:inquiry, :runtime_opts})
 
-      def server_down?, do: GenServer.whereis(__MODULE__) |> is_nil()
-
       @doc """
       Set the Worker to ready or standbyy.
 
@@ -176,6 +174,8 @@ defmodule Helen.Worker.Logic do
       @doc since: "0.0.27"
       def server(atom) when atom in [:ready, :standby],
         do: call({:server_mode, atom})
+
+      def server_down?, do: GenServer.whereis(__MODULE__) |> is_nil()
 
       def status, do: call({:inquiry, :status})
 
@@ -378,7 +378,7 @@ defmodule Helen.Worker.Logic do
     case {server_mode(state), mode} do
       # quietly ignore changes to the same mode
       {current, requested} when current == requested ->
-        state
+        state |> reply({:ok, mode})
 
       # when switching to :standby ensure the switch is off
       {_current, requested} when requested in [:ready, :standby] ->

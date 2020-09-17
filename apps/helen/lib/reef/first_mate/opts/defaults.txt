@@ -2,6 +2,7 @@
 
 base
   syntax_vsn '2020-0818'
+  worker_name 'first_mate'
   timeout PT3M
   timezone 'America/New_York'
 

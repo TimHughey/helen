@@ -232,6 +232,12 @@ defmodule Helen.Worker.State do
   def pending_action(state), do: track_get(state, :pending_action) || :none
 
   def pending_action_put(state, val) do
+    IO.puts(
+      "subsystem: #{worker_name(state)} pending_action: #{
+        inspect(val, pretty: true)
+      }"
+    )
+
     track_put(state, :pending_action, val)
   end
 
@@ -373,4 +379,6 @@ defmodule Helen.Worker.State do
 
   # allow update_elapsed/1 calls when there isn't a mode running
   def update_elapsed(state), do: state
+
+  def worker_name(state), do: opts_get(state, [:base, :worker_name])
 end
