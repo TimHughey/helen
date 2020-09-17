@@ -449,7 +449,11 @@ defmodule Helen.Worker.Logic do
 
     if worker_name(state) == "roost",
       do:
-        IO.puts("roost next_action called.  status: #{inspect(status(state))}")
+        IO.puts(
+          "roost next_action called.  status: #{
+            inspect(status(state), pretty: true)
+          }"
+        )
 
     case actions_to_execute_get(state) do
       [] ->
