@@ -51,6 +51,7 @@ defmodule Helen.Worker.Status do
         step: active_step(state),
         action: pending_action(state) |> clean_action.()
       },
+      first_mode: first_mode(state),
       modes: all_modes_status(state),
       sub_workers: all_workers_status(state)
     }

@@ -12,11 +12,12 @@ defmodule UI.HelenChannel do
     {:ok, socket}
   end
 
-  def join("helen:reef", message, socket) do
+  def join("helen:reef", _message, socket) do
+    alias UI.Channel.Handler.Reef
     # Logger.info("join helen:reef #{inspect(message)}")
     # Logger.info("socket: #{inspect(socket, pretty: true)}")
 
-    {:ok, assign(socket, :live_update, false)}
+    {:ok, Reef.join(socket)}
   end
 
   def join("room:" <> _private_room_id, _params, _socket) do
@@ -92,6 +93,17 @@ defmodule UI.HelenChannel do
     """)
 
     {:reply, {:nop, %{}}, socket}
+  end
+
+  def handle_info({:live_update, subsystem}, %{assigns: %{live_update: live_update}} = socket) do
+    alias UI.Channel.Handler.Reef
+
+    if subsystem == "reef" and live_update do
+      broadcast(socket, "live_update", Reef.add_status(%{live_update: true}))
+      Process.send_after(self(), {:live_update, subsystem}, 1000)
+    end
+
+    {:noreply, socket}
   end
 
   defp reply_home_status_map(socket, base_resp) do

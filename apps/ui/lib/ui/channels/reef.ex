@@ -15,6 +15,11 @@ defmodule UI.Channel.Handler.Reef do
     |> reply()
   end
 
+  def join(socket) do
+    Socket.assign(socket, :live_update, false)
+    |> Socket.assign(:modes_locked?, true)
+  end
+
   def page_loaded(socket) do
     add_status()
     |> reply(socket)

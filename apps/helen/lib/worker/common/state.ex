@@ -27,6 +27,9 @@ defmodule Helen.Worker.State.Common do
 
   def ready?(state), do: server_mode(state) == :ready
 
+  def first_mode(state),
+    do: opts_get(state, [:base, :first_mode]) || :none
+
   def last_timeout(%{lasts: %{timeout: last_timeout}} = state) do
     tz = opts(state, :timezone) || "America/New_York"
 
@@ -52,6 +55,9 @@ defmodule Helen.Worker.State.Common do
       what -> get_in(state, [:opts, what])
     end
   end
+
+  def opts_get(state, what \\ []), do: get_in(state, flatten([:opts, what]))
+  def opts_mode_names(state), do: opts_get(state, :modes) |> Map.keys()
 
   def server_get(state, what), do: get_in(state, flatten([:server, what]))
 
@@ -95,4 +101,6 @@ defmodule Helen.Worker.State.Common do
     |> put_in([:timeouts, :last], utc_now())
     |> update_in([:timeouts, :count], fn x -> x + 1 end)
   end
+
+  def worker_name(state), do: opts_get(state, [:base, :worker_name])
 end

@@ -225,9 +225,6 @@ defmodule Helen.Worker.State do
     end
   end
 
-  def opts_get(state, what \\ []), do: get_in(state, flatten([:opts, what]))
-  def opts_mode_names(state), do: opts_get(state, :modes) |> Map.keys()
-
   def pending_action(state), do: track_get(state, :pending_action) || :none
 
   def pending_action_put(state, val) do
@@ -381,6 +378,4 @@ defmodule Helen.Worker.State do
 
   # allow update_elapsed/1 calls when there isn't a mode running
   def update_elapsed(state), do: state
-
-  def worker_name(state), do: opts_get(state, [:base, :worker_name])
 end

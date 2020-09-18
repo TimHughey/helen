@@ -29,9 +29,16 @@ defmodule UI.ReefView do
 
   @doc false
   def live_update(%{"subsystem" => subsystem}, socket) do
+    live_update? = socket_get(socket, :live_update)
+    next_live_update? = not live_update?
+
+    if next_live_update? do
+      Process.send_after(self(), {:live_update, subsystem}, 1000)
+    end
+
     %{
-      ui: %{subsystem: subsystem, live_update: true},
-      socket: socket_put(socket, :live_update, true)
+      ui: %{subsystem: subsystem, live_update: next_live_update?},
+      socket: socket_put(socket, :live_update, next_live_update?)
     }
   end
 
@@ -55,7 +62,7 @@ defmodule UI.ReefView do
   @doc false
   def modes_lock(worker, socket) do
     # by default modes are always locked
-    locked? = socket_get(socket, :modes_locked?) || true
+    locked? = socket_get(socket, :modes_locked?)
     next_locked? = not locked?
     socket = socket_put(socket, :modes_locked?, next_locked?)
     # toggle locked? by negating the existing value
@@ -83,7 +90,11 @@ defmodule UI.ReefView do
 
     rc = mod.mode(to_atom.(mode), [])
 
-    %{ui: %{worker: worker, mode: mode}, socket: socket} |> click_rc(rc)
+    %{
+      ui: %{worker: worker, mode: mode, modes_locked: true},
+      socket: socket_put(socket, :modes_locked?, true)
+    }
+    |> click_rc(rc)
   end
 
   # def button_click(%{"device" => device} = payload) do
@@ -107,7 +118,7 @@ defmodule UI.ReefView do
   #   end
   # end
 
-  def socket_get(socket, what), do: get_in(socket, flatten([:assign, what]))
+  def socket_get(%{assigns: assigns}, what), do: get_in(assigns, flatten([what]))
 
   def socket_put(socket, what, val) do
     import Phoenix.Socket, only: [assign: 3]
