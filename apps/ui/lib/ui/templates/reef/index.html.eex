@@ -6,7 +6,7 @@
 
   <div class="ui attached segment">
     <div class="ui two raised stackable cards">
-    <div class="mini card" data-subsystem-worker="captain">
+      <div class="mini card" data-subsystem-worker="captain">
       <div class="content" data-buttons="controls">
         <div class="right floated">
           <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
@@ -17,7 +17,7 @@
             <i class="stop icon"></i>
           </button>
 
-          <button class="ui raised tiny icon button" data-action="unlock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
+          <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
             <i class="lock icon"></i>
           </button>
 
@@ -62,43 +62,54 @@
         </div>
       </div>
     </div>
+      <div class="mini card" data-subsystem-worker="first_mate">
+      <div class="content" data-buttons="controls">
+        <div class="right floated">
+          <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
+            <i class="undo icon"></i>
+          </button>
 
-    <div class="mini card" data-subsystem-worker="first_mate">
-      <div class="content">
+          <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
+            <i class="stop icon"></i>
+          </button>
+
+          <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
+            <i class="lock icon"></i>
+          </button>
+
+          <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
+            <i class="radiation icon"></i>
+          </button>
+        </div>
+
+
         <div class="label header">
           First Mate
-          <div class="right floated ui green label">
-            Available
-          </div>
         </div>
+
         <div class="meta">
           Reef Worker
         </div>
+
         <div class="description">
           <span>
-            First Mate is responsible for controlling the auto top off
-            the live reef.
+            First Mate controls all aspects of the Display Tank including ATO and heater.
           </span>
         </div>
       </div>
-      <div class="center aligned extra content">
-        <div class="raised ui buttons">
-          <button class="ui compact icon button" data-action="off">
-            <i class="power off icon"></i>
-          </button>
-          <button class="ui compact icon button" data-action="play">
-            <i class="play icon"></i>
-          </button>
-          <button class="ui compact icon button" data-action="stop">
-            <i class="stop icon"></i>
-          </button>
-          <button class="ui compact icon button" data-worker="ato">
+      <div class="center aligned extra content" data-buttons="workers">
+        <div class="ui large raised icon buttons">
+          <button class="ui button" data-worker="rodi" data-tooltip="RODI Valve" data-variation="tiny">
             <i class="faucet icon"></i>
+          </button>
+
+          <button class="ui button" data-worker="mix_heater" data-tooltip="Heater" data-variation="tiny">
+            <i class="thermometer half icon"></i>
           </button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
     <div class="ui vertical segment" >
       <div class="ui seven top attached mini steps">
         <a class="step disabled" data-mode="fill">

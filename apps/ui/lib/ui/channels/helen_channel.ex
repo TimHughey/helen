@@ -3,15 +3,18 @@ defmodule UI.HelenChannel do
   Handle socket messages for the Helen Channel
   """
 
+  require Logger
+
   use Phoenix.Channel, log_join: false, log_handle_in: false
+  alias Phoenix.Socket
 
   def join("helen:admin", _message, socket) do
     {:ok, socket}
   end
 
   def join("helen:reef", message, socket) do
-    IO.puts("join helen:reef #{inspect(message)}")
-    IO.puts("socket: #{inspect(socket, pretty: true)}")
+    # Logger.info("join helen:reef #{inspect(message)}")
+    # Logger.info("socket: #{inspect(socket, pretty: true)}")
 
     {:ok, assign(socket, :live_update, false)}
   end
@@ -49,28 +52,24 @@ defmodule UI.HelenChannel do
     end
   end
 
-  def handle_in(msg, %{"subsystem" => subsystem}, socket)
+  def handle_in(msg, %{"subsystem" => subsystem} = payload, socket)
       when msg in ["refresh_page", "page_loaded"] do
+    alias UI.Channel.Handler.Reef
+
     base_resp = %{active_page: subsystem}
 
     case subsystem do
-      "reef" -> socket |> reply_reef_status_map(base_resp)
+      "reef" -> Reef.page_loaded(socket)
       "roost" -> socket |> reply_roost_status_map(base_resp)
       "module-config" -> socket |> reply_mod_config_status_map(base_resp)
       "home" -> socket |> reply_home_status_map(base_resp)
     end
   end
 
-  def handle_in("reef_click", payload, %{assigns: assigns} = socket) do
-    alias UI.ReefView
+  def handle_in("reef_click", payload, socket) do
+    alias UI.Channel.Handler.Reef
 
-    (assigns[:debug] || payload["debug"]) &&
-      IO.puts("reef_click socket: #{inspect(socket, pretty: true)}")
-
-    base_resp = ReefView.button_click(payload)
-
-    socket
-    |> reply_reef_status_map(base_resp)
+    Reef.click(payload, socket)
   end
 
   def handle_in("roost_click", %{"mode" => mode, "action" => action} = payload, socket)
@@ -88,10 +87,9 @@ defmodule UI.HelenChannel do
     do: {:reply, {:error, %{roost_click: payload}}, socket}
 
   def handle_in(type, payload, socket) do
-    """
-    handle_in(#{type}, #{inspect(payload, pretty: true)})
-    """
-    |> IO.puts()
+    Logger.info("""
+    unmatched handle_in(#{type}, #{inspect(payload, pretty: true)})
+    """)
 
     {:reply, {:nop, %{}}, socket}
   end
@@ -104,18 +102,17 @@ defmodule UI.HelenChannel do
     {:reply, {:module_config_status, Map.merge(base_resp, %{hello: "doctor"})}, socket}
   end
 
-  defp reply_reef_status_map(socket, base_resp) do
-    alias UI.ReefView
-
-    reef_status = ReefView.status()
-    full_resp = Map.merge(base_resp, reef_status)
-
-    {:reply, {:reef_status, full_resp}, socket}
-  end
-
   defp reply_roost_status_map(socket, base_resp) do
     alias UI.RoostView
 
     {:reply, {:roost_status, Map.merge(base_resp, RoostView.status())}, socket}
+  end
+
+  def reply(%Socket{} = socket, response) do
+    {:reply, response, socket}
+  end
+
+  def reply(response, %Socket{} = socket) do
+    {:reply, response, socket}
   end
 end
