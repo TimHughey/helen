@@ -7,7 +7,7 @@
   <!-- Dance with Me! -->
   <div class="ui attached segment">
     <div class="ui three raised stackable cards">
-      <div class="card" data-mode="dance">
+      <div class="card" data-mode="dance_with_me">
         <div class="content">
           <div class="label header">
             Dance With Me!
@@ -26,13 +26,13 @@
         <div class="extra content">
         <div class="center aligned extra content">
           <div class="raised ui buttons">
-            <button class="ui compact icon button" data-action="off">
-              <i class="power off icon"></i>
+            <button class="ui compact icon button" data-mode="dance_with_me" data-action="reset">
+              <i class="undo icon"></i>
             </button>
-            <button class="ui compact icon button" data-action="play">
+            <button class="ui compact icon button" data-mode="dance_with_me" data-action="play">
               <i class="play icon"></i>
             </button>
-            <button class="ui compact icon button" data-action="stop">
+            <button class="ui compact icon button" data-mode="dance_with_me" data-action="stop">
               <i class="stop icon"></i>
             </button>
           </div>
@@ -60,13 +60,13 @@
       <div class="extra content">
         <div class="center aligned extra content">
           <div class="raised ui buttons" >
-            <button class="ui compact icon button" data-action="off">
-              <i class="power off icon"></i>
+            <button class="ui compact icon button" data-mode="leaving" data-action="reset">
+              <i class="undo icon"></i>
             </button>
-            <button class="ui compact icon button" data-action="play">
+            <button class="ui compact icon button" data-mode="leaving" data-action="play">
               <i class="play icon"></i>
             </button>
-            <button class="ui compact icon button" data-action="stop">
+            <button class="ui compact icon button" data-mode="leaving" data-action="stop">
               <i class="stop icon"></i>
             </button>
           </div>
@@ -92,13 +92,13 @@
       </div>
       <div class="center aligned extra content">
         <div class="raised ui buttons">
-          <button class="ui compact icon button" data-action="off">
-            <i class="power off icon"></i>
+          <button class="ui compact icon button" data-mode="closed" data-action="reset">
+            <i class="undo icon"></i>
           </button>
-          <button class="ui compact icon button" data-action="play">
+          <button class="ui compact icon button" data-mode="closed" data-action="play">
             <i class="play icon"></i>
           </button>
-          <button class="ui compact icon button" data-action="stop">
+          <button class="ui compact icon button" data-mode="closed" data-action="stop">
             <i class="stop icon"></i>
           </button>
         </div>

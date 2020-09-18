@@ -11,7 +11,11 @@ defmodule Roost do
   defdelegate last_timeout, to: Server
   defdelegate restart(opts \\ []), to: Server
   defdelegate runtime_opts, to: Server
-  defdelegate status, to: Server
+
+  def status do
+    %{workers: %{roost: Server.status()}}
+  end
+
   defdelegate server(mode), to: Server
   defdelegate timeouts, to: Server
   defdelegate mode(mode, opts \\ []), to: Server

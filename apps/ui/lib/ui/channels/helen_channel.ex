@@ -20,6 +20,14 @@ defmodule UI.HelenChannel do
     {:ok, Reef.join(socket)}
   end
 
+  def join("helen:roost", _message, socket) do
+    alias UI.Channel.Handler.Roost
+    # Logger.info("join helen:reef #{inspect(message)}")
+    # Logger.info("socket: #{inspect(socket, pretty: true)}")
+
+    {:ok, Roost.join(socket)}
+  end
+
   def join("room:" <> _private_room_id, _params, _socket) do
     {:error, %{reason: "unauthorized"}}
   end
@@ -53,15 +61,15 @@ defmodule UI.HelenChannel do
     end
   end
 
-  def handle_in(msg, %{"subsystem" => subsystem} = payload, socket)
+  def handle_in(msg, %{"subsystem" => subsystem}, socket)
       when msg in ["refresh_page", "page_loaded"] do
-    alias UI.Channel.Handler.Reef
+    alias UI.Channel.Handler.{Reef, Roost}
 
     base_resp = %{active_page: subsystem}
 
     case subsystem do
       "reef" -> Reef.page_loaded(socket)
-      "roost" -> socket |> reply_roost_status_map(base_resp)
+      "roost" -> Roost.page_loaded(socket)
       "module-config" -> socket |> reply_mod_config_status_map(base_resp)
       "home" -> socket |> reply_home_status_map(base_resp)
     end
@@ -73,19 +81,11 @@ defmodule UI.HelenChannel do
     Reef.click(payload, socket)
   end
 
-  def handle_in("roost_click", %{"mode" => mode, "action" => action} = payload, socket)
-      when mode in ["dance", "leaving", "closed"] and action in ["off", "play", "stop"] do
-    alias UI.RoostView
+  def handle_in("roost_click", payload, socket) do
+    alias UI.Channel.Handler.Roost
 
-    base_resp = RoostView.button_click(payload)
-
-    socket
-    |> reply_roost_status_map(base_resp)
+    Roost.click(payload, socket)
   end
-
-  # roost_click unmatched mode / action
-  def handle_in("roost_click", payload, socket),
-    do: {:reply, {:error, %{roost_click: payload}}, socket}
 
   def handle_in(type, payload, socket) do
     Logger.info("""
@@ -112,12 +112,6 @@ defmodule UI.HelenChannel do
 
   defp reply_mod_config_status_map(socket, base_resp) do
     {:reply, {:module_config_status, Map.merge(base_resp, %{hello: "doctor"})}, socket}
-  end
-
-  defp reply_roost_status_map(socket, base_resp) do
-    alias UI.RoostView
-
-    {:reply, {:roost_status, Map.merge(base_resp, RoostView.status())}, socket}
   end
 
   def reply(%Socket{} = socket, response) do

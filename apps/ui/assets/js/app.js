@@ -53,7 +53,7 @@ channel.on("broadcast", (msg) => {
 
 var module_config = new ModuleConfigOptions(channel);
 var reef = new Reef(socket);
-var roost = new Roost(channel);
+var roost = new Roost(socket);
 
 // initialize the dropdown menu
 $(".ui.dropdown").dropdown();
@@ -69,5 +69,6 @@ jQuery("document").ready(function () {
   console.log("document ready", active_page);
 
   reef.pageLoaded(active_page);
+  roost.pageLoaded(active_page);
   module_config.pageLoaded(active_page);
 });
