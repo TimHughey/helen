@@ -31,7 +31,7 @@ modes
         all off
       finally
         all off
-        
+
   alpha
     next_mode beta
     sequence at_start middle finally
@@ -47,7 +47,6 @@ modes
         pump off
 
   beta
-    next_mode hold
     sequence step1 step2 repeat
     steps
       step1

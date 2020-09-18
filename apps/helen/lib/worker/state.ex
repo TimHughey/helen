@@ -181,8 +181,6 @@ defmodule Helen.Worker.State do
   def live_put(state, path, val),
     do: put_in(state, [:logic, :live, [path]] |> flatten(), val)
 
-  # def live_put_status(state, status), do: state |> live_put([:status], status)
-
   def live_update(state, path, func) when is_function(func, 1),
     do: state |> update_in(flatten([:logic, :live, path]), func)
 
@@ -271,6 +269,8 @@ defmodule Helen.Worker.State do
   def state_put(state, what, val), do: put_in(state, flatten([what]), val)
 
   def status_get(state), do: live_get(state, :status) || :none
+
+  def status_holding?(state), do: status_get(state) == :holding
 
   def status_put(state, status) do
     state |> live_put(:status, status)

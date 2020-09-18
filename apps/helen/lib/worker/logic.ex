@@ -393,7 +393,7 @@ defmodule Helen.Worker.Logic do
     end
   end
 
-  def holding?(state), do: status_get(state) == :holding
+  def holding?(state), do: status_holding?(state)
 
   def hold_mode(state) do
     state
@@ -480,7 +480,7 @@ defmodule Helen.Worker.Logic do
 
       # there's a next mode defined
       next_mode ->
-        change_mode(state, next_mode)
+        finish_mode(state) |> change_mode(next_mode)
     end
   end
 

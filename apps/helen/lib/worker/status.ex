@@ -29,6 +29,7 @@ defmodule Helen.Worker.Status do
 
   def mode_status(state, mode) do
     cond do
+      active_mode(state) == mode and status_holding?(state) -> :holding
       active_mode(state) == mode -> :running
       finished_mode?(state, mode) -> :finished
       true -> :none
