@@ -18,7 +18,6 @@ defmodule UI.Channel.Handler.Roost do
   end
 
   def join(socket) do
-    Logger.info("Roost channel joined")
     Socket.assign(socket, :live_update, false)
   end
 
