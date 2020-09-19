@@ -99,11 +99,11 @@
       </div>
       <div class="center aligned extra content" data-buttons="workers">
         <div class="ui large raised icon buttons">
-          <button class="ui button" data-worker="rodi" data-tooltip="RODI Valve" data-variation="tiny">
+          <button class="ui button" data-worker="ato" data-tooltip="ATO RODI Valve" data-variation="tiny">
             <i class="faucet icon"></i>
           </button>
 
-          <button class="ui button" data-worker="mix_heater" data-tooltip="Heater" data-variation="tiny">
+          <button class="ui button" data-worker="reef_heater" data-tooltip="Heater" data-variation="tiny">
             <i class="thermometer half icon"></i>
           </button>
         </div>
