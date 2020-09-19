@@ -29,15 +29,16 @@ defmodule UI.ReefView do
 
   @doc false
   def live_update(%{"subsystem" => subsystem}, socket) do
+    modes_locked = socket_get(socket, :modes_locked)
     live_update? = socket_get(socket, :live_update)
     next_live_update? = not live_update?
 
     if next_live_update? do
-      Process.send_after(self(), {:live_update, subsystem}, 1000)
+      Process.send_after(self(), {:live_update, subsystem}, 100)
     end
 
     %{
-      ui: %{subsystem: subsystem, live_update: next_live_update?},
+      ui: %{subsystem: subsystem, live_update: next_live_update?, modes_locked: modes_locked},
       socket: socket_put(socket, :live_update, next_live_update?)
     }
   end
@@ -62,9 +63,9 @@ defmodule UI.ReefView do
   @doc false
   def modes_lock(worker, socket) do
     # by default modes are always locked
-    locked? = socket_get(socket, :modes_locked?)
+    locked? = socket_get(socket, :modes_locked)
     next_locked? = not locked?
-    socket = socket_put(socket, :modes_locked?, next_locked?)
+    socket = socket_put(socket, :modes_locked, next_locked?)
     # toggle locked? by negating the existing value
     %{ui: %{worker: worker, modes_locked: next_locked?}, socket: socket}
   end
@@ -92,31 +93,10 @@ defmodule UI.ReefView do
 
     %{
       ui: %{worker: worker, mode: mode, modes_locked: true},
-      socket: socket_put(socket, :modes_locked?, true)
+      socket: socket_put(socket, :modes_locked, true)
     }
     |> click_rc(rc)
   end
-
-  # def button_click(%{"device" => device} = payload) do
-  #   resp = %{button_click: %{device: device}}
-  #
-  #   rc = button_handle_worker_and_device("captain", device, payload)
-  #
-  #   resp |> populate_click_rc(rc)
-  # end
-
-  # def button_handle_worker_and_device(worker, device, payload) do
-  #   alias Reef.MixTank.{Air, Pump, Rodi}
-  #   # alias Reef.MixTank.Temp, as: Heater
-  #
-  #   case {worker, device} do
-  #     {"captain", "water_pump"} -> Pump.toggle()
-  #     {"captain", "air_pump"} -> Air.toggle()
-  #     {"captain", "rodi_valve"} -> Rodi.toggle()
-  #     {"captain", "heater"} -> :not_permitted
-  #     _x -> {:unhandled_worker_device, payload}
-  #   end
-  # end
 
   def socket_get(%{assigns: assigns}, what), do: get_in(assigns, flatten([what]))
 
@@ -150,24 +130,6 @@ defmodule UI.ReefView do
         |> put_in([:ui, :click, :rc], inspect(rc, pretty: true))
     end
   end
-
-  # defp populate_click_rc(resp, click_rc) do
-  #   case click_rc do
-  #     {rc, anything} when is_atom(rc) ->
-  #       resp
-  #       |> put_in([:click, :rc], rc)
-  #       |> put_in([:click, :rc_str], inspect(anything, pretty: true))
-  #
-  #     rc when is_atom(rc) ->
-  #       resp |> put_in([:click, :rc], Atom.to_string(rc))
-  #
-  #     rc when is_binary(rc) ->
-  #       resp |> put_in([:click, :rc], rc)
-  #
-  #     rc ->
-  #       resp |> put_in([:click, :rc], inspect(rc, pretty: true))
-  #   end
-  # end
 
   def worker_mod(worker) do
     case worker do

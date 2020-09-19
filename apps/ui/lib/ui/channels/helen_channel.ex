@@ -99,8 +99,9 @@ defmodule UI.HelenChannel do
     alias UI.Channel.Handler.Reef
 
     if subsystem == "reef" and live_update do
-      broadcast(socket, "live_update", Reef.add_status(%{live_update: true}))
-      Process.send_after(self(), {:live_update, subsystem}, 1000)
+      broadcast(socket, "live_update", Reef.live_update(socket))
+
+      Process.send_after(self(), {:live_update, subsystem}, 1500)
     end
 
     {:noreply, socket}

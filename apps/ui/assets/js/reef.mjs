@@ -2,26 +2,24 @@ var channel = null;
 
 class Reef {
   constructor(socket) {
-    channel = socket.channel("helen:reef", { data: "initial" });
+    channel = socket.channel("helen:reef", {data: "initial"});
 
     channel
       .join()
-      .receive("ok", (resp) => {
+      .receive("ok", resp => {
         // join was a success
         window.channelJoined = true;
       })
-      .receive("error", (resp) => {
+      .receive("error", resp => {
         console.log("Unable to join", resp);
       });
 
-    channel.on("live_update", (msg) => {
+    channel.on("live_update", msg => {
       handleMessage(msg);
     });
 
     this.subsystem = "reef";
     this.channel = channel;
-    this.modesLocked = true;
-    this.manualControl = false;
   }
 
   channel() {
@@ -36,51 +34,32 @@ class Reef {
     const channel = this.channel;
 
     const reef_buttons = $("[data-subsystem='reef'] .button");
-    reef_buttons.on("click", (e) => {
+    reef_buttons.on("click", e => {
       handleClick(e);
     });
 
     const reef_links = $("div[data-subsystem='reef'] a[data-mode]");
-    reef_links.on("click", (e) => {
+    reef_links.on("click", e => {
       handleClick(e);
     });
 
     const live_update = jQuery("#live-update-button");
     live_update.removeClass("disabled");
 
-    live_update.on("click", (e) => {
+    live_update.on("click", e => {
       handleClick(e);
     });
 
     channel
-      .push("page_loaded", { subsystem: "reef" })
-      .receive("reef", (msg) => {
+      .push("page_loaded", {subsystem: "reef"})
+      .receive("reef", msg => {
         handleMessage(msg);
       })
-      .receive("nop", (msg) => {})
-      .receive("error", (reasons) => console.log("error", reasons))
+      .receive("nop", msg => {})
+      .receive("error", reasons => console.log("error", reasons))
       .receive("timeout", () => console.log("Networking issue..."));
   }
 }
-
-// function modesLock(worker, lock) {
-//   const steps = selectSteps();
-//   const icon = selectButtonIcon(worker, "unlock-modes");
-//
-//   if (lock) {
-//     // NOTE
-//     //  updating the disabled class when locking is handled via a
-//     //  reef status message from the server
-//     icon.removeClass("open");
-//     this.modesLocked = true;
-//   } else {
-//     // unlocking the steps (remving the disabled class) is handled
-//     // within the brower and without server interaction
-//     steps.removeClass("disabled");
-//     icon.addClass("open");
-//     this.modesLocked = false;
-//   }
-// }
 
 function handleClick(e) {
   const target = e.currentTarget;
@@ -90,112 +69,37 @@ function handleClick(e) {
     action: jQuery(target).data("action"),
     device: jQuery(target).data("device"),
     mode: jQuery(target).data("mode"),
-    worker: workerName(),
+    worker: workerName()
   };
 
   pushMessage(payload);
 }
 
-// function handleManualControl(payload) {
-//   const manual_control = this.manualControl;
-//   const icon = this.selectButtonIcon("captain", "manual-control");
-//   const button = jQuery(icon).closest("button");
-//
-//   // always toggle the manual override flag
-//   this.manualControl = !manual_control;
-//
-//   if (this.manualControl) {
-//     icon.removeClass("radiation").addClass("exclamation");
-//     button.addClass("active red");
-//   } else {
-//     // we are leaving manual control
-//     icon.removeClass("exclamation").addClass("radiation");
-//     button.removeClass("active red");
-//   }
-//
-//   payload.value = this.manualControl;
-//
-//   this.pushMessage(payload);
-// }
-
 function handleMessage(msg) {
-  const { live_update: live_update = false } = msg;
+  const {
+    live_update: live_update = false,
+    modes_locked: modes_locked = true
+  } = msg;
 
   if (live_update == true) {
-    // nothing
+    // console.log("reef message: ", msg);
   } else {
     console.log("reef message: ", msg);
   }
 
   const {
-    status: { workers: workers = [] },
-    ui: ui = {},
+    status: {workers: workers = []},
+    ui: ui = {}
   } = msg;
 
   for (let worker in workers) {
-    workerMessage(workers[worker]);
+    workerMessage(workers[worker], modes_locked);
   }
 
-  updateUI(ui);
-
-  // updateStopButton(captain_mode);
-  //
-  // if (captain_ready == false) {
-  //   workerStandbyMode("captain", true);
-  // } else if (typeof captain_mode == "string") {
-  //   // if the captain mode was specified then update steps
-  //   let steps = selectSteps();
-  //
-  //   switch (captain_mode) {
-  //     case "all_stop":
-  //     case "none":
-  //       let fill = jQuery(steps).filter("[data-mode='fill']");
-  //       let fill_icon = jQuery(steps).find(".icon");
-  //       let rest = jQuery(steps).filter("[data-mode!='fill']");
-  //
-  //       if (this.manualControl == false) {
-  //         this.modeActive(fill);
-  //         this.modeDisabled(rest);
-  //         fill_icon.removeClass("green");
-  //       } else {
-  //         this.modeDisabled(steps);
-  //       }
-  //
-  //       break;
-  //
-  //     default:
-  //       const active_filter = `[data-mode='${captain_mode}']`;
-  //       const disabled_filter = `[data-mode!='${captain_mode}']`;
-  //       const current_mode = jQuery(steps).filter("a.active");
-  //
-  //       const active = jQuery(steps).filter(active_filter);
-  //       const disabled = jQuery(steps).filter(disabled_filter);
-  //
-  //       this.modeActive(active);
-  //       this.modeDisabled(disabled);
-  //   }
-  // }
-  // this.handleModeStatus(msg);
-  // this.handleCaptainWorkerStatus(msg);
+  updateUI(ui, live_update);
 }
 
-// function handleUnlockSteps(msg) {
-//   if (msg["button_click"] === undefined) {
-//     return;
-//   }
-//
-//   const {
-//     button_click: { action: action, step: step = "none" },
-//   } = msg;
-//
-//   if (action == "unlock-modes") {
-//     const steps = this.selectSteps();
-//   } else if (step != "none") {
-//     this.selectButtonIcon("captain", "unlock-modes").removeClass("open");
-//   }
-// }
-
-function workerMessage(msg) {
+function workerMessage(msg, modes_locked = true) {
   const {
     name: worker_name,
     active: {
@@ -204,13 +108,13 @@ function workerMessage(msg) {
       action: {
         cmd: cmd = null,
         stmt: stmt = null,
-        worker_cmd: worker_cmd = null,
-      },
+        worker_cmd: worker_cmd = null
+      }
     },
     first_mode: first_mode,
     ready: worker_ready = false,
     status: worker_status = null,
-    sub_workers: sub_workers,
+    sub_workers: sub_workers
   } = msg;
 
   // console.log("workerMessage: ", msg);
@@ -219,7 +123,7 @@ function workerMessage(msg) {
   updateSubworkers(worker_name, sub_workers);
 
   if (worker_name == "captain") {
-    updateModes(msg);
+    updateModes(msg, modes_locked);
 
     if (active_mode === "none") {
       const step_targets = selectSteps();
@@ -229,68 +133,39 @@ function workerMessage(msg) {
       modeReady(first_step_target);
     }
   }
-
-  //
-  // if (ready == false) {
-  //   standbyMode(subsystem, true);
-  // } else if (typeof mode == "string") {
-  //   // if the captain mode was specified then update steps
-  //   let steps = selectSteps(worker);
-  //
-  //   switch (mode) {
-  //     case "all_stop":
-  //     case "none":
-  //       let fill = jQuery(steps).filter("[data-mode='fill']");
-  //       let fill_icon = jQuery(steps).find(".icon");
-  //       let rest = jQuery(steps).filter("[data-mode!='fill']");
-  //
-  //       modeActive(fill);
-  //       modeDisabled(rest);
-  //       fill_icon.removeClass("green");
-  //
-  //       break;
-  //
-  //     default:
-  //       const active_filter = `[data-mode='${captain_mode}']`;
-  //       const disabled_filter = `[data-mode!='${captain_mode}']`;
-  //       const current_mode = jQuery(steps).filter("a.active");
-  //
-  //       const active = jQuery(steps).filter(active_filter);
-  //       const disabled = jQuery(steps).filter(disabled_filter);
-  //
-  //       modeActive(active);
-  //       modeDisabled(disabled);
-  //   }
-  // }
-  // handleModeStatus(worker, msg);
-  // handleCaptainWorkerStatus(worker, msg);
 }
 
 function modeActive(target) {
   const remove = "completed disabled";
   const add = "active";
 
-  jQuery(target).addClass(add).removeClass(remove);
+  jQuery(target)
+    .addClass(add)
+    .removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
   icon.removeClass("black").addClass("green");
 }
 
-function modeDisabled(target) {
+function modeDisabled(target, modes_locked = true) {
   const remove = "completed active";
-  const add = "disabled";
 
-  jQuery(target).removeClass(remove).addClass(add);
+  jQuery(target)
+    .removeClass(remove)
+    .toggleClass("disabled", modes_locked);
 
   let icon = jQuery(target).children(".icon");
   icon.removeClass("green");
 }
 
-function modeFinished(target) {
+function modeFinished(target, modes_locked = true) {
   const remove = "active";
-  const add = "completed disabled";
+  const add = "completed";
 
-  jQuery(target).addClass(add).removeClass(remove);
+  jQuery(target)
+    .addClass(add)
+    .removeClass(remove)
+    .toggleClass("disabled", modes_locked);
 
   let icon = jQuery(target).children(".icon");
   icon.addClass("green");
@@ -316,11 +191,11 @@ function pushMessage(payload) {
 
   channel
     .push("reef_click", payload)
-    .receive("reef", (msg) => {
+    .receive("reef", msg => {
       handleMessage(msg);
     })
-    .receive("nop", (msg) => {})
-    .receive("error", (reasons) => console.log("error", reasons))
+    .receive("nop", msg => {})
+    .receive("error", reasons => console.log("error", reasons))
     .receive("timeout", () => console.log("Networking issue..."));
 }
 
@@ -382,12 +257,12 @@ function selectSubWorker(targets, name) {
   return target;
 }
 
-function updateModes(msg) {
-  const { name: worker_name, modes: modes } = msg;
+function updateModes(msg, modes_locked = true) {
+  const {name: worker_name, modes: modes} = msg;
 
   const step_targets = selectSteps();
 
-  for (const { mode: mode_name, status: mode_status } of modes) {
+  for (const {mode: mode_name, status: mode_status} of modes) {
     let target = selectStep(step_targets, mode_name);
 
     if (target) {
@@ -398,11 +273,11 @@ function updateModes(msg) {
           break;
 
         case "finished":
-          modeFinished(target);
+          modeFinished(target, modes_locked);
           break;
 
         case "none":
-          modeDisabled(target);
+          modeDisabled(target, modes_locked);
 
         default:
         // no change to classes
@@ -429,7 +304,7 @@ function updateStopButton(worker, mode) {
 function updateSubworkers(worker_name, sub_workers) {
   const buttons = selectSubworkers(worker_name);
 
-  for (let { status: status, ready: ready, name: name } of sub_workers) {
+  for (let {status: status, ready: ready, name: name} of sub_workers) {
     const target = selectSubWorker(buttons, name);
 
     if (ready && status) {
@@ -446,12 +321,8 @@ function updateSubworkers(worker_name, sub_workers) {
   }
 }
 
-function updateUI(msg) {
-  const {
-    worker: worker = "none",
-    live_update: live_update,
-    modes_locked: modes_locked = true,
-  } = msg;
+function updateUI(msg, live_update) {
+  const {worker: worker = "none", modes_locked: modes_locked = true} = msg;
 
   if (live_update === true) {
     $("#live-update-button").transition("pulse");
@@ -463,18 +334,6 @@ function updateUI(msg) {
     selectStepsDisabled(worker).toggleClass("disabled", modes_locked);
   }
 }
-
-// function workerStandby(worker, standby) {
-//   const {}
-//   switch (worker) {
-//     case "captain":
-//       const steps = selectSteps(subsystem);
-//       steps.removeClass("active green").addClass("disabled");
-//
-//       const devices = this.selectDevices("captain");
-//       devices.removeClass("disabled");
-//   }
-// }
 
 function workerName() {
   const target = jQuery(
@@ -490,4 +349,4 @@ function workerSelector(worker) {
   return worker_selector;
 }
 
-export { Reef };
+export {Reef};
