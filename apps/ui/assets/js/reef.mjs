@@ -2,19 +2,19 @@ var channel = null;
 
 class Reef {
   constructor(socket) {
-    channel = socket.channel("helen:reef", {data: "initial"});
+    channel = socket.channel("helen:reef", { data: "initial" });
 
     channel
       .join()
-      .receive("ok", resp => {
+      .receive("ok", (resp) => {
         // join was a success
         window.channelJoined = true;
       })
-      .receive("error", resp => {
+      .receive("error", (resp) => {
         console.log("Unable to join", resp);
       });
 
-    channel.on("live_update", msg => {
+    channel.on("live_update", (msg) => {
       handleMessage(msg);
     });
 
@@ -34,29 +34,29 @@ class Reef {
     const channel = this.channel;
 
     const reef_buttons = $("[data-subsystem='reef'] .button");
-    reef_buttons.on("click", e => {
+    reef_buttons.on("click", (e) => {
       handleClick(e);
     });
 
     const reef_links = $("div[data-subsystem='reef'] a[data-mode]");
-    reef_links.on("click", e => {
+    reef_links.on("click", (e) => {
       handleClick(e);
     });
 
     const live_update = jQuery("#live-update-button");
     live_update.removeClass("disabled");
 
-    live_update.on("click", e => {
+    live_update.on("click", (e) => {
       handleClick(e);
     });
 
     channel
-      .push("page_loaded", {subsystem: "reef"})
-      .receive("reef", msg => {
+      .push("page_loaded", { subsystem: "reef" })
+      .receive("reef", (msg) => {
         handleMessage(msg);
       })
-      .receive("nop", msg => {})
-      .receive("error", reasons => console.log("error", reasons))
+      .receive("nop", (msg) => {})
+      .receive("error", (reasons) => console.log("error", reasons))
       .receive("timeout", () => console.log("Networking issue..."));
   }
 }
@@ -71,7 +71,7 @@ function handleClick(e) {
     mode: jQuery(target).data("mode"),
     worker: jQuery(target)
       .closest("div[data-subsystem-worker]")
-      .data("subsystem-worker")
+      .data("subsystem-worker"),
   };
 
   pushMessage(payload);
@@ -80,7 +80,7 @@ function handleClick(e) {
 function handleMessage(msg) {
   const {
     live_update: live_update = false,
-    modes_locked: modes_locked = true
+    modes_locked: modes_locked = true,
   } = msg;
 
   if (live_update == true) {
@@ -90,8 +90,8 @@ function handleMessage(msg) {
   }
 
   const {
-    status: {workers: workers = []},
-    ui: ui = {}
+    status: { workers: workers = [] },
+    ui: ui = {},
   } = msg;
 
   for (let worker in workers) {
@@ -105,20 +105,16 @@ function modeActive(target) {
   const remove = "completed disabled";
   const add = "active";
 
-  jQuery(target)
-    .addClass(add)
-    .removeClass(remove);
+  jQuery(target).addClass(add).removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
-  icon.removeClass("black").addClass("green");
+  icon.removeClass("black").addClass("green").transition("tada");
 }
 
 function modeDisabled(target, modes_locked = true) {
   const remove = "completed active";
 
-  jQuery(target)
-    .removeClass(remove)
-    .toggleClass("disabled", modes_locked);
+  jQuery(target).removeClass(remove).toggleClass("disabled", modes_locked);
 
   let icon = jQuery(target).children(".icon");
   icon.removeClass("green");
@@ -157,11 +153,11 @@ function pushMessage(payload) {
 
   channel
     .push("reef_click", payload)
-    .receive("reef", msg => {
+    .receive("reef", (msg) => {
       handleMessage(msg);
     })
-    .receive("nop", msg => {})
-    .receive("error", reasons => console.log("error", reasons))
+    .receive("nop", (msg) => {})
+    .receive("error", (reasons) => console.log("error", reasons))
     .receive("timeout", () => console.log("Networking issue..."));
 }
 
@@ -224,11 +220,11 @@ function selectSubWorker(targets, name) {
 }
 
 function updateModes(msg, modes_locked = true) {
-  const {name: worker_name, modes: modes} = msg;
+  const { name: worker_name, modes: modes } = msg;
 
   const step_targets = selectSteps();
 
-  for (const {mode: mode_name, status: mode_status} of modes) {
+  for (const { mode: mode_name, status: mode_status } of modes) {
     let target = selectStep(step_targets, mode_name);
 
     if (target) {
@@ -270,7 +266,7 @@ function updateStopButton(worker, mode) {
 function updateSubworkers(worker_name, sub_workers) {
   const buttons = selectSubworkers(worker_name);
 
-  for (let {status: status, ready: ready, name: name} of sub_workers) {
+  for (let { status: status, ready: ready, name: name } of sub_workers) {
     const target = selectSubWorker(buttons, name);
 
     if (ready && status) {
@@ -288,7 +284,7 @@ function updateSubworkers(worker_name, sub_workers) {
 }
 
 function updateUI(msg, live_update) {
-  const {worker: worker = "none", modes_locked: modes_locked = true} = msg;
+  const { worker: worker = "none", modes_locked: modes_locked = true } = msg;
 
   if (live_update === true) {
     $("#live-update-button").transition("pulse");
@@ -310,13 +306,13 @@ function workerMessage(msg, modes_locked = true) {
       action: {
         cmd: cmd = null,
         stmt: stmt = null,
-        worker_cmd: worker_cmd = null
-      }
+        worker_cmd: worker_cmd = null,
+      },
     },
     first_mode: first_mode,
     ready: worker_ready = false,
     status: worker_status = null,
-    sub_workers: sub_workers
+    sub_workers: sub_workers,
   } = msg;
 
   // console.log("workerMessage: ", msg);
@@ -342,4 +338,4 @@ function workerSelector(worker) {
   return worker_selector;
 }
 
-export {Reef};
+export { Reef };

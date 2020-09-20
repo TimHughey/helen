@@ -12,7 +12,6 @@ defmodule UI.ReefView do
   @doc false
   def button_click(%{"worker" => worker} = payload, socket) do
     case payload do
-      %{"action" => "live-update"} -> live_update(payload, socket)
       %{"action" => "lock-modes"} -> modes_lock(worker, socket)
       %{"action" => "manual-control"} -> manual_control(worker, socket)
       %{"action" => "reset"} -> restart(worker, socket)
