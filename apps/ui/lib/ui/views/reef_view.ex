@@ -6,6 +6,9 @@ defmodule UI.ReefView do
   alias Reef.Captain.Server, as: Captain
   alias Reef.FirstMate.Server, as: FirstMate
 
+  def button_click(%{"action" => "live-update"} = payload, socket),
+    do: live_update(payload, socket)
+
   @doc false
   def button_click(%{"worker" => worker} = payload, socket) do
     case payload do
