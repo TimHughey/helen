@@ -5,15 +5,13 @@
   </h3>
 
   <!-- Dance with Me! -->
-  <div class="ui attached segment">
+  <div class="ui attached segment" data-worker="roost">
     <div class="ui three raised stackable cards">
       <div class="card" data-mode="dance_with_me">
         <div class="content">
           <div class="label header">
             Dance With Me!
-            <div class="right floated ui green label">
-              Ready
-            </div>
+            <div class="right floated ui label" data-status></div>
           </div>
           <div class="meta">
             <span>Roost Mode</span>
@@ -26,28 +24,26 @@
         <div class="extra content">
         <div class="center aligned extra content">
           <div class="raised ui buttons">
-            <button class="ui compact icon button" data-mode="dance_with_me" data-action="reset">
+            <button class="ui compact icon button" data-action="reset">
               <i class="undo icon"></i>
             </button>
-            <button class="ui compact icon button" data-mode="dance_with_me" data-action="play">
+            <button class="ui compact icon button" data-action="play">
               <i class="play icon"></i>
             </button>
-            <button class="ui compact icon button" data-mode="dance_with_me" data-action="stop">
+            <button class="ui compact icon button" data-action="stop">
               <i class="stop icon"></i>
             </button>
           </div>
         </div>
       </div>
-      </div>
+    </div>
 
     <!-- Leaving -->
     <div class="card" data-mode="leaving">
       <div class="content">
         <div class="label header">
           Leaving...
-          <div class="right floated ui green label">
-            Ready
-          </div>
+          <div class="right floated ui label" data-status></div>
         </div>
         <div class="meta">
           Roost Mode
@@ -60,13 +56,13 @@
       <div class="extra content">
         <div class="center aligned extra content">
           <div class="raised ui buttons" >
-            <button class="ui compact icon button" data-mode="leaving" data-action="reset">
+            <button class="ui compact icon button" data-action="reset">
               <i class="undo icon"></i>
             </button>
-            <button class="ui compact icon button" data-mode="leaving" data-action="play">
+            <button class="ui compact icon button" data-action="play">
               <i class="play icon"></i>
             </button>
-            <button class="ui compact icon button" data-mode="leaving" data-action="stop">
+            <button class="ui compact icon button" data-action="stop">
               <i class="stop icon"></i>
             </button>
           </div>
@@ -79,9 +75,7 @@
       <div class="content">
         <div class="label header">
           Closed
-          <div class="right floated ui green label">
-            Ready
-          </div>
+          <div class="right floated ui label" data-status></div>
         </div>
         <div class="meta">
           Roost Mode
@@ -92,13 +86,13 @@
       </div>
       <div class="center aligned extra content">
         <div class="raised ui buttons">
-          <button class="ui compact icon button" data-mode="closed" data-action="reset">
+          <button class="ui compact icon button" data-action="reset">
             <i class="undo icon"></i>
           </button>
-          <button class="ui compact icon button" data-mode="closed" data-action="play">
+          <button class="ui compact icon button" data-action="play">
             <i class="play icon"></i>
           </button>
-          <button class="ui compact icon button" data-mode="closed" data-action="stop">
+          <button class="ui compact icon button" data-action="stop">
             <i class="stop icon"></i>
           </button>
         </div>

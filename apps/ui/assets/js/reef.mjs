@@ -69,7 +69,9 @@ function handleClick(e) {
     action: jQuery(target).data("action"),
     device: jQuery(target).data("device"),
     mode: jQuery(target).data("mode"),
-    worker: workerName()
+    worker: jQuery(target)
+      .closest("div[data-subsystem-worker]")
+      .data("subsystem-worker")
   };
 
   pushMessage(payload);
@@ -97,42 +99,6 @@ function handleMessage(msg) {
   }
 
   updateUI(ui, live_update);
-}
-
-function workerMessage(msg, modes_locked = true) {
-  const {
-    name: worker_name,
-    active: {
-      mode: active_mode = "none",
-      step: step = null,
-      action: {
-        cmd: cmd = null,
-        stmt: stmt = null,
-        worker_cmd: worker_cmd = null
-      }
-    },
-    first_mode: first_mode,
-    ready: worker_ready = false,
-    status: worker_status = null,
-    sub_workers: sub_workers
-  } = msg;
-
-  // console.log("workerMessage: ", msg);
-
-  updateStopButton(worker_name, active_mode);
-  updateSubworkers(worker_name, sub_workers);
-
-  if (worker_name == "captain") {
-    updateModes(msg, modes_locked);
-
-    if (active_mode === "none") {
-      const step_targets = selectSteps();
-      const first_step_target = selectStep(step_targets, first_mode);
-
-      modeDisabled(step_targets);
-      modeReady(first_step_target);
-    }
-  }
 }
 
 function modeActive(target) {
@@ -335,13 +301,40 @@ function updateUI(msg, live_update) {
   }
 }
 
-function workerName() {
-  const target = jQuery(
-    "div[data-subsystem='reef'] div[data-subsystem-worker]"
-  );
-  const worker = target.data("subsystem-worker");
+function workerMessage(msg, modes_locked = true) {
+  const {
+    name: worker_name,
+    active: {
+      mode: active_mode = "none",
+      step: step = null,
+      action: {
+        cmd: cmd = null,
+        stmt: stmt = null,
+        worker_cmd: worker_cmd = null
+      }
+    },
+    first_mode: first_mode,
+    ready: worker_ready = false,
+    status: worker_status = null,
+    sub_workers: sub_workers
+  } = msg;
 
-  return worker;
+  // console.log("workerMessage: ", msg);
+
+  updateStopButton(worker_name, active_mode);
+  updateSubworkers(worker_name, sub_workers);
+
+  if (worker_name == "captain") {
+    updateModes(msg, modes_locked);
+
+    if (active_mode === "none") {
+      const step_targets = selectSteps();
+      const first_step_target = selectStep(step_targets, first_mode);
+
+      modeDisabled(step_targets);
+      modeReady(first_step_target);
+    }
+  }
 }
 
 function workerSelector(worker) {

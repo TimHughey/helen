@@ -45,10 +45,9 @@
           Control the Roost systems.
         </div>
         <div class="extra">
-            <button class="ui right floated icon primary button" id="home-roost-button">
-                Control the Roost
-                <i class="right chevron icon"></i>
-            </button>
+          <%= content = ["Control the Roost", raw("<i class=\"right chevron icon\"></i>")]
+              button(content, to: "/roost", method: :post,
+                      class: "ui right floated icon primary button") %>
             <div class="ui green label">
               Have fun, no damage can be caused adjusting The Roost
             </div>
@@ -69,10 +68,9 @@
           Adjust the configuration of Helen modules.
         </div>
         <div class="extra">
-          <button class="ui right floated icon primary button" id="home-module-config-button">
-              Adjust Module Configurations
-              <i class="right chevron icon"></i>
-          </button>
+          <%= content = ["Adjust Module Configuration", raw("<i class=\"right chevron icon\"></i>")]
+              button(content, to: "/module_opts", method: :post,
+                      class: "ui right floated icon primary button") %>
           <div class="ui red label">
             Use extreme caution when adjusting module configurations.
           </div>

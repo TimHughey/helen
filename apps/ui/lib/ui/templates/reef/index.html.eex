@@ -110,7 +110,7 @@
       </div>
     </div>
     </div>
-    <div class="ui vertical segment" >
+    <div class="ui vertical segment" data-subsystem-worker="captain">
       <div class="ui seven top attached mini steps">
         <a class="step disabled" data-mode="fill">
           <i class="faucet icon"></i>
