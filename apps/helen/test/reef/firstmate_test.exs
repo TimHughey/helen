@@ -41,8 +41,7 @@ defmodule ReefFirstMateTest do
              :all_stop,
              :clean,
              :normal_operations,
-             :water_change_finish,
-             :water_change_start
+             :water_change
            ]
   end
 

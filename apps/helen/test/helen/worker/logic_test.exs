@@ -146,7 +146,7 @@ defmodule WorkerLogicTest do
 
     assert Logic.finished?(state, mode)
     # has live been populated with the next mode?
-    assert State.active_mode(state) == :beta
+    assert State.active_mode(state) in [:none, :beta]
   end
 
   test "can start a mode that repeats" do
