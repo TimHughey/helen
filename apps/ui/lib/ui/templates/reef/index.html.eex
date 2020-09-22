@@ -45,14 +45,14 @@
             <a class="step disabled" data-mode="keep_fresh">
               <i class="fan icon"></i>
               <div class="content">
-                <div class="title">Keep Fresh</div>
+                <div class="title" data-tooltip="Keep MixTank Fresh">Fresh</div>
               </div>
             </a>
 
             <a class="step disabled" data-mode="add_salt">
               <i class="random icon"></i>
               <div class="content">
-                <div class="title">Add salt</div>
+                <div class="title" data-tooltip="Add Salt">Salt</div>
               </div>
             </a>
 
@@ -80,7 +80,7 @@
             <a class="step disabled" data-mode="final_check">
               <i class="thumbs up outline icon"></i>
               <div class="content">
-                <div class="title">Final Check</div>
+                <div class="title" data-tooltip="Final checks prior to starting Fill">Check</div>
               </div>
             </a>
           </div>

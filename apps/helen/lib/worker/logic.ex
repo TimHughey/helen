@@ -94,9 +94,7 @@ defmodule Helen.Worker.Logic do
       @doc false
       @impl true
       def handle_continue(:bootstrap, state) do
-        state
-        |> Common.change_token()
-        |> Logic.cache_worker_modules()
+        Logic.bootstrap(state)
         |> Logic.noreply()
       end
 
@@ -216,6 +214,12 @@ defmodule Helen.Worker.Logic do
     get_in(opts, [:modes])
     |> Map.keys()
     |> Enum.sort()
+  end
+
+  def bootstrap(state) do
+    state
+    |> change_token()
+    |> cache_worker_modules()
   end
 
   def cache_worker_modules(%{opts: %{workers: workers}} = state) do
