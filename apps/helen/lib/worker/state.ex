@@ -144,6 +144,8 @@ defmodule Helen.Worker.State do
       when is_atom(mode) and is_map(mode_map),
       do: put_in(state, [:logic, :finished, mode], mode_map)
 
+  def finished_reset(state), do: put_in(state, [:logic, :finished], %{})
+
   def init_fault_put(state, val),
     do: state |> build_logic_map() |> put_in([:logic, :faults, :init], val)
 
@@ -243,6 +245,8 @@ defmodule Helen.Worker.State do
 
   def stage_get(state, path),
     do: get_in(state, flatten([:logic, :stage, path]))
+
+  def stage_get_base_opt(state, key), do: stage_get_opts(state, [:base, key])
 
   def stage_get_opts(state, path \\ []),
     do: state |> stage_get(flatten([:opts, path]))

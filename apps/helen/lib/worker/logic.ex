@@ -369,9 +369,10 @@ defmodule Helen.Worker.Logic do
 
   def handle_logic_msg(%{token: msg_token} = action, %{token: token} = state)
       when msg_token != token do
-    Logger.info("""
+    Logger.debug("""
     handle_logic_msg/2
-    token mismatch: #{inspect(Map.drop(action, [:worker_cache]), pretty: true)}
+    token mismatch:
+    #{inspect(Map.drop(action, [:worker_cache]), pretty: true)}
     """)
 
     state
@@ -486,6 +487,14 @@ defmodule Helen.Worker.Logic do
 
   def noreply(s), do: {:noreply, s, loop_timeout(s)}
 
+  def purge_finished_if_needed(state) do
+    if is_atom(stage_get_base_opt(state, :first_mode)) do
+      finished_reset(state)
+    else
+      state
+    end
+  end
+
   def repeat_step(state) do
     state
     |> actions_to_execute_put(step_actions_get(state, active_step(state)))
@@ -535,6 +544,7 @@ defmodule Helen.Worker.Logic do
   def start(state) do
     state
     |> finish_mode_if_needed()
+    |> purge_finished_if_needed()
     |> move_stage_to_live()
     |> status_put(:running)
     |> track_put(:started_at)

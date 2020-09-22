@@ -75,7 +75,7 @@ modes
       at_start
         sleep PT30S
       warm
-        tell mix_heater match_display_tank
+        tell mix_heater active
       stir
         pump on PT1M then off
         pump off PT5M
@@ -85,7 +85,6 @@ modes
     sequence at_start adjust_valves pump_to_sewer
     steps
       at_start
-        tell mix_heater standby
         tell reef_heater standby
         tell first_mate clean
       adjust_valves

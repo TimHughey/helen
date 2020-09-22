@@ -7,173 +7,200 @@
   <div class="ui attached segment">
     <div class="ui two raised stackable cards">
       <div class="mini card" data-subsystem-worker="captain">
-      <div class="content" data-buttons="controls">
-        <div class="right floated">
-          <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
-            <i class="undo icon"></i>
-          </button>
+        <div class="content" data-buttons="controls">
+          <div class="right floated">
+            <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
+              <i class="undo icon"></i>
+            </button>
 
-          <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
-            <i class="stop icon"></i>
-          </button>
+            <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
+              <i class="stop icon"></i>
+            </button>
 
-          <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
-            <i class="lock icon"></i>
-          </button>
+            <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
+              <i class="lock icon"></i>
+            </button>
 
-          <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
-            <i class="radiation icon"></i>
-          </button>
-        </div>
+            <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
+              <i class="radiation icon"></i>
+            </button>
+          </div>
 
-
-        <div class="label header">
-          Captain
-        </div>
-
-        <div class="meta">
-          Reef Worker
-        </div>
-
+        <div class="label header">Captain</div>
+        <div class="meta">Reef Worker</div>
         <div class="description">
-          <span>
             Captain controls all aspects of the Mix Tank including filling it with
             with RODI and controlling the circulation pump, air pump and heater.
-          </span>
         </div>
-      </div>
-      <div class="center aligned extra content" data-buttons="workers">
-        <div class="ui large raised icon buttons">
-          <button class="ui button" data-worker="pump" data-tooltip="Water Pump" data-variation="tiny">
+        </div>
+        <div class="content">
+          <div class="ui tiny steps">
+            <a class="step disabled" data-mode="fill">
+              <i class="faucet icon"></i>
+              <div class="content">
+                <div class="title" data-tooltip="Fill MixTank">Fill</div>
+              </div>
+            </a>
+
+            <a class="step disabled" data-mode="keep_fresh">
+              <i class="fan icon"></i>
+              <div class="content">
+                <div class="title">Keep Fresh</div>
+              </div>
+            </a>
+
+            <a class="step disabled" data-mode="add_salt">
+              <i class="random icon"></i>
+              <div class="content">
+                <div class="title">Add salt</div>
+              </div>
+            </a>
+
+            <a class="step disabled" data-mode="match_conditions">
+              <i class="balance scale icon"></i>
+              <div class="content">
+                <div class="title">Match Conditions</div>
+              </div>
+            </a>
+
+            <a class="step disabled" data-mode="dump_water">
+              <i class="trash icon"></i>
+              <div class="content">
+                <div class="title">Dump Water</div>
+              </div>
+            </a>
+
+            <a class="step disabled" data-mode="load_water">
+              <i class="upload icon"></i>
+              <div class="content">
+                <div class="title">Load Water</div>
+              </div>
+            </a>
+
+            <a class="step disabled" data-mode="final_check">
+              <i class="thumbs up outline icon"></i>
+              <div class="content">
+                <div class="title">Final Check</div>
+              </div>
+            </a>
+          </div>
+        </div>
+        <div class="center aligned extra content" data-subworkers>
+          <button class="ui big circular icon button" data-subworker="pump" data-tooltip="Water Pump" data-variation="tiny">
             <i class="fan icon"></i>
           </button>
 
-          <button class="ui button" data-worker="air" data-tooltip="Air Pump" data-variation="tiny">
+          <button class="ui big circular icon button" data-subworker="air" data-tooltip="Air Pump" data-variation="tiny">
             <i class="wind icon"></i>
           </button>
 
-          <button class="ui button" data-worker="rodi" data-tooltip="RODI Valve" data-variation="tiny">
+          <button class="ui big circular icon button" data-subworker="rodi" data-tooltip="RODI Valve" data-variation="tiny">
             <i class="faucet icon"></i>
           </button>
 
-          <button class="ui button" data-worker="mix_heater" data-tooltip="Heater" data-variation="tiny">
+          <button class="ui big circular icon button" data-subworker="mix_heater" data-tooltip="Heater" data-variation="tiny">
             <i class="thermometer half icon"></i>
           </button>
         </div>
+
+        <div class="extra content">
+          <div class="ui message">
+            <div class="ui small icon header">
+              <i class="info icon"></i>
+              <div class="content" data-mode-status>
+                Select Fill to begin a new batch of water.
+              </div>
+            </div>
+          </div>
+
+          <div class="ui tiny message">
+            <div class="floated left header">
+              Informational Messages
+            </div>
+            <div class="content">
+                This is where informational messages are shown.
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+
       <div class="mini card" data-subsystem-worker="first_mate">
-      <div class="content" data-buttons="controls">
-        <div class="right floated">
-          <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
-            <i class="undo icon"></i>
-          </button>
+        <div class="content">
+          <div class="right floated">
+            <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
+              <i class="undo icon"></i>
+            </button>
 
-          <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
-            <i class="stop icon"></i>
-          </button>
+            <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
+              <i class="stop icon"></i>
+            </button>
 
-          <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
-            <i class="lock icon"></i>
-          </button>
+            <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
+              <i class="lock icon"></i>
+            </button>
 
-          <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
-            <i class="radiation icon"></i>
-          </button>
-        </div>
-
-
-        <div class="label header">
-          First Mate
-        </div>
-
-        <div class="meta">
-          Reef Worker
-        </div>
-
-        <div class="description">
-          <span>
+            <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
+              <i class="radiation icon"></i>
+            </button>
+          </div>
+          <div class="label header">First Mate</div>
+          <div class="meta">Reef Worker</div>
+          <div class="description">
             First Mate controls all aspects of the Display Tank including ATO and heater.
-          </span>
+          </div>
         </div>
-      </div>
-      <div class="center aligned extra content" data-buttons="workers">
-        <div class="ui large raised icon buttons">
-          <button class="ui button" data-worker="ato" data-tooltip="ATO RODI Valve" data-variation="tiny">
-            <i class="faucet icon"></i>
-          </button>
 
-          <button class="ui button" data-worker="reef_heater" data-tooltip="Heater" data-variation="tiny">
-            <i class="thermometer half icon"></i>
-          </button>
+        <div class="center aligned content" data-modes>
+          <div class="ui vertical tiny steps">
+            <a class="step" data-mode="normal_operations">
+              <i class="rocket icon"></i>
+              <div class="content">
+                <div class="title" data-tooltip="ATO and Display Tank Heater Enabled" data-variation="tiny">Normal Operations</div>
+              </div>
+            </a>
+            <a class="step" data-mode="clean">
+              <i class="broom icon"></i>
+              <div class="content">
+                <div class="title" data-tooltip="Disable ATO" data-variation="tiny">Clean</div>
+              </div>
+            </a>
+            <a class="step" data-mode="water_change">
+              <i class="upload icon"></i>
+              <div class="content">
+                <div class="title" data-tooltip="ATO and Display Tank Heater Disabled" data-variation="tiny">Water Change</div>
+              </div>
+            </a>
+          </div>
         </div>
-      </div>
-    </div>
-    </div>
-    <div class="ui vertical segment" data-subsystem-worker="captain">
-      <div class="ui seven top attached mini steps">
-        <a class="step disabled" data-mode="fill">
+
+        <div class="center aligned extra content" data-subworkers>
+        <button class="ui big circular icon button" data-subworker="ato" data-tooltip="ATO RODI Valve" data-variation="tiny">
           <i class="faucet icon"></i>
-          <div class="content">
-            <div class="title" data-tooltip="Fill MixTank">Fill</div>
-          </div>
-        </a>
+        </button>
 
-        <a class="step disabled" data-mode="keep_fresh">
-          <i class="fan icon"></i>
-          <div class="content">
-            <div class="title">Keep Fresh</div>
-          </div>
-        </a>
-
-        <a class="step disabled" data-mode="add_salt">
-          <i class="random icon"></i>
-          <div class="content">
-            <div class="title">Add salt</div>
-          </div>
-        </a>
-
-        <a class="step disabled" data-mode="match_conditions">
-          <i class="balance scale icon"></i>
-          <div class="content">
-            <div class="title">Match Conditions</div>
-          </div>
-        </a>
-
-        <a class="step disabled" data-mode="dump_water">
-          <i class="trash icon"></i>
-          <div class="content">
-            <div class="title">Dump Water</div>
-          </div>
-        </a>
-
-        <a class="step disabled" data-mode="load_water">
-          <i class="upload icon"></i>
-          <div class="content">
-            <div class="title">Load Water</div>
-          </div>
-        </a>
-
-        <a class="step disabled" data-mode="final_check">
-          <i class="thumbs up outline icon"></i>
-          <div class="content">
-            <div class="title">Final Check</div>
-          </div>
-        </a>
+        <button class="ui big circular icon button" data-subworker="reef_heater" data-tooltip="Heater" data-variation="tiny">
+          <i class="thermometer half icon"></i>
+        </button>
       </div>
+      <div class="extra content">
+        <div class="ui message">
+          <div class="ui small icon header">
+            <i class="info icon"></i>
+            <div class="content" data-mode-status>
+              Select Clean to begin cleaning.
+            </div>
+          </div>
+        </div>
 
-      <div class="ui placeholder segment" id="reef-mode-details">
-        <div class="ui icon header">
-          <i class="info icon"></i>
-          <span data-mode-status>Select Fill to begin a new batch of water.</span>
+        <div class="ui tiny message">
+          <div class="floated left header">
+            Informational Messages
+          </div>
+          <div class="content">
+              This is where informational messages are shown.
+          </div>
         </div>
       </div>
-
-      <div class="ui top attached tiny message">
-        <div class="header">
-          Status
-        </div>
-        <span>This is where important status messages are shown.</span>
       </div>
     </div>
   </div>

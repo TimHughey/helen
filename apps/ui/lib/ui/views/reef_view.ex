@@ -17,17 +17,12 @@ defmodule UI.ReefView do
       %{"action" => "reset"} -> restart(worker, socket)
       %{"action" => "stop"} -> worker_mode(worker, :all_stop, socket)
       %{"mode" => mode} -> worker_mode(worker, mode, socket)
+      payload -> unhandled_click(payload, socket)
     end
   end
 
   @doc false
-  def button_click(payload, socket) do
-    resp = %{ui: %{unhandled_click: true, payload: payload}, socket: socket}
-
-    IO.puts(inspect(resp, pretty: true))
-
-    resp
-  end
+  def button_click(payload, socket), do: unhandled_click(payload, socket)
 
   @doc false
   def live_update(%{"subsystem" => subsystem}, socket) do
@@ -110,6 +105,14 @@ defmodule UI.ReefView do
 
   def status do
     Reef.status()
+  end
+
+  def unhandled_click(payload, socket) do
+    resp = %{ui: %{unhandled_click: true, payload: payload}, socket: socket}
+
+    IO.puts(inspect(resp, pretty: true))
+
+    resp
   end
 
   def click_rc(resp, rc) do
