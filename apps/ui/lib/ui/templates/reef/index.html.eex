@@ -7,7 +7,7 @@
   <div class="ui attached segment">
     <div class="ui two raised stackable cards">
       <div class="mini card" data-subsystem-worker="captain">
-        <div class="content" data-buttons="controls">
+        <div class="content">
           <div class="right floated">
             <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
               <i class="undo icon"></i>
@@ -33,7 +33,7 @@
             with RODI and controlling the circulation pump, air pump and heater.
         </div>
         </div>
-        <div class="content">
+        <div class="center aligned content">
           <div class="ui tiny steps">
             <a class="step disabled" data-mode="fill">
               <i class="faucet icon"></i>
@@ -59,21 +59,21 @@
             <a class="step disabled" data-mode="match_conditions">
               <i class="balance scale icon"></i>
               <div class="content">
-                <div class="title">Match Conditions</div>
+                <div class="title">Match</div>
               </div>
             </a>
 
             <a class="step disabled" data-mode="dump_water">
               <i class="trash icon"></i>
               <div class="content">
-                <div class="title">Dump Water</div>
+                <div class="title">Dump</div>
               </div>
             </a>
 
             <a class="step disabled" data-mode="load_water">
               <i class="upload icon"></i>
               <div class="content">
-                <div class="title">Load Water</div>
+                <div class="title">Load</div>
               </div>
             </a>
 
@@ -103,25 +103,7 @@
           </button>
         </div>
 
-        <div class="extra content">
-          <div class="ui message">
-            <div class="ui small icon header">
-              <i class="info icon"></i>
-              <div class="content" data-mode-status>
-                Select Fill to begin a new batch of water.
-              </div>
-            </div>
-          </div>
-
-          <div class="ui tiny message">
-            <div class="floated left header">
-              Informational Messages
-            </div>
-            <div class="content">
-                This is where informational messages are shown.
-            </div>
-          </div>
-        </div>
+        <%= Phoenix.View.render(UI.ReefView, "mode_status.html", %{worker: "captain"}) %>
       </div>
 
       <div class="mini card" data-subsystem-worker="first_mate">
@@ -182,25 +164,9 @@
           <i class="thermometer half icon"></i>
         </button>
       </div>
-      <div class="extra content">
-        <div class="ui message">
-          <div class="ui small icon header">
-            <i class="info icon"></i>
-            <div class="content" data-mode-status>
-              Select Clean to begin cleaning.
-            </div>
-          </div>
-        </div>
 
-        <div class="ui tiny message">
-          <div class="floated left header">
-            Informational Messages
-          </div>
-          <div class="content">
-              This is where informational messages are shown.
-          </div>
-        </div>
-      </div>
+      <%= Phoenix.View.render(UI.ReefView, "mode_status.html", %{worker: "first_mate"}) %>
+
       </div>
     </div>
   </div>

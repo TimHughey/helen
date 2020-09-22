@@ -20,6 +20,7 @@ defmodule UI.Router do
 
     get "/module_opts", ModuleConfigController, :index
     get "/reef", ReefController, :index
+    get "/reef/mode/status/:mode", ReefController, :show
     get "/roost", RoostController, :index
     get "/", HomeController, :index
     resources "/:next_page", HomeController, only: [:create]
