@@ -281,7 +281,7 @@ defmodule Helen.Worker.State do
     do: live_get(state, [:steps, step_name, :actions])
 
   def step_run_for(state),
-    do: live_get(state, [:steps, active_step(state), :for])
+    do: live_get(state, [:steps, active_step(state), :run_for])
 
   def steps_to_execute(%{logic: %{live: %{track: %{steps_to_execute: x}}}}),
     do: x

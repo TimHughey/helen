@@ -43,7 +43,7 @@ modes
 
   keep_fresh
     next_mode hold
-    sequence init circulate aerate repeat
+    sequence init circulate aerate power_save repeat
     steps
       init
         all off
@@ -57,8 +57,10 @@ modes
 
   add_salt
     next_mode match_conditions
-    sequence add mix finally
+    sequence init add mix finally
     steps
+      init
+        air off
       add
         pump on PT20M then off
       mix for PT30M
@@ -70,14 +72,15 @@ modes
 
   match_conditions
     next_mode dump_water
-    sequence at_start warm stir repeat
+    sequence init warm stir repeat
     steps
-      at_start
-        sleep PT30S
+      init
+        sleep PT5M
       warm
         tell mix_heater active
       stir
         pump on PT1M then off
+        air on PT4M then off
         pump off PT5M
 
   dump_water
@@ -115,6 +118,6 @@ modes
         sleep PT30M
       normal_operations
         tell reef_heater active
-        tell first_mate clean_finished
+        tell first_mate normal_operations
 
 # end of config

@@ -590,7 +590,7 @@ defmodule Helen.Worker.Logic do
 
     # step does not have a run for defined or the required time to repeat
     # this step would exceeded the defined run_for
-    if is_nil(run_for) or elapsed?(run_for, [elapsed, required]) do
+    if is_nil(run_for) or elapsed?(run_for, [elapsed]) do
       start_mode_next_step(state)
 
       # there is enough time to repeat the step
