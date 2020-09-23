@@ -47,7 +47,7 @@ modes
     steps
       init
         all off
-        sleep PT5.3S
+        sleep PT10S
       circulate
         pump on PT2M then off
       aerate
@@ -72,22 +72,24 @@ modes
 
   match_conditions
     next_mode dump_water
-    sequence init warm stir repeat
+    sequence warm stir power_save repeat
     steps
-      init
-        sleep PT5M
       warm
         tell mix_heater active
       stir
         pump on PT1M then off
         air on PT4M then off
         pump off PT5M
+      power_save
+        sleep PT5M
 
   dump_water
     next_mode load_water
     sequence at_start adjust_valves pump_to_sewer
     steps
       at_start
+        air off
+        pump off
         tell reef_heater standby
         tell first_mate clean
       adjust_valves
@@ -100,6 +102,7 @@ modes
     sequence at_start adjust_valves pump_to_reef
     steps
       at_start
+        pump off
         tell mix_heater standby
         tell reef_heater standby
         tell first_mate clean
@@ -115,7 +118,7 @@ modes
       at_start
         all off
       check
-        sleep PT30M
+        sleep PT10M
       normal_operations
         tell reef_heater active
         tell first_mate normal_operations
