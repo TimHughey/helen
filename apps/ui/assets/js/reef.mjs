@@ -110,10 +110,7 @@ function modeActive(target) {
     .removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
-  icon
-    .removeClass("black")
-    .addClass("green")
-    .transition("tada");
+  icon.removeClass("black").addClass("green");
 }
 
 function modeDisabled(target, modes_locked = true) {
@@ -298,7 +295,7 @@ function updateUI(msg, live_update) {
   const {worker: worker = "none", modes_locked: modes_locked = true} = msg;
 
   if (live_update === true) {
-    $("#live-update-button").transition("pulse");
+    $("#live-update-button").transition("jiggle");
   }
 
   selectButtonIcon(worker, "lock-modes").toggleClass("open", !modes_locked);

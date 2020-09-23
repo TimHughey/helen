@@ -586,7 +586,7 @@ defmodule Helen.Worker.Logic do
     run_for = step_run_for(state)
 
     elapsed = track_step_elapsed_get(state)
-    required = track_calculated_step_duration_get(state, active_step(state))
+    # required = track_calculated_step_duration_get(state, active_step(state))
 
     # step does not have a run for defined or the required time to repeat
     # this step would exceeded the defined run_for
