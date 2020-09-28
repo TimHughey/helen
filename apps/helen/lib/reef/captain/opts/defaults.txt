@@ -26,8 +26,10 @@ modes
 
   fill
     next_mode keep_fresh
-    sequence initial main topoff finally
+    sequence at_start initial main topoff finally
     steps
+      at_start
+        all off
       initial for PT2H
         rodi on PT2M10S then off
         rodi off PT12M
@@ -39,7 +41,7 @@ modes
         air off
         rodi on PT15M then off
       finally
-        off air rodi
+        all off
 
   keep_fresh
     next_mode hold
