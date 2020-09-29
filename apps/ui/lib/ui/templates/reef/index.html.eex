@@ -1,3 +1,4 @@
+<script>window.activePage = "reef";</script>
 <div class="ui container" data-subsystem="reef">
 
   <h2 class="ui attached centered block header">
@@ -103,7 +104,7 @@
           </button>
         </div>
 
-        <%= Phoenix.View.render(UI.ReefView, "mode_status.html", %{worker: "captain"}) %>
+        <%= Phoenix.View.render(UI.ReefView, "captain_mode_status.html", @workers[:captain]) %>
       </div>
 
       <div class="mini card" data-subsystem-worker="first_mate">
@@ -165,7 +166,7 @@
         </button>
       </div>
 
-      <%= Phoenix.View.render(UI.ReefView, "mode_status.html", %{worker: "first_mate"}) %>
+      <%= Phoenix.View.render(UI.ReefView, "first_mate_mode_status.html", %{worker: "first_mate"}) %>
 
       </div>
     </div>

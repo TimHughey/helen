@@ -19,8 +19,9 @@ defmodule UI.Router do
     pipe_through :browser
 
     get "/module_opts", ModuleConfigController, :index
+    get "/reef/mode/status", ReefController, :show
     get "/reef", ReefController, :index
-    get "/reef/mode/status/:mode", ReefController, :show
+
     get "/roost", RoostController, :index
     get "/", HomeController, :index
     resources "/:next_page", HomeController, only: [:create]

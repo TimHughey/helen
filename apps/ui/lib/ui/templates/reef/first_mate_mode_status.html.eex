@@ -1,0 +1,19 @@
+<div class="extra content" data-mode-status>
+  <div class="ui message">
+    <div class="ui small icon header">
+      <i class="info icon"></i>
+      <div class="content">
+        Select Clean to begin cleaning.
+      </div>
+    </div>
+  </div>
+
+  <div class="ui tiny message">
+    <div class="floated left header">
+      Informational Messages
+    </div>
+    <div class="content">
+        This is where informational messages are shown.
+    </div>
+  </div>
+</div>

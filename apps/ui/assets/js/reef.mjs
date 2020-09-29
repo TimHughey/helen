@@ -61,6 +61,12 @@ class Reef {
   }
 }
 
+function activeModeUI(worker_name) {
+  const target = selectModes(worker_name).filter(".active");
+
+  return target.length === 0 ? "none" : jQuery(target).data("mode");
+}
+
 function handleClick(e) {
   const target = e.currentTarget;
 
@@ -206,6 +212,13 @@ function selectModesDisabled(worker_name) {
   return targets;
 }
 
+function selectModeProgressBar(worker_name, mode) {
+  const mode_status = selectWorker(worker_name).find("[data-mode-status]");
+  const target = jQuery(mode_status).find(`[data-mode-progress="${mode}"]`);
+
+  return target;
+}
+
 function selectSubworkers(worker) {
   const worker_target = selectWorker(worker);
   const subworker_targets = worker_target.find("div[data-subworkers]");
@@ -254,6 +267,42 @@ function updateModes(msg, modes_locked = true) {
       }
     }
   }
+}
+
+function updateModeProgress(msg) {
+  let {
+    name: worker_name,
+    active: {
+      mode: active_mode = "none",
+      action: {
+        cmd: cmd = null,
+        stmt: stmt = null,
+        worker_cmd: worker_cmd = null,
+        run_for: {ms: run_for_ms = 0, binary: run_for_binary} = {},
+        elapsed: {ms: elapsed_ms = 0} = {}
+      }
+    }
+  } = msg;
+
+  const progress = selectModeProgressBar(worker_name, active_mode);
+  const label = jQuery(progress).find(".label");
+
+  if (run_for_ms === 0) {
+    elapsed_ms = 0;
+  }
+
+  jQuery(progress).progress({total: run_for_ms, value: elapsed_ms});
+
+  jQuery(progress).addClass("active");
+
+  let label_html = "none";
+  if (cmd === stmt) {
+    label_html = `${stmt} ${run_for_binary}`;
+  } else {
+    label_html = `${cmd} ${stmt} ${run_for_binary}`;
+  }
+
+  jQuery(label).html(label_html);
 }
 
 function updateStopButton(worker, mode) {
@@ -323,7 +372,20 @@ function workerMessage(msg, modes_locked = true) {
     sub_workers: sub_workers
   } = msg;
 
-  // console.log("workerMessage: ", msg);
+  const origin = window.location.origin;
+  const path = "reef/mode/status div[data-mode-status]";
+  const uri = `${path}`;
+  const status_target = selectWorker(worker_name).find("div[data-mode-status]");
+  const progress_target = selectModeProgressBar(worker_name, active_mode);
+
+  const params = jQuery.param({
+    active_mode: active_mode,
+    worker: worker_name
+  });
+
+  if (progress_target.length === 0) {
+    jQuery(status_target).load(uri, params);
+  }
 
   updateStopButton(worker_name, active_mode);
   updateSubworkers(worker_name, sub_workers);
@@ -340,8 +402,11 @@ function workerMessage(msg, modes_locked = true) {
       modeDisabled(modes_target);
       modeReady(first_mode_target);
     }
+
+    updateModeProgress(msg);
   }
 }
+
 function workerSelector(worker) {
   const worker_selector = `div[data-subsystem-worker=${worker}]`;
   return worker_selector;

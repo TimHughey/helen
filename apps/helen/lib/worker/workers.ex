@@ -13,6 +13,16 @@ defmodule Helen.Workers do
   import Helen.Worker.State
   import Helen.Workers.ModCache, only: [module: 2]
 
+  def action_run_for(action) do
+    import Helen.Time.Helper, only: [zero: 0]
+
+    case action do
+      %{stmt: :sleep, args: run_for} -> run_for
+      %{for: run_for} -> run_for
+      _x -> zero()
+    end
+  end
+
   def add_via_msg(action),
     do: put_in(action, [:via_msg], true) |> put_in([:wait], true)
 
@@ -77,8 +87,6 @@ defmodule Helen.Workers do
   # NOTE: has test case
   @doc false
   def execute_action(%{stmt: :all, args: cmd, worker_cache: wc} = action) do
-    # Logger.info("stmt all, worker_cache: #{inspect(wc, pretty: true)}")
-
     execute_result(action, fn ->
       for {ident, %{module: mod, found?: true, type: type} = worker}
           when type in [:simple_device, :gen_device] <- wc,
@@ -116,10 +124,17 @@ defmodule Helen.Workers do
   end
 
   def make_action(msg_type, worker_cache, action, %{token: token} = state) do
+    import Helen.Time.Helper, only: [utc_now: 0, zero: 0]
+
     Map.merge(action, %{
       msg_type: msg_type,
       worker_cache: worker_cache,
       worker: resolve_worker(worker_cache, action[:worker]),
+      meta: %{
+        started_at: utc_now(),
+        elapsed: zero(),
+        run_for: action_run_for(action)
+      },
       reply_to: self(),
       # default to instant processing of the action (e.g. immeidately call
       # next_action/1).  the default can be overriden by calling add_via_msg/1.
@@ -148,6 +163,32 @@ defmodule Helen.Workers do
       cmd_def ->
         worker_cmd_put(action, :custom)
         |> put_in([:custom], cmd_definition(state, cmd_def))
+    end
+  end
+
+  def meta_elapsed(state), do: pending_action_meta(state) |> get_in([:elapsed])
+
+  def meta_started_at(state),
+    do: pending_action_meta(state) |> get_in([:started_at])
+
+  def action_meta_update_elapsed(state) do
+    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0, zero: 0]
+
+    now = utc_now()
+
+    meta = pending_action_meta(state)
+    started_at = meta_started_at(state)
+
+    if Enum.empty?(meta) or is_nil(started_at) do
+      state
+    else
+      meta =
+        update_in(meta, [:elapsed], fn
+          nil -> zero()
+          _x -> elapsed(started_at, now)
+        end)
+
+      pending_action_meta_put(state, meta)
     end
   end
 

@@ -243,6 +243,19 @@ defmodule Helen.Worker.State do
   def pending_action_drop(state),
     do: track_update(state, [], fn x -> Map.drop(x, [:pending_action]) end)
 
+  def pending_action_meta(state) do
+    action = pending_action(state)
+
+    if action === :none,
+      do: %{},
+      else: get_in(action, [:meta])
+  end
+
+  def pending_action_meta_put(state, meta_map) do
+    action = pending_action(state) |> put_in([:meta], meta_map)
+    pending_action_put(state, action)
+  end
+
   def stage_get(state, path),
     do: get_in(state, flatten([:logic, :stage, path]))
 
@@ -279,6 +292,10 @@ defmodule Helen.Worker.State do
 
   def step_actions_get(state, step_name),
     do: live_get(state, [:steps, step_name, :actions])
+
+  def step_elapsed(state), do: track_step_get(state, :elapsed)
+
+  def step_started_at(state), do: track_step_get(state, :started_at)
 
   def step_run_for(state),
     do: live_get(state, [:steps, active_step(state), :run_for])
@@ -328,6 +345,8 @@ defmodule Helen.Worker.State do
     state
     |> track_get([:steps, active_step, what])
   end
+
+  def track_step_get(_state, _what), do: nil
 
   def track_step_put(
         %{logic: %{live: %{track: %{active_step: active_step}}}} = state,

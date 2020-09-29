@@ -20,7 +20,7 @@ defmodule UI.Channel.Handler.Reef do
     |> Socket.assign(:modes_locked, true)
   end
 
-  def live_update(%Socket{assigns: assigns} = socket) do
+  def live_update(%Socket{assigns: assigns}) do
     base_msg = Map.take(assigns, [:modes_locked, :live_update])
 
     add_status(base_msg)

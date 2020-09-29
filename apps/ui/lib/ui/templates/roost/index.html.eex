@@ -1,3 +1,4 @@
+<script>window.activePage = "roost";</script>
 <div class="ui container" data-subsystem="roost">
 
   <h3 class="ui centered attached block header">

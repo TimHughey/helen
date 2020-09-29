@@ -359,7 +359,7 @@ defmodule Helen.Time.Helper do
 
   """
   @doc since: "0.0.27"
-  def to_ms(args, default \\ "") do
+  def to_ms(args, default \\ "PT0S") do
     alias Timex.Duration
 
     case args do

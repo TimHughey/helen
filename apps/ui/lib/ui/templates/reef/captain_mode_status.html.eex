@@ -1,0 +1,72 @@
+<div class="extra content" data-mode-status>
+  <div class="ui message">
+    <div class="ui small icon header">
+
+
+<%= case get_in(@active, [:mode]) do %>
+<%    x when x in [:all_stop, :none] -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        Select Fill to begin a new batch of water.
+      </div>
+
+<% :add_salt -> %>
+      <div class="ui indicating progress" data-mode-progress="add_salt">
+        <div class="bar">
+          <div class="progress"></div>
+        </div>
+        <div class="label">Add Salt</div>
+      </div>
+
+<% :dump_water -> %>
+      <div class="ui indicating progress" data-mode-progress="dump_water">
+        <div class="bar">
+          <div class="progress"></div>
+        </div>
+        <div class="label">Dumping Water</div>
+      </div>
+
+<% :fill -> %>
+      <div class="ui indicating progress" data-mode-progress="fill">
+        <div class="bar">
+          <div class="progress"></div>
+        </div>
+        <div class="label">Filling</div>
+      </div>
+
+<% :final_check -> %>
+      <div class="ui indicating progress" data-mode-progress="final_check">
+        <div class="bar">
+          <div class="progress"></div>
+        </div>
+        <div class="label">Final Check</div>
+      </div>
+
+<% :load_water -> %>
+      <div class="ui indicating progress" data-mode-progress="load_water">
+        <div class="bar">
+          <div class="progress"></div>
+        </div>
+        <div class="label">Dumping Water</div>
+      </div>
+
+<%    x -> %>
+      <i class="meh outline icon"></i>
+      <div class="content">
+        Status for "<%= x %>" not implemented yet.
+      </div>
+
+<% end %>
+    </div>
+  </div>
+
+
+  <div class="ui tiny message">
+    <div class="floated left header">
+      Informational Messages
+    </div>
+    <div class="content">
+        This is where informational messages are shown.
+    </div>
+  </div>
+</div>

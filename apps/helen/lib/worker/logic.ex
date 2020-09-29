@@ -301,7 +301,7 @@ defmodule Helen.Worker.Logic do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     state
-    |> update_elapsed()
+    |> update_all_elapsed()
     |> live_put(:status, :finished)
     |> live_put(:finished_at, utc_now())
     |> move_live_to_finished()
@@ -319,7 +319,7 @@ defmodule Helen.Worker.Logic do
     case msg do
       {:inquiry, what} -> handle_inquiry(what, state)
       {:server_mode, mode} -> handle_server_mode(mode, state)
-      {:state, _} -> state |> update_elapsed() |> reply(state)
+      {:state, _} -> state |> update_all_elapsed() |> reply(state)
     end
   end
 
@@ -338,7 +338,7 @@ defmodule Helen.Worker.Logic do
       :live_opts -> opts(state, :live)
       :ready? -> ready?(state)
       :runtime_opts -> opts(state, :runtime)
-      :status -> status(state)
+      :status -> update_all_elapsed(state) |> status()
       :standby? -> not ready?(state)
       :timeouts -> timeouts(state)
     end
@@ -402,7 +402,7 @@ defmodule Helen.Worker.Logic do
 
   def hold_mode(state) do
     state
-    |> update_elapsed()
+    |> update_all_elapsed()
     |> status_put(:holding)
   end
 
@@ -452,7 +452,7 @@ defmodule Helen.Worker.Logic do
   def next_action(state) do
     alias Helen.Workers
 
-    state = update_elapsed(state)
+    state = update_all_elapsed(state)
     workers = cached_workers(state)
 
     # if worker_name(state) == "roost",
@@ -506,10 +506,10 @@ defmodule Helen.Worker.Logic do
   end
 
   def reply(%{token: _} = s, val),
-    do: {:reply, val, update_elapsed(s), loop_timeout(s)}
+    do: {:reply, val, update_all_elapsed(s), loop_timeout(s)}
 
   def reply(val, %{token: _} = s),
-    do: {:reply, val, update_elapsed(s), loop_timeout(s)}
+    do: {:reply, val, update_all_elapsed(s), loop_timeout(s)}
 
   def restart(mod, opts) do
     # the Supervisor is the base of the module name with Supervisor appended
@@ -600,6 +600,12 @@ defmodule Helen.Worker.Logic do
   end
 
   defdelegate status(state), to: Helen.Worker.Status
+
+  def update_all_elapsed(state) do
+    alias Helen.Workers
+
+    state |> update_elapsed() |> Workers.action_meta_update_elapsed()
+  end
 
   def msg_puts(state, msg) do
     Logger.info("""
