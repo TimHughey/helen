@@ -30,16 +30,16 @@ modes
     steps
       at_start
         all off
-      initial for PT2H
+      initial for PT3H30M
         rodi on PT2M10S then off
         rodi off PT12M
-      main for PT3H
+      main for PT4H
         rodi on PT2M10S then off
         air on PT5M then off nowait
         rodi off PT12M
-      topoff for PT15M
+      topoff
         air off
-        rodi on PT15M then off
+        rodi on PT5M then off
       finally
         all off
 
