@@ -12,12 +12,18 @@ defmodule UI.HelenChannel do
     {:ok, socket}
   end
 
-  def join("helen:reef", _message, socket) do
+  def join("helen:reef", _message, %{assigns: assigns} = socket) do
     alias UI.Channel.Handler.Reef
     # Logger.info("join helen:reef #{inspect(message)}")
     # Logger.info("socket: #{inspect(socket, pretty: true)}")
 
-    {:ok, Reef.join(socket)}
+    if is_nil(get_in(assigns, [:live_update])) do
+      Process.send_after(self(), {:live_update, "reef"}, 100)
+
+      {:ok, Reef.join(Socket.assign(socket, :live_update, true))}
+    else
+      {:ok, Reef.join(socket)}
+    end
   end
 
   def join("helen:roost", _message, socket) do
@@ -99,7 +105,7 @@ defmodule UI.HelenChannel do
     alias UI.Channel.Handler.Reef
 
     if subsystem == "reef" and live_update do
-      broadcast(socket, "live_update", Reef.live_update(socket))
+      push(socket, "live_update", Reef.live_update(socket))
 
       Process.send_after(self(), {:live_update, subsystem}, 1500)
     end

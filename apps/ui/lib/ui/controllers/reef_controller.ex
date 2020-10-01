@@ -1,6 +1,8 @@
 defmodule UI.ReefController do
   use UI, :controller
 
+  plug :put_layout, false when action in [:show]
+
   require Logger
 
   def index(conn, _params) do

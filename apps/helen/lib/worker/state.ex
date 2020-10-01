@@ -256,6 +256,8 @@ defmodule Helen.Worker.State do
     pending_action_put(state, action)
   end
 
+  def stage_active_mode(state), do: stage_get(state, :active_mode)
+
   def stage_get(state, path),
     do: get_in(state, flatten([:logic, :stage, path]))
 

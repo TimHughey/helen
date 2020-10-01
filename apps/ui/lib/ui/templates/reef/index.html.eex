@@ -18,10 +18,6 @@
               <i class="stop icon"></i>
             </button>
 
-            <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
-              <i class="lock icon"></i>
-            </button>
-
             <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
               <i class="radiation icon"></i>
             </button>
@@ -36,49 +32,49 @@
         </div>
         <div class="center aligned content">
           <div class="ui tiny steps">
-            <a class="step disabled" data-mode="fill">
+            <a class="step" data-mode="fill">
               <i class="faucet icon"></i>
               <div class="content">
                 <div class="title" data-tooltip="Fill MixTank">Fill</div>
               </div>
             </a>
 
-            <a class="step disabled" data-mode="keep_fresh">
+            <a class="step" data-mode="keep_fresh">
               <i class="fan icon"></i>
               <div class="content">
                 <div class="title" data-tooltip="Keep MixTank Fresh">Fresh</div>
               </div>
             </a>
 
-            <a class="step disabled" data-mode="add_salt">
+            <a class="step" data-mode="add_salt">
               <i class="random icon"></i>
               <div class="content">
                 <div class="title" data-tooltip="Add Salt">Salt</div>
               </div>
             </a>
 
-            <a class="step disabled" data-mode="match_conditions">
+            <a class="step" data-mode="match_conditions">
               <i class="balance scale icon"></i>
               <div class="content">
                 <div class="title">Match</div>
               </div>
             </a>
 
-            <a class="step disabled" data-mode="dump_water">
+            <a class="step" data-mode="dump_water">
               <i class="trash icon"></i>
               <div class="content">
                 <div class="title">Dump</div>
               </div>
             </a>
 
-            <a class="step disabled" data-mode="load_water">
+            <a class="step" data-mode="load_water">
               <i class="upload icon"></i>
               <div class="content">
                 <div class="title">Load</div>
               </div>
             </a>
 
-            <a class="step disabled" data-mode="final_check">
+            <a class="step" data-mode="final_check">
               <i class="thumbs up outline icon"></i>
               <div class="content">
                 <div class="title" data-tooltip="Final checks prior to starting Fill">Check</div>
@@ -116,10 +112,6 @@
 
             <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
               <i class="stop icon"></i>
-            </button>
-
-            <button class="ui raised tiny icon button" data-action="lock-modes" data-tooltip="Unlock Steps" data-variation="tiny">
-              <i class="lock icon"></i>
             </button>
 
             <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">

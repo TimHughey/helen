@@ -492,7 +492,7 @@ defmodule Helen.Worker.Logic do
   def noreply(s), do: {:noreply, s, loop_timeout(s)}
 
   def purge_finished_if_needed(state) do
-    if is_atom(stage_get_base_opt(state, :first_mode)) do
+    if stage_get_base_opt(state, :first_mode) == stage_active_mode(state) do
       finished_reset(state)
     else
       state

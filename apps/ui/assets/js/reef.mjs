@@ -2,24 +2,26 @@ var channel = null;
 
 class Reef {
   constructor(socket) {
-    channel = socket.channel("helen:reef", {data: "initial"});
+    channel = socket.channel("helen:reef", { data: "initial" });
 
     channel
       .join()
-      .receive("ok", resp => {
+      .receive("ok", (resp) => {
         // join was a success
         window.channelJoined = true;
       })
-      .receive("error", resp => {
+      .receive("error", (resp) => {
         console.log("Unable to join", resp);
       });
 
-    channel.on("live_update", msg => {
+    channel.on("live_update", (msg) => {
       handleMessage(msg);
     });
 
     this.subsystem = "reef";
     this.channel = channel;
+
+    statePut({ live_update: true });
   }
 
   channel() {
@@ -34,29 +36,39 @@ class Reef {
     const channel = this.channel;
 
     const reef_buttons = $("[data-subsystem='reef'] .button");
-    reef_buttons.on("click", e => {
+    reef_buttons.on("click", (e) => {
       handleClick(e);
     });
 
     const reef_links = $("div[data-subsystem='reef'] a[data-mode]");
-    reef_links.on("click", e => {
+    reef_links.on("click", (e) => {
       handleClick(e);
     });
 
     const live_update = jQuery("#live-update-button");
     live_update.removeClass("disabled");
 
-    live_update.on("click", e => {
+    live_update.on("click", (e) => {
       handleClick(e);
     });
 
+    let state = stateGet();
+
+    state.live_update_interval_id = setInterval(() => {
+      if (isLiveUpdateActive()) {
+        $("#live-update-button").transition("pulse");
+      }
+    }, 5000);
+
+    statePut(state);
+
     channel
-      .push("page_loaded", {subsystem: "reef"})
-      .receive("reef", msg => {
+      .push("page_loaded", { subsystem: "reef" })
+      .receive("reef", (msg) => {
         handleMessage(msg);
       })
-      .receive("nop", msg => {})
-      .receive("error", reasons => console.log("error", reasons))
+      .receive("nop", (msg) => {})
+      .receive("error", (reasons) => console.log("error", reasons))
       .receive("timeout", () => console.log("Networking issue..."));
   }
 }
@@ -77,74 +89,79 @@ function handleClick(e) {
     mode: jQuery(target).data("mode"),
     worker: jQuery(target)
       .closest("div[data-subsystem-worker]")
-      .data("subsystem-worker")
+      .data("subsystem-worker"),
   };
+
+  if (payload.action === "live-update") {
+    let state = stateGet();
+    state.live_update = !state.live_update;
+    statePut(state);
+  }
 
   pushMessage(payload);
 }
 
 function handleMessage(msg) {
-  const {
-    live_update: live_update = false,
-    modes_locked: modes_locked = true
-  } = msg;
+  const { live_update: msg_live_update = false } = msg;
 
-  if (live_update == true) {
+  if (msg_live_update == true && isLiveUpdateActive() == false) {
+    return;
+  } else if (msg_live_update == true && isLiveUpdateActive()) {
     // console.log("reef message: ", msg);
   } else {
     console.log("reef message: ", msg);
+
+    let state = stateGet();
+    console.log("state: ", state);
   }
 
   const {
-    status: {workers: workers = []},
-    ui: ui = {}
+    status: { workers: workers = [] },
+    ui: ui_msg = {},
   } = msg;
 
   for (let worker in workers) {
-    workerMessage(workers[worker], modes_locked);
+    workerMessage(workers[worker]);
   }
 
-  updateUI(ui, live_update);
+  updateUI(ui_msg);
+}
+
+function isLiveUpdateActive() {
+  return stateGet("live_update");
 }
 
 function modeActive(target) {
-  const remove = "completed disabled";
+  const remove = "completed";
   const add = "active";
 
-  jQuery(target)
-    .addClass(add)
-    .removeClass(remove);
+  jQuery(target).addClass(add).removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
   icon.removeClass("black").addClass("green");
 }
 
-function modeDisabled(target, modes_locked = true) {
-  const remove = "completed active";
+function modeInactive(target) {
+  const remove = "active completed";
 
-  jQuery(target)
-    .removeClass(remove)
-    .toggleClass("disabled", modes_locked);
+  jQuery(target).removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
   icon.removeClass("green");
 }
 
-function modeFinished(target, modes_locked = true) {
+function modeFinished(target) {
   const remove = "active";
   const add = "completed";
 
-  jQuery(target)
-    .addClass(add)
-    .removeClass(remove)
-    .toggleClass("disabled", modes_locked);
+  jQuery(target).addClass(add).removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
   icon.addClass("green");
 }
 
 function modeReady(target) {
-  const remove = "active completed disabled";
+  const remove = "active completed";
 
   jQuery(target).removeClass(remove);
 
@@ -152,22 +169,16 @@ function modeReady(target) {
   icon.addClass("black");
 }
 
-function modeUnlocked(target) {
-  const remove = "disabled";
-
-  jQuery(target).removeClass(remove);
-}
-
 function pushMessage(payload) {
   console.log("pushing payload: ", payload);
 
   channel
     .push("reef_click", payload)
-    .receive("reef", msg => {
+    .receive("reef", (msg) => {
       handleMessage(msg);
     })
-    .receive("nop", msg => {})
-    .receive("error", reasons => console.log("error", reasons))
+    .receive("nop", (msg) => {})
+    .receive("error", (reasons) => console.log("error", reasons))
     .receive("timeout", () => console.log("Networking issue..."));
 }
 
@@ -206,12 +217,6 @@ function selectModes(worker_name) {
   return targets;
 }
 
-function selectModesDisabled(worker_name) {
-  const targets = selectModes(worker_name).filter(".disabled");
-
-  return targets;
-}
-
 function selectModeProgressBar(worker_name, mode) {
   const mode_status = selectWorker(worker_name).find("[data-mode-status]");
   const target = jQuery(mode_status).find(`[data-mode-progress="${mode}"]`);
@@ -233,19 +238,25 @@ function selectSubWorker(targets, name) {
   return target;
 }
 
-function updateModes(msg, modes_locked = true) {
-  const {name: worker_name, modes: modes} = msg;
+function stateGet(key = "all") {
+  const state = JSON.parse(sessionStorage.getItem("reef-state"));
 
-  for (const {mode: mode_name, status: mode_status} of modes) {
+  return key == "all" ? state : state[key];
+}
+
+function statePut(state) {
+  sessionStorage.setItem("reef-state", JSON.stringify(state));
+}
+
+function updateModes(msg) {
+  const { name: worker_name, modes: modes } = msg;
+
+  for (const { mode: mode_name, status: mode_status } of modes) {
     const target = selectMode(worker_name, mode_name);
 
     // skip modes not represented in the user interface
     if (target === undefined) {
       continue;
-    }
-
-    if (worker_name === "first_mate") {
-      modes_locked = false;
     }
 
     if (target) {
@@ -256,13 +267,17 @@ function updateModes(msg, modes_locked = true) {
           break;
 
         case "finished":
-          modeFinished(target, modes_locked);
+          modeFinished(target);
           break;
 
         case "none":
-          modeDisabled(target, modes_locked);
+          modeInactive(target);
+          break;
 
         default:
+          console.log(
+            `updateModes unhandled mode ${mode_name} status: ${mode_status}`
+          );
         // no change to classes
       }
     }
@@ -278,10 +293,10 @@ function updateModeProgress(msg) {
         cmd: cmd = null,
         stmt: stmt = null,
         worker_cmd: worker_cmd = null,
-        run_for: {ms: run_for_ms = 0, binary: run_for_binary} = {},
-        elapsed: {ms: elapsed_ms = 0} = {}
-      }
-    }
+        run_for: { ms: run_for_ms = 0, binary: run_for_binary } = {},
+        elapsed: { ms: elapsed_ms = 0 } = {},
+      },
+    },
   } = msg;
 
   const progress = selectModeProgressBar(worker_name, active_mode);
@@ -291,7 +306,7 @@ function updateModeProgress(msg) {
     elapsed_ms = 0;
   }
 
-  jQuery(progress).progress({total: run_for_ms, value: elapsed_ms});
+  jQuery(progress).progress({ total: run_for_ms, value: elapsed_ms });
 
   jQuery(progress).addClass("active");
 
@@ -323,7 +338,7 @@ function updateStopButton(worker, mode) {
 function updateSubworkers(worker_name, sub_workers) {
   const buttons = selectSubworkers(worker_name);
 
-  for (let {status: status, ready: ready, name: name} of sub_workers) {
+  for (let { status: status, ready: ready, name: name } of sub_workers) {
     const target = selectSubWorker(buttons, name);
 
     if (ready && status) {
@@ -340,21 +355,14 @@ function updateSubworkers(worker_name, sub_workers) {
   }
 }
 
-function updateUI(msg, live_update) {
-  const {worker: worker = "none", modes_locked: modes_locked = true} = msg;
+function updateUI(msg) {
+  const { worker: worker = "none" } = msg;
 
-  if (live_update === true) {
-    $("#live-update-button").transition("jiggle");
-  }
-
-  selectButtonIcon(worker, "lock-modes").toggleClass("open", !modes_locked);
-
-  if (modes_locked === false) {
-    selectModesDisabled(worker).toggleClass("disabled", modes_locked);
+  if (isLiveUpdateActive() === true) {
   }
 }
 
-function workerMessage(msg, modes_locked = true) {
+function workerMessage(msg) {
   const {
     name: worker_name,
     active: {
@@ -363,24 +371,23 @@ function workerMessage(msg, modes_locked = true) {
       action: {
         cmd: cmd = null,
         stmt: stmt = null,
-        worker_cmd: worker_cmd = null
-      }
+        worker_cmd: worker_cmd = null,
+      },
     },
     first_mode: first_mode,
     ready: worker_ready = false,
     status: worker_status = null,
-    sub_workers: sub_workers
+    sub_workers: sub_workers,
   } = msg;
 
   const origin = window.location.origin;
-  const path = "reef/mode/status div[data-mode-status]";
-  const uri = `${path}`;
+  const uri = "reef/mode/status";
   const status_target = selectWorker(worker_name).find("div[data-mode-status]");
   const progress_target = selectModeProgressBar(worker_name, active_mode);
 
   const params = jQuery.param({
     active_mode: active_mode,
-    worker: worker_name
+    worker: worker_name,
   });
 
   if (progress_target.length === 0) {
@@ -390,16 +397,14 @@ function workerMessage(msg, modes_locked = true) {
   updateStopButton(worker_name, active_mode);
   updateSubworkers(worker_name, sub_workers);
 
-  updateModes(msg, modes_locked);
+  updateModes(msg);
 
   if (worker_name === "captain") {
     const base_modes = ["all_stop", "none"];
 
     if (base_modes.includes(active_mode)) {
-      const modes_target = selectModes(worker_name);
       const first_mode_target = selectMode(worker_name, first_mode);
 
-      modeDisabled(modes_target);
       modeReady(first_mode_target);
     }
 
@@ -412,4 +417,4 @@ function workerSelector(worker) {
   return worker_selector;
 }
 
-export {Reef};
+export { Reef };

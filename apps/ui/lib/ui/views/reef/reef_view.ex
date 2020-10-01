@@ -6,13 +6,13 @@ defmodule UI.ReefView do
   alias Reef.Captain.Server, as: Captain
   alias Reef.FirstMate.Server, as: FirstMate
 
-  def button_click(%{"action" => "live-update"} = payload, socket),
-    do: live_update(payload, socket)
+  def button_click(%{"action" => "live-update"}, socket) do
+    %{socket: socket}
+  end
 
   @doc false
   def button_click(%{"worker" => worker} = payload, socket) do
     case payload do
-      %{"action" => "lock-modes"} -> modes_lock(worker, socket)
       %{"action" => "manual-control"} -> manual_control(worker, socket)
       %{"action" => "reset"} -> restart(worker, socket)
       %{"action" => "stop"} -> worker_mode(worker, :all_stop, socket)
@@ -23,22 +23,6 @@ defmodule UI.ReefView do
 
   @doc false
   def button_click(payload, socket), do: unhandled_click(payload, socket)
-
-  @doc false
-  def live_update(%{"subsystem" => subsystem}, socket) do
-    modes_locked = socket_get(socket, :modes_locked)
-    live_update? = socket_get(socket, :live_update)
-    next_live_update? = not live_update?
-
-    if next_live_update? do
-      Process.send_after(self(), {:live_update, subsystem}, 100)
-    end
-
-    %{
-      ui: %{subsystem: subsystem, live_update: next_live_update?, modes_locked: modes_locked},
-      socket: socket_put(socket, :live_update, next_live_update?)
-    }
-  end
 
   @doc false
   def manual_control(worker, socket) do
@@ -55,16 +39,6 @@ defmodule UI.ReefView do
     rc = mod.server(mode.(next_manual_control?))
 
     %{ui: %{worker: worker, manual_control: next_manual_control?}, socket: socket} |> click_rc(rc)
-  end
-
-  @doc false
-  def modes_lock(worker, socket) do
-    # by default modes are always locked
-    locked? = socket_get(socket, :modes_locked)
-    next_locked? = not locked?
-    socket = socket_put(socket, :modes_locked, next_locked?)
-    # toggle locked? by negating the existing value
-    %{ui: %{worker: worker, modes_locked: next_locked?}, socket: socket}
   end
 
   @doc false
