@@ -127,10 +127,14 @@ defmodule WorkerLogicTest do
 
     assert State.track_get(state, :steps_to_execute) == [:middle, :finally]
 
+    Process.sleep(1000)
+
     state =
       Logic.next_action(state) |> Logic.next_action() |> Logic.next_action()
 
     assert State.track_get(state, :steps_to_execute) == [:finally]
+
+    Process.sleep(1000)
 
     # confirm the mode finishes
     token = get_in(state, [:token])
