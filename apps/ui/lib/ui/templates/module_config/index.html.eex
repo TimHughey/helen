@@ -50,24 +50,17 @@
       </div>
     </div>
 
-    <div class="right floated twelve wide column">
+    <div class="right twelve wide column">
       <form class="ui form" data-form="module_config">
         <div class="field">
-
 
           <div class="ui left corner labeled input">
             <div class="ui left corner label">
               <i class="asterisk icon"></i>
             </div>
-            <textarea rows="20" autocapitalize="none" spellcheck="false" data-input="module_config" data-mod="">
+            <textarea rows="28" autocapitalize="none" spellcheck="false" data-input="module_config" data-mod="">
             </textarea>
 
-          </div>
-        </div>
-        <div class="field">
-          <div class="ui blue labeled submit icon button" data-action="save">
-            <i class="icon edit"></i>
-            Save
           </div>
         </div>
       </form>

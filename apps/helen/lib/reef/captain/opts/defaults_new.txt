@@ -1,0 +1,119 @@
+base {
+  syntax_vsn "2020-0901"
+  worker_name "captain"
+  description "reef captain default config"
+  timeout PT3M
+  timezone "America/New_York"
+  first_mode fill
+}
+
+workers {
+  air "mixtank air"
+  pump "mixtank pump"
+  rodi "mixtank rodi"
+  mix_heater "mixtank heater"
+  reef_heater "display tank heater"
+  first_mate "reef_worker"
+}
+
+mode all_stop {
+  next_mode hold
+  sequence all_stop
+
+  step all_stop { all off }
+}
+
+mode fill {
+  next_mode keep_fresh
+  sequence at_start, initial, main, topoff, finally
+
+  step at_start { all off }
+  step initial for PT3H30M { rodi on for PT2M10S then off; rodi off for PT12M }
+
+  step main for PT4H {
+    rodi on for PT2M10S then off
+    air on for PT5M then off nowait
+    rodi off for PT12M
+  }
+
+  step topoff { off air, rodi; rodi on for PT5M then off }
+  step finally { all off }
+}
+
+mode keep_fresh {
+  next_mode hold
+  sequence init, circulate, aerate, power_save, repeat
+
+  step init { air off }
+  step circulate { pump on for PT2M then off }
+  step aerate { air on for PT3M then off }
+  step power_save { sleep PT10M }
+}
+
+mode add_salt {
+  next_mode match_conditions
+  sequence init, add, mix, finally
+
+  step init { air off }
+  step add { pump on for PT20M then off }
+  step mix for PT30M { air on for PT3M then off; pump on for PT5M then off }
+  step finally {off air, pump}
+}
+
+mode match_conditions {
+  next_mode dump_water
+  sequence warm, stir, power_save, repeat
+
+  step warm { tell mix_heater active }
+
+  step stir {
+    pump on for PT1M then off
+    air on for PT4M then off
+    pump off for PT5M
+  }
+
+  step power_save { sleep PT5M }
+}
+
+mode dump_water {
+  next_mode load_water
+  sequence at_start, adjust_valves, pump_to_sewer
+
+  step at_start {
+    off air, pump
+    tell reef_heater standby
+    tell first_mate clean
+  }
+
+  step adjust_valves { sleep PT30S }
+  step pump_to_sewer { pump on for PT2M17S then off}
+}
+
+mode load_water {
+  next_mode final_check
+  sequence at_start, adjust_valves, pump_to_reef
+
+  step at_start {
+    pump off
+    tell mix_heater standby
+    tell reef_heater standby
+    tell first_mate clean
+  }
+
+  step adjust_valves { sleep PT45S }
+  step pump_to_reef { pump on for PT2M17S then off}
+}
+
+mode final_check {
+  next_mode fill
+  sequence at_start, check, normal_operations
+
+  step at_start { all off}
+  step check { sleep PT10M }
+  step normal_operations {
+    tell reef_heater active
+    tell first_mate normal_operations
+  }
+}
+
+# end of config

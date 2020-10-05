@@ -1,0 +1,42 @@
+# start of first mate config
+
+base {
+  syntax_vsn "2020-0818"
+  worker_name "first_mate"
+  start_mode normal_operations
+  timeout PT3M
+  timezone "America/New_York"
+}
+
+workers {
+  ato "display tank ato"
+  reef_heater "display tank heater"
+}
+
+mode all_stop {
+  next_mode hold; sequence all_stop
+  step all_stop { all off }
+}
+
+mode clean {
+  next_mode normal_operations
+  sequence ato_disable, ato_enable
+
+  step ato_disable for PT6H { ato off for PT1M then off }
+  step ato_enable { ato on }
+}
+
+mode water_change {
+  next_mode normal_operations
+  sequence ato_disable
+
+  step ato_disable for PT3H { ato off for PT30S then off }
+}
+
+mode normal_operations {
+  sequence ato_enable, repeat
+
+  step ato_enable { ato on for PT1M then on }
+}
+
+# end of first mate config

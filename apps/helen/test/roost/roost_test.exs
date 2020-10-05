@@ -3,13 +3,7 @@ defmodule RoostServerTest do
 
   use ExUnit.Case, async: false
 
-  alias Helen.Config.Parser
   alias Roost.Server
-
-  @lib_path Path.join([__DIR__, "..", "..", "lib"]) |> Path.expand()
-  @config_path Path.join([@lib_path, "roost", "opts"])
-  @config_file Path.join([@config_path, "defaults.txt"])
-  @config_txt File.read!(@config_file)
 
   setup_all do
     for {pwm_dev, pwm_alias} <- [
@@ -42,13 +36,6 @@ defmodule RoostServerTest do
     assert %{token: _, token_at: _} = state
     assert %{module: Roost.Server} = state
     assert %{base: _, workers: _, modes: _} = state[:opts]
-  end
-
-  test "can parse default config" do
-    state = Parser.parse(@config_txt)
-
-    assert is_map(state[:parser])
-    assert Parser.syntax_ok?(state)
   end
 
   test "can get Roost available modes" do

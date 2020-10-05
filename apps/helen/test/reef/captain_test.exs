@@ -3,13 +3,7 @@ defmodule ReefCaptainTest do
 
   use ExUnit.Case, async: false
 
-  alias Helen.Config.Parser
   alias Reef.Captain.Server, as: Captain
-
-  @lib_path Path.join([__DIR__, "..", "..", "lib"]) |> Path.expand()
-  @config_path Path.join([@lib_path, "reef", "captain", "opts"])
-  @config_file Path.join([@config_path, "defaults.txt"])
-  @config_txt File.read!(@config_file)
 
   setup_all do
     %{}
@@ -34,13 +28,6 @@ defmodule ReefCaptainTest do
     assert %{token: _, token_at: _} = state
     assert %{module: Captain} = state
     assert %{base: _, workers: _, modes: _} = state[:opts]
-  end
-
-  test "can parse default config" do
-    state = Parser.parse(@config_txt)
-
-    assert is_map(state[:parser])
-    assert Parser.syntax_ok?(state)
   end
 
   test "can get Captain available modes" do
