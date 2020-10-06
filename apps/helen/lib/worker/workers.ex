@@ -199,9 +199,7 @@ defmodule Helen.Workers do
 
       # deal with the case when the "worker" is a list of workers
       idents when is_list(idents) ->
-        for ident <- idents do
-          get_in(cache, [ident])
-        end
+        Map.take(cache, idents) |> Enum.into([])
     end
   end
 

@@ -123,21 +123,6 @@ defmodule Helen.Module.DB.Config do
   end
 
   @doc """
-    Returned a parsed representation of a text configuration.
-  """
-  @doc since: "0.0.27"
-  def parsed(module_or_id) do
-    alias Helen.Config.Parser
-
-    with %Schema{opts: raw, version: vsn} <- find(module_or_id),
-         %{parser: %{syntax: :ok}} = config <- Parser.parse(raw) do
-      put_in(config, [:__available__], true) |> put_in([:__version__], vsn)
-    else
-      _config -> put_in(%{}, [:__available__], false)
-    end
-  end
-
-  @doc """
     Put the opts of a Module Config
   """
   @doc since: "0.0.26"
