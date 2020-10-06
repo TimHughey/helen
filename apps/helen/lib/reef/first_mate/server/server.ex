@@ -17,11 +17,7 @@ defmodule Reef.FirstMate.Server do
   def init(args) do
     import Reef.FirstMate.Opts, only: [parsed: 0]
 
-    # just in case we were passed a map?!?
-    args = Enum.into(args, [])
-    opts = parsed()
-
-    Logic.init_server(__MODULE__, args, opts)
+    Logic.init_server(__MODULE__, args, %{config: parsed()})
   end
 
   def start_link(args) do

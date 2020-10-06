@@ -2,9 +2,9 @@ defmodule WorkerLogicTest do
   @moduledoc false
 
   use Timex
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
-  alias Helen.Config.Parser
+  alias Helen.Worker.Config, as: Parser
   alias Helen.Worker.{Logic, State}
   alias Helen.Worker.State.Common
   alias Helen.Workers
@@ -13,12 +13,9 @@ defmodule WorkerLogicTest do
   @test_config_txt File.read!(@test_file)
 
   def config(:test) do
-    parsed = Parser.parse(@test_config_txt)
+    assert {:ok, config} = Parser.parse(@test_config_txt)
 
-    make_state(%{
-      opts: get_in(parsed, [:config]),
-      parser: get_in(parsed, [:parser])
-    })
+    make_state(%{opts: config})
   end
 
   def make_state(map \\ %{}) do
@@ -77,31 +74,32 @@ defmodule WorkerLogicTest do
   end
 
   test "can perform init" do
-    %{logic: %{stage: stage}} =
+    %{logic: %{live: live}} =
       state =
       config(:test)
       |> Logic.init(:alpha)
 
     refute Common.faults?(state)
-    assert %{active_mode: :alpha, steps: steps} = stage |> Map.drop([:opts])
+    assert %{active_mode: :alpha, steps: steps} = live
     assert %{at_start: %{actions: actions}} = steps
-    assert %{worker: :air, cmd: :on} = hd(actions)
+
+    assert %{worker_name: :air, cmd: :on, for: "PT0.1S", then: :off} ==
+             hd(actions)
+
     assert state[:workers] |> is_map()
   end
 
   test "can start a mode that does not repeat and has next mode defined" do
     import Helen.Time.Helper, only: [to_duration: 1, to_ms: 1]
 
-    expected_duration = to_duration("PT2S")
+    expected_duration = to_duration("PT0.3S")
     mode = :alpha
 
     state = config(:test) |> Logic.init(mode) |> Logic.start()
 
-    stage = State.stage_get(state, [])
     live = State.live_get(state, [])
 
-    assert is_map(stage) and is_map(live)
-    assert Enum.empty?(stage)
+    assert is_map(live)
     assert State.live_get(state, :active_mode) == mode
     assert %DateTime{} = State.track_get(state, :started_at)
     assert State.live_get(state, :will_finish_in_ms) == to_ms(expected_duration)
@@ -158,11 +156,9 @@ defmodule WorkerLogicTest do
 
     state = config(:test) |> Logic.init(mode) |> Logic.start()
 
-    stage = State.stage_get(state, [])
     live = State.live_get(state, [])
 
-    assert is_map(stage) and is_map(live)
-    assert Enum.empty?(stage)
+    assert is_map(live)
     assert State.active_mode(state) == mode
     assert %DateTime{} = State.track_get(state, :started_at)
     assert is_nil(State.live_get(state, :will_finish_in_ms))
@@ -213,7 +209,7 @@ defmodule WorkerLogicTest do
   test "can get the sequence of the live mode" do
     state = config(:test) |> Logic.init(:alpha) |> Logic.start()
 
-    assert State.live_get_mode_sequence(state) == [:at_start, :middle, :finally]
+    assert State.mode_sequence(state) == [:at_start, :middle, :finally]
   end
 
   test "can get command definitions" do

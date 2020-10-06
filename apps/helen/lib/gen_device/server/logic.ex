@@ -407,13 +407,15 @@ defmodule GenDevice.Logic do
 
   def start_run_for_if_needed(state) do
     import Process, only: [send_after: 3]
-    import Helen.Time.Helper, only: [to_ms: 1]
+    import Helen.Time.Helper, only: [to_duration: 1, to_ms: 1]
 
     case cmd_for(state) do
       :none ->
         inflight_status(state, :finished)
 
-      dur when is_struct(dur) ->
+      dur when is_struct(dur) or is_binary(dur) ->
+        dur = to_duration(dur)
+
         inflight_put(
           state,
           :run_for_timer,

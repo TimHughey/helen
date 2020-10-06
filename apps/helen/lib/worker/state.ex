@@ -15,15 +15,25 @@ defmodule Helen.Worker.State do
   def actions_to_execute_update(state, func) when is_function(func, 1),
     do: track_update(state, [:actions_to_execute], func)
 
-  def active_mode(state), do: live_get(state, :active_mode) || :none
+  def active_mode(state, mode \\ nil) do
+    if is_nil(mode) do
+      live_get(state, :active_mode) || :none
+    else
+      live_put(state, :active_mode, mode)
+    end
+  end
+
   def active_step(state), do: track_get(state, :active_step) || :none
+
+  def base_opt(state, path \\ []),
+    do: get_in(state, flatten([:opts, :base, path]))
 
   def build_logic_map(state) do
     import Map, only: [put_new: 3]
 
     put_new(state, :logic, %{})
     |> update_in([:logic], fn logic_map ->
-      for x <- [:faults, :finished, :live, :stage], reduce: logic_map do
+      for x <- [:faults, :finished, :live], reduce: logic_map do
         logic_map -> put_new(logic_map, x, %{})
       end
     end)
@@ -39,18 +49,16 @@ defmodule Helen.Worker.State do
     for action <- actions, reduce: zero() do
       duration ->
         case action do
-          %{for: run_for, wait: true} ->
-            add_list([duration, run_for])
-
-          _other_cmds ->
-            duration
+          %{wait: false} -> duration
+          %{for: run_for} -> add_list([duration, run_for])
+          _anything -> duration
         end
     end
   end
 
   def calculate_steps_durations(state) do
-    for x <- live_get_mode_sequence(state),
-        {step_name, details} when x == step_name <- live_get_steps(state),
+    for x <- mode_sequence(state),
+        {step_name, details} when x == step_name <- mode_steps(state),
         reduce: state do
       state ->
         duration = calculate_step_duration(details)
@@ -94,7 +102,7 @@ defmodule Helen.Worker.State do
   end
 
   def cmd_definition(state, what),
-    do: live_get(state, [:opts, :cmd_definitions, what])
+    do: get_in(state, [:opts, :commands, what])
 
   def cmd_rc(state), do: track_get(state, [:cmd_rc])
 
@@ -106,34 +114,18 @@ defmodule Helen.Worker.State do
     |> track_put([:cmd_rc], val)
   end
 
-  def copy_opts_to_stage(%{opts: opts} = state) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state
-    |> stage_put([], %{
-      active_mode: nil,
-      active_step: nil,
-      opts: opts,
-      steps: %{},
-      track: %{},
-      temp: %{},
-      will_finish_in_ms: 0,
-      will_finish_by: nil
-    })
-  end
-
   def detect_sequence_repeats(state),
     do:
       live_put(
         state,
         :repeat_until_stopped?,
-        Enum.member?(live_get_mode_sequence(state), :repeat)
+        Enum.member?(mode_sequence(state), :repeat)
       )
 
   def execute_actions?(state), do: live_get(state, :execute_actions) || false
   # flag that we want actions to be executed.  used in production.  not used
   # during testing to avoid inifinite loops with repeating steps
-  def execute_actions(state, flag), do: stage_put(state, :execute_actions, flag)
+  def execute_actions(state, flag), do: live_put(state, :execute_actions, flag)
 
   def finished_get(state, path),
     do: get_in(state, flatten([:logic, :finished, path]))
@@ -155,36 +147,50 @@ defmodule Helen.Worker.State do
       |> build_logic_map()
       |> update_in([:logic, :faults], fn x -> Map.drop(x, [:init]) end)
 
+  def live_init(state) do
+    import Helen.Time.Helper, only: [utc_now: 0]
+
+    state
+    |> live_put([], %{
+      active_mode: nil,
+      active_step: nil,
+      steps: %{},
+      track: %{},
+      temp: %{},
+      will_finish_in_ms: 0,
+      will_finish_by: nil
+    })
+  end
+
   def lasts_put(state, what, val),
     do: put_in(state, flatten([:lasts, what]), val)
 
   def live_get(state, path),
     do: get_in(state, flatten([:logic, :live, path]))
 
-  def live_get_mode_opt(state, path),
-    do:
-      live_get(
-        state,
-        flatten([:opts, :modes, live_get(state, :active_mode), path])
-      )
-
-  def live_get_mode_sequence(state), do: live_get_mode_opt(state, :sequence)
-
-  def live_next_mode(state), do: live_get_mode_opt(state, :next_mode) || :none
+  def live_next_mode(state), do: mode_opt(state, :next_mode) || :none
 
   def live_get_step(state, step_name),
-    do: live_get_steps(state) |> get_in([step_name])
+    do: mode_steps(state) |> get_in([step_name])
 
-  def live_get_steps(state), do: live_get(state, [:steps])
-
-  def live_opts_get(state, what \\ []),
-    do: live_get(state, flatten([:opts, what]))
+  def mode_steps(state) do
+    for {:step, %{name: name} = details} <- mode_opt(state), reduce: %{} do
+      steps -> put_in(steps, [name], details)
+    end
+  end
 
   def live_put(state, path, val),
-    do: put_in(state, [:logic, :live, [path]] |> flatten(), val)
+    do: put_in(state, flatten([:logic, :live, [path]]), val)
 
   def live_update(state, path, func) when is_function(func, 1),
     do: state |> update_in(flatten([:logic, :live, path]), func)
+
+  def mode_opt(state, path \\ []) do
+    active_mode = live_get(state, :active_mode)
+    get_in(state, flatten([:opts, :modes, active_mode, :details, path]))
+  end
+
+  def mode_sequence(state), do: mode_opt(state, :sequence)
 
   def mode_repeat_until_stopped?(state),
     do: live_get(state, :repeat_until_stopped?)
@@ -201,14 +207,8 @@ defmodule Helen.Worker.State do
     |> live_put([], %{})
   end
 
-  def move_stage_to_live(%{logic: %{stage: stage}} = state) do
-    state |> put_in([:logic, :live], stage) |> put_in([:logic, :stage], %{})
-  end
-
-  def note_delay_if_requested(state) do
+  def note_delay_if_requested(%{opts: opts} = state) do
     import Helen.Time.Helper, only: [to_ms: 1, valid_ms?: 1]
-
-    opts = stage_get_opts(state)
 
     case opts[:start_delay] do
       # just fine, no delay requested
@@ -220,7 +220,7 @@ defmodule Helen.Worker.State do
         if valid_ms?(delay) do
           state
           # store the delay for pattern matching later
-          |> stage_put([:delay], to_ms(delay))
+          |> live_put([:delay], to_ms(delay))
         else
           state |> init_fault_put({:invalid_delay, delay})
         end
@@ -256,31 +256,8 @@ defmodule Helen.Worker.State do
     pending_action_put(state, action)
   end
 
-  def stage_active_mode(state), do: stage_get(state, :active_mode)
-
-  def stage_get(state, path),
-    do: get_in(state, flatten([:logic, :stage, path]))
-
-  def stage_get_base_opt(state, key), do: stage_get_opts(state, [:base, key])
-
-  def stage_get_opts(state, path \\ []),
-    do: state |> stage_get(flatten([:opts, path]))
-
-  def stage_get_mode_opts(state, path \\ []) do
-    stage_get_opts(
-      state,
-      flatten([:modes, stage_get(state, :active_mode), path])
-    )
-  end
-
-  def stage_initialize_steps(state),
-    do: state |> stage_put(:steps, stage_get_mode_opts(state, :steps))
-
-  def stage_put(state, path, val),
-    do: state |> put_in(flatten([:logic, :stage, path]), val)
-
-  def stage_put_active_mode(state, mode),
-    do: state |> stage_put(:active_mode, mode)
+  def initialize_steps(state),
+    do: state |> live_put(:steps, mode_steps(state))
 
   def state_put(state, what, val), do: put_in(state, flatten([what]), val)
 

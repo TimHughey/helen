@@ -25,6 +25,8 @@ defmodule Helen.Worker.Logic do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       @behaviour Helen.Worker.Logic
 
+      use Helen.Worker.Opts
+
       alias Helen.Worker.{Logic, State}
       alias Helen.Worker.State.Common
 
@@ -412,26 +414,26 @@ defmodule Helen.Worker.Logic do
     state
     |> build_logic_map()
     |> cache_worker_modules()
-    # initialize the :stage map with a copy of the opts that will be used
-    # when this mode goes live
-    |> copy_opts_to_stage()
-    # set the active_mode
-    |> stage_put_active_mode(mode)
-    |> stage_initialize_steps()
+    |> finish_mode_if_needed()
+    |> purge_finished_if_needed(mode)
+    |> live_init()
+    |> active_mode(mode)
+    |> initialize_steps()
     |> note_delay_if_requested()
   end
 
-  def init_server(mod, args, opts, base_state \\ %{})
-      when is_atom(mod) and is_list(args) and is_map(opts) and
-             is_map(base_state) do
-    state =
-      Map.merge(base_state, %{
-        module: mod,
-        opts: opts,
-        timeouts: %{last: :never, count: 0},
-        token: nil,
-        token_at: nil
-      })
+  def init_server(mod, args, opts \\ %{})
+
+  def init_server(mod, args, %{config: {:ok, config}})
+      when is_atom(mod) and is_list(args) do
+    state = %{
+      module: mod,
+      args: args,
+      opts: config,
+      timeouts: %{last: :never, count: 0},
+      token: nil,
+      token_at: nil
+    }
 
     # initial server mode order of precedence:
     #  1. args passed to Worker server
@@ -447,6 +449,16 @@ defmodule Helen.Worker.Logic do
     else
       {:ok, state, {:continue, :bootstrap}}
     end
+  end
+
+  def init_server(mod, args, %{config: {:error, error}}) do
+    Logger.warn("""
+    #{inspect(mod)} not starting
+      args:   #{inspect(args, pretty: true)}
+      config: #{inspect(error, pretty: true)}
+    """)
+
+    :ignore
   end
 
   def next_action(state) do
@@ -485,14 +497,15 @@ defmodule Helen.Worker.Logic do
 
       # there's a next mode defined
       next_mode ->
+        Logger.info("next mode: #{inspect(next_mode)}")
         finish_mode(state) |> change_mode(next_mode)
     end
   end
 
   def noreply(s), do: {:noreply, s, loop_timeout(s)}
 
-  def purge_finished_if_needed(state) do
-    if stage_get_base_opt(state, :first_mode) == stage_active_mode(state) do
+  def purge_finished_if_needed(state, next_mode) do
+    if base_opt(state, :first_mode) == next_mode do
       finished_reset(state)
     else
       state
@@ -533,13 +546,13 @@ defmodule Helen.Worker.Logic do
 
   # when :delay has a value we send ourself a :timer message
   # when that timer expires the delay value is removed
-  def start(%{stage: %{delay: ms}} = state) do
+  def start(%{live: %{delay: ms}} = state) do
     import Process, only: [send_after: 3]
     import Helen.Time.Helper, only: [utc_now: 0]
 
     state
-    |> stage_put([:issued_at], utc_now())
-    |> stage_put(
+    |> live_put([:issued_at], utc_now())
+    |> live_put(
       [:delayed_start_timer],
       send_after(self(), {:timer, :delayed_cmd}, ms)
     )
@@ -547,15 +560,12 @@ defmodule Helen.Worker.Logic do
 
   def start(state) do
     state
-    |> finish_mode_if_needed()
-    |> purge_finished_if_needed()
-    |> move_stage_to_live()
     |> status_put(:running)
     |> track_put(:started_at)
     |> calculate_steps_durations()
     |> detect_sequence_repeats()
     |> calculate_will_finish_by()
-    |> track_put(:sequence, stage_get_mode_opts(state, :sequence))
+    |> track_put(:sequence, mode_sequence(state))
     |> track_copy(:sequence, :steps_to_execute)
     |> start_mode_next_step()
   end

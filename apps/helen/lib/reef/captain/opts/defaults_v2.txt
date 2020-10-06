@@ -13,7 +13,7 @@ workers {
   rodi "mixtank rodi"
   mix_heater "mixtank heater"
   reef_heater "display tank heater"
-  first_mate "reef_worker"
+  first_mate "reef worker"
 }
 
 mode all_stop {

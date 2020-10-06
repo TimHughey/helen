@@ -1,4 +1,4 @@
-defmodule Helen.ModConfig.Parser.New do
+defmodule Helen.Worker.Config do
   @moduledoc false
 
   require Logger

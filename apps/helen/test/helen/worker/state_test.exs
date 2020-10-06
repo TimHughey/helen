@@ -15,8 +15,7 @@ defmodule WorkerLogicStateTest do
                  init: %{hello: :doctor}
                },
                finished: %{},
-               live: %{},
-               stage: %{}
+               live: %{}
              }
            } == state
   end

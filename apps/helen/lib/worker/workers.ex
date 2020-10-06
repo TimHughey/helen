@@ -16,20 +16,23 @@ defmodule Helen.Workers do
   def action_run_for(action) do
     import Helen.Time.Helper, only: [zero: 0]
 
-    case action do
-      %{stmt: :sleep, args: run_for} -> run_for
-      %{for: run_for} -> run_for
-      _x -> zero()
-    end
+    get_in(action, [:for]) || zero()
   end
 
   def add_via_msg(action),
     do: put_in(action, [:via_msg], true) |> put_in([:wait], true)
 
+  def add_via_msg_if_needed(action) do
+    case action do
+      %{for: _} -> add_via_msg(action)
+      action -> action
+    end
+  end
+
   def build_module_cache(nil), do: %{}
 
-  def build_module_cache(workers_map) when is_map(workers_map) do
-    for {ident, name} <- workers_map, into: %{} do
+  def build_module_cache(workers) do
+    for {ident, name} <- workers, into: %{} do
       {ident, module(ident, name)}
     end
   end
@@ -48,32 +51,36 @@ defmodule Helen.Workers do
     cmd_rc_put(state, result)
   rescue
     anything ->
-      Logger.warn("""
-      rescued: #{inspect(anything, pretty: true)}
-
-      #{inspect(__STACKTRACE__, pretty: true)}
-
-      #{
-        inspect(pending_action(state) |> Map.drop([:worker_cache]), pretty: true)
-      }
-      """)
+      Logger.warn("rescued: #{inspect(anything, pretty: true)}")
+      Logger.warn("#{inspect(__STACKTRACE__, pretty: true)}")
+      # Logger.warn("""
+      # rescued: #{inspect(anything, pretty: true)}
+      #
+      # #{inspect(__STACKTRACE__, pretty: true)}
+      #
+      # #{
+      #   inspect(pending_action(state) |> Map.drop([:worker_cache]), pretty: true)
+      # }
+      # """)
 
       state
   end
 
   # NOTE: has test case
   @doc false
-  def execute_action(%{stmt: :sleep, args: duration, reply_to: pid} = action) do
+  def execute_action(%{cmd: :sleep, for: duration, reply_to: pid} = action) do
     import Helen.Time.Helper, only: [to_ms: 1]
 
-    execute_result(action, fn ->
+    action
+    |> add_via_msg()
+    |> execute_result(fn ->
       Process.send_after(pid, make_msg(action), to_ms(duration))
     end)
   end
 
   def execute_action(
         %{
-          stmt: :tell,
+          cmd: :tell,
           worker: %{type: worker_type, module: mod},
           worker_cmd: worker_cmd,
           msg: msg
@@ -84,24 +91,12 @@ defmodule Helen.Workers do
     |> execute_result(fn -> apply(mod, worker_cmd, [msg]) end)
   end
 
-  # NOTE: has test case
   @doc false
-  def execute_action(%{stmt: :all, args: cmd, worker_cache: wc} = action) do
-    execute_result(action, fn ->
+  def execute_action(%{cmd: cmd, worker: workers} = action)
+      when is_list(workers) and cmd in [:on, :off] do
+    action
+    |> execute_result(fn ->
       for {ident, %{module: mod, found?: true, type: type} = worker}
-          when type in [:simple_device, :gen_device] <- wc,
-          into: %{} do
-        # add the worker to the action for matching by the executing module
-        action = worker_cmd_put(action, cmd) |> put_in([:worker], worker)
-
-        {ident, mod.execute_action(action)}
-      end
-    end)
-  end
-
-  def execute_action(%{stmt: :cmd_list, cmd: cmd, worker: workers} = action) do
-    execute_result(action, fn ->
-      for %{ident: ident, module: mod, found?: true, type: type} = worker
           when type in [:simple_device, :gen_device] <- workers,
           into: %{} do
         # add the worker to the action for matching by the executing module
@@ -112,14 +107,7 @@ defmodule Helen.Workers do
     end)
   end
 
-  def execute_action(%{stmt: :cmd_basic, worker: %{module: mod}} = action) do
-    execute_result(action, fn -> mod.execute_action(action) end)
-  end
-
-  def execute_action(%{stmt: stmt, worker: %{module: mod}} = action)
-      when stmt in [:cmd_for, :cmd_for_then] do
-    action = add_via_msg(action)
-
+  def execute_action(%{worker: %{module: mod}} = action) do
     execute_result(action, fn -> mod.execute_action(action) end)
   end
 
@@ -128,8 +116,7 @@ defmodule Helen.Workers do
 
     Map.merge(action, %{
       msg_type: msg_type,
-      worker_cache: worker_cache,
-      worker: resolve_worker(worker_cache, action[:worker]),
+      worker: resolve_worker(worker_cache, action[:worker_name]),
       meta: %{
         started_at: utc_now(),
         elapsed: zero(),
@@ -143,26 +130,21 @@ defmodule Helen.Workers do
       action_ref: make_ref(),
       token: token
     })
+    |> add_via_msg_if_needed()
     |> make_action_specific(state)
   end
 
   def make_action_specific(%{cmd: cmd} = action, state) do
     case cmd do
-      :all ->
-        worker_cmd_put(action, action[:args])
-
       :tell ->
-        worker_cmd_put(action, :mode) |> put_in([:mode], action[:msg])
-
-      :sleep ->
-        add_via_msg(action)
+        worker_cmd_put(action, :mode) |> put_in([:msg], action[:mode])
 
       cmd when cmd in [:on, :off, :duty] ->
         worker_cmd_put(action, cmd)
 
-      cmd_def ->
+      cmd ->
         worker_cmd_put(action, :custom)
-        |> put_in([:custom], cmd_definition(state, cmd_def))
+        |> put_in([:custom], cmd_definition(state, cmd))
     end
   end
 
@@ -195,7 +177,7 @@ defmodule Helen.Workers do
   def make_msg(%{msg_type: type} = action),
     do: {type, action}
 
-  def execute_result(%{stmt: _, cmd: _} = action, func),
+  def execute_result(%{cmd: _} = action, func),
     do: put_in(action, [:result], func.())
 
   @doc false
@@ -207,6 +189,9 @@ defmodule Helen.Workers do
 
       :self ->
         :self
+
+      :all ->
+        cache |> Enum.into([])
 
       # deak with the case when the worker is a simple atom
       ident when is_atom(ident) ->

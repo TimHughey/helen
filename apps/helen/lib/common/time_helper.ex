@@ -330,13 +330,14 @@ defmodule Helen.Time.Helper do
   Returns a `%Duration{}` or raises on error.
   """
   @doc since: "0.0.27"
-  def to_duration(d) when is_binary(d) or is_struct(d) do
+  def to_duration(d) do
     alias Timex.Duration
 
     case d do
       d when is_list(d) -> list_to_ms(d, []) |> Duration.from_milliseconds()
       %Duration{} = x -> x
-      x -> Duration.parse!(x)
+      x when is_binary(x) -> Duration.parse!(x)
+      _no_match -> Duration.zero()
     end
   end
 

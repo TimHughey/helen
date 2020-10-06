@@ -131,7 +131,7 @@ defmodule PulseWidth do
     case cmd do
       :on -> on(name)
       :off -> off(name)
-      :duty -> duty(name, action[:num_bin])
+      :duty -> duty(name, action[:number])
       _cmd -> Alias.cmd_direct(name, action[:custom], [])
     end
   end

@@ -54,13 +54,13 @@ defmodule HelenWorkersTest do
       Workers.make_action(
         :test,
         wc,
-        %{stmt: :sleep, cmd: :sleep, args: to_duration("PT0.001S")},
+        %{cmd: :sleep, for: to_duration("PT0.001S")},
         %{token: token}
       )
 
     res = Workers.execute_action(action)
 
-    assert res[:stmt] == :sleep
+    assert res[:cmd] == :sleep
     assert res[:via_msg]
     assert is_reference(res[:action_ref])
     assert is_reference(res[:result])

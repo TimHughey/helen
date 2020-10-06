@@ -20,8 +20,16 @@ defmodule PulseWidth.Payload.Auto do
       %{type: _} -> handle_flat_cmd_map(pwm, cmd_map, opts)
       %{duty: _} -> Duty.send_cmd(pwm, cmd_map, opts)
       %{random: %{max: _, min: _}} -> Random.send_cmd(pwm, cmd_map, opts)
+      %{random: _, name: _} -> handle_cmd_definition(pwm, cmd_map, opts)
       %{basic: %{steps: _}} -> Basic.send_cmd(pwm, cmd_map, opts)
     end
+  end
+
+  @doc false
+  def handle_cmd_definition(pwm, %{name: n, random: %{details: d}}, opts) do
+    details = Enum.into(d, %{})
+
+    send_cmd(pwm, %{:name => n, :random => details}, opts)
   end
 
   @doc false

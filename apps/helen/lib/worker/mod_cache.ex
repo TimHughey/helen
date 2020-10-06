@@ -41,7 +41,7 @@ defmodule Helen.Workers.ModCache do
 
   # only one Reef Worker that can be used in a worker config exists
   defp search(
-         %{find: {:first_mate, :reef_worker}, module: nil} = acc,
+         %{find: {:first_mate, "reef worker"}, module: nil} = acc,
          :reef_workers
        ),
        do:

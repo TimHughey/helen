@@ -8,12 +8,10 @@ defmodule GenDevice.State do
 
   def action_cmd(state), do: action_get(state, :worker_cmd)
 
-  def action_for(state), do: action_get(state, :for) || :none
-
   def action_get(state, what),
     do: get_in(state, flatten([:inflight, :action, what]))
 
-  def action_then_cmd(state), do: action_get(state, :at_cmd_finish)
+  def action_then_cmd(state), do: action_get(state, :then)
 
   def at_cmd_finished?(state), do: notify?(state, :at_finish)
 

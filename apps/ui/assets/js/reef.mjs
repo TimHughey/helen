@@ -291,7 +291,6 @@ function updateModeProgress(msg) {
       mode: active_mode = "none",
       action: {
         cmd: cmd = null,
-        stmt: stmt = null,
         worker_cmd: worker_cmd = null,
         run_for: { ms: run_for_ms = 0, binary: run_for_binary } = {},
         elapsed: { ms: elapsed_ms = 0 } = {},
@@ -310,12 +309,7 @@ function updateModeProgress(msg) {
 
   jQuery(progress).addClass("active");
 
-  let label_html = "none";
-  if (cmd === stmt) {
-    label_html = `${stmt} ${run_for_binary}`;
-  } else {
-    label_html = `${cmd} ${stmt} ${run_for_binary}`;
-  }
+  let label_html = `${cmd} ${run_for_binary}`;
 
   jQuery(label).html(label_html);
 }

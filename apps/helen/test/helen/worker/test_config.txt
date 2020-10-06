@@ -1,66 +1,55 @@
 # start of test config
 
-base
-  syntax_vsn '2020-0817'
-  description 'test configuration'
+base {
+  syntax_vsn "2020-0817"
+  description "test configuration"
   timeout PT3M
-  timezone America/New_York
+  timezone "America/New_York"
   first_mode alpha
+}
 
-workers
-  air   'mixtank air'
-  pump  'mixtank pump'
+workers { air "mixtank air"; pump "mixtank pump" }
 
-cmd_definitions
-  cmd_alpha
-    name 'fade1'
-    random
-      min 128
-      max 2048
-      primes 35
-      step_ms 55
-      step 13
-      priority 7
+command cmd_alpha "fade1" random {
+  min 128, max 2048, primes 35, step_ms 55, step 13, priority 7
+}
 
-modes
-  all_stop
-    next_mode hold
-    sequence at_start finally
-    steps
-      at_start
-        all off
-      finally
-        all off
+mode all_stop {
+  next_mode hold
+  sequence at_start, finally
 
-  alpha
-    next_mode beta
-    sequence at_start middle finally
-    steps
-      at_start for PT1S
-        air on PT0.1S then off
-      middle for PT1S
-        air on PT0.1S then off
-        air on PT0.1S then off
-        pump off
-      finally
-        air off
-        pump off
+  step at_start { all off }
+  step finally { all off }
+}
 
-  beta
-    sequence step1 step2 repeat
-    steps
-      step1
-        sleep PT0.1S
-      step2
-        sleep PT0.1S
+mode alpha {
+  next_mode beta
+  sequence at_start, middle, finally
 
-  gamma
-    next_mode hold
-    sequence step1 step2
-    steps
-      step1
-        sleep PT0.1S
-      step2
-        sleep PT0.1S
+  step at_start for PT1S { air on for PT0.1S then off }
+
+  step middle for PT1S {
+    air on for PT0.1S then off
+    air on for PT0.1S then off
+    punp off
+  }
+
+  step finally { air off; pump off}
+}
+
+mode beta {
+  sequence step1, step2, repeat
+
+  step step1 { sleep PT0.1S }
+  step step2 { sleep PT0.1S }
+}
+
+mode gamma {
+  next_mode hold
+  sequence step1, step2
+
+  step step1 { sleep PT0.1S }
+  step step2 { sleep PT0.1S }
+}
 
 # end of config
