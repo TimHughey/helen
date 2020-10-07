@@ -42,7 +42,8 @@ defmodule ReefCaptainTest do
              :final_check,
              :keep_fresh,
              :load_water,
-             :match_conditions
+             :match_conditions,
+             :topoff
            ]
   end
 

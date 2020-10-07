@@ -25,9 +25,6 @@ defmodule Helen.Worker.State do
 
   def active_step(state), do: track_get(state, :active_step) || :none
 
-  def base_opt(state, path \\ []),
-    do: get_in(state, flatten([:opts, :base, path]))
-
   def build_logic_map(state) do
     import Map, only: [put_new: 3]
 

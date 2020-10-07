@@ -50,11 +50,18 @@ mode keep_fresh {
   step power_save { sleep PT10M }
 }
 
+mode topoff {
+  next_mode add_salt
+  sequence init, topoff
+  step init { off pump, air, rodi }
+  step topoff { rodi on for PT5M then off }
+}
+
 mode add_salt {
   next_mode match_conditions
   sequence init, add, mix, finally
 
-  step init { air off }
+  step init { off air, pump, rodi }
   step add { pump on for PT20M then off }
   step mix for PT30M { air on for PT3M then off; pump on for PT5M then off }
   step finally {off air, pump}

@@ -42,14 +42,21 @@
             <a class="step" data-mode="keep_fresh">
               <i class="fan icon"></i>
               <div class="content">
-                <div class="title" data-tooltip="Keep MixTank Fresh">Fresh</div>
+                <div class="title" data-tooltip="Keep MixTank Fresh">Keep Fresh</div>
+              </div>
+            </a>
+
+            <a class="step" data-mode="topoff">
+              <i class="flask icon"></i>
+              <div class="content">
+                <div class="title" data-tooltip="Top off MixTank">Top Off</div>
               </div>
             </a>
 
             <a class="step" data-mode="add_salt">
               <i class="random icon"></i>
               <div class="content">
-                <div class="title" data-tooltip="Add Salt">Salt</div>
+                <div class="title" data-tooltip="Add Salt">Add Salt</div>
               </div>
             </a>
 
@@ -70,14 +77,14 @@
             <a class="step" data-mode="load_water">
               <i class="upload icon"></i>
               <div class="content">
-                <div class="title">Load</div>
+                <div class="title">Load Water</div>
               </div>
             </a>
 
             <a class="step" data-mode="final_check">
               <i class="thumbs up outline icon"></i>
               <div class="content">
-                <div class="title" data-tooltip="Final checks prior to starting Fill">Check</div>
+                <div class="title" data-tooltip="Final checks prior to starting Fill">Final Check</div>
               </div>
             </a>
           </div>

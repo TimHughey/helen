@@ -4,6 +4,9 @@ defmodule Helen.Worker.State.Common do
   import List, only: [flatten: 1]
   import Map, only: [put_new: 3]
 
+  def base_opt(state, path \\ []),
+    do: get_in(state, flatten([:opts, :base, path]))
+
   def change_token(state) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
@@ -48,6 +51,8 @@ defmodule Helen.Worker.State.Common do
     to_ms(timeout)
   end
 
+  def not_ready?(state), do: not ready?(state)
+
   def opts(state, what) when not is_nil(what) and is_atom(what) do
     case what do
       :runtime -> get_in(state, [:opts])
@@ -89,6 +94,8 @@ defmodule Helen.Worker.State.Common do
       _unmatched -> server_put(state, :standby_reason, :unknown)
     end
   end
+
+  def startup_mode(state), do: base_opt(state, :start_mode) || :none
 
   def timeouts(%{timeouts: %{count: count}}), do: count
 

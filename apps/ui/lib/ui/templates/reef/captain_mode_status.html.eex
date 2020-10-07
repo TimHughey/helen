@@ -66,6 +66,14 @@
         <div class="label">Matching Conditions</div>
       </div>
 
+  <% :topoff -> %>
+        <div class="ui indicating progress" data-mode-progress="topoff">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label">Topping Off MixTank</div>
+        </div>
+
 <%    x -> %>
       <i class="meh outline icon"></i>
       <div class="content">

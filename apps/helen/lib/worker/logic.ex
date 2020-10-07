@@ -209,6 +209,7 @@ defmodule Helen.Worker.Logic do
 
   require Logger
 
+  import Helen.Worker.Common.Logging
   import Helen.Worker.State.Common
   import Helen.Worker.State
 
@@ -222,6 +223,7 @@ defmodule Helen.Worker.Logic do
     state
     |> change_token()
     |> cache_worker_modules()
+    |> startup_mode_if_needed()
   end
 
   def cache_worker_modules(%{opts: %{workers: workers}} = state) do
@@ -231,13 +233,18 @@ defmodule Helen.Worker.Logic do
   end
 
   def change_mode(state, mode) do
-    if ready?(state) do
-      init(state, mode)
-      # flag that actions should be executed
-      |> execute_actions(true)
-      |> start()
-    else
-      init_fault_put(state, %{server: :standby})
+    cond do
+      not_ready?(state) ->
+        init_fault_put(state, %{server: :standby})
+
+      mode_exists?(state, mode) ->
+        init(state, mode)
+        # flag that actions should be executed
+        |> execute_actions(true)
+        |> start()
+
+      true ->
+        init_fault_put(state, %{change_mode: {:unknown, mode}}) |> log_faults()
     end
   end
 
@@ -461,6 +468,10 @@ defmodule Helen.Worker.Logic do
     :ignore
   end
 
+  def mode_exists?(state, mode) do
+    if mode in available_modes(state), do: true, else: false
+  end
+
   def next_action(state) do
     alias Helen.Workers
 
@@ -497,7 +508,6 @@ defmodule Helen.Worker.Logic do
 
       # there's a next mode defined
       next_mode ->
-        Logger.info("next mode: #{inspect(next_mode)}")
         finish_mode(state) |> change_mode(next_mode)
     end
   end
@@ -587,6 +597,23 @@ defmodule Helen.Worker.Logic do
         |> actions_to_execute_put(step_actions_get(state, next_step))
         |> track_step_started()
         |> next_action()
+    end
+  end
+
+  def startup_mode_if_needed(state) do
+    case startup_mode(state) do
+      :none ->
+        state
+
+      mode when is_atom(mode) ->
+        change_mode(state, mode)
+
+      unmatched ->
+        Logger.info(
+          "#{registered_name()} unknown startup mode #{inspect(unmatched)}"
+        )
+
+        state
     end
   end
 
