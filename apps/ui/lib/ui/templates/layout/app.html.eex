@@ -28,7 +28,7 @@
       <div class="ui stackable container menu">
         <div class="item">
           <h2 class="ui header" data-buttons="header">
-            <%= link "I am Helen", to: Routes.home_path(@conn, :index) %>
+            <%= link "I'm Helen", to: Routes.home_path(@conn, :index) %>
           </h2>
         </div>
         <div class="right menu">

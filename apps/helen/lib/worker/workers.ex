@@ -13,6 +13,27 @@ defmodule Helen.Workers do
   import Helen.Worker.State
   import Helen.Workers.ModCache, only: [module: 2]
 
+  def action_meta_update_elapsed(state) do
+    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0, zero: 0]
+
+    now = utc_now()
+
+    meta = pending_action_meta(state)
+    started_at = meta_started_at(state)
+
+    if Enum.empty?(meta) or is_nil(started_at) do
+      state
+    else
+      meta =
+        update_in(meta, [:elapsed], fn
+          nil -> zero()
+          _x -> elapsed(started_at, now)
+        end)
+
+      pending_action_meta_put(state, meta)
+    end
+  end
+
   def action_run_for(action) do
     import Helen.Time.Helper, only: [zero: 0]
 
@@ -34,13 +55,6 @@ defmodule Helen.Workers do
   def build_module_cache(workers) do
     for {ident, name} <- workers, into: %{} do
       {ident, module(ident, name)}
-    end
-  end
-
-  def module_cache_complete?(cache) do
-    for {_ident, entry} <- cache, reduce: true do
-      true -> entry[:found?] || false
-      false -> false
     end
   end
 
@@ -87,8 +101,7 @@ defmodule Helen.Workers do
         } = action
       )
       when worker_type in [:temp_server, :reef_worker] do
-    action
-    |> execute_result(fn -> apply(mod, worker_cmd, [msg]) end)
+    execute_result(action, fn -> apply(mod, worker_cmd, [msg]) end)
   end
 
   @doc false
@@ -110,6 +123,9 @@ defmodule Helen.Workers do
   def execute_action(%{worker: %{module: mod}} = action) do
     execute_result(action, fn -> mod.execute_action(action) end)
   end
+
+  def execute_result(%{cmd: _} = action, func),
+    do: put_in(action, [:result], func.())
 
   def make_action(msg_type, worker_cache, action, %{token: token} = state) do
     import Helen.Time.Helper, only: [utc_now: 0, zero: 0]
@@ -153,32 +169,15 @@ defmodule Helen.Workers do
   def meta_started_at(state),
     do: pending_action_meta(state) |> get_in([:started_at])
 
-  def action_meta_update_elapsed(state) do
-    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0, zero: 0]
-
-    now = utc_now()
-
-    meta = pending_action_meta(state)
-    started_at = meta_started_at(state)
-
-    if Enum.empty?(meta) or is_nil(started_at) do
-      state
-    else
-      meta =
-        update_in(meta, [:elapsed], fn
-          nil -> zero()
-          _x -> elapsed(started_at, now)
-        end)
-
-      pending_action_meta_put(state, meta)
-    end
-  end
-
   def make_msg(%{msg_type: type} = action),
     do: {type, action}
 
-  def execute_result(%{cmd: _} = action, func),
-    do: put_in(action, [:result], func.())
+  def module_cache_complete?(cache) do
+    for {_ident, entry} <- cache, reduce: true do
+      true -> entry[:found?] || false
+      false -> false
+    end
+  end
 
   @doc false
   # resolve the worker ident to the internal module details

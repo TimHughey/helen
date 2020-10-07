@@ -52,19 +52,10 @@ defmodule UI.HelenChannel do
     {:reply, {:nop, %{}}, socket}
   end
 
-  def handle_in("module_config_click", %{"module" => mod_bin}, socket) do
-    alias Reef.Captain
+  def handle_in("module_config_click", msg, socket) do
+    import UI.ModuleConfigView, only: [button_click: 2]
 
-    case mod_bin do
-      "Reef.Captain.Server" ->
-        {:reply,
-         {:module_config_click_reply, %{module: mod_bin, opts: Captain.Opts.default_opts()}},
-         socket}
-
-      mod_bin ->
-        {:reply, {:module_config_click_reply, %{module: mod_bin, opts: "not implemented"}},
-         socket}
-    end
+    {:reply, {:module_config_click_reply, button_click(msg, socket)}, socket}
   end
 
   def handle_in(msg, %{"subsystem" => subsystem}, socket)

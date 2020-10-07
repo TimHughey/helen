@@ -6,7 +6,7 @@ defmodule FatHelen.MixProject do
   def project do
     [
       apps_path: "apps",
-      version: "0.1.1",
+      version: "0.1.2",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       releases: releases()

@@ -44,7 +44,7 @@ defmodule HelenWorkersTest do
   test "can resolve a list of workers", %{wc: wc} do
     res = Workers.resolve_worker(wc, [:air, :pump])
 
-    assert res == [get_in(wc, [:air]), get_in(wc, [:pump])]
+    assert res == Map.take(wc, [:air, :pump]) |> Enum.into([])
   end
 
   test "can execute a sleep action", %{wc: wc, token: token} do

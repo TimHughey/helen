@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 12.2
--- Dumped by pg_dump version 12.2
+-- Dumped by pg_dump version 12.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -19,40 +19,6 @@ SET row_security = off;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: helen_mod_config; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.helen_mod_config (
-    id bigint NOT NULL,
-    module character varying(255) NOT NULL,
-    description character varying(255) DEFAULT '<none>'::character varying,
-    opts text DEFAULT '[]'::text NOT NULL,
-    version uuid NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: helen_mod_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.helen_mod_config_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: helen_mod_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.helen_mod_config_id_seq OWNED BY public.helen_mod_config.id;
-
 
 --
 -- Name: pwm_alias; Type: TABLE; Schema: public; Owner: -
@@ -514,13 +480,6 @@ ALTER SEQUENCE public.switch_device_id_seq OWNED BY public.switch_device.id;
 
 
 --
--- Name: helen_mod_config id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.helen_mod_config ALTER COLUMN id SET DEFAULT nextval('public.helen_mod_config_id_seq'::regclass);
-
-
---
 -- Name: pwm_alias id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -595,14 +554,6 @@ ALTER TABLE ONLY public.switch_command ALTER COLUMN id SET DEFAULT nextval('publ
 --
 
 ALTER TABLE ONLY public.switch_device ALTER COLUMN id SET DEFAULT nextval('public.switch_device_id_seq'::regclass);
-
-
---
--- Name: helen_mod_config helen_mod_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.helen_mod_config
-    ADD CONSTRAINT helen_mod_config_pkey PRIMARY KEY (id);
 
 
 --
@@ -699,13 +650,6 @@ ALTER TABLE ONLY public.switch_command
 
 ALTER TABLE ONLY public.switch_device
     ADD CONSTRAINT switch_device_pkey PRIMARY KEY (id);
-
-
---
--- Name: helen_mod_config_module_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX helen_mod_config_module_index ON public.helen_mod_config USING btree (module);
 
 
 --
@@ -1024,3 +968,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20200623215512);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624104559);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624152332);
+INSERT INTO public."schema_migrations" (version) VALUES (20201007141801);
