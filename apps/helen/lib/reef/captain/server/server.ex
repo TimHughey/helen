@@ -17,7 +17,7 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
-    import Reef.Captain.Opts, only: [parsed: 0]
+    import Reef.Captain.Config, only: [parsed: 0]
 
     Logic.init_server(__MODULE__, args, %{config: parsed()})
   end

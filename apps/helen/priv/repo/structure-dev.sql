@@ -480,6 +480,69 @@ ALTER SEQUENCE public.switch_device_id_seq OWNED BY public.switch_device.id;
 
 
 --
+-- Name: worker_config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.worker_config (
+    id bigint NOT NULL,
+    module character varying(60) NOT NULL,
+    comment character varying(80) DEFAULT '<none>'::character varying,
+    version character varying(12) NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: worker_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.worker_config_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: worker_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.worker_config_id_seq OWNED BY public.worker_config.id;
+
+
+--
+-- Name: worker_config_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.worker_config_line (
+    id bigint NOT NULL,
+    line text NOT NULL,
+    worker_config_id bigint
+);
+
+
+--
+-- Name: worker_config_line_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.worker_config_line_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: worker_config_line_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.worker_config_line_id_seq OWNED BY public.worker_config_line.id;
+
+
+--
 -- Name: pwm_alias id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -554,6 +617,20 @@ ALTER TABLE ONLY public.switch_command ALTER COLUMN id SET DEFAULT nextval('publ
 --
 
 ALTER TABLE ONLY public.switch_device ALTER COLUMN id SET DEFAULT nextval('public.switch_device_id_seq'::regclass);
+
+
+--
+-- Name: worker_config id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config ALTER COLUMN id SET DEFAULT nextval('public.worker_config_id_seq'::regclass);
+
+
+--
+-- Name: worker_config_line id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config_line ALTER COLUMN id SET DEFAULT nextval('public.worker_config_line_id_seq'::regclass);
 
 
 --
@@ -650,6 +727,22 @@ ALTER TABLE ONLY public.switch_command
 
 ALTER TABLE ONLY public.switch_device
     ADD CONSTRAINT switch_device_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: worker_config_line worker_config_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config_line
+    ADD CONSTRAINT worker_config_line_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: worker_config worker_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config
+    ADD CONSTRAINT worker_config_pkey PRIMARY KEY (id);
 
 
 --
@@ -821,6 +914,20 @@ CREATE UNIQUE INDEX switch_device_device_index ON public.switch_device USING btr
 
 
 --
+-- Name: worker_config_line_worker_config_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX worker_config_line_worker_config_id_index ON public.worker_config_line USING btree (worker_config_id);
+
+
+--
+-- Name: worker_config_module_version_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX worker_config_module_version_index ON public.worker_config USING btree (module, version);
+
+
+--
 -- Name: pwm_alias pwm_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -882,6 +989,14 @@ ALTER TABLE ONLY public.switch_command
 
 ALTER TABLE ONLY public.switch_command
     ADD CONSTRAINT switch_command_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.switch_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: worker_config_line worker_config_line_worker_config_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config_line
+    ADD CONSTRAINT worker_config_line_worker_config_id_fkey FOREIGN KEY (worker_config_id) REFERENCES public.worker_config(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -969,3 +1084,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20200624104559);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624152332);
 INSERT INTO public."schema_migrations" (version) VALUES (20201007141801);
+INSERT INTO public."schema_migrations" (version) VALUES (20201007225427);

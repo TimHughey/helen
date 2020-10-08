@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 12.2
--- Dumped by pg_dump version 12.2
+-- Dumped by pg_dump version 12.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -19,40 +19,6 @@ SET row_security = off;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: helen_mod_config; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.helen_mod_config (
-    id bigint NOT NULL,
-    module character varying(255) NOT NULL,
-    description character varying(255) DEFAULT '<none>'::character varying,
-    opts text DEFAULT '[]'::text NOT NULL,
-    version uuid NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: helen_mod_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.helen_mod_config_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: helen_mod_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.helen_mod_config_id_seq OWNED BY public.helen_mod_config.id;
-
 
 --
 -- Name: pwm_alias; Type: TABLE; Schema: public; Owner: -
@@ -103,7 +69,8 @@ CREATE TABLE public.pwm_cmd (
     sent_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    alias_id bigint
 );
 
 
@@ -450,7 +417,8 @@ CREATE TABLE public.switch_command (
     sent_at timestamp without time zone NOT NULL,
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    alias_id bigint
 );
 
 
@@ -512,10 +480,66 @@ ALTER SEQUENCE public.switch_device_id_seq OWNED BY public.switch_device.id;
 
 
 --
--- Name: helen_mod_config id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: worker_config; Type: TABLE; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.helen_mod_config ALTER COLUMN id SET DEFAULT nextval('public.helen_mod_config_id_seq'::regclass);
+CREATE TABLE public.worker_config (
+    id bigint NOT NULL,
+    module character varying(60) NOT NULL,
+    comment character varying(80) DEFAULT '<none>'::character varying,
+    version character varying(12) NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: worker_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.worker_config_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: worker_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.worker_config_id_seq OWNED BY public.worker_config.id;
+
+
+--
+-- Name: worker_config_line; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.worker_config_line (
+    id bigint NOT NULL,
+    line text NOT NULL,
+    worker_config_id bigint
+);
+
+
+--
+-- Name: worker_config_line_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.worker_config_line_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: worker_config_line_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.worker_config_line_id_seq OWNED BY public.worker_config_line.id;
 
 
 --
@@ -596,11 +620,17 @@ ALTER TABLE ONLY public.switch_device ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- Name: helen_mod_config helen_mod_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: worker_config id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.helen_mod_config
-    ADD CONSTRAINT helen_mod_config_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.worker_config ALTER COLUMN id SET DEFAULT nextval('public.worker_config_id_seq'::regclass);
+
+
+--
+-- Name: worker_config_line id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config_line ALTER COLUMN id SET DEFAULT nextval('public.worker_config_line_id_seq'::regclass);
 
 
 --
@@ -700,10 +730,26 @@ ALTER TABLE ONLY public.switch_device
 
 
 --
--- Name: helen_mod_config_module_index; Type: INDEX; Schema: public; Owner: -
+-- Name: worker_config_line worker_config_line_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX helen_mod_config_module_index ON public.helen_mod_config USING btree (module);
+ALTER TABLE ONLY public.worker_config_line
+    ADD CONSTRAINT worker_config_line_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: worker_config worker_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config
+    ADD CONSTRAINT worker_config_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: pwm_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_alias_device_id_index ON public.pwm_alias USING btree (device_id);
 
 
 --
@@ -721,10 +767,31 @@ CREATE INDEX pwm_cmd_acked_index ON public.pwm_cmd USING btree (acked);
 
 
 --
+-- Name: pwm_cmd_alias_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_alias_id_index ON public.pwm_cmd USING btree (alias_id);
+
+
+--
+-- Name: pwm_cmd_orphan_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_orphan_index ON public.pwm_cmd USING btree (orphan);
+
+
+--
 -- Name: pwm_cmd_refid_index; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX pwm_cmd_refid_index ON public.pwm_cmd USING btree (refid);
+
+
+--
+-- Name: pwm_cmd_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_sent_at_index ON public.pwm_cmd USING btree (sent_at);
 
 
 --
@@ -784,6 +851,13 @@ CREATE UNIQUE INDEX sensor_device_unique_index ON public.sensor_device USING btr
 
 
 --
+-- Name: switch_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_alias_device_id_index ON public.switch_alias USING btree (device_id);
+
+
+--
 -- Name: switch_alias_name_hash_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -798,17 +872,24 @@ CREATE UNIQUE INDEX switch_alias_name_index ON public.switch_alias USING btree (
 
 
 --
--- Name: switch_command_ack_at_sent_at_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_command_acked_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_ack_at_sent_at_index ON public.switch_command USING btree (ack_at, sent_at);
+CREATE INDEX switch_command_acked_index ON public.switch_command USING btree (acked);
 
 
 --
--- Name: switch_command_acked_orphan_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_command_alias_id_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_acked_orphan_index ON public.switch_command USING btree (acked, orphan);
+CREATE INDEX switch_command_alias_id_index ON public.switch_command USING btree (alias_id);
+
+
+--
+-- Name: switch_command_orphan_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_command_orphan_index ON public.switch_command USING btree (orphan);
 
 
 --
@@ -816,6 +897,13 @@ CREATE INDEX switch_command_acked_orphan_index ON public.switch_command USING bt
 --
 
 CREATE UNIQUE INDEX switch_command_refid_index ON public.switch_command USING btree (refid);
+
+
+--
+-- Name: switch_command_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_command_sent_at_index ON public.switch_command USING btree (sent_at);
 
 
 --
@@ -833,11 +921,33 @@ CREATE UNIQUE INDEX switch_device_device_index ON public.switch_device USING btr
 
 
 --
+-- Name: worker_config_line_worker_config_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX worker_config_line_worker_config_id_index ON public.worker_config_line USING btree (worker_config_id);
+
+
+--
+-- Name: worker_config_module_version_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX worker_config_module_version_index ON public.worker_config USING btree (module, version);
+
+
+--
 -- Name: pwm_alias pwm_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.pwm_alias
     ADD CONSTRAINT pwm_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.pwm_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: pwm_cmd pwm_cmd_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pwm_cmd
+    ADD CONSTRAINT pwm_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.pwm_alias(id);
 
 
 --
@@ -873,11 +983,27 @@ ALTER TABLE ONLY public.switch_alias
 
 
 --
+-- Name: switch_command switch_command_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.switch_command
+    ADD CONSTRAINT switch_command_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id);
+
+
+--
 -- Name: switch_command switch_command_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.switch_command
     ADD CONSTRAINT switch_command_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.switch_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: worker_config_line worker_config_line_worker_config_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.worker_config_line
+    ADD CONSTRAINT worker_config_line_worker_config_id_fkey FOREIGN KEY (worker_config_id) REFERENCES public.worker_config(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -961,3 +1087,8 @@ INSERT INTO public."schema_migrations" (version) VALUES (20200617120412);
 INSERT INTO public."schema_migrations" (version) VALUES (20200617172518);
 INSERT INTO public."schema_migrations" (version) VALUES (20200619202154);
 INSERT INTO public."schema_migrations" (version) VALUES (20200623215512);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624104559);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);
+INSERT INTO public."schema_migrations" (version) VALUES (20200624152332);
+INSERT INTO public."schema_migrations" (version) VALUES (20201007141801);
+INSERT INTO public."schema_migrations" (version) VALUES (20201007225427);

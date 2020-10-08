@@ -1,4 +1,4 @@
-defmodule Helen.Worker.Config do
+defmodule Helen.Worker.Config.Parser do
   @moduledoc false
 
   require Logger
@@ -7,8 +7,8 @@ defmodule Helen.Worker.Config do
     with {:ok, tokens, _} <- :mc_lexer.string(to_char_list(str)),
          {:ok, parsed} <- :mc_parser.parse(tokens) do
       {:ok,
-       collapse(parsed, :modes, :mode)
-       |> collapse(:commands, :command)
+       collapse(parsed, :modes)
+       |> collapse(:commands)
        |> Enum.into(%{})}
     else
       {:error, {line, :mc_lexer, reason}, _} ->
@@ -21,7 +21,11 @@ defmodule Helen.Worker.Config do
     end
   end
 
-  def collapse(parsed, collection, key) do
+  def collapse(parsed, collection) do
+    import String, only: [to_atom: 1, trim_trailing: 2]
+
+    key = to_string(collection) |> trim_trailing("s") |> to_atom()
+
     {items, rest} = Keyword.split(parsed, [key])
 
     for {^key, details} when is_map(details) <- items,

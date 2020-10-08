@@ -15,7 +15,7 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def init(args) do
-    import Reef.FirstMate.Opts, only: [parsed: 0]
+    import Reef.FirstMate.Config, only: [parsed: 0]
 
     Logic.init_server(__MODULE__, args, %{config: parsed()})
   end

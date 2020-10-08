@@ -4,7 +4,7 @@ defmodule WorkerLogicTest do
   use Timex
   use ExUnit.Case, async: false
 
-  alias Helen.Worker.Config, as: Parser
+  alias Helen.Worker.Config.Parser
   alias Helen.Worker.{Logic, State}
   alias Helen.Worker.State.Common
   alias Helen.Workers

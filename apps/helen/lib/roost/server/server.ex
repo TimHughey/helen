@@ -15,7 +15,7 @@ defmodule Roost.Server do
 
   @impl true
   def init(args) do
-    import Roost.Opts, only: [parsed: 0]
+    import Roost.Config, only: [parsed: 0]
 
     Logic.init_server(__MODULE__, args, %{config: parsed()})
   end

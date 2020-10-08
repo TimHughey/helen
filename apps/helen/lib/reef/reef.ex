@@ -24,8 +24,8 @@ defmodule Reef do
   """
   @doc since: "0.0.27"
   def opts(server \\ [:captain]) when server in [:captain, :first_mate] do
-    alias Reef.Captain.Opts, as: Captain
-    alias Reef.FirstMate.Opts, as: FirstMate
+    alias Reef.Captain.Config, as: Captain
+    alias Reef.FirstMate.Config, as: FirstMate
 
     case server do
       :captain -> Captain.parsed()

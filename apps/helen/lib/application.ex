@@ -15,7 +15,11 @@ defmodule Helen.Application do
   def start(:normal, args) do
     import Application, only: [get_env: 3]
 
-    Logger.info(inspect(File.cwd(), pretty: true))
+    Logger.info([
+      "application starting, ",
+      "working directory: ",
+      "#{inspect(File.cwd(), pretty: true)}"
+    ])
 
     # only start if there are children to supervise and the Repo db passwd
     # exists in the environment

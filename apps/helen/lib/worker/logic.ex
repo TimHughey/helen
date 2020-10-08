@@ -25,7 +25,7 @@ defmodule Helen.Worker.Logic do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       @behaviour Helen.Worker.Logic
 
-      use Helen.Worker.Opts
+      use Helen.Worker.Config
 
       alias Helen.Worker.{Logic, State}
       alias Helen.Worker.State.Common

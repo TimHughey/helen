@@ -1,7 +1,7 @@
 defmodule HelenWorkerConfigTest do
   @moduledoc false
 
-  alias Helen.Worker.Config, as: Parser
+  alias Helen.Worker.Config.Parser
 
   use ExUnit.Case
 
@@ -170,27 +170,27 @@ defmodule HelenWorkerConfigTest do
   end
 
   test "can parse Reef Captain default opts" do
-    alias Reef.Captain.Opts
+    alias Reef.Captain.Config
 
-    result = Opts.default_opts() |> Parser.parse()
+    result = Config.default_opts() |> Parser.parse()
 
     assert {:ok, parsed} = result
     assert is_map(parsed)
   end
 
   test "can parse Reef FirstMate default opts" do
-    alias Reef.FirstMate.Opts
+    alias Reef.FirstMate.Config
 
-    result = Opts.default_opts() |> Parser.parse()
+    result = Config.default_opts() |> Parser.parse()
 
     assert {:ok, parsed} = result
     assert is_map(parsed)
   end
 
   test "can parse Roost default opts" do
-    alias Roost.Opts
+    alias Roost.Config
 
-    result = Opts.default_opts() |> Parser.parse()
+    result = Config.default_opts() |> Parser.parse()
 
     assert {:ok, parsed} = result
     assert is_map(parsed)
