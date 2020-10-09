@@ -58,10 +58,9 @@ defmodule Remote.DB.Remote do
 
   @doc since: "0.0.21"
   def delete(name_id_host) do
-    with %Schema{} = x <- find(name_id_host) do
-      Repo.delete(x)
-    else
-      nil -> {:not_found, name_id_host}
+    case find(name_id_host) do
+      %Schema{} = x -> Repo.delete(x)
+      x when is_nil(x) -> {:not_found, name_id_host}
       error -> error
     end
   end

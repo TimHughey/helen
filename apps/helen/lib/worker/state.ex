@@ -38,7 +38,10 @@ defmodule Helen.Worker.State do
 
   def cached_workers(state), do: get_in(state, [:workers])
 
-  def calculate_step_duration(%{run_for: run_for}), do: run_for
+  def calculate_step_duration(%{for: run_for}) do
+    import Helen.Time.Helper, only: [to_duration: 1]
+    to_duration(run_for)
+  end
 
   def calculate_step_duration(%{actions: actions}) do
     import Helen.Time.Helper, only: [add_list: 1, zero: 0]
@@ -273,8 +276,15 @@ defmodule Helen.Worker.State do
 
   def step_started_at(state), do: track_step_get(state, :started_at)
 
-  def step_run_for(state),
-    do: live_get(state, [:steps, active_step(state), :run_for])
+  def step_run_for(state) do
+    import Helen.Time.Helper, only: [to_duration: 1]
+
+    csse live_get(state, [:steps, active_step(state), :for]) do
+      x when is_nil(x) -> nil
+      x when is_binary(x) -> to_duration(x)
+      _no_match -> nil
+    end
+  end
 
   def steps_to_execute(%{logic: %{live: %{track: %{steps_to_execute: x}}}}),
     do: x

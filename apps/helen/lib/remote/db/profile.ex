@@ -339,9 +339,8 @@ defmodule Remote.DB.Profile do
 
     import Repo, only: [get!: 2]
 
-    with id when is_integer(id) <- handle_args.(opt) do
-      get!(Schema, id)
-    else
+    case handle_args.(opt) do
+      id when is_integer(id) -> get!(Schema, id)
       x -> {:error, x}
     end
   end
@@ -367,10 +366,9 @@ defmodule Remote.DB.Profile do
 
   @doc since: "0.0.20"
   def to_external_map(name) do
-    with %Schema{} = p <- find(name) do
-      as_external_map(p)
-    else
-      _not_found -> %{}
+    case find(name) do
+      %Schema{} = p -> as_external_map(p)
+      _not_found -> &{}
     end
   end
 
