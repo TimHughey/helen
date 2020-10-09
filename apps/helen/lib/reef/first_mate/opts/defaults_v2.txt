@@ -22,7 +22,7 @@ mode clean {
   next_mode normal_operations
   sequence ato_disable, ato_enable
 
-  step ato_disable for PT6H { ato off for PT1M then off }
+  step ato_disable for PT6H { ato off for PT1M }
   step ato_enable { ato on }
 }
 

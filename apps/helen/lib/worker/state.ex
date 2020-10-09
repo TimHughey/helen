@@ -279,7 +279,7 @@ defmodule Helen.Worker.State do
   def step_run_for(state) do
     import Helen.Time.Helper, only: [to_duration: 1]
 
-    csse live_get(state, [:steps, active_step(state), :for]) do
+    case live_get(state, [:steps, active_step(state), :for]) do
       x when is_nil(x) -> nil
       x when is_binary(x) -> to_duration(x)
       _no_match -> nil

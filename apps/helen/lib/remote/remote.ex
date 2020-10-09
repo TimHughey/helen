@@ -6,9 +6,9 @@ defmodule Remote do
 
   require Logger
 
-  alias Remote.DB.Remote, as: Schema
   alias Remote.DB
   alias Remote.DB.Profile
+  alias Remote.DB.Remote, as: Schema
 
   def browse do
     sorted = Repo.all(Schema) |> Enum.sort(fn a, b -> a.name <= b.name end)

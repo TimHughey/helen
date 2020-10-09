@@ -368,7 +368,7 @@ defmodule Remote.DB.Profile do
   def to_external_map(name) do
     case find(name) do
       %Schema{} = p -> as_external_map(p)
-      _not_found -> &{}
+      _not_found -> %{}
     end
   end
 
