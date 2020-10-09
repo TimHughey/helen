@@ -499,8 +499,6 @@ defmodule Helen.Worker.Logic do
   end
 
   def next_mode(state) do
-    Logger.info("next_mode/1: #{live_next_mode(state)}")
-
     case live_next_mode(state) do
       :none ->
         finish_mode(state)

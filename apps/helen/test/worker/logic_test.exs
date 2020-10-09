@@ -92,7 +92,7 @@ defmodule WorkerLogicTest do
   test "can start a mode that does not repeat and has next mode defined" do
     import Helen.Time.Helper, only: [to_duration: 1, to_ms: 1]
 
-    expected_duration = to_duration("PT0.3S")
+    expected_duration = to_duration("PT2S")
     mode = :alpha
 
     state = config(:test) |> Logic.init(mode) |> Logic.start()
