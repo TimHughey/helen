@@ -43,7 +43,7 @@ defmodule HelenWorkerConfigTest do
              syntax_vsn: "2020-09-03",
              worker_name: "captain",
              description: "reef captain",
-             timeout: {:duration, "PT5M"},
+             timeout: "PT5M",
              timezone: "America/New_York",
              first_mode: :fill
            ] === base_defs
@@ -169,28 +169,28 @@ defmodule HelenWorkerConfigTest do
              details
   end
 
-  test "can parse Reef Captain default opts" do
+  test "can parse Reef Captain default configuration" do
     alias Reef.Captain.Config
 
-    result = Config.default_opts() |> Parser.parse()
+    result = Config.config(:default)
 
     assert {:ok, parsed} = result
     assert is_map(parsed)
   end
 
-  test "can parse Reef FirstMate default opts" do
+  test "can parse Reef FirstMate default configuration" do
     alias Reef.FirstMate.Config
 
-    result = Config.default_opts() |> Parser.parse()
+    result = Config.config(:default)
 
     assert {:ok, parsed} = result
     assert is_map(parsed)
   end
 
-  test "can parse Roost default opts" do
+  test "can parse Roost default configuration" do
     alias Roost.Config
 
-    result = Config.default_opts() |> Parser.parse()
+    result = Config.config(:default)
 
     assert {:ok, parsed} = result
     assert is_map(parsed)

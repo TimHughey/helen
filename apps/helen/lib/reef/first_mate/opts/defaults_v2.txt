@@ -2,6 +2,7 @@
 
 base {
   syntax_vsn "2020-0818"
+  config_vsn "0.1.0"
   worker_name "first_mate"
   start_mode normal_operations
   timeout PT3M

@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
 
 pushd -q ${HOME}/devel/helen/extra/scripts
-./dev-delete-last-migration.sh
+./delete-last-migration.sh $argv[@]
 popd -q

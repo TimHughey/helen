@@ -46,7 +46,7 @@ defmodule Helen.Worker.State.Common do
   def loop_timeout(state) do
     import Helen.Time.Helper, only: [to_ms: 1]
 
-    timeout = get_in(state, [:opts, :timeout]) || "PT30.0S"
+    timeout = base_opt(state, [:timeout]) || "PT30.0S"
 
     to_ms(timeout)
   end

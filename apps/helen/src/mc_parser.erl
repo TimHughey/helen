@@ -2,8 +2,8 @@
 -export([parse/1, parse_and_scan/1, format_error/1]).
 -file("src/mc_parser.yrl", 140).
 
-make_type_tuple({_, _, Key}, {Type, _, Value}) ->
-  {Key, {Type, Value}}.
+% make_type_tuple({_, _, Key}, {Type, _, Value}) ->
+%   {Key, {Type, Value}}.
 
 make_keyword(KeyTuple, ValueTuple) ->
  {case KeyTuple of
@@ -905,7 +905,7 @@ yeccpars2_8_(__Stack0) ->
 yeccpars2_11_(__Stack0) ->
  [__2,__1 | __Stack] = __Stack0,
  [begin
-   make_type_tuple ( __1 , __2 )
+   make_keyword ( __1 , __2 )
   end | __Stack].
 
 -compile({inline,yeccpars2_12_/1}).

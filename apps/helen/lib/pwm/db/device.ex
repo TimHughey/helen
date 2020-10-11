@@ -45,9 +45,8 @@ defmodule PulseWidth.DB.Device do
   """
   @doc since: "0.0.25"
   def device_find_alias(device_or_id) do
-    with %Schema{_alias_: dev_alias} <- find(device_or_id) do
-      dev_alias
-    else
+    case find(device_or_id) do
+      %Schema{_alias_: dev_alias} -> dev_alias
       _not_found -> {:not_found, device_or_id}
     end
   end

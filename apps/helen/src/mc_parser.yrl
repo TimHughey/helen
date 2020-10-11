@@ -36,7 +36,7 @@ section_items ->
   section_item section_items : [ '$1' | '$2'].
 
 section_item ->
-  section_kw duration : make_type_tuple('$1', '$2').
+  section_kw duration : make_keyword('$1', '$2').
 
 section_item ->
   % section_kw string : [value('$1'), value('$2')].
@@ -139,8 +139,8 @@ cmd_rnd_detail ->
 
 Erlang code.
 
-make_type_tuple({_, _, Key}, {Type, _, Value}) ->
-  {Key, {Type, Value}}.
+% make_type_tuple({_, _, Key}, {Type, _, Value}) ->
+%   {Key, {Type, Value}}.
 
 make_keyword(KeyTuple, ValueTuple) ->
  {case KeyTuple of

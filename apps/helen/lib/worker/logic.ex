@@ -581,10 +581,6 @@ defmodule Helen.Worker.Logic do
   end
 
   def start_mode_next_step(state) do
-    Logger.info(
-      "start_mode_next_step/1: #{inspect(steps_to_execute(state), pretty: true)}"
-    )
-
     case steps_to_execute(state) do
       [] ->
         # reached the end of steps

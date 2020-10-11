@@ -2,9 +2,11 @@
 
 base {
   syntax_vsn "2020-08-18"
+  config_vsn "0.1.0"
   worker_name "roost"
   timeout PT1M
   timezone "America/New_York"
+  start_mode closed
 }
 
 workers {

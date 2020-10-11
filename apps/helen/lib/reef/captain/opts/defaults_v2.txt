@@ -1,5 +1,6 @@
 base {
   syntax_vsn "2020-0901"
+  config_vsn "0.1.0"
   worker_name "captain"
   description "reef captain default config"
   timeout PT3M
