@@ -57,7 +57,7 @@ defmodule Fact.Influx do
   @doc since: "0.0.16"
   def measurements do
     case run_query("SHOW MEASUREMENTS") do
-      vals when is_list(vals) -> List.flatten()
+      vals when is_list(vals) -> List.flatten(vals)
       error -> error
     end
   end
