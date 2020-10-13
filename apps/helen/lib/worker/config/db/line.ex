@@ -14,9 +14,9 @@ defmodule Helen.Worker.Config.DB.Line do
   end
 
   def as_binary(lines) do
-    for %Schema{line: line} <- lines, reduce: nil do
-      nil -> line
-      binary -> Enum.join([binary, "\n", line])
+    for %Schema{line: line} <- lines, reduce: "" do
+      "" -> line
+      x -> Enum.join([x, "\n", line])
     end
   end
 

@@ -25,7 +25,7 @@ value(Tuple) ->
     {Value, _} -> Value
   end.
 
--file("/usr/local/Cellar/erlang/23.0.2_1/lib/erlang/lib/parsetools-2.2/include/yeccpre.hrl", 0).
+-file("/usr/local/Cellar/erlang/23.1.1/lib/erlang/lib/parsetools-2.2/include/yeccpre.hrl", 0).
 %%
 %% %CopyrightBegin%
 %%

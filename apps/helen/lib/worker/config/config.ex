@@ -28,8 +28,22 @@ defmodule Helen.Worker.Config do
         def config(:save_default, _config_txt) do
           Config.save(__MODULE__, @defaults_txt)
         end
+
+        def config(:raw, _config_txt) do
+          Config.raw(__MODULE__, @defaults_txt)
+        end
       end
     end
+
+    ##
+    ## CAllback added to base module
+    ##
+
+    # alias __MODULE__.Config
+    #
+    # def config(what \\ :version, config_txt \\ "") do
+    #   Config.config(what, config_txt)
+    # end
   end
 
   ##
@@ -47,6 +61,13 @@ defmodule Helen.Worker.Config do
     case DB.Config.as_binary(module, version) do
       x when is_binary(x) -> Parser.parse(x)
       :not_found -> Parser.parse(defaults_bin)
+    end
+  end
+
+  def raw(module, defaults_bin) do
+    case DB.Config.as_binary(module, :latest) do
+      x when is_binary(x) -> x
+      :not_found -> defaults_bin
     end
   end
 

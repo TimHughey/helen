@@ -5,7 +5,7 @@ defmodule Fact.Influx do
   use Instream.Connection, otp_app: :helen
 
   @doc """
-    Primary entry point for writing timeseries metrics for Sensors
+    Primary entry point for writing timeseries metrics for Sensors or Remotes
 
     The message map received by MQTT is forwarded to the Sensor, Remote or
     Switch module for processing.  Those modules then forward the mesasage
@@ -34,20 +34,6 @@ defmodule Fact.Influx do
     end
   end
 
-  @doc """
-    Primary entry point for writing timeseries metrics for Remotes
-
-    The message map received by MQTT is forwarded to the Sensor, Remote or
-    Switch module for processing.  Those modules then forward the mesasage
-    to this function.  If this function finds that the previous module
-    successfully processed the message it will write the necesssary
-    metrics to the timeseries database.
-
-    NOTE:  This function must return the passed message map (with additional
-           keys, if necessary)
-
-  """
-  @doc since: "0.0.16"
   def handle_message(%{remote_host: remote_host, msg_recv_dt: _} = msg) do
     alias Remote.DB.Remote, as: Schema
     alias Remote.Fact
@@ -70,9 +56,8 @@ defmodule Fact.Influx do
 
   @doc since: "0.0.16"
   def measurements do
-    with vals when is_list(vals) <- run_query("SHOW MEASUREMENTS") do
-      List.flatten(vals)
-    else
+    case run_query("SHOW MEASUREMENTS") do
+      vals when is_list(vals) -> List.flatten()
       error -> error
     end
   end

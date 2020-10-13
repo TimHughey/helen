@@ -15,12 +15,13 @@ defmodule Roost.Server do
 
   @impl true
   def init(args) do
-    import Roost.Config, only: [config: 1]
-
     Logic.init_server(__MODULE__, args, %{config: config(:latest)})
   end
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
+
+  def config(what \\ :latest, config_txt \\ ""),
+    do: Roost.Config.config(what, config_txt)
 end

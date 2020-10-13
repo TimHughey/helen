@@ -79,24 +79,16 @@ defmodule Helen.Time.Helper do
   @doc """
   Compare the sum of the list (durations or integers representing milliseconds)
   is equal to or exceeds the specified maxiumum.
+
+  Determines if duration (second argument) has elapsed
+  relative to the reference datatime (first argument)
+
   """
   @doc since: "0.0.27"
   def elapsed?(%Duration{} = max, check) when is_list(check) do
     to_ms(max) <= to_ms(add_list(check))
   end
 
-  @doc """
-  Determines if duration (second argument) has elapsed
-  relative to the reference datatime (first argument)
-
-  Returns a boolean.
-
-  ## Examples
-
-      iex> Helen.Time.Helper.elapsed?(reference, duration)
-
-  """
-  @doc since: "0.0.27"
   def elapsed?(%DateTime{} = reference, %Duration{} = duration) do
     import Timex, only: [after?: 2, shift: 2]
 

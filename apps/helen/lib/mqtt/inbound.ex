@@ -123,7 +123,6 @@ defmodule Mqtt.Inbound do
   @doc """
   Process a raw JSON payload into a map
   """
-
   @doc since: "0.0.14"
   def incoming_msg(
         %{payload: <<123::utf8, _rest::binary>> = json} = msg,
@@ -163,11 +162,6 @@ defmodule Mqtt.Inbound do
     end
   end
 
-  @doc """
-  Process a raw MsgPack payload into a map
-  """
-
-  @doc since: "0.0.14"
   def incoming_msg(%{payload: msgpack} = msg, %{} = s, opts)
       when is_bitstring(msgpack) do
     #
