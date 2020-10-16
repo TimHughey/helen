@@ -5,10 +5,10 @@ defmodule Helen.Worker.Config do
 
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
-      mod_base = Module.split(__MODULE__) |> Enum.drop(-1) |> Module.concat()
+      mod_base = __MODULE__
 
       defmodule Module.concat(mod_base, "Config") do
-        @defaults_file Path.join([__DIR__, "..", "opts", "defaults_v2.txt"])
+        @defaults_file Path.join([__DIR__, "opts", "defaults_v2.txt"])
         @external_resource @defaults_file
         @defaults_txt File.read!(@defaults_file)
 
@@ -34,16 +34,6 @@ defmodule Helen.Worker.Config do
         end
       end
     end
-
-    ##
-    ## CAllback added to base module
-    ##
-
-    # alias __MODULE__.Config
-    #
-    # def config(what \\ :version, config_txt \\ "") do
-    #   Config.config(what, config_txt)
-    # end
   end
 
   ##

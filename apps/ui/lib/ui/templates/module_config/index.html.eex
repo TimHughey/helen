@@ -7,65 +7,57 @@
 
   <div class="ui attached segment">
     <div class="ui grid">
-    <div class="left floated two wide column">
-      <div class="ui vertical menu">
-        <div class="item">
-          <div class="header">Garden</div>
-          <div class="menu">
-            <a class="item" data-mod="Garden.Irrigation.Server">Irrigation</a>
-            <a class="item" data-mod="Garden.Lighting.Server">Lighting</a>
+      <div class="left floated two wide column">
+        <div class="ui vertical menu">
+          <div class="item">
+            <div class="header">Garden</div>
+            <div class="menu">
+              <a class="item" data-mod="Garden.Irrigation.Server">Irrigation</a>
+              <a class="item" data-mod="Garden.Lighting.Server">Lighting</a>
+            </div>
+          </div>
+          <div class="item">
+            <div class="header">Reef</div>
+            <div class="menu">
+              <a class="item" data-mod="Reef.Captain.Server">Captain</a>
+              <a class="item" data-mod="Reef.FirstMate.Server">First Mate</a>
+            </div>
+          </div>
+          <div class="item">
+            <div class="header">Mix Tank</div>
+            <div class="menu">
+              <a class="item" data-mod="Reef.MixTank.Air">Air</a>
+              <a class="item" data-mod="Reef.MixTank.Pump">Pump</a>
+              <a class="item" data-mod="Reef.MixTank.RODI">Fill</a>
+              <a class="item" data-mod="Reef.MixTank.Temp">Temperature</a>
+            </div>
+          </div>
+          <div class="item">
+            <div class="header">Display Tank</div>
+            <div class="menu">
+              <a class="item" data-mod="Reef.DisplayTank.Ato">Auto Top-off</a>
+              <a class="item">Heater</a>
+            </div>
+          </div>
+          <div class="item">
+            <div class="header">Roost</div>
+            <div class="menu">
+              <a class="item" data-mod="Roost.Server">Server</a>
+            </div>
           </div>
         </div>
-        <div class="item">
-          <div class="header">Reef</div>
-          <div class="menu">
-            <a class="item" data-mod="Reef.Captain.Server">Captain</a>
-            <a class="item" data-mod="Reef.FirstMate.Server">First Mate</a>
-          </div>
-        </div>
-        <div class="item">
-          <div class="header">Mix Tank</div>
-          <div class="menu">
-            <a class="item" data-mod="Reef.MixTank.Air">Air</a>
-            <a class="item" data-mod="Reef.MixTank.Pump">Pump</a>
-            <a class="item" data-mod="Reef.MixTank.RODI">Fill</a>
-            <a class="item" data-mod="Reef.MixTank.Temp">Temperature</a>
-          </div>
-        </div>
-        <div class="item">
-          <div class="header">Display Tank</div>
-          <div class="menu">
-            <a class="item" data-mod="Reef.DisplayTank.Ato">Auto Top-off</a>
-            <a class="item">Heater</a>
-          </div>
-        </div>
+      </div>
 
-        <div class="item">
-          <div class="header">Roost</div>
-          <div class="menu">
-            <a class="item" data-mod="Roost.Server">Server</a>
+      <div class="right attached twelve wide column">
+        <div class="ui hidden form" data-form-"module_config">
+          <div class="fields">
+            <div class="fifteen wide field">
+              <textarea rows="28" autocapitalize="none" spellcheck="false" data-input="module_config" data-mod="">
+              </textarea>
+            </div>
           </div>
         </div>
-
       </div>
     </div>
-
-    <div class="right twelve wide column">
-      <form class="ui form" data-form="module_config">
-        <div class="field">
-
-          <div class="ui left corner labeled input">
-            <div class="ui left corner label">
-              <i class="asterisk icon"></i>
-            </div>
-            <textarea rows="28" autocapitalize="none" spellcheck="false" data-input="module_config" data-mod="">
-            </textarea>
-
-          </div>
-        </div>
-      </form>
-    </div>
   </div>
-  </div>
-
 </div>

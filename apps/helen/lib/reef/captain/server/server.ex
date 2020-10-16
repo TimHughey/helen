@@ -6,12 +6,6 @@ defmodule Reef.Captain.Server do
   use GenServer, restart: :transient, shutdown: 7000
   use Helen.Worker.Logic
 
-  alias Reef.Captain.Config
-
-  # alias Reef.FirstMate.Server, as: FirstMate
-  # alias Reef.MixTank
-  # alias Reef.MixTank.{Air, Pump, Rodi}
-
   ##
   ## GenServer Start and Initialization
   ##
@@ -19,13 +13,12 @@ defmodule Reef.Captain.Server do
   @doc false
   @impl true
   def init(args) do
-    Logic.init_server(__MODULE__, args, %{config: config(:latest)})
+    alias Reef.Captain.Config
+
+    Logic.init_server(__MODULE__, args, %{config: Config.config(:latest)})
   end
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
-
-  def config(what \\ :latest, config_txt \\ ""),
-    do: Config.config(what, config_txt)
 end

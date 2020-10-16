@@ -3,6 +3,8 @@ defmodule Roost do
   Roost Public API
   """
 
+  use Helen.Worker.Config
+
   alias Roost.Server
 
   defdelegate ready?, to: Server

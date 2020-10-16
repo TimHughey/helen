@@ -8,8 +8,6 @@ defmodule Reef.FirstMate.Server do
   use GenServer, restart: :transient, shutdown: 5000
   use Helen.Worker.Logic
 
-  alias Reef.FirstMate.Config
-
   ##
   ## GenServer init and start
   ##
@@ -17,13 +15,12 @@ defmodule Reef.FirstMate.Server do
   @doc false
   @impl true
   def init(args) do
-    Logic.init_server(__MODULE__, args, %{config: config(:latest)})
+    alias Reef.FirstMate.Config
+
+    Logic.init_server(__MODULE__, args, %{config: Config.config(:latest, "")})
   end
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
-
-  def config(what \\ :latest, config_txt \\ ""),
-    do: Config.config(what, config_txt)
 end
