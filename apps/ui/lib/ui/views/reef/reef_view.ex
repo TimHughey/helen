@@ -17,6 +17,7 @@ defmodule UI.ReefView do
       %{"action" => "reset"} -> restart(worker, socket)
       %{"action" => "stop"} -> worker_mode(worker, :all_stop, socket)
       %{"mode" => mode} -> worker_mode(worker, mode, socket)
+      %{"subworker" => sub} -> subworker_toggle(worker, sub, socket)
       payload -> unhandled_click(payload, socket)
     end
   end
@@ -26,19 +27,12 @@ defmodule UI.ReefView do
 
   @doc false
   def manual_control(worker, socket) do
-    mode = fn
-      true -> :standby
-      false -> :ready
-    end
-
     mod = worker_mod(worker)
 
-    manual_control? = not mod.ready?()
-    next_manual_control? = not manual_control?
-    # actual change to worker server mode
-    rc = mod.server(mode.(next_manual_control?))
+    {rc, server_mode} = mod.manual_control()
 
-    %{ui: %{worker: worker, manual_control: next_manual_control?}, socket: socket} |> click_rc(rc)
+    %{ui: %{worker: worker, manual_control: server_mode == :manual_control}, socket: socket}
+    |> click_rc(rc)
   end
 
   @doc false
@@ -79,6 +73,19 @@ defmodule UI.ReefView do
 
   def status do
     Reef.status()
+  end
+
+  def subworker_toggle(worker, subworker, socket) do
+    mod =
+      case worker do
+        "captain" -> Reef.Captain
+        "first_mate" -> Reef.FirstMate
+      end
+
+    rc = apply(mod, :subworker_toggle, [subworker])
+
+    %{ui: %{worker: worker, subworker: subworker, toggle: true}, socket: socket}
+    |> click_rc(rc)
   end
 
   def unhandled_click(payload, socket) do

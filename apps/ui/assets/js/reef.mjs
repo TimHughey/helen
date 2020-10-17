@@ -21,7 +21,10 @@ class Reef {
     this.subsystem = "reef";
     this.channel = channel;
 
-    statePut({ live_update: true });
+    statePut({
+      live_update: true,
+      manual_control: { captain: false, first_mate: false },
+    });
   }
 
   channel() {
@@ -98,6 +101,14 @@ function handleClick(e) {
     statePut(state);
   }
 
+  if (payload.subworker != undefined && !manualControl(payload.worker)) {
+    console.log(
+      `worker ${payload.worker} manual_control: `,
+      manualControl(payload.worker)
+    );
+    return;
+  }
+
   pushMessage(payload);
 }
 
@@ -129,6 +140,17 @@ function handleMessage(msg) {
 
 function isLiveUpdateActive() {
   return stateGet("live_update");
+}
+
+function manualControl(worker, enabled = null) {
+  var mc = stateGet("manual_control");
+
+  if (enabled === null) {
+    return mc[worker];
+  } else {
+    mc[worker] = enabled;
+    statePutProp("manual_control", mc);
+  }
 }
 
 function modeActive(target) {
@@ -246,6 +268,33 @@ function stateGet(key = "all") {
 
 function statePut(state) {
   sessionStorage.setItem("reef-state", JSON.stringify(state));
+}
+
+function statePutProp(prop, val) {
+  let state = stateGet();
+
+  state[prop] = val;
+  statePut(state);
+}
+
+function updateManualControlButton(worker, msg) {
+  const {
+    ready: worker_ready = undefined,
+    not_ready_reason: reason = "none",
+  } = msg;
+
+  let manual_control_button = selectButton(worker, "manual-control");
+
+  if (worker_ready) {
+    manual_control_button.removeClass("red");
+    manualControl(worker, false);
+    return;
+  }
+
+  if (!worker_ready && reason === "manual_control") {
+    manual_control_button.addClass("red");
+    manualControl(worker, true);
+  }
 }
 
 function updateModes(msg) {
@@ -388,6 +437,7 @@ function workerMessage(msg) {
     jQuery(status_target).load(uri, params);
   }
 
+  updateManualControlButton(worker_name, msg);
   updateStopButton(worker_name, active_mode);
   updateSubworkers(worker_name, sub_workers);
 

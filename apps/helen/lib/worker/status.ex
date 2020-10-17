@@ -4,6 +4,16 @@ defmodule Helen.Worker.Status do
   import Helen.Worker.State.Common
   import Helen.Worker.State
 
+  def add_ready_status(status, state) do
+    import Map, only: [merge: 2]
+
+    if ready?(state) do
+      merge(status, %{ready: true})
+    else
+      merge(status, %{ready: false, not_ready_reason: standby_reason(state)})
+    end
+  end
+
   def all_modes_status(state) do
     for mode <- opts_mode_names(state) do
       %{mode: mode, status: mode_status(state, mode)}
@@ -51,7 +61,6 @@ defmodule Helen.Worker.Status do
 
     %{
       name: worker_name(state),
-      ready: ready?(state),
       status: status_get(state),
       active: %{
         mode: active_mode(state),
@@ -66,6 +75,7 @@ defmodule Helen.Worker.Status do
       modes: all_modes_status(state),
       sub_workers: all_workers_status(state)
     }
+    |> add_ready_status(state)
   end
 
   def clean_action(state) do

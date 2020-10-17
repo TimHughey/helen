@@ -28,8 +28,6 @@ defmodule Helen.Worker.State.Common do
     get_in(state, flatten([:logic, :faults, what]))
   end
 
-  def ready?(state), do: server_mode(state) == :ready
-
   def first_mode(state),
     do: opts_get(state, [:base, :first_mode]) || :none
 
@@ -51,6 +49,8 @@ defmodule Helen.Worker.State.Common do
     to_ms(timeout)
   end
 
+  def manual_control?(state), do: standby_reason(state) == :manual_control
+
   def not_ready?(state), do: not ready?(state)
 
   def opts(state, what) when not is_nil(what) and is_atom(what) do
@@ -64,6 +64,8 @@ defmodule Helen.Worker.State.Common do
   def opts_get(state, what \\ []), do: get_in(state, flatten([:opts, what]))
   def opts_mode_names(state), do: opts_get(state, :modes) |> Map.keys()
 
+  def ready?(state), do: server_mode(state) == :ready
+
   def server_get(state, what), do: get_in(state, flatten([:server, what]))
 
   def server_mode(state, mode \\ nil) do
@@ -76,9 +78,14 @@ defmodule Helen.Worker.State.Common do
       })
 
     case mode do
-      nil -> server_get(state, :mode)
-      mode when mode in [:ready, :standby] -> server_put(state, :mode, mode)
-      _unmatched -> state
+      mode when is_nil(mode) ->
+        server_get(state, :mode)
+
+      mode when mode in [:manual_control, :ready, :standby] ->
+        server_put(state, :mode, mode)
+
+      _unmatched ->
+        state
     end
   end
 
@@ -89,9 +96,14 @@ defmodule Helen.Worker.State.Common do
 
   def standby_reason_set(state, reason) do
     case standby_reason(state) do
-      :standby -> server_put(state, :standby_reason, reason)
-      :active -> server_put(state, :standby_reason, :none)
-      _unmatched -> server_put(state, :standby_reason, :unknown)
+      x when x in [:manual_control, :standby] ->
+        server_put(state, :standby_reason, reason)
+
+      :active ->
+        server_put(state, :standby_reason, :none)
+
+      _unmatched ->
+        server_put(state, :standby_reason, :unknown)
     end
   end
 

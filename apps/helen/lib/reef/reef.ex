@@ -103,4 +103,9 @@ defmodule Reef do
 
   @doc delegate_to: {Captain, :mode, 2}
   defdelegate mode(mode, opts \\ []), to: Captain
+
+  @doc false
+  def worker_to_mod(worker) do
+    if worker == "captain", do: Reef.Captain, else: Reef.FirstMate
+  end
 end

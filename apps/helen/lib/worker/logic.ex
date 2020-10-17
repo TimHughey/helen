@@ -125,6 +125,12 @@ defmodule Helen.Worker.Logic do
       def last_timeout, do: call({:inquiry, :last_timeout})
 
       @doc """
+      Toggle manual control
+      """
+      @doc since: "0.0.28"
+      def manual_control, do: server(:manual_control)
+
+      @doc """
       Set the Worker to a specific mode.
       """
       @doc since: "0.0.27"
@@ -170,7 +176,7 @@ defmodule Helen.Worker.Logic do
 
       """
       @doc since: "0.0.27"
-      def server(atom) when atom in [:ready, :standby],
+      def server(atom) when atom in [:manual_control, :ready, :standby],
         do: call({:server_mode, atom})
 
       def server_down?, do: GenServer.whereis(__MODULE__) |> is_nil()
@@ -232,8 +238,12 @@ defmodule Helen.Worker.Logic do
 
   def change_mode(state, mode) do
     cond do
+      # allow mode changes while in manual control and cancel manual control
+      manual_control?(state) and mode_exists?(state, mode) ->
+        server_mode(state, :ready) |> change_mode(mode)
+
       not_ready?(state) ->
-        init_fault_put(state, %{server: :standby})
+        init_fault_put(state, %{server: standby_reason(state)})
 
       mode_exists?(state, mode) ->
         init(state, mode)
@@ -391,6 +401,22 @@ defmodule Helen.Worker.Logic do
 
   def handle_server_mode(mode, state) do
     case {server_mode(state), mode} do
+      # manual control is a toggle, always handle it
+      {:manual_control, :manual_control} ->
+        state
+        |> change_token()
+        |> server_mode(:ready)
+        |> standby_reason_set(:api)
+        |> reply({:ok, :ready})
+
+      {_anything, :manual_control} ->
+        state
+        |> change_token()
+        |> server_mode(:manual_control)
+        |> standby_reason_set(:manual_control)
+        |> finish_mode_if_needed()
+        |> reply({:ok, :manual_control})
+
       # quietly ignore changes to the same mode
       {current, requested} when current == requested ->
         state |> reply({:ok, mode})

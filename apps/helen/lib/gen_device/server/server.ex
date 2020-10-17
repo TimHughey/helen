@@ -102,7 +102,7 @@ defmodule GenDevice do
       """
       @doc since: "0.0.27"
       def toggle(opts \\ []) when is_list(opts),
-        do: call({:execute, %{cmd: :toggle, opts: opts}})
+        do: call({:action, %{cmd: :toggle, worker_cmd: :toggle, opts: opts}})
 
       @doc """
       Return the current value (position) off the device managed by this server.
