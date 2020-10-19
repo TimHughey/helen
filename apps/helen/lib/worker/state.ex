@@ -174,9 +174,7 @@ defmodule Helen.Worker.State do
     do: mode_steps(state) |> get_in([step_name])
 
   def mode_steps(state) do
-    for {:step, %{name: name} = details} <- mode_opt(state), reduce: %{} do
-      steps -> put_in(steps, [name], details)
-    end
+    mode_opt(state, [:steps])
   end
 
   def live_put(state, path, val),

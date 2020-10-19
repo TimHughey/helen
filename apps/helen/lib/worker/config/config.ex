@@ -8,7 +8,7 @@ defmodule Helen.Worker.Config do
       mod_base = __MODULE__
 
       defmodule Module.concat(mod_base, "Config") do
-        @defaults_file Path.join([__DIR__, "opts", "defaults_v2.txt"])
+        @defaults_file Path.join([__DIR__, "config", "defaults_v2.txt"])
         @external_resource @defaults_file
         @defaults_txt File.read!(@defaults_file)
 
@@ -18,7 +18,7 @@ defmodule Helen.Worker.Config do
 
         def config(version, _config_txt)
             when version in [:default, :latest, :previous] do
-          Config.get(version, __MODULE__, @defaults_txt)
+          Config.get(version, __MODULE__, @defaults_txt) |> Config.finalize()
         end
 
         def config(:save, config_txt) when is_binary(config_txt) do
@@ -42,6 +42,8 @@ defmodule Helen.Worker.Config do
 
   alias Helen.Worker.Config.DB
   alias Helen.Worker.Config.Parser
+
+  def finalize(config), do: Parser.finalize(config)
 
   def get(:default, _mod_base, defaults_bin) when is_binary(defaults_bin) do
     Parser.parse(defaults_bin)

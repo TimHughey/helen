@@ -12,11 +12,7 @@ base {
 workers {
   ato "display tank ato"
   reef_heater "display tank heater"
-}
-
-mode all_stop {
-  next_mode hold; sequence all_stop
-  step all_stop { all off }
+  peristaltic_pump "reef peristaltic pump"
 }
 
 mode clean {
@@ -38,6 +34,11 @@ mode normal_operations {
   sequence ato_enable, repeat
 
   step ato_enable { ato on for PT1M then on }
+}
+
+mode heat_only {
+  next_mode hold; sequence heat_only
+  step heat_only { tell reef_heater active }
 }
 
 # end of first mate config

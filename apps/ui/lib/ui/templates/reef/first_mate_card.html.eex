@@ -1,0 +1,66 @@
+<div class="mini card" data-subsystem-worker="first_mate">
+  <div class="content">
+    <div class="right floated">
+      <button class="ui raised tiny icon button" data-action="reset" data-tooltip="Reset" data-variation="tiny">
+        <i class="undo icon"></i>
+      </button>
+
+      <button class="ui raised tiny icon button" data-action="stop" data-tooltip="All Stop" data-variation="tiny">
+        <i class="stop icon"></i>
+      </button>
+
+      <button class="ui raised tiny icon button" data-action="manual-control" data-tooltip="Manual Control" data-variation="tiny">
+        <i class="radiation icon"></i>
+      </button>
+    </div>
+    <div class="label header">First Mate</div>
+    <div class="meta">Reef Worker</div>
+    <div class="description">
+      First Mate controls all aspects of the Display Tank including ATO and heater.
+    </div>
+  </div>
+
+  <div class="center aligned content" data-modes>
+    <div class="ui tiny steps">
+      <a class="step" data-mode="normal_operations">
+        <i class="rocket icon"></i>
+        <div class="content">
+          <div class="title" data-tooltip="ATO and Display Tank Heater Enabled" data-variation="tiny">Normal Ops</div>
+        </div>
+      </a>
+      <a class="step" data-mode="clean">
+        <i class="broom icon"></i>
+        <div class="content">
+          <div class="title" data-tooltip="Disable ATO" data-variation="tiny">Clean</div>
+        </div>
+      </a>
+      <a class="step" data-mode="water_change">
+        <i class="upload icon"></i>
+        <div class="content">
+          <div class="title" data-tooltip="ATO and Display Tank Heater Disabled" data-variation="tiny">Water Change</div>
+        </div>
+      </a>
+      <a class="step" data-mode="heat_only">
+        <i class="temperature high icon"></i>
+        <div class="content">
+          <div class="title" data-tooltip="Enable Display Tank Heat" data-variation="tiny">Heat Only</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="center aligned extra content" data-subworkers>
+    <button class="ui big circular icon button" data-subworker="peristaltic_pump" data-tooltip="Peristaltic Pump" data-variation="tiny">
+      <i class="water icon"></i>
+    </button>
+
+    <button class="ui big circular icon button" data-subworker="ato" data-tooltip="ATO RODI Valve" data-variation="tiny">
+      <i class="faucet icon"></i>
+    </button>
+
+    <button class="ui big circular icon button" data-subworker="reef_heater" data-tooltip="Heater" data-variation="tiny">
+      <i class="thermometer half icon"></i>
+    </button>
+  </div>
+
+  <%= Phoenix.View.render(UI.ReefView, "first_mate_mode_status.html", @first_mate) %>

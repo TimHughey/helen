@@ -26,11 +26,6 @@ command closed_fade "roost closed fade" random {
     min 64, max 768, primes 35, step_ms 55, step 7, priority 7
 }
 
-mode all_stop {
-  next_mode hold; sequence all_stop
-  step all_stop { all off }
-}
-
 mode dance_with_me {
   next_mode hold
   sequence spin_up, slow_disco_ball, dance

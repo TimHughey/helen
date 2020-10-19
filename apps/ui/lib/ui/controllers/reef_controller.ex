@@ -11,13 +11,16 @@ defmodule UI.ReefController do
     |> render("index.html", Reef.status())
   end
 
-  def show(conn, %{"worker" => "captain"}) do
-    status = Reef.status() |> get_in([:workers, :captain])
+  # def show(conn, %{"worker" => worker}) do
+  #   status = Reef.status() |> get_in([:workers, :captain])
+  #
+  #   render(conn, "captain_mode_status.html", status)
+  # end
 
-    render(conn, "captain_mode_status.html", status)
-  end
+  def show(conn, %{"worker" => worker}) do
+    import String, only: [to_atom: 1]
 
-  def show(conn, %{"worker" => worker, "active_mode" => _active_mode} = params) do
-    render(conn, "#{worker}_mode_status.html", params)
+    status = Reef.status() |> get_in([:workers, to_atom(worker)])
+    render(conn, "#{worker}_mode_status.html", status)
   end
 end

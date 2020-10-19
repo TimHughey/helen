@@ -96,7 +96,7 @@ defmodule HelenWorkerConfigTest do
     assert is_map(mode)
     assert is_list(mode_details)
 
-    step = get_in(mode_details, [:step])
+    step = get_in(mode_details, [:steps, :all_stop])
 
     assert is_map(step)
 

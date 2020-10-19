@@ -17,13 +17,6 @@ workers {
   first_mate "reef worker"
 }
 
-mode all_stop {
-  next_mode hold
-  sequence all_stop
-
-  step all_stop { all off }
-}
-
 mode fill {
   next_mode keep_fresh
   sequence at_start, initial, main, topoff, finally
