@@ -64,7 +64,10 @@ defmodule Helen.Mixfile do
         :parse_trans,
         :httpoison,
         :observer,
-        :agnus
+        :agnus,
+        :crypto,
+        :iex,
+        :crontab
       ],
       env: []
     ]
@@ -89,7 +92,7 @@ defmodule Helen.Mixfile do
     [
       {:timex, "~> 3.0"},
       {:jason, "~> 1.0"},
-      {:instream, "~> 0.17"},
+      {:instream, "~> 1.0"},
       {:hackney, "~> 1.1"},
       {:poolboy, "~> 1.5"},
       {:httpoison, "~> 1.6"},
@@ -98,7 +101,7 @@ defmodule Helen.Mixfile do
       {:tortoise, "~> 0.9"},
       {:uuid, "~> 1.1"},
       {:gettext, "~> 0.11"},
-      {:quantum, "~> 3.0.1"},
+      {:quantum, "~> 3.0"},
       {:scribe, "~> 0.10"},
       {:msgpax, "~> 2.0"},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
