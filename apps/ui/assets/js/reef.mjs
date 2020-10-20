@@ -2,19 +2,19 @@ var channel = null;
 
 class Reef {
   constructor(socket) {
-    channel = socket.channel("helen:reef", {data: "initial"});
+    channel = socket.channel("helen:reef", { data: "initial" });
 
     channel
       .join()
-      .receive("ok", resp => {
+      .receive("ok", (resp) => {
         // join was a success
         window.channelJoined = true;
       })
-      .receive("error", resp => {
+      .receive("error", (resp) => {
         console.log("Unable to join", resp);
       });
 
-    channel.on("live_update", msg => {
+    channel.on("live_update", (msg) => {
       handleMessage(msg);
     });
 
@@ -23,7 +23,7 @@ class Reef {
 
     statePut({
       live_update: true,
-      manual_control: {captain: false, first_mate: false}
+      manual_control: { captain: false, first_mate: false },
     });
   }
 
@@ -39,19 +39,19 @@ class Reef {
     const channel = this.channel;
 
     const reef_buttons = $("[data-subsystem='reef'] .button");
-    reef_buttons.on("click", e => {
+    reef_buttons.on("click", (e) => {
       handleClick(e);
     });
 
     const reef_links = $("div[data-subsystem='reef'] a[data-mode]");
-    reef_links.on("click", e => {
+    reef_links.on("click", (e) => {
       handleClick(e);
     });
 
     const live_update = jQuery("#live-update-button");
     live_update.removeClass("disabled");
 
-    live_update.on("click", e => {
+    live_update.on("click", (e) => {
       handleClick(e);
     });
 
@@ -66,12 +66,12 @@ class Reef {
     statePut(state);
 
     channel
-      .push("page_loaded", {subsystem: "reef"})
-      .receive("reef", msg => {
+      .push("page_loaded", { subsystem: "reef" })
+      .receive("reef", (msg) => {
         handleMessage(msg);
       })
-      .receive("nop", msg => {})
-      .receive("error", reasons => console.log("error", reasons))
+      .receive("nop", (msg) => {})
+      .receive("error", (reasons) => console.log("error", reasons))
       .receive("timeout", () => console.log("Networking issue..."));
   }
 }
@@ -92,7 +92,7 @@ function handleClick(e) {
     mode: jQuery(target).data("mode"),
     worker: jQuery(target)
       .closest("div[data-subsystem-worker]")
-      .data("subsystem-worker")
+      .data("subsystem-worker"),
   };
 
   if (payload.action === "live-update") {
@@ -102,10 +102,10 @@ function handleClick(e) {
   }
 
   if (payload.subworker != undefined && !manualControl(payload.worker)) {
-    console.log(
-      `worker ${payload.worker} manual_control: `,
-      manualControl(payload.worker)
-    );
+    const manual_control_button = selectManualControl(payload.worker);
+    jQuery(manual_control_button).transition("zoom");
+    jQuery(manual_control_button).transition("zoom");
+
     return;
   }
 
@@ -113,7 +113,7 @@ function handleClick(e) {
 }
 
 function handleMessage(msg) {
-  const {live_update: msg_live_update = false} = msg;
+  const { live_update: msg_live_update = false } = msg;
 
   if (msg_live_update == true && isLiveUpdateActive() == false) {
     return;
@@ -127,8 +127,8 @@ function handleMessage(msg) {
   }
 
   const {
-    status: {workers: workers = []},
-    ui: ui_msg = {}
+    status: { workers: workers = [] },
+    ui: ui_msg = {},
   } = msg;
 
   for (let worker in workers) {
@@ -157,9 +157,7 @@ function modeActive(target) {
   const remove = "completed";
   const add = "active";
 
-  jQuery(target)
-    .addClass(add)
-    .removeClass(remove);
+  jQuery(target).addClass(add).removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
   icon.removeClass("black").addClass("green");
@@ -178,9 +176,7 @@ function modeFinished(target) {
   const remove = "active";
   const add = "completed";
 
-  jQuery(target)
-    .addClass(add)
-    .removeClass(remove);
+  jQuery(target).addClass(add).removeClass(remove);
 
   let icon = jQuery(target).children(".icon");
   icon.addClass("green");
@@ -200,11 +196,11 @@ function pushMessage(payload) {
 
   channel
     .push("reef_click", payload)
-    .receive("reef", msg => {
+    .receive("reef", (msg) => {
       handleMessage(msg);
     })
-    .receive("nop", msg => {})
-    .receive("error", reasons => console.log("error", reasons))
+    .receive("nop", (msg) => {})
+    .receive("error", (reasons) => console.log("error", reasons))
     .receive("timeout", () => console.log("Networking issue..."));
 }
 
@@ -223,11 +219,10 @@ function selectButtonIcon(worker, action) {
   return icon_target;
 }
 
-function selectWorker(worker) {
-  const subsystem_target = jQuery("div[data-subsystem='reef']");
-  const worker_target = subsystem_target.find(workerSelector(worker));
+function selectManualControl(worker) {
+  let manual_control_button = selectButton(worker, "manual-control");
 
-  return worker_target;
+  return manual_control_button;
 }
 
 function selectMode(worker_name, mode_name) {
@@ -264,6 +259,13 @@ function selectSubWorker(targets, name) {
   return target;
 }
 
+function selectWorker(worker) {
+  const subsystem_target = jQuery("div[data-subsystem='reef']");
+  const worker_target = subsystem_target.find(workerSelector(worker));
+
+  return worker_target;
+}
+
 function stateGet(key = "all") {
   const state = JSON.parse(sessionStorage.getItem("reef-state"));
 
@@ -284,10 +286,10 @@ function statePutProp(prop, val) {
 function updateManualControlButton(worker, msg) {
   const {
     ready: worker_ready = undefined,
-    not_ready_reason: reason = "none"
+    not_ready_reason: reason = "none",
   } = msg;
 
-  let manual_control_button = selectButton(worker, "manual-control");
+  const manual_control_button = selectManualControl(worker);
 
   if (worker_ready) {
     manual_control_button.removeClass("red");
@@ -302,9 +304,9 @@ function updateManualControlButton(worker, msg) {
 }
 
 function updateModes(msg) {
-  const {name: worker_name, modes: modes} = msg;
+  const { name: worker_name, modes: modes } = msg;
 
-  for (const {mode: mode_name, status: mode_status} of modes) {
+  for (const { mode: mode_name, status: mode_status } of modes) {
     const target = selectMode(worker_name, mode_name);
 
     // skip modes not represented in the user interface
@@ -338,11 +340,11 @@ function updateModes(msg) {
 }
 
 function updateModeProgress(msg) {
-  const {name: worker_name, active: active_mode} = msg;
+  const { name: worker_name, active: active_mode } = msg;
   // {active: {}}
-  const {mode: active_mode_name = "none"} = active_mode;
-  const {action: action} = active_mode;
-  const {cmd: cmd = null, worker_cmd: worker_cmd = null} = action;
+  const { mode: active_mode_name = "none" } = active_mode;
+  const { action: action } = active_mode;
+  const { cmd: cmd = null, worker_cmd: worker_cmd = null } = action;
 
   const progress = selectModeProgressBar(worker_name, active_mode_name);
   const label = jQuery(progress).find(".label");
@@ -357,17 +359,17 @@ function updateModeProgress(msg) {
 
   if (which_elapsed === "mode") {
     ({
-      run_for: {ms: run_for_ms, binary: run_for_binary} = {},
-      elapsed: {ms: elapsed_ms} = {}
+      run_for: { ms: run_for_ms, binary: run_for_binary } = {},
+      elapsed: { ms: elapsed_ms } = {},
     } = active_mode);
   } else {
     ({
-      run_for: {ms: run_for_ms, binary: run_for_binary} = {},
-      elapsed: {ms: elapsed_ms} = {}
+      run_for: { ms: run_for_ms, binary: run_for_binary } = {},
+      elapsed: { ms: elapsed_ms } = {},
     } = action);
   }
 
-  jQuery(progress).progress({total: run_for_ms, value: elapsed_ms});
+  jQuery(progress).progress({ total: run_for_ms, value: elapsed_ms });
 
   jQuery(progress).addClass("active");
 
@@ -394,7 +396,7 @@ function updateStopButton(worker, mode) {
 function updateSubworkers(worker_name, sub_workers) {
   const buttons = selectSubworkers(worker_name);
 
-  for (let {status: status, ready: ready, name: name} of sub_workers) {
+  for (let { status: status, ready: ready, name: name } of sub_workers) {
     const target = selectSubWorker(buttons, name);
 
     if (ready && status) {
@@ -412,7 +414,7 @@ function updateSubworkers(worker_name, sub_workers) {
 }
 
 function updateUI(msg) {
-  const {worker: worker = "none"} = msg;
+  const { worker: worker = "none" } = msg;
 
   if (isLiveUpdateActive() === true) {
   }
@@ -427,13 +429,13 @@ function workerMessage(msg) {
       action: {
         cmd: cmd = null,
         stmt: stmt = null,
-        worker_cmd: worker_cmd = null
-      }
+        worker_cmd: worker_cmd = null,
+      },
     },
     first_mode: first_mode,
     ready: worker_ready = false,
     status: worker_status = null,
-    sub_workers: sub_workers
+    sub_workers: sub_workers,
   } = msg;
 
   const origin = window.location.origin;
@@ -443,7 +445,7 @@ function workerMessage(msg) {
 
   const params = jQuery.param({
     active_mode: active_mode,
-    worker: worker_name
+    worker: worker_name,
   });
 
   if (progress_target.length === 0) {
@@ -472,4 +474,4 @@ function workerSelector(worker) {
   return worker_selector;
 }
 
-export {Reef};
+export { Reef };
