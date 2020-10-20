@@ -1,87 +1,119 @@
 <div class="extra content" data-mode-status>
-  <div class="ui message">
-    <div class="ui small icon header">
-
+  <div class="ui icon message">
 
 <%= case get_in(@active, [:mode]) do %>
 <%    x when x in [:all_stop, :none] -> %>
       <i class="info icon"></i>
       <div class="content">
-        Select Fill to begin a new batch of water.
+        <div class="header">Standing By</div>
+        <p>Select Fill to begin a new batch of water.</p>
       </div>
 
 <% :add_salt -> %>
-      <div class="ui indicating progress" data-mode-progress="add_salt">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Add Salt</div>
-      </div>
-
-<% :dump_water -> %>
-      <div class="ui indicating progress" data-mode-progress="dump_water">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Dumping Water</div>
-      </div>
-
-<% :fill -> %>
-      <div class="ui indicating progress" data-mode-progress="fill">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Filling</div>
-      </div>
-
-<% :final_check -> %>
-      <div class="ui indicating progress" data-mode-progress="final_check">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Final Check</div>
-      </div>
-
-<% :keep_fresh -> %>
-      <div class="ui indicating progress" data-mode-progress="keep_fresh">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Keeping Water Fresh</div>
-      </div>
-
-<% :load_water -> %>
-      <div class="ui indicating progress" data-mode-progress="load_water">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Loading Water</div>
-      </div>
-
-<% :match_conditions -> %>
-      <div class="ui indicating progress" data-mode-progress="match_conditions">
-        <div class="bar">
-          <div class="progress"></div>
-        </div>
-        <div class="label">Matching Conditions</div>
-      </div>
-
-  <% :topoff -> %>
-        <div class="ui indicating progress" data-mode-progress="topoff">
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Add Salt</div>
+        <div class="ui indicating progress" data-mode-progress="add_salt">
           <div class="bar">
             <div class="progress"></div>
           </div>
-          <div class="label">Topping Off MixTank</div>
+          <div class="label"></div>
         </div>
+      </div>
+
+<% :dump_water -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Dumping Water</div>
+        <div class="ui indicating progress" data-mode-progress="dump_water">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
+
+<% :fill -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Filling MixTank</div>
+        <div class="ui indicating progress" data-mode-progress="fill">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
+
+<% :final_check -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Final Check</div>
+        <div class="ui indicating progress" data-mode-progress="final_check">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
+
+<% :keep_fresh -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Keeping Fresh</div>
+        <div class="ui indicating progress" data-mode-progress="keep_fresh">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
+
+<% :load_water -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Loading Water</div>
+        <div class="ui indicating progress" data-mode-progress="load_water">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
+
+<% :match_conditions -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Matching MixTank to DisplayTank</div>
+        <div class="ui indicating progress" data-mode-progress="match_conditions">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
+
+  <% :topoff -> %>
+      <i class="info icon"></i>
+      <div class="content">
+        <div class="header">Topping Off MixTank</div>
+        <div class="ui indicating progress" data-mode-progress="top_off">
+          <div class="bar">
+            <div class="progress"></div>
+          </div>
+          <div class="label"></div>
+        </div>
+      </div>
 
 <%    x -> %>
-      <i class="meh outline icon"></i>
+      <i class="violet meh outline icon"></i>
       <div class="content">
-        Status for "<%= x %>" not implemented yet.
+        <div class="header">Not Implemented</div>
+        <p>Status for "<%= x %>" not implemented yet.</p>
       </div>
 
 <% end %>
-    </div>
+
   </div>
 
 
