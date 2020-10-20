@@ -26,7 +26,7 @@ defmodule UI.MixProject do
   def application do
     [
       mod: {UI.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :crypto]
     ]
   end
 
