@@ -97,7 +97,7 @@
       <i class="info icon"></i>
       <div class="content">
         <div class="header">Topping Off MixTank</div>
-        <div class="ui indicating progress" data-mode-progress="top_off">
+        <div class="ui indicating progress" data-mode-progress="topoff">
           <div class="bar">
             <div class="progress"></div>
           </div>
