@@ -17,8 +17,9 @@ workers {
 
 mode clean {
   next_mode normal_operations
-  sequence ato_disable, ato_enable
+  sequence init, ato_disable, ato_enable
 
+  step init { peristaltic_pump duty 0.99 }
   step ato_disable for PT6H { ato off for PT1M }
   step ato_enable { ato on }
 }

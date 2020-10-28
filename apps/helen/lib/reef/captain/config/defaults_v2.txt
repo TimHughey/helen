@@ -57,7 +57,7 @@ mode add_salt {
 
   step init { off air, pump, rodi }
   step add { pump on for PT20M then off }
-  step mix for PT30M { air on for PT3M then off; pump on for PT5M then off }
+  step mix for PT30M { air on for PT5M then off; pump on for PT2M then off }
   step finally {off air, pump}
 }
 
