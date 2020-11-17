@@ -107,15 +107,14 @@ mode load_water {
 
 mode final_check {
   next_mode fill
-  sequence at_start, check, normal_operations, pause_for_ato
+  sequence at_start, check, normal_operations
 
   step at_start { all off }
   step check { sleep PT5M }
   step normal_operations {
     tell reef_heater active
-    tell first_mate normal_operations
+    tell first_mate clean
   }
-  step pause_for_ato { sleep PT15M }
 }
 
 # end of config

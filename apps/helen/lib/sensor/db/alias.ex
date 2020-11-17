@@ -5,8 +5,8 @@ defmodule Sensor.DB.Alias do
 
   use Ecto.Schema
 
-  alias Sensor.DB.Device
   alias Sensor.DB.Alias, as: Schema
+  alias Sensor.DB.Device
 
   schema "sensor_alias" do
     field(:name, :string)
@@ -25,6 +25,7 @@ defmodule Sensor.DB.Alias do
     timestamps(type: :utc_datetime_usec)
   end
 
+  @doc false
   def changeset(x, p) when is_map(p) do
     import Ecto.Changeset,
       only: [
@@ -56,6 +57,19 @@ defmodule Sensor.DB.Alias do
       |> Map.merge(%{device_id: id, name: name, device_checked: true})
 
     upsert(%Schema{}, params)
+  end
+
+  @doc """
+    Unalias a device by deleting the alias.
+
+    Same return values as Repo.get_by/2
+  """
+  @doc since: "0.0.28"
+  def delete(id_or_name) do
+    case find(id_or_name) do
+      %Schema{} = found -> Repo.delete(found)
+      x -> {:not_found, x}
+    end
   end
 
   @doc """
@@ -173,9 +187,8 @@ defmodule Sensor.DB.Alias do
 
     import Repo, only: [get!: 2]
 
-    with id when is_integer(id) <- handle_args.(opt) do
-      get!(Schema, id)
-    else
+    case handle_args.(opt) do
+      id when is_integer(id) -> get!(Schema, id)
       x -> {:error, x}
     end
   end

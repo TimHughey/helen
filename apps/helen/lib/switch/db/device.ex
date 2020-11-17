@@ -114,9 +114,8 @@ defmodule Switch.DB.Device do
   end
 
   def dev_alias(device_or_id, opts) when is_list(opts) do
-    with %Schema{} = x <- find(device_or_id) do
-      dev_alias(x, opts)
-    else
+    case find(device_or_id) do
+      %Schema{} = x -> dev_alias(x, opts)
       _not_found -> {:not_found, device_or_id}
     end
   end

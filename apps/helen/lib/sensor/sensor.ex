@@ -10,7 +10,7 @@ defmodule Sensor do
     * querying for datapoint values
   """
 
-  alias Sensor.DB.{Alias, Device, DataPoint}
+  alias Sensor.DB.{Alias, DataPoint, Device}
   alias Sensor.Notify
 
   @doc """
@@ -30,13 +30,23 @@ defmodule Sensor do
   end
 
   @doc """
+    Public API for deleting a Sensor Alias
+  """
+  @doc since: "0.0.28"
+  def alias_delete(name_or_id) do
+    case Alias.delete(name_or_id) do
+      {:ok, %Alias{name: name}} -> {:deleted, name}
+      rc -> rc
+    end
+  end
+
+  @doc """
   Alias the most recently inserted device
   """
   @doc since: "0.0.27"
   def alias_most_recent(name) do
-    with {device, _inserted_at} <- unaliased_recent() |> hd() do
-      alias_create(device, name)
-    else
+    case unaliased_recent() |> hd() do
+      {device, _inserted_at} -> alias_create(device, name)
       [] -> {:no_unaliased_devices}
       rc -> rc
     end
@@ -73,7 +83,7 @@ defmodule Sensor do
   """
   @doc since: "0.0.19"
   def names do
-    Sensor.DB.Alias.names()
+    Alias.names()
   end
 
   @doc """
@@ -112,9 +122,8 @@ defmodule Sensor do
   """
   @doc since: "0.0.27"
   def replace_with_most_recent(name) do
-    with {device, _inserted_at} <- unaliased_recent() |> hd() do
-      replace(name, device)
-    else
+    case unaliased_recent() |> hd() do
+      {device, _inserted_at} -> replace(name, device)
       [] -> {:no_unaliased_devices}
       rc -> rc
     end

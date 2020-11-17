@@ -5,9 +5,9 @@ defmodule Sensor.DB.Device do
 
   use Ecto.Schema
 
+  alias Sensor.DB.Alias, as: Alias
   alias Sensor.DB.DataPoint, as: DataPoint
   alias Sensor.DB.Device, as: Schema
-  alias Sensor.DB.Alias, as: Alias
 
   schema "sensor_device" do
     field(:device, :string)
@@ -53,7 +53,7 @@ defmodule Sensor.DB.Device do
 
   """
   @doc since: "0.0.27"
-  def delete_unavailable(opts) when is_list(opts) do
+  def delete_unavailable(opts) do
     import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
     import Ecto.Query, only: [from: 2]
     import Repo, only: [all: 1]
@@ -74,7 +74,7 @@ defmodule Sensor.DB.Device do
   defp delete(x) do
     for %Schema{id: id, device: dev_name} = dev when is_integer(id) <-
           [x] |> List.flatten() do
-      case Repo.delete(dev) do
+      case Repo.delete(dev, timeout: 5 * 60 * 1000) do
         {:ok, %Schema{device: deleted_name}} -> {:ok, deleted_name}
         rc -> {:failed, dev_name, rc}
       end
@@ -223,10 +223,8 @@ defmodule Sensor.DB.Device do
 
     # need to wrap the Repo.all/1 in a list in case the limit is 1
     for dev <- all(q) do
-      with %Schema{_alias_: nil, device: d, inserted_at: at} <-
-             preload(dev, [:_alias_]) do
-        [{d, at}]
-      else
+      case preload(dev, [:_alias_]) do
+        %Schema{_alias_: nil, device: d, inserted_at: at} -> [{d, at}]
         _no_alias -> []
       end
     end
@@ -245,7 +243,7 @@ defmodule Sensor.DB.Device do
 
   """
   @doc since: "0.0.27"
-  def unavailable(opts) when is_list(opts) do
+  def unavailable(opts) do
     import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
     import Ecto.Query, only: [from: 2]
     import Repo, only: [all: 1]
