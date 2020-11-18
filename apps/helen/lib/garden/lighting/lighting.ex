@@ -38,8 +38,30 @@ defmodule Lighting do
   @doc delegate_to: {Server, :start_job, 3}
   defdelegate start_job(job_name, job_tod, token), to: Server
 
+  @doc """
+  Manually start Garden Lighting jobs.
+
+  Time of day options: day, evening, night (default)
+
+  ## Examples
+
+      iex> Lighting.start_jobs_manual(time_of_day)
+
+  """
+  @doc since: "0.0.28"
+  def start_jobs_manual(tod \\ :night) when tod in [:day, :evening, :night] do
+    %{token: token} = token()
+
+    for job <- [:porch, :red_maple, :evergreen] do
+      [{job, start_job(job, tod, token)}]
+    end
+  end
+
   @doc delegate_to: {Server, :timeouts, 0}
   defdelegate timeouts, to: Server
+
+  @doc false
+  def token, do: Server.x_state() |> get_in([:token])
 
   @doc delegate_to: {Server, :restart, 0}
   defdelegate restart, to: Server
