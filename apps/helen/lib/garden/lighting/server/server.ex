@@ -30,10 +30,9 @@ defmodule Garden.Lighting.Server do
     }
 
     # should the server start?
-    cond do
-      state[:server_mode] == :standby -> :ignore
-      true -> {:ok, state, {:continue, :bootstrap}}
-    end
+    if state[:server_mode] == :standby,
+      do: :ignore,
+      else: {:ok, state, {:continue, :bootstrap}}
   end
 
   @doc false
@@ -137,6 +136,9 @@ defmodule Garden.Lighting.Server do
     call({:start_job, job_name, job_tod, token})
   end
 
+  @doc false
+  def token, do: x_state(:token)
+
   @doc """
   Return the GenServer state.
 
@@ -159,7 +161,7 @@ defmodule Garden.Lighting.Server do
 
       case keys do
         [] -> state
-        [x] -> Map.get(state, x)
+        [x] -> get_in(state, [x])
         x -> Map.take(state, [x] |> List.flatten())
       end
     end
