@@ -47,6 +47,7 @@ defmodule GenNotify do
           # single device alias
           %_{name: _} = x ->
             GenServer.cast(__MODULE__, {:notify, x})
+            msg
 
           # list of aliases
           list_of_aliases when is_list(list_of_aliases) ->
