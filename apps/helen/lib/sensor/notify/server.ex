@@ -15,10 +15,10 @@ defmodule Sensor.Notify do
   def extract_dev_alias_from_msg(%{device: dev_tuple}) do
     case dev_tuple do
       {:ok, %Device{_alias_: %Alias{} = x}} -> x
-      _no_match -> nil
+      _no_match -> []
     end
   end
 
   @impl true
-  def extract_dev_alias_from_msg(_no_match), do: nil
+  def extract_dev_alias_from_msg(_no_match), do: []
 end
