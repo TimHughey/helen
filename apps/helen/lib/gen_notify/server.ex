@@ -41,11 +41,17 @@ defmodule GenNotify do
         dev_alias = extract_dev_alias_from_msg(msg)
 
         case dev_alias do
-          %_{name: _} = x ->
-            GenServer.cast(__MODULE__, {:notify, x})
+          [] ->
             msg
 
-          _no_matcg ->
+          list_of_aliases when is_list(list_of_aliases) ->
+            for %_{name: _} = x <- list_of_aliases do
+              GenServer.cast(__MODULE__, {:notify, x})
+            end
+
+            msg
+
+          _no_match ->
             msg
         end
       end
@@ -171,7 +177,7 @@ defmodule GenNotify do
             {pid_key, %{opts: o, last: l}} <- pid_map,
             # unfold the seen_list filtering by registered name
             # ensure we're dealing with a list, wrap and flatten seen_list
-            %_Alias{name: n} = item when n == registered_name <-
+            %_{name: n} = item when n == registered_name <-
               flatten([seen_list]),
             # we now have all what we need to send a message to a registered pid
             # finally, we'll be reducing the original state
