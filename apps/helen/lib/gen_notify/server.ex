@@ -42,12 +42,11 @@ defmodule GenNotify do
 
         case dev_alias do
           [] ->
-            msg
+            nil
 
           # single device alias
           %_{name: _} = x ->
             GenServer.cast(__MODULE__, {:notify, x})
-            msg
 
           # list of aliases
           list_of_aliases when is_list(list_of_aliases) ->
@@ -55,11 +54,12 @@ defmodule GenNotify do
               GenServer.cast(__MODULE__, {:notify, x})
             end
 
-            msg
-
           _no_match ->
-            msg
+            nil
         end
+
+        # always pass through the original message
+        msg
       end
 
       @doc """
