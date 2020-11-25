@@ -55,7 +55,7 @@ mode add_salt {
   next_mode match_conditions
   sequence init, add, mix, finally
 
-  step init { off air, pump, rodi }
+  step init { off air, rodi }
   step add { pump on for PT20M then off }
   step mix for PT30M { air on for PT5M then off; pump on for PT2M then off }
   step finally {off air, pump}

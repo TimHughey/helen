@@ -11,47 +11,35 @@ defmodule Remote.DB.Profile do
     field(:version, Ecto.UUID, autogenerate: true)
     field(:watch_stacks, :boolean, default: false)
     field(:core_loop_interval_ms, :integer, default: 1000)
-    field(:core_timestamp_ms, :integer, default: 6 * 60 * 1000)
+    field(:core_timestamp_ms, :integer, default: 60 * 60 * 1000)
 
     field(:dalsemi_enable, :boolean, default: true)
-    field(:dalsemi_core_stack, :integer, default: 1536)
+    field(:dalsemi_core_stack, :integer, default: 4096)
     field(:dalsemi_core_priority, :integer, default: 1)
-    field(:dalsemi_discover_stack, :integer, default: 4096)
-    field(:dalsemi_discover_priority, :integer, default: 12)
-    field(:dalsemi_report_stack, :integer, default: 3072)
-    field(:dalsemi_report_priority, :integer, default: 13)
-    field(:dalsemi_convert_stack, :integer, default: 2048)
-    field(:dalsemi_convert_priority, :integer, default: 13)
-    field(:dalsemi_command_stack, :integer, default: 3072)
+    field(:dalsemi_core_interval_ms, :integer, default: 30 * 1000)
+    field(:dalsemi_report_stack, :integer, default: 4096)
+    field(:dalsemi_report_priority, :integer, default: 5)
+    field(:dalsemi_report_interval_ms, :integer, default: 7 * 1000)
+    field(:dalsemi_command_stack, :integer, default: 4096)
     field(:dalsemi_command_priority, :integer, default: 14)
-    field(:dalsemi_core_interval_ms, :integer, default: 30)
-    field(:dalsemi_discover_interval_ms, :integer, default: 30)
-    field(:dalsemi_convert_interval_ms, :integer, default: 7)
-    field(:dalsemi_report_interval_ms, :integer, default: 7)
 
     field(:i2c_enable, :boolean, default: true)
     field(:i2c_use_multiplexer, :boolean, default: false)
-    field(:i2c_core_stack, :integer, default: 1536)
+    field(:i2c_core_stack, :integer, default: 4096)
     field(:i2c_core_priority, :integer, default: 1)
-    field(:i2c_discover_stack, :integer, default: 4096)
-    field(:i2c_discover_priority, :integer, default: 12)
-    field(:i2c_report_stack, :integer, default: 3072)
-    field(:i2c_report_priority, :integer, default: 13)
-    field(:i2c_command_stack, :integer, default: 3072)
+    field(:i2c_core_interval_ms, :integer, default: 30 * 1000)
+    field(:i2c_report_stack, :integer, default: 4096)
+    field(:i2c_report_priority, :integer, default: 5)
+    field(:i2c_report_interval_ms, :integer, default: 7 * 1000)
+    field(:i2c_command_stack, :integer, default: 4096)
     field(:i2c_command_priority, :integer, default: 14)
-    field(:i2c_core_interval_ms, :integer, default: 7)
-    field(:i2c_discover_interval_ms, :integer, default: 60)
-    field(:i2c_report_interval_ms, :integer, default: 7)
 
     field(:pwm_enable, :boolean, default: true)
-    field(:pwm_core_stack, :integer, default: 1536)
-    field(:pwm_core_priority, :integer, default: 1)
-    field(:pwm_report_stack, :integer, default: 2048)
+    field(:pwm_core_stack, :integer, default: 4096)
+    field(:pwm_core_priority, :integer, default: 14)
+    field(:pwm_report_stack, :integer, default: 4096)
     field(:pwm_report_priority, :integer, default: 12)
-    field(:pwm_command_stack, :integer, default: 2048)
-    field(:pwm_command_priority, :integer, default: 14)
-    field(:pwm_core_interval_ms, :integer, default: 10)
-    field(:pwm_report_interval_ms, :integer, default: 10)
+    field(:pwm_report_interval_ms, :integer, default: 7 * 1000)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -90,20 +78,10 @@ defmodule Remote.DB.Profile do
           pri: p.dalsemi_core_priority,
           interval_ms: p.dalsemi_core_interval_ms
         },
-        discover: %{
-          stack: p.dalsemi_discover_stack,
-          pri: p.dalsemi_discover_priority,
-          interval_ms: p.dalsemi_discover_interval_ms
-        },
         report: %{
           stack: p.dalsemi_report_stack,
           pri: p.dalsemi_report_priority,
           interval_ms: p.dalsemi_report_interval_ms
-        },
-        convert: %{
-          stack: p.dalsemi_convert_stack,
-          pri: p.dalsemi_convert_priority,
-          interval_ms: p.dalsemi_convert_interval_ms
         },
         command: %{
           stack: p.dalsemi_command_stack,
@@ -116,11 +94,6 @@ defmodule Remote.DB.Profile do
           stack: p.i2c_core_stack,
           pri: p.i2c_core_priority,
           interval_ms: p.i2c_core_interval_ms
-        },
-        discover: %{
-          stack: p.i2c_discover_stack,
-          pri: p.i2c_discover_priority,
-          interval_ms: p.i2c_discover_interval_ms
         },
         report: %{
           stack: p.i2c_report_stack,
@@ -136,17 +109,12 @@ defmodule Remote.DB.Profile do
         enable: p.pwm_enable,
         core: %{
           stack: p.pwm_core_stack,
-          pri: p.pwm_core_priority,
-          interval_ms: p.pwm_core_interval_ms
+          pri: p.pwm_core_priority
         },
         report: %{
           stack: p.pwm_report_stack,
           pri: p.pwm_report_priority,
           interval_ms: p.pwm_report_interval_ms
-        },
-        command: %{
-          stack: p.pwm_command_stack,
-          pri: p.pwm_command_priority
         }
       },
       misc: %{

@@ -36,11 +36,9 @@ defmodule GenNotify do
       ##
 
       def notify_as_needed(msg) do
-        # call the user defined function to extract the device alias
+        # call the user defined function to extract the device alias(es)
         # that will be used for notifications
-        dev_alias = extract_dev_alias_from_msg(msg)
-
-        case dev_alias do
+        case extract_dev_alias_from_msg(msg) do
           [] ->
             nil
 
@@ -178,7 +176,6 @@ defmodule GenNotify do
         #  this assumes the notify map has less keys then the unique devices
         #  receiving updates
         for {registered_name, pid_map} <- s[:notify_map] || %{},
-
             # unfold the pid map
             {pid_key, %{opts: o, last: l}} <- pid_map,
             # unfold the seen_list filtering by registered name
@@ -237,11 +234,6 @@ defmodule GenNotify do
                 # nothing to do, simply return the state (accumulator)
                 state
             end
-
-            # |> (fn x ->
-            #       ["new state: ", inspect(x, pretty: true)] |> IO.puts()
-            #       x
-            #     end).()
         end
         |> noreply()
       end
