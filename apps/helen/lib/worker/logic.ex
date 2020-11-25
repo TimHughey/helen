@@ -439,7 +439,8 @@ defmodule Helen.Worker.Logic do
     |> status_put(:holding)
   end
 
-  def init(%{logic: %{faults: %{init: _}}} = state, _mode), do: state
+  def init(%{logic: %{faults: %{init: _}}} = state, _mode),
+    do: state |> change_token()
 
   def init(state, mode) do
     state
@@ -451,6 +452,7 @@ defmodule Helen.Worker.Logic do
     |> active_mode(mode)
     |> initialize_steps()
     |> note_delay_if_requested()
+    |> change_token()
   end
 
   def init_server(mod, args, opts \\ %{})
