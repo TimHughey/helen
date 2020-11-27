@@ -54,7 +54,7 @@ defmodule Remote do
   """
   @doc since: "0.0.16"
   def handle_message(%{processed: false, type: type} = msg_in)
-      when type in ["remote", "boot"] do
+      when type in ["remote", "boot", "watcher"] do
     alias Fact.Influx
 
     # the with begins with processing the message through Device.DB.upsert/1
@@ -272,9 +272,8 @@ defmodule Remote do
 
   defp remote_send_cmds(remotes, cmd, %{} = payload) when is_list(remotes) do
     for x <- remotes do
-      with %Schema{} = found <- Schema.find(x) do
-        remote_send_cmds(found, cmd, payload)
-      else
+      case Schema.find(x) do
+        %Schema{} = found -> remote_send_cmds(found, cmd, payload)
         _not_found -> {:not_found, x}
       end
     end

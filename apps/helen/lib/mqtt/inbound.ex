@@ -292,7 +292,7 @@ defmodule Mqtt.Inbound do
       type when type in ["sensor"] ->
         msg_sensor(r)
 
-      type when type in ["boot", "remote"] ->
+      type when type in ["boot", "remote", "watcher"] ->
         msg_remote(r)
 
       type ->
