@@ -394,10 +394,12 @@ defmodule Remote.DB.Profile do
 
   def update(id_or_name, opts)
       when is_integer(id_or_name) or is_binary(id_or_name) do
-    with {:ok, %Schema{name: name} = p} <- find(id_or_name) |> update(opts),
+    with %Schema{} = profile <- find(id_or_name),
+         {:ok, %Schema{name: name} = p} <- update(profile, opts),
          res <- Map.take(p, Keyword.keys(opts)) |> Enum.to_list() do
-      [name: name] ++ res
+      [[name: name], res] |> List.flatten()
     else
+      nil -> {:not_found, id_or_name}
       error -> error
     end
   end

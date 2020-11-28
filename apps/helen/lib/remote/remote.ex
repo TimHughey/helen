@@ -146,6 +146,35 @@ defmodule Remote do
   def ota_all, do: ["roost-", "lab-", "reef-", "test-"] |> ota()
 
   @doc """
+    Adjust an existing profile by add/subtracting the values specified to
+    the existing profile values.
+
+    ## Examples
+      iex> Remote.profile_adjust("test-builder", [i2c_core_stack: -1024])
+  """
+  @doc since: "0.0.29"
+  def profile_adjust(profile_name, adjustments) when is_list(adjustments) do
+    case profile_find(profile_name) do
+      %Profile{} = profile ->
+        changes =
+          for {k, v} when is_atom(k) <- adjustments, reduce: [] do
+            acc ->
+              case get_in(Map.from_struct(profile), [k]) do
+                nil -> acc
+                val when is_integer(val) -> put_in(acc, [k], val + v)
+                val when is_boolean(val) -> put_in(acc, [k], val)
+                _no_match -> acc
+              end
+          end
+
+        profile_update(profile_name, changes)
+
+      nil ->
+        {:not_found, profile_name}
+    end
+  end
+
+  @doc """
     Set the profile for a Remote
   """
   @doc since: "0.0.20"
@@ -200,11 +229,10 @@ defmodule Remote do
   defdelegate rename(existing_name_id_host, new_name), to: DB.Remote
 
   @doc """
-    Issue a restart request to a single or list of Remotes
+    Issue a restart command to the Remotes that match the specified pattern
   """
-
   @doc since: "0.0.21"
-  def restart(name_pattern) do
+  def restart(name_pattern) when is_binary(name_pattern) do
     with remotes when is_list(remotes) <- names_begin_with(name_pattern),
          false <- Enum.empty?(remotes) do
       # restart commands are trivial, they only require the base cmd info
@@ -212,6 +240,14 @@ defmodule Remote do
       remote_send_cmds(remotes, "restart")
     else
       _not_found -> {:not_found, name_pattern}
+    end
+  end
+
+  # accepts the returned list of profile_* functions
+  def restart(list) when is_list(list) do
+    case get_in(list, [:name]) do
+      name when is_binary(name) -> restart(name)
+      _x -> {:bad_args, list}
     end
   end
 

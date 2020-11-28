@@ -512,11 +512,11 @@ defmodule Reef.Temp.Server do
 
           {:ok, pos} when pos != expected_pos ->
             state
-            |> update_in([:devices, dev_name, :fault], :position_mismatch)
+            |> put_in([:devices, dev_name, :fault], :position_mismatch)
 
           unmatched ->
             state
-            |> update_in([:devices, dev_name, :fault], unmatched)
+            |> put_in([:devices, dev_name, :fault], unmatched)
         end
       end
 
