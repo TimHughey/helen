@@ -97,7 +97,7 @@ defmodule Reef do
       :mixtank_rodi -> MixTank.Rodi
       :mixtank_heat -> Mixtank.Temp
       :displaytank_ato -> DisplayTank.Ato
-      :displaytank_heat -> DisplayTank.Heat
+      :displaytank_heat -> DisplayTank.Temp
     end
   end
 

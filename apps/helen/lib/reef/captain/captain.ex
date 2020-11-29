@@ -13,7 +13,7 @@ defmodule Reef.Captain do
       "pump" -> Reef.MixTank.Pump
       "air" -> Reef.MixTank.Air
       "rodi" -> Reef.MixTank.Rodi
-      "mix_heater" -> Reef.MixTank.Heater
+      "mix_heater" -> Reef.MixTank.Temp
     end
   end
 
