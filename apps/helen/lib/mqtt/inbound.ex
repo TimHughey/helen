@@ -54,6 +54,10 @@ defmodule Mqtt.Inbound do
 
   def process(%{payload: payload, topic: _} = msg, opts \\ [])
       when is_bitstring(payload) and is_list(opts) do
+    alias Mqtt.Client.Fact.Payload, as: Influx
+
+    Influx.write_specific_metric(msg)
+
     async = Keyword.get(opts, :async, true)
 
     if async,

@@ -108,10 +108,13 @@ defmodule Mqtt.Client do
     {feed, qos} = Keyword.get(opts, :feed, default_feed)
     pub_opts = Keyword.get(opts, :pub_opts, []) ++ [qos: qos]
 
-    with {:ok, payload} <- Msgpax.pack(msg_map) do
-      GenServer.call(__MODULE__, {:publish, feed, payload, pub_opts})
-    else
-      e -> report_publish_error(e)
+    case Msgpax.pack(msg_map) do
+      {:ok, payload} ->
+        msg = {:publish, feed, payload, pub_opts}
+        GenServer.call(__MODULE__, msg)
+
+      x ->
+        report_publish_error(x)
     end
   end
 
@@ -123,11 +126,15 @@ defmodule Mqtt.Client do
 
   @impl true
   def handle_call(
-        {:publish, feed, payload, pub_opts},
+        {:publish, feed, payload, pub_opts} = msg,
         _from,
         %{autostart: true, client_id: client_id} = s
       )
       when is_binary(feed) and is_list(pub_opts) do
+    alias Mqtt.Client.Fact.Payload, as: Influx
+
+    Influx.write_specific_metric(msg)
+
     {elapsed_us, pub_rc} =
       :timer.tc(fn ->
         Tortoise.publish(client_id, feed, payload, pub_opts)

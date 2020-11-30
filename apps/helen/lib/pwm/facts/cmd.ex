@@ -1,4 +1,7 @@
 defmodule PulseWidth.Fact.Command do
+  @moduledoc """
+  Timeseries metrics for PulseWidth Commands
+  """
   use Timex
 
   alias PulseWidth.DB.Command, as: Command

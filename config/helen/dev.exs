@@ -14,8 +14,7 @@ config :helen, Mqtt.Client,
     client_id: "helen-dev",
     user_name: "mqtt",
     password: "mqtt",
-    server:
-      {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
+    server: {Tortoise.Transport.Tcp, host: "mqtt.test.wisslanding.com", port: 1883},
     keep_alive: 15
   ]
 
@@ -50,7 +49,7 @@ config :helen, Repo,
   username: "helen_dev",
   password: "helen_dev",
   database: "helen_dev",
-  port: 15432,
+  port: 15_432,
   hostname: "db.dev.wisslanding.com",
   pool_size: 10,
   migration_timestamps: [type: :utc_datetime_usec],

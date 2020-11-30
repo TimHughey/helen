@@ -1,4 +1,8 @@
 defmodule Mqtt.Handler do
+  @moduledoc """
+  Mqtt Message Handler Callbacks
+  """
+
   require Logger
   use Tortoise.Handler
 
@@ -44,16 +48,16 @@ defmodule Mqtt.Handler do
     {:ok, state}
   end
 
-  def handle_message(
-        [_env, "f", src_host, device] = topic,
-        payload,
-        state
-      ) do
-    %{payload: payload, topic: topic, src_host: src_host, device: device}
-    |> Mqtt.Inbound.process()
-
-    {:ok, state}
-  end
+  # def handle_message(
+  #       [_env, "f", src_host, device] = topic,
+  #       payload,
+  #       state
+  #     ) do
+  #   %{payload: payload, topic: topic, src_host: src_host, device: device}
+  #   |> Mqtt.Inbound.process()
+  #
+  #   {:ok, state}
+  # end
 
   def handle_message(topic, payload, state) do
     [
