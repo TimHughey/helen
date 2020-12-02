@@ -1,4 +1,8 @@
 defmodule Broom do
+  @moduledoc """
+  Tracks and handles device command timeouts
+  """
+
   use GenServer
 
   # @callback init(init_arg :: term) ::
@@ -358,12 +362,12 @@ defmodule Broom do
 
   @doc false
   def handle_info({:report_metrics, opts_vsn}, %{} = s) do
-    with true <- opts_vsn == s[:opts_vsn] do
+    if opts_vsn == s[:opts_vsn] do
       {:noreply, report_metrics(s) |> schedule_metrics()}
     else
       # the opts have changed (message opts_vsn != state opts_vsn) so skip
       # this report and simply schedule the next (using the new opts)
-      false -> {:noreply, schedule_metrics(s)}
+      {:noreply, schedule_metrics(s)}
     end
   end
 

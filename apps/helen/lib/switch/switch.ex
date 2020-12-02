@@ -148,9 +148,8 @@ defmodule Switch do
   """
   @doc since: "0.0.21"
   def device_find_alias(device_or_id, name, pio, opts \\ []) do
-    with %Device{} = dev <- device_find(device_or_id) do
-      Device.find_alias(dev, name, pio, opts)
-    else
+    csse device_find(device_or_id) do
+      %Device{} = dev -> Device.find_alias(dev, name, pio, opts)
       _not_found -> {:not_found, device_or_id}
     end
   end
