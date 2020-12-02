@@ -21,8 +21,8 @@ mode fill {
   next_mode keep_fresh
   sequence at_start, initial, main, topoff, finally
 
-  step at_start { all off }
-  step initial for PT3H30M { rodi on for PT2M10S then off; rodi off for PT12M }
+  step at_start { all off; sleep PT5S; }
+  step initial for PT3H30M { rodi on for PT2M10S; rodi off for PT12M }
 
   step main for PT4H {
     rodi on for PT2M10S then off
@@ -30,8 +30,12 @@ mode fill {
     rodi off for PT12M
   }
 
-  step topoff { off air, rodi; rodi on for PT5M then off }
-  step finally { all off }
+  step topoff {
+    off air, rodi
+    sleep PT5S
+    rodi on for PT5M
+  }
+  step finally { all off; sleep PT5S }
 }
 
 mode keep_fresh {
@@ -46,19 +50,23 @@ mode keep_fresh {
 
 mode topoff {
   next_mode add_salt
-  sequence init, topoff
-  step init { off pump, air, rodi }
+  sequence at_start, topoff
+  step at_start { all off; sleep PT5S }
   step topoff { rodi on for PT5M then off }
 }
 
 mode add_salt {
   next_mode match_conditions
-  sequence init, add, mix, finally
+  sequence at_start, add, mix, finally
 
-  step init { off air, rodi }
+  step at_start { all off; sleep PT5S }
   step add { pump on for PT20M then off }
   step mix for PT30M { air on for PT5M then off; pump on for PT2M then off }
-  step finally {off air, pump}
+  step finally {
+    sleep PT5S;
+    off air, pump
+    sleep PT2S;
+  }
 }
 
 mode match_conditions {
@@ -87,7 +95,8 @@ mode dump_water {
   }
 
   step adjust_valves { sleep PT30S }
-  step pump_to_sewer { pump on for PT2M17S then off}
+  step pump_to_sewer { pump on for PT2M17S then off; sleep PT5S }
+
 }
 
 mode load_water {
