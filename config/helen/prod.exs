@@ -68,7 +68,7 @@ config :helen, Switch.DB.Command,
   #        shifted DateTime in UTC
   orphan: [
     at_startup: true,
-    sent_before: "PT12S"
+    sent_before: "PT1.1S"
   ],
   purge: [
     at_startup: true,
