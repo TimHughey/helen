@@ -21,7 +21,12 @@ mode fill {
   next_mode keep_fresh
   sequence at_start, initial, main, topoff, finally
 
-  step at_start { all off; sleep PT5S; }
+  step at_start {
+    sleep PT2S; all off
+    sleep PT5S; tell mix_heater standby
+    sleep PT5S
+  }
+
   step initial for PT3H30M { rodi on for PT2M10S; rodi off for PT12M }
 
   step main for PT4H {
@@ -91,11 +96,12 @@ mode dump_water {
   step at_start {
     off air, pump
     tell reef_heater standby
+    tell mix_heater standby
     tell first_mate clean
   }
 
   step adjust_valves { sleep PT30S }
-  step pump_to_sewer { pump on for PT2M17S then off; sleep PT5S }
+  step pump_to_sewer { pump on for PT2M15S then off; sleep PT5S }
 
 }
 
@@ -104,6 +110,7 @@ mode load_water {
   sequence at_start, adjust_valves, pump_to_reef
 
   step at_start {
+    sleep PT5S
     pump off
     tell mix_heater standby
     tell reef_heater standby
