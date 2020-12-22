@@ -224,7 +224,7 @@ defmodule Remote do
   """
 
   @doc since: "0.0.29"
-  def cmd_raw(name_id_host, raw) when is_binary(raw) do
+  def raw(name_id_host, raw) when is_binary(raw) do
     case find(name_id_host) do
       %Schema{} = r -> send_cmds(r, "raw", %{text: raw})
       _not_found -> {:not_found, name_id_host}
