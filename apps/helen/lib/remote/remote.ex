@@ -127,7 +127,7 @@ defmodule Remote do
          false <- Enum.empty?(remotes),
          # ota commands must include the uri of the firmware in the payload
          ota_cmd_map <- ota_uri_build(opts) do
-      remote_send_cmds(remotes, "ota", ota_cmd_map)
+      send_cmds(remotes, "ota", ota_cmd_map)
     else
       _not_found -> {:not_found, name_pattern}
     end
@@ -220,6 +220,18 @@ defmodule Remote do
   defdelegate profile_lookup_key(key), to: DB.Profile, as: :lookup_key
 
   @doc """
+  Send an unstructured raw text command to a single Remote
+  """
+
+  @doc since: "0.0.29"
+  def cmd_raw(name_id_host, raw) when is_binary(raw) do
+    case find(name_id_host) do
+      %Schema{} = r -> send_cmds(r, "raw", %{text: raw})
+      _not_found -> {:not_found, name_id_host}
+    end
+  end
+
+  @doc """
     Rename a Remote
 
     NOTE: the remote to rename is found by id, name or host
@@ -236,8 +248,8 @@ defmodule Remote do
     with remotes when is_list(remotes) <- names_begin_with(name_pattern),
          false <- Enum.empty?(remotes) do
       # restart commands are trivial, they only require the base cmd info
-      # which is provided by remote_send_cmds/2
-      remote_send_cmds(remotes, "restart")
+      # which is provided by send_cmds/2
+      send_cmds(remotes, "restart")
     else
       _not_found -> {:not_found, name_pattern}
     end
@@ -304,24 +316,24 @@ defmodule Remote do
     |> Keyword.get(:uri)
   end
 
-  defp remote_send_cmds(remotes, cmd, payload \\ %{})
+  defp send_cmds(remotes, cmd, payload \\ %{})
 
-  defp remote_send_cmds(remotes, cmd, %{} = payload) when is_list(remotes) do
+  defp send_cmds(remotes, cmd, %{} = payload) when is_list(remotes) do
     for x <- remotes do
       case Schema.find(x) do
-        %Schema{} = found -> remote_send_cmds(found, cmd, payload)
+        %Schema{} = found -> send_cmds(found, cmd, payload)
         _not_found -> {:not_found, x}
       end
     end
     |> List.flatten()
   end
 
-  defp remote_send_cmds(
+  defp send_cmds(
          %Schema{name: name, host: host},
          cmd,
          %{} = payload
        )
-       when cmd in ["restart", "ota"] do
+       when cmd in ["ota", "raw", "restart"] do
     import Mqtt.Client, only: [publish_to_host: 2]
     import Helen.Time.Helper, only: [unix_now: 0]
 
