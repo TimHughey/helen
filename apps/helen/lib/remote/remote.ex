@@ -379,7 +379,6 @@ defmodule Remote do
            reset_reason: reset,
            heap_free: heap_free,
            heap_min: heap_min,
-           batt_mv: batt_mv,
            ap_rssi: ap_rssi,
            remote_host: remote_host
          } = msg
@@ -393,9 +392,8 @@ defmodule Remote do
 
       heap = ["heap(", heap_min, "k,", heap_free, "k)"] |> IO.iodata_to_binary()
       ap_db = [Integer.to_string(ap_rssi), "dB"] |> IO.iodata_to_binary()
-      batt_mv = [Integer.to_string(batt_mv), "mV"] |> IO.iodata_to_binary()
 
-      [name, "BOOT", reset, vsn, ap_db, batt_mv, heap]
+      [name, "BOOT", reset, vsn, ap_db, heap]
       |> Enum.join(" ")
       |> Logger.info()
     else
