@@ -5,7 +5,7 @@ import Config
 config :helen,
   feeds: [
     prefix: "dev",
-    rpt: {"prod/r/#", 0}
+    rpt: {"dev/r/#", 0}
   ]
 
 config :helen, Mqtt.Client,
