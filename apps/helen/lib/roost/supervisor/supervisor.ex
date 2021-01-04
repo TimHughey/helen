@@ -5,7 +5,8 @@ defmodule Roost.Supervisor do
 
   @impl true
   def init(_opts) do
-    Supervisor.init([{Roost.Server, []}], strategy: :one_for_one)
+    children = [{Roost.Server, []}, {LightDesk.Server, []}]
+    Supervisor.init(children, strategy: :one_for_one)
   end
 
   def start_link(opts) do

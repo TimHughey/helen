@@ -16,6 +16,7 @@ workers {
   lights_one    "roost lights sound one"
   lights_three  "roost lights sound three"
   led_forest    "roost led forest"
+  lightdesk     "roost worker"
 }
 
 command dance_fade "dance fade" random {
@@ -36,7 +37,7 @@ command closed_fade "closed fade" random {
 
 mode dance_with_me {
   next_mode hold
-  sequence spin_up, slow_disco_ball, dance
+  sequence spin_up, slow_disco_ball
 
   step spin_up {
     led_forest dance_fade
@@ -44,10 +45,10 @@ mode dance_with_me {
     el_wire_entry el_fade_entry
     disco_ball duty 0.7
     on lights_one, lights_three
+    tell lightdesk dance
   }
 
   step slow_disco_ball { sleep PT1M; disco_ball duty 0.63 }
-  step dance { sleep PT1M }
 }
 
 mode leaving {

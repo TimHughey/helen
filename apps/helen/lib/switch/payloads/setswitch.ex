@@ -1,10 +1,8 @@
 defmodule Switch.Payload.Position do
   @moduledoc false
 
-  require Logger
-
-  alias Switch.DB.Device, as: Device
   alias Switch.DB.Command, as: Command
+  alias Switch.DB.Device, as: Device
 
   def create_cmd(
         %Device{device: device, host: host},

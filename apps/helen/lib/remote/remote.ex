@@ -281,6 +281,19 @@ defmodule Remote do
     end
   end
 
+  @doc """
+  Transmit a payload to a Remote.
+
+  The payload is merged into the generated base map and transmitted to the
+  Remote specificed.  The subtopic specified is transmitted as-is.
+  """
+  @doc since: "0.0.29"
+  def tx_payload(name_or_id, subtopic, payload)
+      when is_binary(subtopic) and is_map(payload) do
+    list_of_remotes = [name_or_id] |> List.flatten()
+    send_cmds(list_of_remotes, subtopic, payload)
+  end
+
   #
   # PRIVATE FUNCTIONS
   #
@@ -333,7 +346,7 @@ defmodule Remote do
          cmd,
          %{} = payload
        )
-       when cmd in ["ota", "raw", "restart"] do
+       when is_binary(cmd) do
     import Mqtt.Client, only: [publish_to_host: 2]
     import Helen.Time.Helper, only: [unix_now: 0]
 
