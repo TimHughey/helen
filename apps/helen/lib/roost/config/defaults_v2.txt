@@ -13,14 +13,13 @@ workers {
   disco_ball    "roost disco ball"
   el_wire       "roost el wire"
   el_wire_entry "roost el wire entry"
-  lights_one    "roost lights sound one"
   lights_three  "roost lights sound three"
   led_forest    "roost led forest"
   lightdesk     "roost worker"
 }
 
 command dance_fade "dance fade" random {
-    min 0, max 128, primes 13, step_ms 25, step 13, priority 15
+    min 0, max 128, primes 7, step_ms 25, step 7, priority 15
 }
 
 command el_fade_main "el fade main" random {
@@ -41,10 +40,13 @@ mode dance_with_me {
 
   step spin_up {
     led_forest dance_fade
+
     el_wire el_fade_main
     el_wire_entry el_fade_entry
+
     disco_ball duty 0.7
-    on lights_one, lights_three
+    
+    on lights_three
     tell lightdesk dance
   }
 
@@ -54,8 +56,15 @@ mode dance_with_me {
 mode leaving {
   next_mode closed; sequence house_lights
   step house_lights {
-    off disco_ball, el_wire, lights_one, lights_three
-    on led_forest, el_wire_entry
+    tell lightdesk stop
+
+    off disco_ball
+    off el_wire
+    off lights_three
+
+    on led_forest
+    on el_wire_entry
+
     sleep PT10M
   }
 }

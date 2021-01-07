@@ -11,12 +11,17 @@ defmodule LightDesk.Server do
   # Public API
   #
 
-  def dance(remote, interval),
-    do: call({:dance, remote, interval})
+  def mode(:dance), do: call({:dance})
+  def mode(:ready), do: call({:mode_flag, :ready})
+  def mode(:stop), do: call({:mode_flag, :stop})
 
-  def mode(remote, flag), do: call({:mode_flag, remote, flag})
+  def remote_host do
+    :sys.get_state(__MODULE__) |> get_in([:remote_host])
+  end
 
-  def execute_action(action), do: call({:action, action})
+  def remote_host(new_host) do
+    call({:remote_host, new_host})
+  end
 
   #
   # Private API
@@ -32,30 +37,32 @@ defmodule LightDesk.Server do
   end
 
   @impl true
-  def handle_call({:dance, remote, interval}, _from, state) do
+  def handle_call({:dance}, _from, state) do
     import Remote, only: [tx_payload: 3]
 
-    rc = tx_payload(remote, "lightdesk", %{dance: %{interval_secs: interval}})
+    %{remote_host: host, dance: %{secs: interval}} = state
+
+    rc = tx_payload(host, "lightdesk", %{dance: %{interval_secs: interval}})
 
     {:reply, rc, state}
   end
 
   @impl true
-  def handle_call({:mode_flag, remote, mode_flag}, _from, state) do
+  def handle_call({:mode_flag, mode_flag}, _from, state) do
     import Remote, only: [tx_payload: 3]
 
-    rc = tx_payload(remote, "lightdesk", %{mode: %{mode_flag => true}})
+    %{remote_host: host} = state
+
+    rc = tx_payload(host, "lightdesk", %{mode: %{mode_flag => true}})
 
     {:reply, rc, state}
   end
 
   @impl true
-  def handle_call({:action, _action} = msg, _from, state) do
-    Logger.info(
-      "whoops... LightDesk server received: #{inspect(msg, pretty: true)}"
-    )
+  def handle_call({:remote_host, new_host}, _from, state) do
+    state = put_in(state, [:remote_host], new_host)
 
-    {:reply, :ok, state}
+    {:reply, {:ok, new_host}, state}
   end
 
   @doc false
@@ -68,6 +75,8 @@ defmodule LightDesk.Server do
 
     state = %{
       module: __MODULE__,
+      remote_host: "roost-beta",
+      dance: %{secs: 23.3},
       args: args,
       token: generate(),
       token_at: utc_now()

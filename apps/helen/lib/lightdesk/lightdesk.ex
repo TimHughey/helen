@@ -5,24 +5,16 @@ defmodule LightDesk do
 
   alias LightDesk.Server, as: Server
 
-  def dance, do: dance("roost-beta", 23.3)
-
-  def dance(remote, interval \\ 23.3)
-      when is_integer(remote) or (is_binary(remote) and is_number(interval)) do
-    Server.dance(remote, interval)
-  end
-
   def mode(val) do
     case val do
-      :dance -> dance()
-      :pause -> pause()
+      :dance -> Server.mode(:dance)
+      :ready -> Server.mode(:ready)
+      :stop -> Server.mode(:stop)
     end
   end
 
-  def mode_ready(remote), do: Server.mode(remote, :ready)
-  def mode_pause(remote), do: Server.mode(remote, :pause)
-
-  def pause, do: mode_pause("roost-beta")
+  def remote_host, do: Server.remote_host()
+  def remote_host(new_host), do: Server.remote_host(new_host)
 
   def state, do: Server.state()
 end

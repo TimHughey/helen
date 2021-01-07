@@ -62,7 +62,7 @@ mode keep_fresh {
 }
 
 mode topoff {
-  next_mode hold
+  next_mode add_salt
   sequence at_start, ensure_full
 
   step at_start {
@@ -126,7 +126,6 @@ mode dump_water {
 
   step adjust_valves { sleep PT30S }
   step pump_to_sewer { pump on for PT2M15S then off }
-
 }
 
 mode load_water {
