@@ -16,7 +16,7 @@ defmodule UI.Channel.Handler.Reef do
     socket
   end
 
-  def live_update(%Socket{assigns: _assigns}) do
+  def live_update(%Socket{assigns: assigns}) do
     base_msg = Map.take(assigns, [:live_update])
 
     add_status(base_msg)
