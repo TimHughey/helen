@@ -6,7 +6,7 @@ defmodule UI.Channel.Handler.Reef do
 
   def add_status(resp \\ %{}), do: put_in(resp, [:status], ReefView.status())
 
-  def click(payload, %{assigns: assigns} = socket) do
+  def click(payload, %{assigns: _assigns} = socket) do
     ReefView.button_click(payload, socket)
     |> add_status()
     |> reply()
@@ -16,7 +16,7 @@ defmodule UI.Channel.Handler.Reef do
     socket
   end
 
-  def live_update(%Socket{assigns: assigns}) do
+  def live_update(%Socket{assigns: _assigns}) do
     base_msg = Map.take(assigns, [:live_update])
 
     add_status(base_msg)

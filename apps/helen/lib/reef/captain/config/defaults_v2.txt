@@ -86,7 +86,7 @@ mode add_salt {
     rodi off
   }
 
-  step add { pump on for PT20M then off }
+  step add { pump on for PT35M then off }
 
   step mix for PT30M {
     air on for PT5M then off
