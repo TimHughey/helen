@@ -7,12 +7,11 @@ defmodule UI.Channel.Handler.Reef do
   def add_status(resp \\ %{}), do: put_in(resp, [:status], ReefView.status())
 
   def click(payload, %{assigns: assigns} = socket) do
+    # IO.puts("reef_click socket: #{inspect(socket, pretty: true)}")
     (assigns[:debug] || payload["debug"]) &&
-      IO.puts("reef_click socket: #{inspect(socket, pretty: true)}")
-
-    ReefView.button_click(payload, socket)
-    |> add_status()
-    |> reply()
+      ReefView.button_click(payload, socket)
+      |> add_status()
+      |> reply()
   end
 
   def join(socket) do

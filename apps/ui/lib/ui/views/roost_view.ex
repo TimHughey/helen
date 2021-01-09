@@ -17,7 +17,7 @@ defmodule UI.RoostView do
   def button_click(payload, socket) do
     resp = %{ui: %{unhandled_click: true, payload: payload}, socket: socket}
 
-    IO.puts(inspect(resp, pretty: true))
+    # O.puts(inspect(resp, pretty: true))
 
     resp
   end

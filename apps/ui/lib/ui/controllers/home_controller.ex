@@ -29,7 +29,7 @@ defmodule UI.HomeController do
   end
 
   def create(conn, %{"next_page" => next_page} = params) do
-    IO.puts("conn: #{inspect(conn, pretty: true)} \n params: #{inspect(params, pretty: true)}")
+    # IO.puts("conn: #{inspect(conn, pretty: true)} \n params: #{inspect(params, pretty: true)}")
 
     conn
     |> put_session(:active_page, next_page)
