@@ -778,7 +778,7 @@
 ---------------*/
 
 .ui.icon.buttons .button,
-.ui.icon.button:not(.animated) {
+.ui.icon.button:not(.animated):not(.compact) {
   padding: 0.75em 0.75em 0.75em;
 }
 .ui.animated.icon.button > .content > .icon,

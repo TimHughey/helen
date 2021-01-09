@@ -64,7 +64,7 @@ defmodule FatHelen.MixProject do
   defp releases do
     [
       helen: [
-        version: "0.1.1",
+        version: "0.1.2",
         applications: [helen: :permanent, ui: :permanent],
         include_erts: true,
         include_executables_for: [:unix],
