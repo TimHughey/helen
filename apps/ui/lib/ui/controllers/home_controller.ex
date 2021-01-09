@@ -28,7 +28,7 @@ defmodule UI.HomeController do
     |> redirect(external: get_req_header(conn, "referer") |> hd())
   end
 
-  def create(conn, %{"next_page" => next_page} = params) do
+  def create(conn, %{"next_page" => next_page} = _params) do
     # IO.puts("conn: #{inspect(conn, pretty: true)} \n params: #{inspect(params, pretty: true)}")
 
     conn
