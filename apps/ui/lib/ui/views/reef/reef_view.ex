@@ -91,8 +91,6 @@ defmodule UI.ReefView do
   def unhandled_click(payload, socket) do
     resp = %{ui: %{unhandled_click: true, payload: payload}, socket: socket}
 
-    # IO.puts(inspect(resp, pretty: true))
-
     resp
   end
 

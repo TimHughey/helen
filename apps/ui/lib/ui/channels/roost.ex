@@ -7,11 +7,9 @@ defmodule UI.Channel.Handler.Roost do
   def add_status(resp \\ %{}), do: put_in(resp, [:status], RoostView.status())
 
   def click(payload, %{assigns: assigns} = socket) do
-    # IO.puts("roost_click socket: #{inspect(socket, pretty: true)}")
-    (assigns[:debug] || payload["debug"]) &&
-      RoostView.button_click(payload, socket)
-      |> add_status()
-      |> reply()
+    RoostView.button_click(payload, socket)
+    |> add_status()
+    |> reply()
   end
 
   def join(socket) do

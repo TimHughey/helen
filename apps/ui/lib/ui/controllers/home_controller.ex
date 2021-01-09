@@ -2,9 +2,6 @@ defmodule UI.HomeController do
   use UI, :controller
 
   def index(%{request_path: _request_path} = conn, _params) do
-    # conn |> get_session() |> inspect(pretty: true) |> IO.puts()
-    # request_path |> inspect(pretty: true) |> IO.puts()
-
     auto_refresh = get_session(conn, :auto_refresh) || false
 
     render(conn, "index.html", live_update: auto_refresh)
@@ -29,8 +26,6 @@ defmodule UI.HomeController do
   end
 
   def create(conn, %{"next_page" => next_page} = _params) do
-    # IO.puts("conn: #{inspect(conn, pretty: true)} \n params: #{inspect(params, pretty: true)}")
-
     conn
     |> put_session(:active_page, next_page)
     |> redirect(to: "/#{next_page}")
