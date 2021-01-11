@@ -453,7 +453,7 @@ defmodule Mqtt.Inbound do
   defp log_cmd_ack_fault_if_needed(msg), do: msg
 
   defp log_fault_if_needed(%{fault: fault} = msg) do
-    error = get_in(msg, fault)
+    error = get_in(msg, [fault])
 
     """
     fault:
