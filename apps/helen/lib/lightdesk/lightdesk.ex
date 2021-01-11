@@ -5,11 +5,11 @@ defmodule LightDesk do
 
   alias LightDesk.Server, as: Server
 
-  def mode(val) do
+  def mode(val, opts \\ []) do
     case val do
-      :dance -> Server.mode(:dance)
-      :ready -> Server.mode(:ready)
-      :stop -> Server.mode(:stop)
+      :dance -> Server.mode(:dance, interval_secs: 23.3)
+      :ready -> Server.mode(:ready, opts)
+      :stop -> Server.mode(:stop, opts)
     end
   end
 

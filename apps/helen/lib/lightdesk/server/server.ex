@@ -11,9 +11,7 @@ defmodule LightDesk.Server do
   # Public API
   #
 
-  def mode(:dance), do: call({:dance})
-  def mode(:ready), do: call({:mode_flag, :ready})
-  def mode(:stop), do: call({:mode_flag, :stop})
+  def mode(mode, opts), do: call({:mode_flag, mode, opts})
 
   def remote_host do
     :sys.get_state(__MODULE__) |> get_in([:remote_host])
@@ -37,23 +35,14 @@ defmodule LightDesk.Server do
   end
 
   @impl true
-  def handle_call({:dance}, _from, state) do
-    import Remote, only: [tx_payload: 3]
-
-    %{remote_host: host, dance: %{secs: interval}} = state
-
-    rc = tx_payload(host, "lightdesk", %{dance: %{interval_secs: interval}})
-
-    {:reply, rc, state}
-  end
-
-  @impl true
-  def handle_call({:mode_flag, mode_flag}, _from, state) do
+  def handle_call({:mode_flag, mode_flag, opts}, _from, state) do
     import Remote, only: [tx_payload: 3]
 
     %{remote_host: host} = state
 
-    rc = tx_payload(host, "lightdesk", %{mode: %{mode_flag => true}})
+    payload = %{mode: %{mode_flag => true, opts: Enum.into(opts, %{})}}
+
+    rc = tx_payload(host, "lightdesk", payload)
 
     {:reply, rc, state}
   end
