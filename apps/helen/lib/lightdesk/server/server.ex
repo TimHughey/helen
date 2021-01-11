@@ -65,7 +65,6 @@ defmodule LightDesk.Server do
     state = %{
       module: __MODULE__,
       remote_host: "roost-beta",
-      dance: %{secs: 23.3},
       args: args,
       token: generate(),
       token_at: utc_now()
