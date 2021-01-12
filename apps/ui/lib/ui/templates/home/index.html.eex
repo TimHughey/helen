@@ -7,26 +7,18 @@
         <img src="images/reef.png">
       </div>
       <div class="content">
-        <%= link "Reef", to: Routes.reef_path(@conn, :index), class: "header" %>
+        <%= content = ["The Reef"]
+            button(content, to: "/reef", method: :post,
+                    class: "ui floated icon primary button", id: "home-reef-button") %>
         <div class="meta">
-          <a>Date</a>
-          <a>Water, Pumps and Heaters</a>
+          <p>Reef Captain and First Mate</p>
         </div>
         <div class="description">
-          <p>
-            Provides control of the Salt Water Mix Tank and Display Tank systems.
-          </p>
-          <p>
-            Use this to mix a fresh batch of salt water, control the display
-            tank auto-top-off and perform water changes.
-          </p>
+          <p>Mix fresh batches of salt water, clean the sump and perform water changes.</p>
         </div>
         <div class="extra">
-          <%= content = ["Control the Reef", raw("<i class=\"right chevron icon\"></i>")]
-              button(content, to: "/reef", method: :post,
-                      class: "ui right floated icon primary button", id: "home-reef-button") %>
           <div class="ui red label">
-            This functionality can create damage if used incorrectly
+            Use with care to avoid equipment damage or flooding.
           </div>
         </div>
       </div>
@@ -36,25 +28,23 @@
         <img src="images/roost.png">
       </div>
       <div class="content">
-        <%= link "Roost", to: Routes.roost_path(@conn, :index), class: "header" %>
+        <%= content = ["The Roost"]
+            button(content, to: "/roost", method: :post,
+                    class: "ui floated icon primary button") %>
         <div class="meta">
-          <a>Date</a>
-          <a>Lighting</a>
+        <p> Lights, Disco Ball, EL Wire and LED Forest</p>
         </div>
         <div class="description">
-          Control the Roost systems.
+          Music, lighting and dancing.
         </div>
         <div class="extra">
-          <%= content = ["Control the Roost", raw("<i class=\"right chevron icon\"></i>")]
-              button(content, to: "/roost", method: :post,
-                      class: "ui right floated icon primary button") %>
-            <div class="ui green label">
-              Have fun, no damage can be caused adjusting The Roost
-            </div>
+          <div class="ui green label">
+            It is completely safe to adjust The Roost.
+          </div>
         </div>
       </div>
     </div>
-    <div class="item">
+    <!-- <div class="item">
       <div class="ui small image">
         <img src="images/gears1.png">
       </div>
@@ -76,6 +66,6 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 </div>

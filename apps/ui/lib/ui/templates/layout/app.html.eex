@@ -17,41 +17,22 @@
     </script>
 
 
-    <title>Helen UI</title>
+    <title>I'm Helen</title>
 
   </head>
   <body>
     <script>window.userToken = "<%= assigns[:user_token] %>";</script>
     <script>window.liveUpdate = ("<%= assigns[:live_update] %>" == 'true');</script>
 
-    <!-- <header class="ui container"> -->
-      <div class="ui stackable container menu">
-        <div class="item">
-          <h2 class="ui header" data-buttons="header">
+    <!-- <div class="ui stackable container menu">
+      <div class="center menu">
+        <div class="link item">
+          <h3 class="ui header" data-buttons="header">
             <%= link "I'm Helen", to: Routes.home_path(@conn, :index) %>
-          </h2>
-        </div>
-        <div class="right menu">
-          <div class="item">
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="tiny header">
-              Phoenix Docs
-            </a>
-          </div>
-          <div class="item">
-            <%= if function_exported?(Routes, :live_dashboard_path, 2) do %>
-              <%= link "LiveDashboard", to: Routes.live_dashboard_path(@conn, :home), class: "tiny header" %>
-            <% end %>
-          </div>
-          <div class="item">
-            <i class="settings icon"></i>
-          </div>
-          <div class="item">
-            <button id="live-update-button" class="disabled ui center aligned button" data-action="live-update">
-              Live Update
-            </button>
-          </div>
+          </h3>
         </div>
       </div>
+    </div> -->
     <!-- </header> -->
     <main role="main" class="ui container" id="main_content">
       <p class="alert alert-info" role="alert"><%= get_flash(@conn, :info) %></p>
@@ -60,5 +41,35 @@
         <%= @inner_content %>
       </div>
     </main>
+
+    <div class="ui stackable container menu">
+      <div class="left menu">
+        <div class="item">
+          <h3 class="ui header" data-buttons="header">
+            <%= link "I'm Helen", to: Routes.home_path(@conn, :index) %>
+          </h3>
+        </div>
+        <div class="item">
+          <a href="https://hexdocs.pm/phoenix/overview.html" class="tiny header">
+            Phoenix Docs
+          </a>
+        </div>
+        <div class="item">
+          <%= if function_exported?(Routes, :live_dashboard_path, 2) do %>
+            <%= link "LiveDashboard", to: Routes.live_dashboard_path(@conn, :home), class: "tiny header" %>
+          <% end %>
+        </div>
+      </div>
+      <div class="right menu">
+        <div class="item">
+          <button id="live-update-button" class="disabled ui center aligned button" data-action="live-update">
+            Live Update
+          </button>
+        </div>
+        <div class="item">
+          <i class="settings icon"></i>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
