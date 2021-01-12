@@ -18,7 +18,6 @@ defmodule Remote.DB.Remote do
     field(:build_time, :string)
     field(:last_start_at, :utc_datetime_usec)
     field(:last_seen_at, :utc_datetime_usec)
-    field(:batt_mv, :integer, default: 0)
     field(:reset_reason, :string)
     field(:bssid, :string)
     field(:ap_rssi, :integer, default: 0)
@@ -257,7 +256,6 @@ defmodule Remote.DB.Remote do
       :ap_rssi,
       :ap_pri_chan,
       :bssid,
-      :batt_mv,
       :heap_free,
       :heap_min,
       :uptime_us,

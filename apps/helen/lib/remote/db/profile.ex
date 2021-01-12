@@ -41,6 +41,8 @@ defmodule Remote.DB.Profile do
     field(:pwm_report_priority, :integer, default: 12)
     field(:pwm_report_interval_ms, :integer, default: 7 * 1000)
 
+    field(:lightdesk_enable, :boolean, default: false)
+
     timestamps(type: :utc_datetime_usec)
   end
 
@@ -116,6 +118,9 @@ defmodule Remote.DB.Profile do
           pri: p.pwm_report_priority,
           interval_ms: p.pwm_report_interval_ms
         }
+      },
+      lightdesk: %{
+        enable: p.lightdesk_enable
       },
       misc: %{
         watch_stacks: p.watch_stacks,
