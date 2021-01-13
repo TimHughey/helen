@@ -24,22 +24,12 @@
     <script>window.userToken = "<%= assigns[:user_token] %>";</script>
     <script>window.liveUpdate = ("<%= assigns[:live_update] %>" == 'true');</script>
 
-    <!-- <div class="ui stackable container menu">
-      <div class="center menu">
-        <div class="link item">
-          <h3 class="ui header" data-buttons="header">
-            <%= link "I'm Helen", to: Routes.home_path(@conn, :index) %>
-          </h3>
-        </div>
-      </div>
-    </div> -->
-    <!-- </header> -->
     <main role="main" class="ui container" id="main_content">
       <p class="alert alert-info" role="alert"><%= get_flash(@conn, :info) %></p>
       <p class="alert alert-danger" role="alert"><%= get_flash(@conn, :error) %></p>
-      <div class="ui raised segment" id="inner_content">
-        <%= @inner_content %>
-      </div>
+
+      <%= @inner_content %>
+
     </main>
 
     <div class="ui stackable container menu">

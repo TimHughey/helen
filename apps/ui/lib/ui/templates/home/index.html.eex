@@ -1,6 +1,12 @@
 <script>window.activePage = "home";</script>
 
-<div class="ui container">
+<div class="ui container" data-subsystem="home">
+
+  <h3 class="ui attached centered header">
+  I'm Helen
+</h3>
+
+  <div class="ui attached segment">
   <div class="ui relaxed divided items">
     <div class="item">
       <div class="ui small image">
@@ -68,4 +74,6 @@
       </div>
     </div> -->
   </div>
+</div>
+
 </div>
