@@ -364,9 +364,6 @@ defmodule Garden.Irrigation.Server do
   defp valid_opts?(state) do
     opts = state[:opts]
 
-    cond do
-      is_nil(opts[:jobs]) -> false
-      true -> true
-    end
+    if is_nil(opts[:jobs]), do: false, else: true
   end
 end

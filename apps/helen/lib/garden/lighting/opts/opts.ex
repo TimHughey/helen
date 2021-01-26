@@ -31,6 +31,21 @@ defmodule Garden.Lighting.Opts do
         }
       ],
       jobs: [
+        indoor_garden_alpha: [
+          device: "indoor garden alpha",
+          schedule: [
+            day: [
+              sun_ref: :nautical_twilight_begin,
+              before: "PT0S",
+              cmd: :on
+            ],
+            night: [
+              sun_ref: :nautical_twilight_begin,
+              after: "PT14H",
+              cmd: :off
+            ]
+          ]
+        ],
         porch: [
           device: "front leds porch",
           schedule: [

@@ -35,8 +35,26 @@ defmodule Lighting do
     |> List.flatten()
   end
 
-  @doc delegate_to: {Server, :start_job, 3}
+  @doc false
   defdelegate start_job(job_name, job_tod, token), to: Server
+
+  @doc """
+  Manually start a specific Garden Lighting job.
+
+  Time of day options: day, evening, night (default)
+
+  ## Examples
+
+      iex> Lighting.start_job_manual(job, time_of_day)
+
+  """
+  @doc since: "0.0.28"
+  def start_job_manual(job, tod \\ :night)
+      when is_atom(job) and tod in [:day, :evening, :night] do
+    token = Server.token()
+
+    {job, start_job(job, tod, token)}
+  end
 
   @doc """
   Manually start Garden Lighting jobs.
@@ -52,7 +70,7 @@ defmodule Lighting do
   def start_jobs_manual(tod \\ :night) when tod in [:day, :evening, :night] do
     token = Server.token()
 
-    for job <- [:porch, :red_maple, :evergreen] do
+    for job <- [:indoor_garden_alpha, :porch, :red_maple, :evergreen] do
       {job, start_job(job, tod, token)}
     end
   end
