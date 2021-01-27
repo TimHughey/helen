@@ -19,7 +19,8 @@ workers {
 
 mode fill {
   next_mode keep_fresh
-  sequence at_start, initial, main, topoff, finally
+  # sequence at_start, initial, main, topoff, finally
+  sequence at_start, main, topoff, finally
 
   step at_start {
     tell mix_heater standby
@@ -27,7 +28,7 @@ mode fill {
     air off
   }
 
-  step initial for PT3H30M { rodi on for PT2M10S; rodi off for PT12M }
+  # step initial for PT3H30M { rodi on for PT2M10S; rodi off for PT12M }
 
   step main for PT4H {
     rodi on for PT2M10S then off

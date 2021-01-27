@@ -1,4 +1,6 @@
 defmodule Garden.Lighting.Logic do
+  @moduledoc false
+
   def available_modes(%{opts: opts} = _state) do
     Keyword.drop(opts, [:__available__, :__version__])
     |> Keyword.keys()
@@ -11,6 +13,13 @@ defmodule Garden.Lighting.Logic do
     state
     |> update_in([:token], fn _x -> make_ref() end)
     |> update_in([:token_at], fn _x -> utc_now() end)
+  end
+
+  def control_device(device, cmd) do
+    case apply(PulseWidth, cmd, [device]) do
+      {:not_found, _dev} -> apply(Switch, cmd, [device])
+      pwm_dev_rc -> pwm_dev_rc
+    end
   end
 
   def ensure_devices_map(%{opts: opts} = state) do
@@ -35,11 +44,8 @@ defmodule Garden.Lighting.Logic do
 
         state
 
-      x when x == :off ->
-        state |> put_in([:devices, device, :last_rc], PulseWidth.off(device))
-
-      x when x == :on ->
-        state |> put_in([:devices, device, :last_rc], PulseWidth.on(device))
+      x when x in [:off, :on] ->
+        state |> put_in([:devices, device, :last_rc], control_device(device, x))
 
       x when is_atom(x) ->
         cmd_map = get_in(state, [:opts, :cmd_definitions, cmd])
