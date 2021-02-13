@@ -41,7 +41,7 @@ defmodule Garden.Lighting.Opts do
             ],
             night: [
               sun_ref: :nautical_twilight_begin,
-              after: "PT14H",
+              after: "PT16H",
               cmd: :off
             ]
           ]

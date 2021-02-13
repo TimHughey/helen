@@ -93,7 +93,7 @@ defmodule Switch do
 
   @doc delegate_to: {Command, :cmd_counts_reset, 1}
   @doc since: "0.0.24"
-  defdelegate cmd_counts_reset(opts), to: Command
+  defdelegate cmd_counts_reset(opts \\ []), to: Command
 
   @doc delegate_to: {Command, :cmds_tracked, 0}
   @doc since: "0.0.24"
