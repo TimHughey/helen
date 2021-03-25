@@ -21,6 +21,11 @@ defmodule GenDevice.State do
 
   def device_name(state), do: top_get(state, :device_name)
 
+  def ensure_inflight(state) do
+    state
+    |> put_in([:inflight], %{action: %{}, gen_device: %{}})
+  end
+
   def inflight_adjust_result(state, cmd, rc) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
@@ -31,7 +36,7 @@ defmodule GenDevice.State do
     do: inflight_put(state, [:token], token(state))
 
   def inflight_get(state, what),
-    do: get_in(state, flatten([:inflight, :action, :gen_device, what]))
+    do: get_in(state, flatten([:inflight, :gen_device, what]))
 
   def inflight_move_to_lasts(state) do
     lasts_put(state, :inflight, get_in(state, [:inflight]))
@@ -45,30 +50,24 @@ defmodule GenDevice.State do
 
   def inflight_put(state, what, val) do
     state
-    |> update_in([:inflight], fn x -> put_new(x, :action, %{}) end)
-    |> update_in([:inflight, :action], fn x -> put_new(x, :gen_device, %{}) end)
-    |> put_in(flatten([:inflight, :action, :gen_device, what]), val)
+    |> put_in(flatten([:inflight, :gen_device, what]), val)
   end
 
   def inflight_status(state, status \\ nil) do
     if is_nil(status) do
       inflight_get(state, :status) ||
-        lasts_get(state, [:inflight, :action, :gen_device, :status]) ||
+        lasts_get(state, [:inflight, :gen_device, :status]) ||
         :none
     else
       inflight_put(state, :status, status)
     end
   end
 
-  def inflight_store(state, action) do
-    put_new(state, :inflight, %{}) |> put_in([:inflight, :action], action)
+  def inflight_store_action(state, action) do
+    put_in(state, [:inflight, :action], action)
   end
 
   def inflight_token(state), do: inflight_get(state, :token)
-
-  def inflight_update(state, what, func) do
-    update_in(state, flatten([:inflight, :action, what]), func)
-  end
 
   def module(state), do: top_get(state, :module)
 

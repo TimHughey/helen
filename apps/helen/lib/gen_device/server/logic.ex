@@ -228,10 +228,17 @@ defmodule GenDevice.Logic do
     end
   end
 
-  def handle_info(msg, state) do
+  def handle_info(msg, %{module: mod, token: token} = state) do
     case msg do
-      {:run_for, _action} ->
-        run_for_expired(state) |> next_status() |> noreply()
+      {:run_for, %{token: msg_token}} when msg_token == token ->
+        inflight_put(state, :run_for_expired?, true)
+        |> next_status()
+        |> noreply()
+
+      {:run_for, %{token: _msg_token}} ->
+        msg = "#{inspect(mod)} token mismatch, ignoring run_for msg"
+        Logger.info(msg)
+        noreply(state)
 
       _no_match ->
         noreply(state)
@@ -275,7 +282,8 @@ defmodule GenDevice.Logic do
 
   def init_inflight(state, action, pid, ref) do
     change_token(state)
-    |> inflight_store(action)
+    |> ensure_inflight()
+    |> inflight_store_action(action)
     |> inflight_copy_token()
     # store the pid and reference included in the call for use later
     |> inflight_put(:from_pid, pid)
@@ -365,41 +373,6 @@ defmodule GenDevice.Logic do
     Supervisor.start_child(sup_mod, {mod, opts})
   end
 
-  def run_for_expired(%{module: mod, token: token} = state) do
-    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
-
-    runtime = action_get(state, [:meta, :started_at]) |> elapsed(utc_now())
-
-    if inflight_token(state) == token(state) do
-      msg = [
-        inspect(mod),
-        "handling run_for_expired",
-        inspect(action_cmd(state)),
-        "run_for",
-        inspect(action_get(state, [:meta, :run_for])),
-        "runtime",
-        inspect(runtime)
-      ]
-
-      if mod != Reef.DisplayTank.Ato, do: Logger.info(Enum.join(msg, " "))
-
-      inflight_put(state, :run_for_expired?, true)
-    else
-      msg = [
-        inspect(mod),
-        "ignoring run_for_expired",
-        inspect(inflight_token(state)),
-        "!=",
-        inspect(token),
-        "runtime",
-        inspect(runtime)
-      ]
-
-      Logger.warn(Enum.join(msg, " "))
-      state
-    end
-  end
-
   def run_inflight(state) do
     inflight_status(state, :running)
     |> adjust_device()
@@ -450,7 +423,11 @@ defmodule GenDevice.Logic do
         inflight_put(
           state,
           :run_for_timer,
-          send_after(self(), {:run_for, action_get(state, [])}, to_ms(dur))
+          send_after(
+            self(),
+            {:run_for, %{token: inflight_token(state)}},
+            to_ms(dur)
+          )
         )
 
       _no_match ->

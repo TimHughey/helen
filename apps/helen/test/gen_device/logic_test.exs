@@ -3,6 +3,7 @@ defmodule GenDeviceWorkerTest do
 
   use ExUnit.Case
 
+  alias Helen.Worker.State.Common
   alias GenDevice.{Logic, State}
 
   setup_all do
@@ -73,6 +74,26 @@ defmodule GenDeviceWorkerTest do
       assert %{status: :ready} == Logic.status(state)
 
       assert_receive {:test, %{via_msg_at: :at_finish, via_msg: true}}, 1000
+    end
+
+    test "handle_action() changes the token", state do
+      state = State.inflight_status(state, :received)
+
+      state_token1 = Common.token(state)
+      inflight_token1 = State.inflight_token(state)
+
+      assert state_token1 == inflight_token1
+
+      action = %{cmd: :on, worker_cmd: :on, reply_to: self(), for: "PT2M"}
+
+      {:reply, {:ok, %{status: :running}}, new_state, _timeout} =
+        Logic.handle_action(action, {self(), make_ref()}, state)
+
+      state_token2 = Common.token(new_state)
+      inflight_token2 = State.inflight_token(new_state)
+
+      assert state_token2 == inflight_token2
+      refute state_token1 == inflight_token2
     end
   end
 end
