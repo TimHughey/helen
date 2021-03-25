@@ -366,6 +366,10 @@ defmodule GenDevice.Logic do
   end
 
   def run_for_expired(%{module: mod, token: token} = state) do
+    import Helen.Time.Helper, only: [elapsed: 2, utc_now: 0]
+
+    runtime = action_get(state, [:meta, :started_at]) |> elapsed(utc_now())
+
     if inflight_token(state) == token(state) do
       msg = [
         inspect(mod),
@@ -373,11 +377,11 @@ defmodule GenDevice.Logic do
         inspect(action_cmd(state)),
         "run_for",
         inspect(action_get(state, [:meta, :run_for])),
-        "elapsed",
-        inspect(action_get(state, [:meta, :elapsed]))
+        "runtime",
+        inspect(runtime)
       ]
 
-      Logger.info(Enum.join(msg, " "))
+      if mod != Reef.DisplayTank.Ato, do: Logger.info(Enum.join(msg, " "))
 
       inflight_put(state, :run_for_expired?, true)
     else
@@ -386,7 +390,9 @@ defmodule GenDevice.Logic do
         "ignoring run_for_expired",
         inspect(inflight_token(state)),
         "!=",
-        inspect(token)
+        inspect(token),
+        "runtime",
+        inspect(runtime)
       ]
 
       Logger.warn(Enum.join(msg, " "))
