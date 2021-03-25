@@ -1,8 +1,6 @@
 defmodule Helen.IExHelpers do
   @moduledoc false
 
-  require Logger
-
   def server_state(mod), do: :sys.get_state(mod)
   def server_status(mod), do: :sys.get_status(mod)
 

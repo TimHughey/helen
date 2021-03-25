@@ -3,8 +3,6 @@ defmodule Reef.Captain do
   Reef Captain
   """
 
-  require Logger
-
   use Helen.Worker.Config
 
   @doc false

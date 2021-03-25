@@ -148,6 +148,8 @@ defmodule GenDevice.Logic do
   ## START OF MODULE
   ##
 
+  require Logger
+
   import Helen.Worker.State.Common
   import GenDevice.State
 
@@ -363,10 +365,33 @@ defmodule GenDevice.Logic do
     Supervisor.start_child(sup_mod, {mod, opts})
   end
 
-  def run_for_expired(state) do
-    if inflight_token(state) == token(state),
-      do: inflight_put(state, :run_for_expired?, true),
-      else: state
+  def run_for_expired(%{module: mod, token: token} = state) do
+    if inflight_token(state) == token(state) do
+      msg = [
+        inspect(mod),
+        "handling run_for_expired",
+        inspect(action_cmd(state)),
+        "run_for",
+        inspect(action_get(state, [:meta, :run_for])),
+        "elapsed",
+        inspect(action_get(state, [:meta, :elapsed]))
+      ]
+
+      Logger.info(Enum.join(msg, " "))
+
+      inflight_put(state, :run_for_expired?, true)
+    else
+      msg = [
+        inspect(mod),
+        "ignoring run_for_expired",
+        inspect(inflight_token(state)),
+        "!=",
+        inspect(token)
+      ]
+
+      Logger.warn(Enum.join(msg, " "))
+      state
+    end
   end
 
   def run_inflight(state) do

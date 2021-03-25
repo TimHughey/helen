@@ -504,13 +504,6 @@ defmodule Helen.Worker.Logic do
     state = update_all_elapsed(state)
     workers = cached_workers(state)
 
-    # if worker_name(state) == "roost",
-    #   do:
-    #     Logger.info("""
-    #     roost next_action/1 entry status:
-    #     status: #{inspect(status(state), pretty: true)}
-    #     """)
-
     case actions_to_execute_get(state) do
       [] ->
         step_repeat_or_next(state)

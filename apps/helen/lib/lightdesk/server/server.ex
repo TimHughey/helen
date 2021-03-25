@@ -3,8 +3,6 @@ defmodule LightDesk.Server do
   LightDesk Controller
   """
 
-  require Logger
-
   use GenServer, restart: :transient, shutdown: 7000
 
   #

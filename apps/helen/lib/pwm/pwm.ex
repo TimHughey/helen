@@ -3,7 +3,6 @@ defmodule PulseWidth do
     The PulseWidth module provides the public API for PulseWidth devices.
   """
 
-  require Logger
   use Timex
 
   alias PulseWidth.Command.Example

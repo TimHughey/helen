@@ -5,8 +5,6 @@ defmodule PulseWidth.Payload.Random do
 
   alias PulseWidth.DB.Device, as: Device
 
-  require Logger
-
   def create_cmd(%_{device: d, host: h, cmds: [%_{refid: ref}]}, cmd_map, opts)
       when is_list(opts) do
     %{

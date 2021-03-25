@@ -1,7 +1,6 @@
 defmodule Fact.Supervisor do
   @moduledoc false
 
-  require Logger
   use Supervisor
 
   alias Fact.Influx

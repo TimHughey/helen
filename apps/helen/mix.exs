@@ -25,7 +25,7 @@ defmodule Helen.Mixfile do
       package: package(),
       description: "Helen",
       escript: escript_config(),
-      test_coverage: test_coverage(),
+      #
       deploy_paths: deploy_paths(),
       stage_paths: stage_paths(),
       homepage_url: "https://www.wisslanding.com",
@@ -45,7 +45,8 @@ defmodule Helen.Mixfile do
           Switch,
           Remote
         ]
-      ]
+      ],
+      xref: [exclude: [EEx]]
     ]
   end
 
@@ -105,23 +106,11 @@ defmodule Helen.Mixfile do
       {:scribe, "~> 0.10"},
       {:msgpax, "~> 2.0"},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
-      {:coverex, "~> 1.0", only: :test},
+      #  {:coverex, "~> 1.0", only: :test},
       {:deep_merge, "~> 1.0"},
       {:crontab, "~> 1.1"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:agnus, "~> 0.0.3"}
-      # {:agnus, path: "../agnus"}
-      # {:phoenix, "~> 1.4.0"},
-      # {:phoenix_pubsub, "~> 1.0"},
-      # {:phoenix_ecto, "~> 4.0"},
-      # {:phoenix_html, "~> 2.10"},
-      # {:phoenix_live_reload, "~> 1.2", only: :dev},
-      # {:plug_cowboy, "~> 2.0"},
-      # {:plug, "~> 1.7"},
-      # {:guardian, "~> 1.0"},
-      # {:ueberauth, "~> 0.4"},
-      # {:ueberauth_github, "~> 0.4"},
-      # {:ueberauth_identity, "~> 0.2"},
     ]
   end
 
@@ -179,15 +168,15 @@ defmodule Helen.Mixfile do
     String.trim(result)
   end
 
-  defp test_coverage do
-    [
-      tool: Coverex.Task,
-      ignore_modules: [
-        Helen.IExHelpers,
-        Repo
-      ]
-    ]
-  end
+  # defp test_coverage do
+  #   [
+  #     tool: Coverex.Task,
+  #     ignore_modules: [
+  #       Helen.IExHelpers,
+  #       Repo
+  #     ]
+  #   ]
+  # end
 
   defp sym_link_data(release) do
     {:ok, home} = System.fetch_env("HOME")

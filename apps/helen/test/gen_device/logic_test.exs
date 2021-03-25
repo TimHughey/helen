@@ -46,7 +46,7 @@ defmodule GenDeviceWorkerTest do
     test "can execute an action with all options", _state do
       import Helen.Time.Helper, only: [to_duration: 1]
 
-      state = %{device_name: "mixtank pump"}
+      state = %{device_name: "mixtank pump", module: __MODULE__}
 
       action = %{
         msg_type: :test,
