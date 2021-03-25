@@ -237,7 +237,7 @@ defmodule GenDevice.Logic do
 
       {:run_for, %{token: _msg_token}} ->
         msg = "#{inspect(mod)} token mismatch, ignoring run_for msg"
-        Logger.info(msg)
+        Logger.debug(msg)
         noreply(state)
 
       _no_match ->
