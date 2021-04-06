@@ -10,8 +10,8 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.29",
-      elixir: "~> 1.10",
+      version: "0.0.21",
+      elixir: "~> 1.11",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",

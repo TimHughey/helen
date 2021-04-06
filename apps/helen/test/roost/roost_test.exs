@@ -27,6 +27,7 @@ defmodule RoostServerTest do
     context
   end
 
+  @tag :skip
   test "roost server creates the server state via init/1" do
     {rc, state, continue} = Server.init([])
 
@@ -38,12 +39,14 @@ defmodule RoostServerTest do
     assert %{base: _, workers: _, modes: _} = state[:opts]
   end
 
+  @tag :skip
   test "can get Roost available modes" do
     modes = Roost.available_modes()
     assert is_list(modes)
     assert modes == [:all_stop, :closed, :dance_with_me, :leaving]
   end
 
+  @tag :skip
   test "roost server ignores logic cast messages when msg token != state token" do
     msg = %{token: make_ref()}
     {:ok, state, _continue} = Server.init([])
@@ -52,6 +55,7 @@ defmodule RoostServerTest do
              Server.handle_cast({:logic, msg}, state)
   end
 
+  @tag :skip
   test "roost server ignores logic info messages when the token != state token" do
     msg = %{token: make_ref()}
     {:ok, state, _} = Server.init([])
@@ -60,6 +64,7 @@ defmodule RoostServerTest do
              Server.handle_info({:logic, msg}, state)
   end
 
+  @tag :skip
   test "roost server can be set to all stop" do
     assert {:ok, :all_stop} == Server.change_mode(:all_stop)
 
@@ -67,10 +72,12 @@ defmodule RoostServerTest do
     assert Server.holding?()
   end
 
+  @tag :skip
   test "roost server can change modes" do
     assert {:ok, :dance_with_me} == Roost.mode(:dance_with_me)
   end
 
+  @tag :skip
   test "the truth will set you free" do
     assert true
   end

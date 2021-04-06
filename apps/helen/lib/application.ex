@@ -103,8 +103,8 @@ defmodule Helen.Application do
         Sensor.Supervisor,
         Helen.Scheduler,
         Reef.Supervisor,
-        Garden.Supervisor,
-        Roost.Supervisor
+        Garden.Supervisor
+        # Roost.Supervisor
       ]
     end
   end
