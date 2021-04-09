@@ -1,0 +1,100 @@
+[server]
+timeout = "PT15S"
+timezone = "America/New_York"
+
+[cmd.random_fade_bright]
+name = "fade bright"
+
+[cmd.random_fade_bright.random]
+min = 256
+max = 2048
+primes = 35
+step_ms = 55
+step = 31
+priority = 7
+
+[cmd.random_fade_dim]
+name = "fade bright"
+
+[cmd.random_fade_dim.random]
+min = 256
+max = 1024
+primes = 35
+step_ms = 55
+step = 13
+priority = 7
+
+# INDOOR GARDEN
+
+[job.indoor_garden]
+device = "indoor garden alpha"
+
+[job.indoor_garden.schedule.day]
+sun_ref = "nautical_twilight_begin"
+before = "PT0S"
+cmd = "on"
+
+[job.indoor_garden.schedule.night]
+sun_ref = "nautical_twilight_end"
+after = "PT16H"
+cmd = "off"
+
+# FRONT PORCH
+
+[job.porch]
+device = "front leds porch"
+
+[job.porch.schedule.morning]
+sun_ref = "civil_twilight_begin"
+before = "PT0S"
+cmd = "off"
+
+[job.porch.schedule.evening]
+sun_ref = "sunset"
+after = "PT0S"
+cmd = "random_fade_bright"
+
+[job.porch.schedule.night]
+sun_ref = "civil_twilight_end"
+after = "PT0S"
+cmd = "random_fade_dim"
+
+# RED MAPLE
+
+[job.red_maple]
+device = "front leds red maple"
+
+[job.red_maple.schedule.morning]
+sun_ref = "civil_twilight_begin"
+before = "PT0S"
+cmd = "off"
+
+[job.red_maple.schedule.evening]
+sun_ref = "sunset"
+after = "PT0S"
+cmd = "random_fade_bright"
+
+[job.red_maple.schedule.night]
+sun_ref = "civil_twilight_end"
+after = "PT0S"
+cmd = "random_fade_dim"
+
+# EVERGREEN
+
+[job.evergreen]
+device = "front leds evergreen"
+
+[job.evergreen.schedule.morning]
+sun_ref = "civil_twilight_begin"
+before = "PT0S"
+cmd = "off"
+
+[job.evergreen.schedule.evening]
+sun_ref = "sunset"
+after = "PT0S"
+cmd = "random_fade_bright"
+
+[job.evergreen.schedule.night]
+sun_ref = "civil_twilight_end"
+after = "PT0S"
+cmd = "random_fade_dim"
