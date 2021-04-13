@@ -23,28 +23,19 @@ defmodule Helen.Mixfile do
       compilers: [:gettext] ++ Mix.compilers(),
       aliases: aliases(),
       package: package(),
+      docs: docs(),
       description: "Helen",
       escript: escript_config(),
-      #
       deploy_paths: deploy_paths(),
       stage_paths: stage_paths(),
       homepage_url: "https://www.wisslanding.com",
       source_url: "https://github.com/TimHughey/helen",
-      docs: [
-        extras: ["CHANGELOG.md"],
-        groups_for_modules: [
-          Devices: [PulseWidth, Remote, Sensor, Switch],
-          Servers: [Reef]
-        ],
-        nest_modules_by_prefix: [
-          Helen,
-          Mqtt,
-          PulseWidth,
-          Reef,
-          Sensor,
-          Switch,
-          Remote
-        ]
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
       ],
       xref: [exclude: [EEx]]
     ]
@@ -81,6 +72,25 @@ defmodule Helen.Mixfile do
       prod: "/usr/local/helen"
     ]
 
+  def docs do
+    [
+      extras: ["CHANGELOG.md"],
+      groups_for_modules: [
+        Devices: [PulseWidth, Remote, Sensor, Switch],
+        Servers: [Reef]
+      ],
+      nest_modules_by_prefix: [
+        Helen,
+        Mqtt,
+        PulseWidth,
+        Reef,
+        Sensor,
+        Switch,
+        Remote
+      ]
+    ]
+  end
+
   def stage_paths,
     do: [prod: "/tmp"]
 
@@ -104,11 +114,12 @@ defmodule Helen.Mixfile do
       {:quantum, "~> 3.0"},
       {:scribe, "~> 0.10"},
       {:msgpax, "~> 2.0"},
-      {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
-      {:deep_merge, "~> 1.0"},
+      {:agnus, "~> 0.1.0"},
       {:crontab, "~> 1.1"},
+      {:deep_merge, "~> 1.0"},
+      {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:agnus, "~> 0.0.3"}
+      {:excoveralls, "~> 0.10", only: :test}
     ]
   end
 

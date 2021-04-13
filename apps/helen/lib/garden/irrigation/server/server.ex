@@ -348,7 +348,7 @@ defmodule Garden.Irrigation.Server do
   end
 
   defp update_last_timeout(s) do
-    import Agnus.Time.Helper, only: [utc_now: 0]
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     put_in(s[:last_timeout], utc_now())
     |> Map.update(:timeouts, 1, &(&1 + 1))
