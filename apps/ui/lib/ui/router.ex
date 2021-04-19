@@ -18,7 +18,6 @@ defmodule UI.Router do
   scope "/", UI do
     pipe_through :browser
 
-    get "/module_opts", ModuleConfigController, :index
     get "/reef/mode/status", ReefController, :show
     get "/reef", ReefController, :index
 

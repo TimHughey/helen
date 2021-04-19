@@ -86,10 +86,6 @@ defmodule UI.HelenChannel do
     {:reply, {:home_status, Map.merge(base_resp, %{})}, socket}
   end
 
-  defp reply_mod_config_status_map(socket, base_resp) do
-    {:reply, {:module_config_status, Map.merge(base_resp, %{hello: "doctor"})}, socket}
-  end
-
   def reply(%Socket{} = socket, response) do
     {:reply, response, socket}
   end
