@@ -104,7 +104,6 @@ defmodule Helen.Application do
         Helen.Scheduler,
         Reef.Supervisor,
         Garden.Supervisor
-        # Roost.Supervisor
       ]
     end
   end

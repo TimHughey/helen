@@ -1,6 +1,6 @@
 [server]
-timeout = "PT15S"
-timezone = "America/New_York"
+timeout = "PT0.333S"
+tz = "America/New_York"
 
 [cmd.fade_bright]
 description = "fade bright"
@@ -41,7 +41,7 @@ device = "front leds porch"
 description = "front porch chandelier"
 
 [job.porch.day]
-description = "no light"
+description = "daytime"
 start = {sun_ref = "civil_twilight_begin", cmd = "off"}
 finish = {sun_ref = "sunset"}
 

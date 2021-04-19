@@ -16,10 +16,7 @@ import "../css/app.scss";
 import "../semantic/dist/semantic";
 import "phoenix_html";
 import { Socket } from "phoenix";
-
-import { ModuleConfigOptions } from "./module_config_opts";
 import { Reef } from "./reef";
-import { Roost } from "./roost";
 
 //
 // MAIN CODE
@@ -51,9 +48,7 @@ channel.on("broadcast", (msg) => {
   console.log("Message: ", msg);
 });
 
-var module_config = new ModuleConfigOptions(channel);
 var reef = new Reef(socket);
-var roost = new Roost(socket);
 
 // initialize the dropdown menu
 $(".ui.dropdown").dropdown();
@@ -69,6 +64,4 @@ jQuery("document").ready(function () {
   console.log("document ready", active_page);
 
   reef.pageLoaded(active_page);
-  roost.pageLoaded(active_page);
-  module_config.pageLoaded(active_page);
 });

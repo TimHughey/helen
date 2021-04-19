@@ -149,26 +149,6 @@ defmodule HelenWorkerConfigTest do
     assert Map.keys(parsed[:modes]) == [:alpha, :beta]
   end
 
-  @tag snippet: """
-       command dance_fade "roost dance fade" random {
-           min 128, max 2048, primes 35, step_ms 55, step 13, priority 7
-       }
-       """
-  test "can parse a command definition section", context do
-    command = get_in(context, [:parsed, :commands, :dance_fade])
-    assert is_map(command)
-
-    assert command[:cmd] == :dance_fade
-    assert command[:name] == "roost dance fade"
-    assert command[:type] == :random
-
-    details = command[:details]
-    assert is_list(details)
-
-    assert [min: 128, max: 2048, primes: 35, step_ms: 55, step: 13, priority: 7] ==
-             details
-  end
-
   test "can parse Reef Captain default configuration" do
     alias Reef.Captain.Config
 
@@ -180,15 +160,6 @@ defmodule HelenWorkerConfigTest do
 
   test "can parse Reef FirstMate default configuration" do
     alias Reef.FirstMate.Config
-
-    result = Config.config(:default)
-
-    assert {:ok, parsed} = result
-    assert is_map(parsed)
-  end
-
-  test "can parse Roost default configuration" do
-    alias Roost.Config
 
     result = Config.config(:default)
 

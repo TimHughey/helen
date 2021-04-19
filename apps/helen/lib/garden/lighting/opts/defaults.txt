@@ -65,5 +65,3 @@ jobs
       night
         sun_ref civil_twilight_end
         cmd random_fade_dim
-
-# end of roost config

@@ -29,6 +29,26 @@ defmodule FatHelen.MixProject do
     []
   end
 
+  defp releases do
+    [
+      helen: [
+        version: "0.1.2",
+        applications: [helen: :permanent, ui: :permanent],
+        include_erts: true,
+        include_executables_for: [:unix],
+        applications: [runtime_tools: :permanent],
+        cookie: "augury-kinship-swain-circus",
+        strip_beams: false,
+        steps: [
+          &sym_link_to_tar_rm/1,
+          :assemble,
+          :tar,
+          &sym_link_to_tar/1
+        ]
+      ]
+    ]
+  end
+
   defp sym_link_data(release) do
     {:ok, home} = System.fetch_env("HOME")
 
@@ -66,25 +86,5 @@ defmodule FatHelen.MixProject do
     )
 
     release
-  end
-
-  defp releases do
-    [
-      helen: [
-        version: "0.1.2",
-        applications: [helen: :permanent, ui: :permanent],
-        include_erts: true,
-        include_executables_for: [:unix],
-        applications: [runtime_tools: :permanent],
-        cookie: "augury-kinship-swain-circus",
-        strip_beams: false,
-        steps: [
-          &sym_link_to_tar_rm/1,
-          :assemble,
-          :tar,
-          &sym_link_to_tar/1
-        ]
-      ]
-    ]
   end
 end

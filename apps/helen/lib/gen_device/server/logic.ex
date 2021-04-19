@@ -85,7 +85,7 @@ defmodule GenDevice.Logic do
 
       ## Examples
 
-          iex> Roost.Server.restart([])
+          iex> Reef.Server.restart([])
           :ok
 
       """

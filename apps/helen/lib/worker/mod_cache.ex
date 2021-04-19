@@ -31,7 +31,6 @@ defmodule Helen.Workers.ModCache do
     %{find: {ident, name}, module: nil, type: nil}
     |> search(:workers)
     |> search(:reef_workers)
-    |> search(:roost_workers)
     |> search(:simple_devices)
     |> craft_response()
   end
@@ -49,18 +48,9 @@ defmodule Helen.Workers.ModCache do
          put_in(acc, [:module], Reef.FirstMate.Server)
          |> put_in([:type], :reef_worker)
 
-  # only one Roost Worker that can be used in a worker config exists
-  defp search(
-         %{find: {:lightdesk, "roost worker"}, module: nil} = acc,
-         :roost_workers
-       ),
-       do:
-         put_in(acc, [:module], LightDesk)
-         |> put_in([:type], :roost_worker)
-
   # already found?  then do nothing
   defp search(%{find: _, module: mod} = acc, type)
-       when is_atom(mod) and type in [:reef_workers, :roost_workers],
+       when is_atom(mod) and type in [:reef_workers],
        do: acc
 
   # no match, pass through the accumulator

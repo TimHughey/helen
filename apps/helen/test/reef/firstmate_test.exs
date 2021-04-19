@@ -41,7 +41,7 @@ defmodule ReefFirstMateTest do
              FirstMate.handle_cast({:logic, msg}, state)
   end
 
-  test "roost server ignores logic info messages when the token != state token" do
+  test "reef server ignores logic info messages when the token != state token" do
     msg = %{token: make_ref()}
     {:ok, state, _} = FirstMate.init([])
 

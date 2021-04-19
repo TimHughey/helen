@@ -29,50 +29,6 @@
         </div>
       </div>
     </div>
-    <!-- <div class="item">
-      <div class="ui small image">
-        <img src="images/roost.png">
-      </div>
-      <div class="content">
-        <%= content = ["The Roost"]
-            button(content, to: "/roost", method: :post,
-                    class: "ui floated icon primary button") %>
-        <div class="meta">
-        <p> Lights, Disco Ball, EL Wire and LED Forest</p>
-        </div>
-        <div class="description">
-          Music, lighting and dancing.
-        </div>
-        <div class="extra">
-          <div class="ui green label">
-            It is completely safe to adjust The Roost.
-          </div>
-        </div>
-      </div>
-    </div> -->
-    <!-- <div class="item">
-      <div class="ui small image">
-        <img src="images/gears1.png">
-      </div>
-      <div class="content">
-        <%= link "Module Configuration", to: Routes.module_config_path(@conn, :index), class: "header" %>
-        <div class="meta">
-          <a>Date</a>
-          <a>System Configuration</a>
-        </div>
-        <div class="description">
-          Adjust the configuration of Helen modules.
-        </div>
-        <div class="extra">
-          <%= content = ["Adjust Module Configuration", raw("<i class=\"right chevron icon\"></i>")]
-              button(content, to: "/module_opts", method: :post,
-                      class: "ui right floated icon primary button") %>
-          <div class="ui red label">
-            Use extreme caution when adjusting module configurations.
-          </div>
-        </div>
-      </div>
-    </div> -->
   </div>
 </div>
 

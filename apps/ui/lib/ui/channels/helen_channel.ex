@@ -26,14 +26,6 @@ defmodule UI.HelenChannel do
     end
   end
 
-  def join("helen:roost", _message, socket) do
-    alias UI.Channel.Handler.Roost
-    # Logger.info("join helen:reef #{inspect(message)}")
-    # Logger.info("socket: #{inspect(socket, pretty: true)}")
-
-    {:ok, Roost.join(socket)}
-  end
-
   def join("room:" <> _private_room_id, _params, _socket) do
     {:error, %{reason: "unauthorized"}}
   end
@@ -52,22 +44,14 @@ defmodule UI.HelenChannel do
     {:reply, {:nop, %{}}, socket}
   end
 
-  def handle_in("module_config_click", msg, socket) do
-    import UI.ModuleConfigView, only: [button_click: 2]
-
-    {:reply, {:module_config_click_reply, button_click(msg, socket)}, socket}
-  end
-
   def handle_in(msg, %{"subsystem" => subsystem}, socket)
       when msg in ["refresh_page", "page_loaded"] do
-    alias UI.Channel.Handler.{Reef, Roost}
+    alias UI.Channel.Handler.Reef
 
     base_resp = %{active_page: subsystem}
 
     case subsystem do
       "reef" -> Reef.page_loaded(socket)
-      "roost" -> Roost.page_loaded(socket)
-      "module-config" -> socket |> reply_mod_config_status_map(base_resp)
       "home" -> socket |> reply_home_status_map(base_resp)
     end
   end
@@ -76,12 +60,6 @@ defmodule UI.HelenChannel do
     alias UI.Channel.Handler.Reef
 
     Reef.click(payload, socket)
-  end
-
-  def handle_in("roost_click", payload, socket) do
-    alias UI.Channel.Handler.Roost
-
-    Roost.click(payload, socket)
   end
 
   def handle_in(type, payload, socket) do

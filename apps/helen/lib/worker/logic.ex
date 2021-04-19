@@ -1,6 +1,6 @@
 defmodule Helen.Worker.Logic do
   @moduledoc """
-  Logic for Roost server
+  Logic for Helen Workers
   """
 
   @callback active_mode :: atom()
@@ -149,7 +149,7 @@ defmodule Helen.Worker.Logic do
 
       ## Examples
 
-          iex> Roost.Server.restart([])
+          iex> Worker.restart([])
           :ok
 
       """

@@ -100,7 +100,7 @@ defmodule Helen.Workers do
           msg: msg
         } = action
       )
-      when worker_type in [:temp_server, :reef_worker, :roost_worker] do
+      when worker_type in [:temp_server, :reef_worker] do
     execute_result(action, fn -> apply(mod, worker_cmd, [msg]) end)
   end
 
