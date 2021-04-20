@@ -6,7 +6,7 @@ defmodule UI.MixProject do
   def project do
     [
       app: :ui,
-      version: "0.1.3",
+      version: "0.9.8",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",

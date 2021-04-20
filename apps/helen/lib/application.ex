@@ -101,9 +101,7 @@ defmodule Helen.Application do
         Switch.Supervisor,
         PulseWidth.Supervisor,
         Sensor.Supervisor,
-        Helen.Scheduler,
-        Reef.Supervisor,
-        Garden.Supervisor
+        Reef.Supervisor
       ]
     end
   end

@@ -10,7 +10,7 @@ defmodule Helen.Mixfile do
   def project do
     [
       app: :helen,
-      version: "0.0.21",
+      version: "0.9.9",
       elixir: "~> 1.11",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -56,10 +56,7 @@ defmodule Helen.Mixfile do
         :parse_trans,
         :httpoison,
         :observer,
-        :agnus,
-        :crypto,
-        :iex,
-        :crontab
+        :agnus
       ],
       env: []
     ]
@@ -111,11 +108,9 @@ defmodule Helen.Mixfile do
       {:ecto_sql, "~> 3.1"},
       {:tortoise, "~> 0.9"},
       {:gettext, "~> 0.11"},
-      {:quantum, "~> 3.0"},
       {:scribe, "~> 0.10"},
       {:msgpax, "~> 2.0"},
       {:agnus, "~> 0.1.0"},
-      {:crontab, "~> 1.1"},
       {:deep_merge, "~> 1.0"},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
@@ -176,16 +171,6 @@ defmodule Helen.Mixfile do
     {result, _rc} = System.cmd("git", ["describe"])
     String.trim(result)
   end
-
-  # defp test_coverage do
-  #   [
-  #     tool: Coverex.Task,
-  #     ignore_modules: [
-  #       Helen.IExHelpers,
-  #       Repo
-  #     ]
-  #   ]
-  # end
 
   defp sym_link_data(release) do
     {:ok, home} = System.fetch_env("HOME")
