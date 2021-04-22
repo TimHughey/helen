@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 12.2
--- Dumped by pg_dump version 12.3
+-- Dumped from database version 13.2
+-- Dumped by pg_dump version 13.2
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -106,7 +106,6 @@ CREATE TABLE public.pwm_device (
     duty_min integer DEFAULT 0 NOT NULL,
     dev_latency_us integer DEFAULT 0,
     last_seen_at timestamp without time zone,
-    discovered_at timestamp without time zone,
     last_cmd_at timestamp without time zone,
     inserted_at timestamp(0) without time zone NOT NULL,
     updated_at timestamp(0) without time zone NOT NULL
@@ -145,7 +144,6 @@ CREATE TABLE public.remote (
     last_seen_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    batt_mv integer DEFAULT 0,
     reset_reason character varying(25) DEFAULT 'unknown'::character varying,
     ap_rssi integer DEFAULT 0,
     ap_pri_chan integer DEFAULT 0,
@@ -192,46 +190,35 @@ CREATE TABLE public.remote_profile (
     dalsemi_enable boolean DEFAULT true NOT NULL,
     dalsemi_core_stack integer DEFAULT 1536 NOT NULL,
     dalsemi_core_priority integer DEFAULT 1 NOT NULL,
-    dalsemi_discover_stack integer DEFAULT 4096 NOT NULL,
-    dalsemi_discover_priority integer DEFAULT 12 NOT NULL,
     dalsemi_report_stack integer DEFAULT 3072 NOT NULL,
     dalsemi_report_priority integer DEFAULT 13 NOT NULL,
-    dalsemi_convert_stack integer DEFAULT 2048 NOT NULL,
-    dalsemi_convert_priority integer DEFAULT 13 NOT NULL,
     dalsemi_command_stack integer DEFAULT 3072 NOT NULL,
     dalsemi_command_priority integer DEFAULT 14 NOT NULL,
     dalsemi_core_interval_ms integer DEFAULT 30000 NOT NULL,
-    dalsemi_discover_interval_ms integer DEFAULT 30000 NOT NULL,
-    dalsemi_convert_interval_ms integer DEFAULT 7000 NOT NULL,
     dalsemi_report_interval_ms integer DEFAULT 7000 NOT NULL,
     i2c_enable boolean DEFAULT true NOT NULL,
     i2c_use_multiplexer boolean DEFAULT false NOT NULL,
     i2c_core_stack integer DEFAULT 1536 NOT NULL,
     i2c_core_priority integer DEFAULT 1 NOT NULL,
-    i2c_discover_stack integer DEFAULT 4096 NOT NULL,
-    i2c_discover_priority integer DEFAULT 12 NOT NULL,
     i2c_report_stack integer DEFAULT 3072 NOT NULL,
     i2c_report_priority integer DEFAULT 13 NOT NULL,
     i2c_command_stack integer DEFAULT 3072 NOT NULL,
     i2c_command_priority integer DEFAULT 14 NOT NULL,
     i2c_core_interval_ms integer DEFAULT 7000 NOT NULL,
-    i2c_discover_interval_ms integer DEFAULT 60000 NOT NULL,
     i2c_report_interval_ms integer DEFAULT 7000 NOT NULL,
     pwm_enable boolean DEFAULT true NOT NULL,
     pwm_core_stack integer DEFAULT 1536 NOT NULL,
     pwm_core_priority integer DEFAULT 1 NOT NULL,
     pwm_report_stack integer DEFAULT 2048 NOT NULL,
     pwm_report_priority integer DEFAULT 12 NOT NULL,
-    pwm_command_stack integer DEFAULT 2048 NOT NULL,
-    pwm_command_priority integer DEFAULT 14 NOT NULL,
-    pwm_core_interval_ms integer DEFAULT 30000 NOT NULL,
     pwm_report_interval_ms integer DEFAULT 7000 NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     description character varying(255) DEFAULT ' '::character varying,
     watch_stacks boolean DEFAULT false NOT NULL,
     core_loop_interval_ms integer DEFAULT 1000 NOT NULL,
-    core_timestamp_ms integer DEFAULT 360000 NOT NULL
+    core_timestamp_ms integer DEFAULT 360000 NOT NULL,
+    lightdesk_enable boolean DEFAULT false
 );
 
 
@@ -343,7 +330,6 @@ CREATE TABLE public.sensor_device (
     host character varying(255) NOT NULL,
     dev_latency_us integer DEFAULT 0 NOT NULL,
     last_seen_at timestamp without time zone,
-    discovered_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -454,7 +440,6 @@ CREATE TABLE public.switch_device (
     ttl_ms integer DEFAULT 60000 NOT NULL,
     last_seen_at timestamp without time zone NOT NULL,
     last_cmd_at timestamp without time zone NOT NULL,
-    discovered_at timestamp without time zone NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -486,8 +471,7 @@ ALTER SEQUENCE public.switch_device_id_seq OWNED BY public.switch_device.id;
 CREATE TABLE public.worker_config (
     id bigint NOT NULL,
     module character varying(60) NOT NULL,
-    comment character varying(80) DEFAULT '<none>'::character varying,
-    version character varying(12) NOT NULL,
+    comment text DEFAULT '<none>'::text,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -518,7 +502,8 @@ ALTER SEQUENCE public.worker_config_id_seq OWNED BY public.worker_config.id;
 
 CREATE TABLE public.worker_config_line (
     id bigint NOT NULL,
-    line text NOT NULL,
+    num integer NOT NULL,
+    line text DEFAULT ' '::text NOT NULL,
     worker_config_id bigint
 );
 
@@ -928,10 +913,10 @@ CREATE INDEX worker_config_line_worker_config_id_index ON public.worker_config_l
 
 
 --
--- Name: worker_config_module_version_index; Type: INDEX; Schema: public; Owner: -
+-- Name: worker_config_module_updated_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX worker_config_module_version_index ON public.worker_config USING btree (module, version);
+CREATE UNIQUE INDEX worker_config_module_updated_at_index ON public.worker_config USING btree (module, updated_at);
 
 
 --
@@ -987,7 +972,7 @@ ALTER TABLE ONLY public.switch_alias
 --
 
 ALTER TABLE ONLY public.switch_command
-    ADD CONSTRAINT switch_command_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id);
+    ADD CONSTRAINT switch_command_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id) ON UPDATE SET NULL ON DELETE CASCADE;
 
 
 --
@@ -1092,3 +1077,9 @@ INSERT INTO public."schema_migrations" (version) VALUES (20200624125619);
 INSERT INTO public."schema_migrations" (version) VALUES (20200624152332);
 INSERT INTO public."schema_migrations" (version) VALUES (20201007141801);
 INSERT INTO public."schema_migrations" (version) VALUES (20201007225427);
+INSERT INTO public."schema_migrations" (version) VALUES (20201010000023);
+INSERT INTO public."schema_migrations" (version) VALUES (20201124131225);
+INSERT INTO public."schema_migrations" (version) VALUES (20210112020809);
+INSERT INTO public."schema_migrations" (version) VALUES (20210112021115);
+INSERT INTO public."schema_migrations" (version) VALUES (20210422175619);
+INSERT INTO public."schema_migrations" (version) VALUES (20210422184410);

@@ -123,7 +123,49 @@ defmodule PulseWidth do
   defdelegate example_cmd(type \\ :random, opts \\ []), to: Example, as: :cmd
 
   @doc """
+    Generic execute for general purpose use
+
+    ```elixir
+      # general purpose use
+      PulseWidth.execute(%{cmd: :on, name: "device alias"})
+
+      # set pwm to 50% of max
+      PulseWidth.execute(%{cmd: :duty, name: "device alias", number: 0.50})
+
+      # set pwm to custom cmd
+      cmd = %{}
+      PulseWidth.execute(%{cmd: cmd, name: "device alias"}})
+    ```
+
+  """
+  @doc since: "0.9.9"
+  def execute(%{cmd: cmd, name: name} = action) do
+    opts = action[:opts] || []
+
+    case cmd do
+      :on -> on(name)
+      :off -> off(name)
+      :duty -> duty(name, action[:number])
+      cmd -> Alias.cmd_direct(name, cmd, opts)
+    end
+  end
+
+  @doc """
     Execute an action
+
+    ```elixir
+      # direct support for Helen Worker actions
+      action = %{worker_cmd: :on, worker: %{name: "device alias"}}
+      PulseWidth.execute_action(action)
+
+      # set pwm to 50% of max
+      action = %{worker_cmd: :duty, worker: %{name: "device alias"}, number: 0.50}
+      PulseWidth.execute_action(action)
+
+      # set pwm to custom cmd
+      action = %{worker_cmd: %{...}, worker: %{name: "device alias"}}
+      PulseWidth.execute_action(action)
+    ```
   """
   @doc since: "0.0.27"
   def execute_action(%{worker_cmd: cmd, worker: %{name: name}} = action) do

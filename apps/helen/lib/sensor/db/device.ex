@@ -14,7 +14,6 @@ defmodule Sensor.DB.Device do
     field(:host, :string)
     field(:dev_latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
-    field(:discovered_at, :utc_datetime_usec)
 
     has_many(:datapoints, DataPoint)
 
@@ -155,12 +154,7 @@ defmodule Sensor.DB.Device do
   # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
 
   def keys(:replace),
-    do:
-      keys_drop(:all, [
-        :device,
-        :discovered_at,
-        :inserted_at
-      ])
+    do: keys_drop(:all, [:device, :inserted_at])
 
   def keys(:required),
     do: keys_drop(:cast, [:updated_at, :inserted_at])
@@ -277,16 +271,13 @@ defmodule Sensor.DB.Device do
   """
 
   @doc since: "0.0.15"
-  def upsert(%{device: _, host: _, dev_latency_us: _, mtime: mtime} = msg) do
-    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
+  def upsert(%{device: _, host: _, dev_latency_us: _} = msg) do
+    import Helen.Time.Helper, only: [utc_now: 0]
 
-    params = [:device, :host, :dev_latency_us, :discovered_at, :last_seen_at]
+    params = [:device, :host, :dev_latency_us, :last_seen_at]
 
     # create a map of defaults for keys that may not exist in the msg
-    params_default = %{
-      discovered_at: from_unix(mtime),
-      last_seen_at: utc_now()
-    }
+    params_default = %{last_seen_at: utc_now()}
 
     # assemble a map of changes
     # NOTE:  the second map passed to Map.merge/2 replaces duplicate keys

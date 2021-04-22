@@ -78,7 +78,9 @@ defmodule Switch.DB.Command do
   end
 
   # primary entry point when called from Switch and an ack is not needed
-  def ack_if_needed(%{device: {:ok, %Device{}}} = msg), do: msg
+  def ack_if_needed(%{device: {:ok, %Device{}}} = msg) do
+    msg
+  end
 
   # no match, just pass through
   def ack_if_needed(msg), do: msg

@@ -1,0 +1,20 @@
+[server]
+timeout = "PT0.333S"
+tz = "America/New_York"
+
+# INDOOR GARDEN
+
+[job.parse_fail]
+description = "parse fail test"
+
+[job.parse_fail.test]
+description = "parse fail test"
+start = {sun_ref = "nautical_twilight_begin", cmd = "bad"}
+finish = {sun_ref = "nautical_twilight_begin", plus = "PT16H"}
+otherwise = {cmd = "off"}
+
+[job.parse_fail.test]
+description = "parse fail test"
+start = {sun_ref = "nautical_twilight_begin", cmd = "bad"}
+finish = {sun_ref = "nautical_twilight_begin", plus = "PT16H"}
+otherwise = {cmd = "off"}

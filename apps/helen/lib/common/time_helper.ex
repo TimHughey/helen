@@ -4,6 +4,8 @@ defmodule Helen.Time.Helper do
 
   """
 
+  @default_tz Application.compile_env!(:helen, :default_tz) || "Etc/UTC"
+
   use Timex
 
   @doc """
@@ -177,12 +179,23 @@ defmodule Helen.Time.Helper do
   @doc """
   Return the current time in the specified timezone
 
+  ```elixir
+
+  # accepts a
+
+  ```
+
   If is_nil(tz) UTC is used as the timexone
   """
-  @doc since: "0.0.27"
-  def local_now(tz) do
-    if is_nil(tz), do: Timex.now("UTC"), else: Timex.now(tz)
-  end
+  @doc since: "0.9.9"
+  # (1 of 2) passed a state, look in opts for :tz
+  def local_now(s) when is_map(s), do: get_in(s, [:opts, :tz]) |> local_now()
+
+  # (2 of 2) passed nil default to UTC
+  def local_now(tz) when is_nil(tz), do: Timex.now(@default_tz)
+
+  # (3 of 3) passed a binary timezone name
+  def local_now(tz) when is_binary(tz), do: Timex.now(tz)
 
   @doc """
   Calculate the remaining milliseconds given the finish datetime
@@ -497,7 +510,7 @@ defmodule Helen.Time.Helper do
 
   ## Examples
 
-      iex> Helen.Time.Helper.unix_now(:milliseconds)
+      iex> Helen.Time.Helper.unix_now(:microsecond)
       ~U[2020-06-22 15:16:02.44Z]
 
   """

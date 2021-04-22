@@ -13,7 +13,7 @@ defmodule PulseWidth.Payload.Auto do
   PulesWidth.DB.Command.
   """
   @doc since: "0.0.27"
-  def send_cmd(%Device{} = pwm, cmd_map, opts \\ []) do
+  def send_cmd(%Device{} = pwm, cmd_map, opts) do
     case cmd_map do
       # # allow a flat map that includes the type.  translate the flat map
       # # into a command map.

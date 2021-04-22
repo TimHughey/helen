@@ -37,7 +37,7 @@ defmodule Switch do
       :raw ->
         aliases
 
-      true ->
+      :count ->
         Enum.count(aliases)
     end
   end
@@ -74,19 +74,6 @@ defmodule Switch do
     Alias.rename(name_or_id, new_name, opts)
   end
 
-  @doc """
-  Rename a switch alias and/or update description and ttl_ms
-    (alias for Switch.alias_rename)
-
-      Optional opts:
-      description: <binary>   -- new description
-      ttl_ms:      <integer>  -- new ttl_ms
-  """
-  @doc since: "0.0.23"
-  def rename(name_or_id, new_name, opts \\ []) do
-    Alias.rename(name_or_id, new_name, opts)
-  end
-
   @doc delegate_to: {Command, :cmds_count, 0}
   @doc since: "0.0.24"
   defdelegate cmd_counts, to: Command
@@ -104,16 +91,38 @@ defmodule Switch do
   defdelegate delete(name_or_id), to: Alias, as: :delete
 
   @doc """
-    Execute an action
+    Generic execute for general purpose use
+
+    ```elixir
+      # general purpose use
+      Switch.execute(%{cmd: :on, name: "device alias"})
+
+    ```
+
   """
-  @doc since: "0.0.27"
-  def execute_action(%{worker_cmd: cmd, worker: %{name: name}}) do
+  @doc since: "0.9.9"
+  def execute(%{cmd: cmd, name: name} = action) do
+    opts = action[:opts] || []
+
     case cmd do
-      :on -> on(name)
-      :off -> off(name)
+      :on -> on(name, opts)
+      :off -> off(name, opts)
       _cmd -> :invalid_action
     end
   end
+
+  @doc """
+    Execute an action
+
+    ```elixir
+      # direct support for Helen Worker actions
+      Switch.execute_action(%{worker_cmd: :on, worker: %{name: "device alias"}})
+    ```
+
+  """
+  @doc since: "0.0.27"
+  def execute_action(%{worker_cmd: cmd, worker: %{name: name}}),
+    do: execute(%{cmd: cmd, name: name})
 
   @doc delegate_to: {Alias, :exists?, 1}
   @doc since: "0.0.27"
@@ -154,62 +163,9 @@ defmodule Switch do
     end
   end
 
-  @doc """
-    Retrieve a list of Switch devices that begin with a pattern
-  """
-  @doc since: "0.0.21"
-  def devices_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
+  defdelegate devices_begin_with(pattern \\ ""), to: Device
 
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
-
-    from(x in Device,
-      where: like(x.device, ^like_string),
-      order_by: x.device,
-      select: x.device
-    )
-    |> Repo.all()
-  end
-
-  @doc """
-    Handles all aspects of processing messages for Sensors
-
-     - if the message hasn't been processed, then attempt to
-  """
-  @doc since: "0.0.21"
-  def handle_message(%{processed: false, type: "switch"} = msg_in) do
-    alias Notify, as: Notify
-
-    # the with begins with processing the message through DB.Device.upsert/1
-    with %{device: switch_device} = msg <- Device.upsert(msg_in),
-         # was the upset a success?
-         {:ok, %Device{}} <- switch_device,
-         # technically the message has been processed at this point
-         msg <- Map.put(msg, :processed, true),
-         # send any notifications requested
-         msg <- Notify.notify_as_needed(msg),
-         # Switch does not write any data to the timeseries database
-         # (unlike Sensor, Remote) so simulate the write_rc success
-         # now send the augmented message to the timeseries database
-         msg <- Map.put(msg, :write_rc, {:processed, :ok}) do
-      msg
-    else
-      # if there was an error, add fault: <device_fault> to the message and
-      # the corresponding <device_fault>: <error> to signal to downstream
-      # functions there was an issue
-      error ->
-        Map.merge(msg_in, %{
-          processed: true,
-          fault: :switch_fault,
-          switch_fault: error
-        })
-    end
-  end
-
-  # if the primary handle_message does not match then simply return the msg
-  # since it wasn't for switch and/or has already been processed in the
-  # pipeline
-  def handle_message(%{} = msg_in), do: msg_in
+  defdelegate handle_message(msg), to: Switch.Msg, as: :handle
 
   @doc """
   Convenience wrapper of Switch.position/1
@@ -258,9 +214,7 @@ defmodule Switch do
           false = always send the position command
   """
   def position(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    ensure = Keyword.get(opts, :ensure, false)
-
-    case ensure do
+    case opts[:ensure] || false do
       true -> position_ensure(name, opts)
       false -> Alias.position(name, opts)
     end
@@ -287,17 +241,50 @@ defmodule Switch do
     end
   end
 
+  @doc """
+  Rename a switch alias and/or update description and ttl_ms
+    (alias for Switch.alias_rename)
+
+      Optional opts:
+      description: <binary>   -- new description
+      ttl_ms:      <integer>  -- new ttl_ms
+  """
+  @doc since: "0.0.23"
+  def rename(name_or_id, new_name, opts \\ []) do
+    Alias.rename(name_or_id, new_name, opts)
+  end
+
+  @doc delegate_to: {Notify, :restart, 1}
+  @doc since: "0.0.27"
+  defdelegate restart(opts \\ []), to: Notify
+
   @doc delegate_to: {Notify, :state, 0}
   @doc since: "0.0.26"
   defdelegate state, to: Notify
+
+  @doc """
+    Get a map representing the status of the Switch
+
+  """
+  @doc since: "0.9.9"
+  def status(name_or_id) do
+    base = %{name: name_or_id}
+
+    pos_to_atom = fn x -> if x, do: :on, else: :off end
+    put_pos = fn pos -> put_in(base, [:cmd], pos_to_atom.(pos)) end
+    put_extra = fn m, [{k, v}] -> put_in(m, [k], v) end
+
+    case position(name_or_id) do
+      {:ok, pos} when is_boolean(pos) -> put_pos.(pos)
+      {:ttl_expired, pos} -> put_pos.(pos) |> put_extra.(ttl_expired: true)
+      {:pending, res} -> put_pos.(res[:position]) |> put_extra.(pending: true)
+      error -> put_extra.(base, error: error)
+    end
+  end
 
   @doc delegate_to: {Alias, :toggle, 1}
   defdelegate toggle(name_or_id), to: Alias
 
   @doc delegate_to: {Alias, :toggle, 2}
   defdelegate toggle(name_or_id, opts), to: Alias
-
-  @doc delegate_to: {Notify, :restart, 1}
-  @doc since: "0.0.27"
-  defdelegate restart(opts \\ []), to: Notify
 end

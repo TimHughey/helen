@@ -227,9 +227,15 @@ defmodule Switch.DB.Alias do
     if is_nil(sa), do: {:not_found, name}, else: position(sa, opts)
   end
 
-  def position(%Schema{pio: pio, device: %Device{} = sd} = sa, opts)
+  def position(
+        %Schema{pio: pio, ttl_ms: ttl_ms, device: %Device{} = sd} = sa,
+        opts
+      )
       when is_list(opts) do
+    # accept either :lazy or :force
     lazy = opts[:lazy] || true
+    lazy = opts[:force] || lazy
+
     position = opts[:position]
     cmd_map = %{pio: pio, state: position, initial_opts: opts}
 
@@ -248,12 +254,12 @@ defmodule Switch.DB.Alias do
     else
       {:position, {:opt, false}} ->
         # position change not included in opts, just return current position
-        Device.pio_state(sd, pio, opts)
+        Device.pio_state(sd, pio, opts ++ [ttl_ms: ttl_ms])
 
       {:lazy, true, true} ->
         # requested lazy and requested position matches current position
         # nothing to do here... just return the position
-        Device.pio_state(sd, pio, opts)
+        Device.pio_state(sd, pio, opts ++ [ttl_ms: ttl_ms])
 
       {:lazy, _lazy_or_not, _true_or_false} ->
         # regardless if lazy or not the current position does not match
@@ -315,18 +321,16 @@ defmodule Switch.DB.Alias do
   """
   @doc since: "0.0.22"
   def toggle(name_or_id, opts \\ []) do
-    with {:ok, true} <- position(name_or_id) do
-      position(name_or_id, [position: false] ++ opts)
-    else
+    case position(name_or_id) do
+      {:ok, true} -> position(name_or_id, [position: false] ++ opts)
       {:ok, false} -> position(name_or_id, [position: true] ++ opts)
       error -> error
     end
   end
 
   def update(name_or_id, opts) when is_list(opts) do
-    with %Schema{name: name} = x <- find(name_or_id) do
-      rename(x, [name: name] ++ opts)
-    else
+    case find(name_or_id) do
+      %Schema{name: name} = x -> rename(x, [name: name] ++ opts)
       _not_found -> {:not_found, name_or_id}
     end
   end

@@ -96,32 +96,4 @@ defmodule Fact.Influx do
     |> Map.get(:series)
     |> Enum.find(fn x -> Map.get(x, :name, db) == db end)
   end
-
-  ###
-  ###
-  ###
-
-  def normalize_readings(nil), do: %{}
-
-  def normalize_readings(%{temp_f: nil, temp_c: nil} = x), do: x
-
-  def normalize_readings(%{} = r) do
-    has_tc = Map.has_key?(r, :tc)
-    has_tf = Map.has_key?(r, :tf)
-
-    r =
-      if Map.has_key?(r, :rh),
-        do: Map.put(r, :rh, Float.round(r.rh * 1.0, 3)),
-        else: r
-
-    r = if has_tc, do: Map.put(r, :tc, Float.round(r.tc * 1.0, 3)), else: r
-    r = if has_tf, do: Map.put(r, :tf, Float.round(r.tf * 1.0, 3)), else: r
-
-    cond do
-      has_tc and has_tf -> r
-      has_tc -> Map.put_new(r, :tf, Float.round(r.tc * (9.0 / 5.0) + 32.0, 3))
-      has_tf -> Map.put_new(r, :tc, Float.round(r.tf - 32 * (5.0 / 9.0), 3))
-      true -> r
-    end
-  end
 end

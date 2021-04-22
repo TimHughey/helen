@@ -1,5 +1,5 @@
 [server]
-timeout = "PT0.333S"
+timeout = "PT10.333S"
 tz = "America/New_York"
 
 [cmd.fade_bright]

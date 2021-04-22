@@ -38,7 +38,7 @@ defmodule PulseWidth.Payload.Random do
     create_cmd(pwm_dev, cmd, [])
   end
 
-  def send_cmd(%Device{device: device} = pwm, %{} = cmd_map, opts \\ []) do
+  def send_cmd(%Device{device: device} = pwm, %{} = cmd_map, opts) do
     # extract the prefix of the device and use it as the subtopic
     subtopic = String.split(device, "/") |> hd()
 

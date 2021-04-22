@@ -92,7 +92,7 @@ defmodule Helen.Mixfile do
     do: [prod: "/tmp"]
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/common"]
+  defp elixirc_paths(:test), do: ["lib", "test/common", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
@@ -218,7 +218,7 @@ defmodule Helen.Mixfile do
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],
         cookie: "augury-kinship-swain-circus",
-        strip_beams: false,
+        strip_beams: true,
         steps: [
           &sym_link_to_tar_rm/1,
           :assemble,

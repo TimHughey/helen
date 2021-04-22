@@ -23,7 +23,7 @@ defmodule PulseWidth.Payload.Duty do
     create_cmd(pwm_dev, %{duty: :rand.uniform(8191)}, [])
   end
 
-  def send_cmd(%Device{device: device} = pwm, %{} = cmd_map, opts \\ []) do
+  def send_cmd(%Device{device: device} = pwm, %{} = cmd_map, opts) do
     # extract the prefix of the device and use it as the subtopic
     subtopic = String.split(device, "/") |> hd()
 

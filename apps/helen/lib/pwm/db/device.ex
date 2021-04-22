@@ -19,7 +19,6 @@ defmodule PulseWidth.DB.Device do
     field(:duty_min, :integer, default: 0)
     field(:dev_latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
-    field(:discovered_at, :utc_datetime_usec)
     field(:last_cmd_at, :utc_datetime_usec)
 
     has_many(:cmds, Command, foreign_key: :device_id)
@@ -149,8 +148,8 @@ defmodule PulseWidth.DB.Device do
       else: {:invalid_changes, cs}
   end
 
-  def upsert(%{device: _, host: _, mtime: mtime} = msg) do
-    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
+  def upsert(%{device: _, host: _} = msg) do
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     params = [
       :device,
@@ -159,13 +158,11 @@ defmodule PulseWidth.DB.Device do
       :duty_max,
       :duty_min,
       :dev_latency_us,
-      :discovered_at,
       :last_cmd_at,
       :last_seen_at
     ]
 
     params_default = %{
-      discovered_at: from_unix(mtime),
       last_cmd_at: utc_now(),
       last_seen_at: utc_now()
     }
@@ -260,7 +257,7 @@ defmodule PulseWidth.DB.Device do
     do: keys_drop(:all, [:id, :inserted_at, :updated_at])
 
   def keys(:replace),
-    do: keys_drop(:all, [:device, :discovered_at, :inserted_at])
+    do: keys_drop(:all, [:device, :inserted_at])
 
   def keys(:update),
     do: keys_drop(:all, [:device, :inserted_at, :updated_at])

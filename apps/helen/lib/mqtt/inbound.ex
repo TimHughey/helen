@@ -40,16 +40,6 @@ defmodule Mqtt.Inbound do
     MapSet.to_list(topics) |> Enum.sort()
   end
 
-  def supported_msg_types,
-    do: [
-      "boot",
-      "sensor",
-      "switch",
-      "remote",
-      "text",
-      "pwm"
-    ]
-
   # internal work functions
 
   def process(%{payload: payload, topic: _} = msg, opts \\ [])
@@ -68,8 +58,8 @@ defmodule Mqtt.Inbound do
   # GenServer callbacks
   @impl true
   def handle_call({:additional_message_flags, opts}, _from, s) do
-    set_flags = Keyword.get(opts, :set, nil)
-    merge_flags = Keyword.get(opts, :merge, nil)
+    set_flags = opts[:set] || nil
+    merge_flags = opts[:merge] || nil
 
     cond do
       opts == [] ->
@@ -122,48 +112,6 @@ defmodule Mqtt.Inbound do
   defp config(key, default) when is_atom(key) do
     import Application, only: [get_env: 2]
     get_env(:helen, Mqtt.Inbound) |> Keyword.get(key, default)
-  end
-
-  @doc """
-  Process a raw JSON payload into a map
-  """
-  @doc since: "0.0.14"
-  def incoming_msg(
-        %{payload: <<123::utf8, _rest::binary>> = json} = msg,
-        s,
-        opts
-      ) do
-    #
-    # NOTE must return the state
-    #
-
-    with {:ok, r} <- Jason.decode(json, keys: :atoms),
-         # drop the payload from the msg since it has been decoded
-         # this allows the subsequent call to incoming_msg to match on
-         # the decoded / unpacked message
-         msg <- Map.drop(msg, [:payload]),
-         # merge the decoded message and the original message
-         msg <- Map.merge(msg, r) do
-      incoming_msg(msg, s, opts)
-    else
-      {:error, %Jason.DecodeError{data: data} = _e} ->
-        opts = [binaries: :as_strings, pretty: true, limit: :infinity]
-
-        err_msg =
-          ["parse failure:\n", inspect(data, opts)] |> IO.iodata_to_binary()
-
-        Logger.warn(err_msg)
-
-        Map.put(s, :parse_failure, err_msg)
-
-      anything ->
-        err_msg =
-          ["parse failure:\n", inspect(anything, pretty: true)]
-          |> IO.iodata_to_binary()
-
-        Logger.warn(err_msg)
-        Map.put(s, :parse_failure, err_msg)
-    end
   end
 
   def incoming_msg(%{payload: msgpack} = msg, %{} = s, opts)
@@ -239,7 +187,7 @@ defmodule Mqtt.Inbound do
       # now hand off the message for processing
 
       # NOTE
-      # the new state is returned by msg_process
+      # the new state is returned by msg_proces
       msg_process(s, r, opts)
     else
       # metadata failed checks
@@ -316,7 +264,6 @@ defmodule Mqtt.Inbound do
 
   defp msg_switch(%{async: async} = msg) do
     process = fn ->
-      # the "happy path" of this with is to check for errors
       Switch.handle_message(msg) |> check_msg_fault()
     end
 
@@ -396,22 +343,12 @@ defmodule Mqtt.Inbound do
     Map.put(s, :seen_topics, topics)
   end
 
-  @doc """
-  Does the message have the base metadata?
-  """
+  @mtime_min Helen.Time.Helper.unix_now(:second) - 5
 
-  @doc since: "0.0.14"
-  def metadata(
-        %{mtime: mtime, type: type, host: <<"ruth.", _rest::binary>>} = r
-      )
-      when is_integer(mtime) and
-             is_binary(type),
-      do: Map.merge(r, %{metadata: :ok, processed: false})
-
-  def metadata(%{mtime: mtime, type: type, host: <<"mcr.", _rest::binary>>} = r)
-      when is_integer(mtime) and
-             is_binary(type),
-      do: Map.merge(r, %{metadata: :ok, processed: false})
+  def metadata(%{mtime: m, type: t, host: <<"ruth.", _rest::binary>>} = r)
+      when is_integer(m) and m >= @mtime_min and is_binary(t) do
+    Map.merge(r, %{metadata: :ok, processed: false})
+  end
 
   def metadata(bad) do
     Logger.warn(["bad metadata ", inspect(bad, pretty: true)])
@@ -421,17 +358,6 @@ defmodule Mqtt.Inbound do
   def metadata?(%{metadata: :ok}), do: true
   def metadata?(%{metadata: :failed}), do: false
   def metadata?(%{} = r), do: metadata(r) |> metadata?()
-
-  @doc """
-  Is the message current?
-  """
-  @doc since: "0.0.14"
-  def mtime_good?(%{} = r) do
-    mtime = Map.get(r, :mtime, 0)
-
-    # if greater than epoch + 1 year then it's good
-    mtime > 365 * 24 * 60 * 60 - 1
-  end
 
   ##
   ## Logging Helpers

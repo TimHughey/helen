@@ -22,21 +22,17 @@ defmodule Switch.DB.Device do
     field(:ttl_ms, :integer, default: 60_000)
     field(:last_seen_at, :utc_datetime_usec)
     field(:last_cmd_at, :utc_datetime_usec)
-    field(:discovered_at, :utc_datetime_usec)
 
     has_many(:cmds, Command, foreign_key: :device_id, references: :id)
-
     has_many(:aliases, Alias, foreign_key: :device_id, references: :id)
 
     timestamps(type: :utc_datetime_usec)
   end
 
-  def add(list) when is_list(list) do
-    for %Schema{} = x <- list do
-      upsert(x, x)
-    end
-  end
+  @doc false
+  def all(x), do: Repo.all(x)
 
+  @doc false
   def add_cmd(%Schema{} = x, %Alias{} = a, %DateTime{} = dt) do
     import Ecto.Query, only: [from: 2]
 
@@ -52,17 +48,7 @@ defmodule Switch.DB.Device do
       else: {rc, x}
   end
 
-  def alias_from_legacy(
-        %{name: name, pio: pio, switch: %{device: device}} = legacy
-      ) do
-    extra_opts =
-      Map.take(legacy, [:description, :invert_state, :ttl_ms]) |> Enum.into([])
-
-    opts = [create: true, name: name, pio: pio] ++ extra_opts
-
-    dev_alias(device, opts)
-  end
-
+  @doc false
   def changeset(x, p) do
     import Ecto.Changeset,
       only: [
@@ -87,7 +73,6 @@ defmodule Switch.DB.Device do
   @doc """
     Retrieve Switch Device names
   """
-
   @doc since: "0.0.21"
   def devices do
     import Ecto.Query, only: [from: 2]
@@ -98,73 +83,24 @@ defmodule Switch.DB.Device do
   @doc """
     Retrieve switch device names that begin with a pattern
   """
-
   @doc since: "0.0.21"
   def devices_begin_with(pattern) when is_binary(pattern) do
     import Ecto.Query, only: [from: 2]
+    import IO, only: [iodata_to_binary: 1]
 
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
+    like_string = iodata_to_binary([pattern, "%"])
 
     from(x in Schema,
       where: like(x.device, ^like_string),
       order_by: x.device,
       select: x.device
     )
-    |> Repo.all()
-  end
-
-  def dev_alias(device_or_id, opts) when is_list(opts) do
-    case find(device_or_id) do
-      %Schema{} = x -> dev_alias(x, opts)
-      _not_found -> {:not_found, device_or_id}
-    end
-  end
-
-  def dev_alias(%Schema{} = sd, opts) when is_list(opts) do
-    create = opts[:create]
-    alias_name = opts[:name]
-    pio = opts[:pio]
-    {exists_rc, sa} = find_alias_by_pio(sd, pio)
-
-    check_args =
-      is_binary(alias_name) and is_integer(pio) and pio >= 0 and
-        pio < pio_count(sd)
-
-    cond do
-      check_args == false ->
-        {:bad_args, sd, opts}
-
-      create and exists_rc == :ok ->
-        Alias.rename(sa, [name: alias_name] ++ opts)
-
-      create ->
-        Alias.create(sd, alias_name, pio, opts)
-
-      true ->
-        find_alias(sd, alias_name, pio, opts)
-    end
-  end
-
-  def exists?(device, pio) when is_binary(device) and is_integer(pio) do
-    {rc, _res} = pio_state(device, pio)
-
-    if rc in [:ok, :ttl_expired], do: true, else: false
+    |> all()
   end
 
   @doc """
-    Get a Switch Device id or device
-
-    Same return values as Repo.get_by/2
-
-      1. nil if not found
-      2. %Device{}
-
-      ## Examples
-        iex> Switch.DB.Device.find("default")
-        %Device{}
+  Find the actual device struct using the name or id
   """
-
-  @doc since: "0.0.21"
   def find(id_or_device) do
     check_args = fn
       x when is_binary(x) -> [device: x]
@@ -201,6 +137,7 @@ defmodule Switch.DB.Device do
       else: {:ok, hd(found)}
   end
 
+  @doc false
   def keys(:all) do
     drop =
       [:__meta__, :id, __schema__(:associations)]
@@ -212,33 +149,23 @@ defmodule Switch.DB.Device do
     |> List.flatten()
   end
 
+  @doc false
   def keys(:cast) do
     keys_drop(:all, [__schema__(:embeds)])
   end
 
+  @doc false
   def keys(:required),
     do: keys_drop(:all, [:inserted_at, :updated_at])
 
+  @doc false
   def keys(:replace) do
-    keys_drop(:all, [:device, :discovered_at, :inserted_at])
+    keys_drop(:all, [:device, :inserted_at])
   end
 
-  def find_alias_by_pio(
-        %Schema{aliases: aliases},
-        alias_pio,
-        _opts \\ []
-      )
-      when is_integer(alias_pio) and alias_pio >= 0 do
-    found =
-      for %Alias{pio: pio} = x
-          when pio == alias_pio <- aliases,
-          do: x
-
-    if Enum.empty?(found),
-      do: {:not_found, {alias_pio}},
-      else: {:ok, hd(found)}
-  end
-
+  @doc """
+  Get the count of pios for a device by name or actual device struct
+  """
   def pio_count(%Schema{states: states}), do: Enum.count(states)
 
   def pio_count(device) when is_binary(device) do
@@ -249,29 +176,37 @@ defmodule Switch.DB.Device do
       else: pio_count(sd)
   end
 
-  # function header
-  def pio_state(device, pio, opts \\ [])
-
-  def pio_state(device, pio, opts)
-      when is_binary(device) and
-             is_integer(pio) and
-             pio >= 0 and
-             is_list(opts) do
-    sd = find(device)
-
-    if is_nil(sd), do: {:not_found, device}, else: pio_state(sd, pio, opts)
-  end
-
-  def pio_state(%Schema{} = sd, pio, opts)
+  @doc false
+  def pio_state(%Schema{} = sd, pio, opts \\ [])
       when is_integer(pio) and
              pio >= 0 and
              is_list(opts) do
-    actual_pio_state(sd, pio, opts)
+    pio_state_actual(sd, pio, opts)
+  end
+
+  @doc false
+  defp pio_state_actual(%Schema{device: device} = sd, pio, opts) do
+    import Helen.Time.Helper, only: [ttl_check: 4]
+
+    alias Switch.DB.Device.State, as: State
+
+    find_fn = fn %State{pio: p} -> p == pio end
+
+    with %Schema{states: states, last_seen_at: seen_at, ttl_ms: ttl_ms} <- sd,
+         %State{state: state} <- Enum.find(states, find_fn) do
+      ttl_check(seen_at, state, ttl_ms, opts)
+    else
+      _anything ->
+        {:bad_pio, {device, pio}}
+    end
   end
 
   # NOTE: the %_{} assignment match is any struct
+  @doc false
   def preload(%_{} = x), do: preload_unacked_cmds(x) |> Repo.preload([:aliases])
+  def preload(other), do: other
 
+  @doc false
   def record_cmd(%Schema{} = sd, %Alias{} = sa, opts)
       when is_list(opts) do
     import Switch.Payload.Position, only: [send_cmd: 4]
@@ -296,34 +231,23 @@ defmodule Switch.DB.Device do
     end
   end
 
-  @doc """
-  Reload a %Switch.DB.Device{}
-  """
-
-  @doc since: "0.0.21"
-  def reload(args) do
+  @doc false
+  def reload(%Schema{id: id}) do
     import Repo, only: [get!: 2]
 
-    case args do
-      # results of a Repo function
-      {:ok, %Schema{id: id}} -> get!(Schema, id) |> preload()
-      # an existing struct
-      %Schema{id: id} -> get!(Schema, id) |> preload()
-      # by id
-      id when is_integer(id) -> get!(Schema, id) |> preload()
-      # something we can't handle
-      args -> {:error, {:bad_args, args}}
-    end
+    get!(Schema, id) |> preload()
   end
 
+  @doc false
   def states_changeset(schema, params) do
     import Ecto.Changeset, only: [cast: 3]
 
     cast(schema, params, [:pio, :state])
   end
 
-  def upsert(%{device: _, host: _, mtime: mtime, states: _} = msg) do
-    import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
+  @doc false
+  def upsert(%{device: _, host: _, states: _} = msg) do
+    import Helen.Time.Helper, only: [utc_now: 0]
 
     params = [
       :device,
@@ -331,16 +255,11 @@ defmodule Switch.DB.Device do
       :states,
       :dev_latency_us,
       :ttl_ms,
-      :discovered_at,
       :last_cmd_at,
       :last_seen_at
     ]
 
-    params_default = %{
-      discovered_at: from_unix(mtime),
-      last_cmd_at: utc_now(),
-      last_seen_at: utc_now()
-    }
+    params_default = %{last_cmd_at: utc_now(), last_seen_at: utc_now()}
 
     # assemble a map of changes
     # NOTE:  the second map passed to Map.merge/2 replaces duplicate keys
@@ -355,6 +274,7 @@ defmodule Switch.DB.Device do
     |> Command.ack_if_needed()
   end
 
+  @doc false
   # Device.upsert/2 will insert or update a %Device{} using the map passed in
   def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
     # make certain the params are a map
@@ -385,22 +305,6 @@ defmodule Switch.DB.Device do
 
       error ->
         {:error, error}
-    end
-  end
-
-  defp actual_pio_state(%Schema{device: device} = sd, pio, opts) do
-    import Helen.Time.Helper, only: [ttl_check: 4]
-
-    alias Switch.DB.Device.State, as: State
-
-    find_fn = fn %State{pio: p} -> p == pio end
-
-    with %Schema{states: states, last_seen_at: seen_at, ttl_ms: ttl_ms} <- sd,
-         %State{state: state} <- Enum.find(states, find_fn) do
-      ttl_check(seen_at, state, ttl_ms, opts)
-    else
-      _anything ->
-        {:bad_pio, {device, pio}}
     end
   end
 

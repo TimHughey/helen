@@ -93,9 +93,8 @@ defmodule PulseWidth.DB.Alias do
     # if the duty opt was passed then an update is requested
     with %Schema{device: %Device{} = d} = a <- find(name_or_id),
          # lazy_check does all the heavy lifting
-         {:cmd_needed?, true, cmd_map} <- lazy_check(a, lazy, duty),
-         cmd_map = Map.put(cmd_map, :initial_opts, opts) do
-      Device.record_cmd(d, a, cmd_map: cmd_map)
+         {:cmd_needed?, true, cmd_map} <- lazy_check(a, lazy, duty) do
+      Device.record_cmd(d, a, cmd_map: put_in(cmd_map, [:initial_opts], opts))
     else
       nil ->
         {:not_found, name_or_id}
@@ -201,17 +200,15 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def off(name) when is_binary(name) do
-    with %Schema{device: %Device{duty_min: min}} <- find(name) do
-      duty(name, duty: min)
-    else
+    case find(name) do
+      %Schema{device: %Device{duty_min: min}} -> duty(name, duty: min)
       _catchall -> {:not_found, name}
     end
   end
 
   def on(name) when is_binary(name) do
-    with %Schema{device: %Device{duty_max: max}} <- find(name) do
-      duty(name, duty: max)
-    else
+    case find(name) do
+      %Schema{device: %Device{duty_max: max}} -> duty(name, duty: max)
       _catchall -> {:not_found, name}
     end
   end
@@ -319,27 +316,6 @@ defmodule PulseWidth.DB.Alias do
     |> validate_inclusion(:capability, ["pwm", "toggle"])
   end
 
-  defp duty_calculate(%_{duty_max: max, duty_min: min}, duty) do
-    percent = fn x -> Float.round(max * x, 0) |> trunc() end
-    round = fn x -> Float.round(x, 0) |> trunc() end
-
-    case duty do
-      # duty was not in the original opts
-      nil -> nil
-      # handle simple duty values
-      d when is_integer(d) and d >= min and d <= max -> d
-      # bound limit duty requests
-      d when d > max -> max
-      d when d < min -> min
-      # floats less than one are considered percentages
-      d when is_float(d) and d <= 0.99 -> percent.(d)
-      # floats greater than one are made integers
-      d when is_float(d) and d > 0.99 -> round.(d)
-      # it's just a simple duty > 1, less than max and greater than min
-      duty -> duty
-    end
-  end
-
   defp duty_now(%_{ttl_ms: ttl_ms, device: %_{duty: duty} = x}, opts) do
     import Helen.Time.Helper, only: [ttl_expired?: 2]
 
@@ -374,7 +350,8 @@ defmodule PulseWidth.DB.Alias do
   defp last_seen_at(%Device{last_seen_at: x}), do: x
 
   defp lazy_check(%_{device: %_{duty: d} = device} = dev_alias, lazy, duty) do
-    new_duty = duty_calculate(device, duty)
+    import PulseWidth.Duty, only: [calculate: 2]
+    new_duty = calculate(device, duty)
 
     cond do
       # duty was not in the opts, this is a read

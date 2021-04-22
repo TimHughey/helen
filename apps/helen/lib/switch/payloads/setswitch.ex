@@ -8,7 +8,7 @@ defmodule Switch.Payload.Position do
         %Device{device: device, host: host},
         %Command{refid: refid},
         %{pio: _pio, state: _state} = state_map,
-        opts \\ []
+        opts
       )
       when is_list(opts) do
     import Helen.Time.Helper, only: [unix_now: 1]
@@ -28,7 +28,7 @@ defmodule Switch.Payload.Position do
         %Device{device: device} = d,
         %Command{} = c,
         state_map,
-        opts \\ []
+        opts
       )
       when is_map(state_map) do
     # remove the keys from opts that are consumed by create_cmd
