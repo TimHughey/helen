@@ -5,12 +5,10 @@ import Config
 config :helen,
   feeds: [
     prefix: "test",
-    rpt: {"prod/r/#", 0}
+    rpt: {"test/r/#", 0}
   ]
 
 config :helen, Mqtt.Client,
-  log_dropped_msg: true,
-  runtime_metrics: true,
   tort_opts: [
     client_id: "helen-test",
     user_name: "mqtt",
@@ -18,14 +16,6 @@ config :helen, Mqtt.Client,
     server: {Tortoise.Transport.Tcp, host: "mqtt.live.wisslanding.com", port: 1883},
     keep_alive: 36
   ]
-
-config :helen, Mqtt.Inbound,
-  log: [
-    engine_metrics: false
-  ]
-
-# ],
-# periodic_log: [enable: false, first: {:secs, 10}, repeat: {:mins, 5}]
 
 config :helen, Fact.Influx,
   database: "helen_test",
@@ -57,7 +47,8 @@ config :helen, Repo,
   hostname: "db.test.wisslanding.com",
   pool_size: 10,
   migration_timestamps: [type: :utc_datetime_usec],
-  adapter: Ecto.Adapters.Postgres
+  adapter: Ecto.Adapters.Postgres,
+  loggers: [{Ecto.LogEntry, :log, [:debug]}]
 
 config :helen, Switch.DB.Command,
   # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime

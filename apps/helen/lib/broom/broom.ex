@@ -161,8 +161,7 @@ defmodule Broom do
         before = utc_shift_past(sent_before_opts)
 
         from(x in __MODULE__,
-          where:
-            x.acked == false and x.orphan == false and x.inserted_at <= ^before
+          where: x.acked == false and x.orphan == false and x.inserted_at <= ^before
         )
         |> Repo.all()
         |> Repo.preload(preloads)
@@ -248,15 +247,16 @@ defmodule Broom do
   end
 
   def insert_and_track(server, %Ecto.Changeset{} = cs) do
-    with {:cs_valid, true} <- {:cs_valid, cs.valid?},
-         {:ok, _cmd} = cmd_rc <- Repo.insert(cs, returning: true),
-         # TODO
-         #   as of 0.0.23 we simulate the ultimate implementaton of
-         #   the passing of a msg map
-         msg <- %{cmd: cmd_rc},
-         %{cmd: {:ok, _cmd}} = msg <- track(server, msg) do
-      msg
+    with {:cs_valid, true, _cs} <- {:cs_valid, cs.valid?, cs},
+         {:ok, %_{acked: acked} = cmd} = cmd_rc <- Repo.insert(cs, returning: true) do
+      # if the cmd is already acked no need to track it
+      if acked do
+        %{cmd: {:ok, cmd}}
+      else
+        track(server, %{cmd: cmd_rc})
+      end
     else
+      {:cs_valid, false, cs} -> {:invalid_cs, cs}
       error -> {:error, error}
     end
   end
@@ -301,8 +301,7 @@ defmodule Broom do
 
   @doc false
   def handle_call({:count_reset, opts}, _from, %{counts: counts} = s) do
-    new_counts =
-      for(x <- opts, do: Keyword.new() |> Keyword.put(x, 0)) |> List.flatten()
+    new_counts = for(x <- opts, do: Keyword.new() |> Keyword.put(x, 0)) |> List.flatten()
 
     counts = Keyword.merge(counts, new_counts)
 

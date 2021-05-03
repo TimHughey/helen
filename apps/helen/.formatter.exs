@@ -5,7 +5,7 @@
   # files to format
   # inputs: ["mix.exs", "{config,lib,test}/**/*.{ex,exs}"],
 
-  line_length: 100
+  line_length: 110
 
   # importing configs from other libraries it is depending
   # import_deps: [:dependency1, :dependency2],

@@ -55,6 +55,13 @@ defmodule Helen.Time.Helper do
     end
   end
 
+  def elapsed_ms(dt) do
+    case Timex.diff(utc_now(), dt) do
+      {:error, _} -> 0
+      d -> Duration.to_milliseconds(d, truncate: true)
+    end
+  end
+
   @doc """
   Calculates the elapsed duration of start and finish arguments.
 
@@ -413,11 +420,46 @@ defmodule Helen.Time.Helper do
 
   """
   @doc since: "0.0.27"
+  @deprecated "Use ttl_check/3 instead"
+  # (1 of 4) deprecated multiple args
   def ttl_check(at, val, ttl_ms, opts) do
     # ttl_ms in opts overrides passed in ttl_ms
     ms = Keyword.get(opts, :ttl_ms, ttl_ms)
 
     if ttl_expired?(at, ms), do: {:ttl_expired, val}, else: {:ok, val}
+  end
+
+  # (2 of 4) accept an Alias struct containing a Device struct
+  def ttl_check(m, s, opts) when is_map(m) and is_struct(s) and is_list(opts) do
+    #
+    # NOTE: the first ttl_ms found in opts is used for the check
+    #
+
+    # the case accepts:  (1) %Alias{%Device{}}, (2) legacy %Device{}
+    case s do
+      %_{ttl_ms: x, device: %_{last_seen_at: y}} -> ttl_check(m, opts ++ [ttl_ms: x, seen_at: y])
+      %_{ttl_ms: x, last_seen_at: y} -> ttl_check(m, opts ++ [ttl_ms: x, seen_at: y])
+      x -> {:bad_args, "ttl_check unknown struct:\n#{inspect(x, pretty: true)}"}
+    end
+  end
+
+  # (3 of 4) put into the first arg the ttl_expired? check
+  def ttl_check(m, opts) when is_map(m) and is_list(opts) do
+    # NOTE: the first ttl_ms found in opts is used
+    ttl_ms = opts[:ttl_ms]
+
+    # ttl_ms specified in opts overrides ttl_ms found in struct
+    if ttl_expired?(opts[:seen_at], ttl_ms) do
+      # put the ttl_ms used for this check into the returned map
+      put_in(m, [:ttl_expired], true) |> put_in([:ttl_ms], ttl_ms)
+    else
+      m
+    end
+  end
+
+  # (4 of 4) put into the first arg the ttl_expired? check
+  def ttl_check(%{ttl_ms: ttl_ms, seen_at: seen_at} = m) do
+    (ttl_expired?(seen_at, ttl_ms) && put_in(m, [:ttl_expired], true)) || m
   end
 
   @doc """
@@ -515,8 +557,10 @@ defmodule Helen.Time.Helper do
 
   """
   @doc since: "0.0.27"
-  def unix_now(unit) when is_atom(unit) do
-    Timex.now() |> DateTime.to_unix(unit)
+  def unix_now(unit, opts \\ []) when is_atom(unit) do
+    now = Timex.now() |> DateTime.to_unix(unit)
+
+    (opts[:as] == :string && Integer.to_string(now)) || now
   end
 
   @doc """
