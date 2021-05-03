@@ -54,35 +54,24 @@ defmodule Mqtt.Client do
 
     s = Map.put_new(s, :runtime_metrics, false)
 
-    if Map.get(s, :autostart, false) do
-      # prepare the opts that will be passed to Tortoise and start it
+    # prepare the opts that will be passed to Tortoise and start it
 
-      opts = config(:tort_opts) ++ [handler: {Mqtt.Handler, []}]
-      {:ok, mqtt_pid} = Connection.start_link(opts)
+    opts = config(:tort_opts) ++ [handler: {Mqtt.Handler, []}]
+    {:ok, mqtt_pid} = Connection.start_link(opts)
 
-      # populate the state and construct init() return
-      new_state = %{
-        mqtt_pid: mqtt_pid,
-        client_id: Keyword.get(opts, :client_id),
-        mqtt_env: @feed_prefix,
-        opts: opts
-      }
+    # populate the state and construct init() return
+    new_state = %{
+      mqtt_pid: mqtt_pid,
+      client_id: Keyword.get(opts, :client_id),
+      mqtt_env: @feed_prefix,
+      opts: opts
+    }
 
-      s = Map.merge(s, new_state)
+    s = Map.merge(s, new_state)
 
-      Logger.debug(["MQTT via tortoise ", inspect(mqtt_pid)])
+    Logger.debug(["MQTT via tortoise ", inspect(mqtt_pid)])
 
-      {:ok, s}
-    else
-      # when we don't autostart the mqtt pid will be nil
-      s = Map.put_new(s, :mqtt_pid, nil) |> Map.put_new(:client_id, nil)
-
-      {:ok, s}
-    end
-
-    # init() return is calculated above in if block
-    # at the conclusion of init() we have a running InboundMessage GenServer and
-    # potentially a connection to MQTT
+    {:ok, s}
   end
 
   def start_link(s) when is_map(s) do
@@ -118,18 +107,8 @@ defmodule Mqtt.Client do
     end
   end
 
-  def runtime_metrics, do: GenServer.call(__MODULE__, {:runtime_metrics})
-
-  def runtime_metrics(flag) when is_boolean(flag) or flag == :toggle do
-    GenServer.call(__MODULE__, {:runtime_metrics, flag})
-  end
-
   @impl true
-  def handle_call(
-        {:publish, feed, payload, pub_opts} = msg,
-        _from,
-        %{autostart: true, client_id: client_id} = s
-      )
+  def handle_call({:publish, feed, payload, pub_opts} = msg, _from, %{client_id: client_id} = s)
       when is_binary(feed) and is_list(pub_opts) do
     alias Mqtt.Client.Fact.Payload, as: Influx
 
@@ -140,38 +119,7 @@ defmodule Mqtt.Client do
         Tortoise.publish(client_id, feed, payload, pub_opts)
       end)
 
-    {:reply, pub_rc,
-     Map.put(s, :last_pub_rc, elapsed_us: elapsed_us, rc: pub_rc)}
-  end
-
-  @impl true
-  def handle_call(
-        {:publish, feed, payload, pub_opts},
-        _from,
-        %{autostart: false} = s
-      )
-      when is_binary(feed) and is_list(pub_opts) do
-    Logger.debug(["not started, dropping ", inspect(payload, pretty: true)])
-    {:reply, :not_started, s}
-  end
-
-  @impl true
-  def handle_call({:runtime_metrics}, _from, %{runtime_metrics: flag} = s),
-    do: {:reply, flag, s}
-
-  @impl true
-  def handle_call({:runtime_metrics, flag}, _from, %{runtime_metrics: was} = s)
-      when is_boolean(flag) or flag == :toggle do
-    new_flag =
-      if flag == :toggle do
-        not s.runtime_metrics
-      else
-        flag
-      end
-
-    s = Map.put(s, :runtime_metrics, new_flag)
-
-    {:reply, %{was: was, is: s.runtime_metrics}, s}
+    {:reply, pub_rc, Map.put(s, :last_pub_rc, elapsed_us: elapsed_us, rc: pub_rc)}
   end
 
   @impl true
@@ -229,50 +177,6 @@ defmodule Mqtt.Client do
 
     {:noreply, s}
   end
-
-  # @impl true
-  # def handle_info(
-  #       {ref, result} = msg,
-  #       %{timesync: %{task: %{ref: timesync_ref}}} = s
-  #     )
-  #     when is_reference(ref) and ref == timesync_ref do
-  #   Logger.debug([
-  #     "handle_info(",
-  #     inspect(msg, pretty: true),
-  #     ", ",
-  #     inspect(s, pretty: true)
-  #   ])
-  #
-  #   s = Map.put(s, :timesync, Map.put(s.timesync, :result, result))
-  #
-  #   {:noreply, s}
-  # end
-
-  # @impl true
-  # def handle_info(
-  #       {:DOWN, ref, :process, pid, reason} = msg,
-  #       %{timesync: %{task: %{ref: timesync_ref}}} = s
-  #     )
-  #     when is_reference(ref) and is_pid(pid) do
-  #   Logger.debug([
-  #     "handle_info(",
-  #     inspect(msg, pretty: true),
-  #     ", ",
-  #     inspect(s, pretty: true)
-  #   ])
-  #
-  #   s =
-  #     if ref == timesync_ref do
-  #       track =
-  #         Map.put(s.timesync, :exit, reason)
-  #         |> Map.put(:task, nil)
-  #         |> Map.put(:status, :finished)
-  #
-  #       Map.put(s, :timesync, track)
-  #     end
-  #
-  #   {:noreply, s}
-  # end
 
   @impl true
   def handle_info(unhandled_msg, s) do

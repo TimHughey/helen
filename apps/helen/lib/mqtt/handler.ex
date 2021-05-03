@@ -43,7 +43,7 @@ defmodule Mqtt.Handler do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     %{payload: payload, topic: topic, host: src_host, msg_recv_dt: utc_now()}
-    |> Mqtt.Inbound.process()
+    |> Mqtt.Inbound.handoff_msg()
 
     {:ok, state}
   end

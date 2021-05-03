@@ -1,89 +1,53 @@
 defmodule Mqtt.Inbound do
   @moduledoc false
 
+  @log_opts [reading: false]
+  @compile_opts Application.compile_env(:helen, Mqtt.Inbound)
+
   require Logger
   use GenServer
 
-  def start_link(s) do
-    GenServer.start_link(Mqtt.Inbound, s, name: Mqtt.Inbound)
-  end
-
-  ## Callbacks
-
-  def additional_message_flags(opts \\ []) when is_list(opts) do
-    GenServer.call(__MODULE__, {:additional_message_flags, opts})
+  def start_link(args) do
+    GenServer.start_link(Mqtt.Inbound, args, name: Mqtt.Inbound)
   end
 
   @impl true
-  def init(s)
-      when is_map(s) do
-    Logger.debug(["init()"])
-
-    s =
-      Map.put_new(s, :log_reading, config(:log_reading, false))
-      |> Map.put_new(:messages_dispatched, 0)
-      |> Map.put_new(
-        :additional_message_flags,
-        config(:additional_message_flags,
-          log_invalid_readings: true,
-          log_roundtrip_times: true
-        )
-        |> Enum.into(%{})
-      )
-
-    {:ok, s}
+  def init(_args) do
+    %{
+      async: @compile_opts[:async] || true,
+      log: log_opts(),
+      messages_dispatched: 0,
+      seen_topics: MapSet.new(),
+      # round trip references seen and waiting processes
+      roundtrip: %{}
+    }
+    |> reply_ok()
   end
 
-  def seen_topics do
-    %{seen_topics: topics} = :sys.get_state(__MODULE__)
-
-    MapSet.to_list(topics) |> Enum.sort()
-  end
-
-  # internal work functions
-
-  def process(%{payload: payload, topic: _} = msg, opts \\ [])
-      when is_bitstring(payload) and is_list(opts) do
+  def handoff_msg(%{payload: payload, topic: _} = msg) when is_bitstring(payload) do
     alias Mqtt.Client.Fact.Payload, as: Influx
 
     Influx.write_specific_metric(msg)
 
-    async = Keyword.get(opts, :async, true)
-
-    if async,
-      do: GenServer.cast(Mqtt.Inbound, {:incoming_msg, msg, opts}),
-      else: GenServer.call(Mqtt.Inbound, {:incoming_msg, msg, opts})
-  end
-
-  # GenServer callbacks
-  @impl true
-  def handle_call({:additional_message_flags, opts}, _from, s) do
-    set_flags = opts[:set] || nil
-    merge_flags = opts[:merge] || nil
-
-    cond do
-      opts == [] ->
-        {:reply, s.additional_message_flags, s}
-
-      is_list(set_flags) ->
-        s = Map.put(s, :additional_flags, Enum.into(set_flags, %{}))
-        {:reply, {:ok, s.additional_flags}, s}
-
-      is_list(merge_flags) ->
-        flags =
-          Map.merge(s.additional_message_flags, Enum.into(merge_flags, %{}))
-
-        s = Map.put(s, :additional_flags, flags)
-        {:reply, {:ok, s.additional_flags}, s}
-
-      true ->
-        {:reply, :bad_opts, s}
-    end
+    GenServer.cast(Mqtt.Inbound, {:incoming_msg, msg})
   end
 
   @impl true
-  def handle_call({:incoming_msg, msg, opts}, _from, s) when is_map(msg) do
-    {:reply, :ok, incoming_msg(msg, s, opts)}
+  def handle_call({:incoming_msg, msg}, _from, s) when is_map(msg) do
+    {:reply, :ok, incoming_msg(msg, s)}
+  end
+
+  @impl true
+  # (1 of 2) the roundtrip reference has already been processed
+  def handle_call({:wait_for_roundtrip_ref, ref}, _from, %{roundtrip: roundtrip} = s)
+      when is_map_key(roundtrip, ref) do
+    %{s | roundtrip: Map.delete(roundtrip, ref)} |> reply(:already_received)
+  end
+
+  @impl true
+  # (2 of 2) the roundtrip reference hasn't been seen, add the caller to the waiter map
+  def handle_call({:wait_for_roundtrip_ref, ref}, {pid, _ref}, s) do
+    %{s | roundtrip: put_in(s.roundtrip, [ref], pid)} |> reply(:added_to_waiters)
   end
 
   @impl true
@@ -93,8 +57,13 @@ defmodule Mqtt.Inbound do
   end
 
   @impl true
-  def handle_cast({:incoming_msg, msg, opts}, s) when is_map(msg) do
-    {:noreply, incoming_msg(msg, s, opts)}
+  def handle_cast({:incoming_msg, msg}, s) when is_map(msg) do
+    {:noreply, incoming_msg(msg, s)}
+  end
+
+  @impl true
+  def handle_cast({:notified_waiter, ref}, s) do
+    %{s | roundtrip: Map.delete(s.roundtrip, ref)} |> noreply()
   end
 
   @impl true
@@ -109,30 +78,23 @@ defmodule Mqtt.Inbound do
     {:noreply, s}
   end
 
-  defp config(key, default) when is_atom(key) do
-    import Application, only: [get_env: 2]
-    get_env(:helen, Mqtt.Inbound) |> Keyword.get(key, default)
-  end
-
-  def incoming_msg(%{payload: msgpack} = msg, %{} = s, opts)
-      when is_bitstring(msgpack) do
+  def incoming_msg(%{payload: packed} = msg, s) when is_bitstring(packed) do
     #
     # NOTE must return the state
     #
-
-    with {:ok, r} <- Msgpax.unpack(msgpack),
+    with {:ok, r} <- Msgpax.unpack(packed),
          # drop the payload from the msg since it has been decoded
          # this allows the subsequent call to incoming_msg to match on
          # the decoded / unpacked message
          msg <- Map.drop(msg, [:payload]),
          # NOTE: Msgpax.unpack() returns maps with binaries as keys so let's
          #       convert them to atoms
-         msg <- Map.merge(msg, atomize_keys(r)) do
-      incoming_msg(msg, s, opts)
+         msg <- Map.merge(msg, atomize_keys(r)),
+         s <- add_roundtrip_ref_if_needed(s, msg[:roundtrip_ref]) do
+      incoming_msg(msg, s)
     else
       anything ->
-        err_msg =
-          ["parse failure:\n", inspect(anything)] |> IO.iodata_to_binary()
+        err_msg = ["parse failure:\n", inspect(anything)] |> IO.iodata_to_binary()
 
         Logger.warn(err_msg)
 
@@ -149,46 +111,13 @@ defmodule Mqtt.Inbound do
   # to msg_process
   #
   # this function returns the server state
-  def incoming_msg(%{topic: topic} = msg, s, opts) do
+  def incoming_msg(%{topic: topic} = msg, s) do
     with %{metadata: :ok} = r <- metadata(msg),
-         # begin populating the message (aka Reading) with various
-         # flags
-
-         # log is a bool that directs downstream if logging
-         # should occur for this message.  the value from the
-         # message takes precedence.  if unspecifed then the
-         # config option from the state is used.
-         log_reading <- Map.get(r, :log, s.log_reading),
-         # runtime_metrics consists of various configuration
-         # items for downstream processing.  for consistency, if
-         # the incoming message does not contain this key look in opts
-         # passed to this function.  finally, if not in the opts default
-         # to false
-         runtime_metrics <- Keyword.get(opts, :runtime_metrics, false),
-         # the base of the extra msg (reading) flags are the additional
-         # message flags present in the state.  these flags are initially
-         # from the configuration (or defaults) however could have been
-         # changed at runtime.
-
-         # we also include log_reading and runtime_metrics
-         extra <-
-           Map.get(s, :additional_message_flags, %{})
-           |> Map.put(:log_reading, log_reading)
-           |> Map.put(:runtime_metrics, runtime_metrics),
-         # final step in populating the msg (reading) for processing is to
-         # merge in th extra flags
-
-         # NOTE
-         # the msg (reading) is merged INTO the extra opts to avoid
-         # overriding existing values
-         r <- Map.merge(extra, r),
-         # capture some MQTT metrics for operations
+         r <- put_in(r, [:log_reading], r[:log] || s.log.reading),
          s <- track_topics(s, msg) |> track_messages_dispatched() do
-      # now hand off the message for processing
-
       # NOTE
-      # the new state is returned by msg_proces
-      msg_process(s, r, opts)
+      # the new state is returned by msg_process
+      msg_process(s, r)
     else
       # metadata failed checks
       {:ok, %{metadata: :failed}} ->
@@ -212,25 +141,54 @@ defmodule Mqtt.Inbound do
     end
   end
 
-  def incoming_msg(%{parse_failure: parse_err}, state, _opts) do
+  def incoming_msg(%{parse_failure: parse_err}, state) do
     ["incoming msg parse err: ", inspect(parse_err, pretty: true)]
     |> Logger.warn()
 
     state
   end
 
-  def incoming_msg(msg, state, _opts) do
+  def incoming_msg(msg, state) do
     ["incoming_msg unmatched:\n", inspect(msg, pretty: true)] |> Logger.info()
 
     state
   end
 
-  defp msg_process(%{} = state, %{type: type, topic: topic} = r, opts) do
-    # unless specified in opts, we process "heavy" messages async
-    # include async in the actual message (reading) for downstream
-    async = Keyword.get(opts, :async, true)
-    r = Map.put(r, :async, async)
+  # (2 of 2) no waiter for this roundtrip ref yet, add it
+  defp add_roundtrip_ref_if_needed(%{roundtrip: roundtrip} = s, rt_ref)
+       when is_binary(rt_ref) and not is_map_key(roundtrip, rt_ref) do
+    %{s | roundtrip: put_in(roundtrip, [rt_ref], :received)}
+  end
 
+  # (2 of 2) either already in roundtrip or not a binary
+  defp add_roundtrip_ref_if_needed(s, _), do: s
+
+  # (1 of 2) there is a waiter for the roundtrip ref
+  defp msg_post_process(%{roundtrip: roundtrip, roundtrip_ref: rt_ref} = msg)
+       when is_map_key(roundtrip, rt_ref) do
+    reply_to = get_in(roundtrip, [rt_ref])
+    send(reply_to, {{Mqtt.Inbound, :roundtrip}, rt_ref})
+
+    GenServer.cast(__MODULE__, {:notified_waiter, rt_ref})
+
+    check_msg_fault(msg)
+  end
+
+  # (3 of 3) no roundtrip ref
+  defp msg_post_process(msg), do: check_msg_fault(msg)
+
+  # (1 of 2) populate msg with specific keys from state for use downstream and stop the propagation
+  # of the state because the processing of the message itself could be async
+  defp msg_process(state, r) do
+    extra = Map.take(state, [:async, :roundtrip])
+
+    Map.merge(extra, r) |> msg_process()
+
+    state
+  end
+
+  # (2 of 2)
+  defp msg_process(%{type: type, topic: topic} = r) do
     case type do
       type when type in ["switch"] ->
         msg_switch(r)
@@ -256,15 +214,11 @@ defmodule Mqtt.Inbound do
         ]
         |> Logger.warn()
     end
-
-    # NOTE
-    #  must return the state
-    state
   end
 
   defp msg_switch(%{async: async} = msg) do
     process = fn ->
-      Switch.handle_message(msg) |> check_msg_fault()
+      Switch.handle_message(msg) |> msg_post_process()
     end
 
     if async do
@@ -276,7 +230,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_pwm(%{async: async} = msg) do
     process = fn ->
-      PulseWidth.handle_message(msg) |> check_msg_fault()
+      PulseWidth.handle_message(msg) |> msg_post_process()
     end
 
     if async do
@@ -288,7 +242,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_remote(%{async: async} = msg) do
     process = fn ->
-      Remote.handle_message(msg) |> check_msg_fault()
+      Remote.handle_message(msg) |> msg_post_process()
     end
 
     if async do
@@ -317,7 +271,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_sensor(%{async: async} = msg) do
     process = fn ->
-      Sensor.handle_message(msg) |> check_msg_fault()
+      Sensor.handle_message(msg) |> msg_post_process()
     end
 
     if async do
@@ -334,13 +288,10 @@ defmodule Mqtt.Inbound do
   defp track_messages_dispatched(%{messages_dispatched: dispatched} = s),
     do: %{s | messages_dispatched: dispatched + 1}
 
-  defp track_topics(%{} = s, %{} = msg) do
-    topics = Map.get(s, :seen_topics, MapSet.new())
-    topic_list = Map.get(msg, :topic, ["not", "in", "msg"])
+  defp track_topics(s, %{} = msg) do
+    topic = get_in(msg, [:topic]) || ["not", "in", "msg"]
 
-    topics = MapSet.put(topics, Enum.join(topic_list, "/"))
-
-    Map.put(s, :seen_topics, topics)
+    %{s | seen_topics: MapSet.put(s.seen_topics, Enum.join(topic, "/"))}
   end
 
   @mtime_min Helen.Time.Helper.unix_now(:second) - 5
@@ -391,7 +342,7 @@ defmodule Mqtt.Inbound do
     message:
       #{inspect(msg, pretty: true)}
     """
-    |> Logger.warn()
+    |> Logger.debug()
 
     msg
   end
@@ -419,5 +370,27 @@ defmodule Mqtt.Inbound do
 
   def atomize_keys(not_a_map) do
     not_a_map
+  end
+
+  #
+  # new code as of 2021-05-03
+  #
+
+  defp log_opts do
+    for {k, v} <- @log_opts, into: %{} do
+      {k, @compile_opts[k] || v}
+    end
+  end
+
+  defp noreply(state) when is_map(state) do
+    {:noreply, state}
+  end
+
+  defp reply(state, msg) when is_map(state) do
+    {:reply, msg, state}
+  end
+
+  defp reply_ok(state) do
+    {:ok, state}
   end
 end
