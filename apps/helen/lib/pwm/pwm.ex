@@ -3,282 +3,128 @@ defmodule PulseWidth do
     The PulseWidth module provides the public API for PulseWidth devices.
   """
 
+  require Logger
   use Timex
 
-  alias PulseWidth.Command.Example
   alias PulseWidth.DB.{Alias, Command, Device}
-  alias PulseWidth.Notify
+  alias PulseWidth.{Execute, Msg, Notify, Status}
 
-  @doc """
-    Public API for creating a PulseWidth Alias
-  """
-  @doc since: "0.0.26"
-  def alias_create(device_or_id, name, opts \\ []) do
+  defdelegate acked?(refid), to: Command
+
+  def alias_create(device_or_id, name, pio, opts \\ []) do
     # first, find the device to alias
-    with %Device{device: dev_name} = dev <- device_find(device_or_id),
+    with %Device{} = d <- device_find(device_or_id),
+         {:exists?, nil, _} <- {:exists?, Device.find_alias(d, pio), d},
          # create the alias and capture it's name
-         {:ok, %Alias{name: name}} <- Alias.create(dev, name, opts) do
-      [created: [name: name, device: dev_name]]
+         {:ok, %Alias{} = a} <- Alias.create(d, name, pio, opts) do
+      [created: [name: a.name, device: d.device, pio: pio]]
     else
+      {:exists?, %Alias{} = a, %Device{} = d} -> [exists: [name: a.name, device: d.device, pio: pio]]
       nil -> {:not_found, device_or_id}
       error -> error
     end
   end
 
-  @doc """
-  Finds a PulseWidth alias by name or id
-  """
-
-  @doc since: "0.0.25"
   defdelegate alias_find(name_or_id), to: Alias, as: :find
 
-  @doc """
-  Set all PulseWidth aliased devices to off
-  """
-  @doc since: "0.0.25"
-  defdelegate all_off, to: Alias
-
-  @doc """
-    Send a basic sequence to a PulseWidth found by name or actual struct
-
-    PulseWidth.basic(name, basic: %{})
-  """
-  @doc since: "0.0.27"
-  def basic(name_id_pwm, cmd_map, opts \\ []) do
-    Alias.cmd_direct(name_id_pwm, cmd_map, opts)
-  end
-
-  @doc """
-    Return a keyword list of the PulseWidth command counts
-  """
-  @doc since: "0.0.24"
   defdelegate cmd_counts, to: Command
-
-  @doc """
-    Reset the counts maintained by Command (Broom)
-  """
-  @doc since: "0.0.24"
   defdelegate cmd_counts_reset(opts), to: Command
-
-  @doc """
-    Return a list of the PulseWidth commands tracked
-  """
-  @doc since: "0.0.24"
   defdelegate cmds_tracked, to: Command
 
-  @doc """
-    Public API for deleting a PulseWidth Alias
-  """
-  @doc since: "0.0.25"
   defdelegate delete(name_or_id), to: Alias, as: :delete
-
-  @doc """
-    Find a PulseWidth Device by device or id
-  """
-  @doc since: "0.0.25"
   defdelegate device_find(device_or_id), to: Device, as: :find
+  defdelegate devices_begin_with(pattern \\ ""), to: Device
 
-  @doc """
-    Find the alias of a PulseWidth device
-  """
-  @doc since: "0.0.25"
-  defdelegate device_find_alias(device_or_id), to: Device
+  # (1 of 2) single arg entry point, extract name and opts
+  def execute(%{name: name} = cmd_map) do
+    opts = cmd_map[:opts] || []
+    cmd_map = Map.delete(cmd_map, :opts)
 
-  @doc """
-    Retrieve a list of PulseWidth devices that begin with a pattern
-  """
-  @doc since: "0.0.25"
-  def devices_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
-
-    from(x in Device,
-      where: like(x.device, ^like_string),
-      order_by: x.device,
-      select: x.device
-    )
-    |> Repo.all()
+    execute(name, cmd_map, opts)
   end
 
-  def duty(name, opts \\ [])
+  # (2 of 2) prevent crashes
+  def execute(cmd_map) when is_map(cmd_map) do
+    {:invalid, "cmd map must include name"}
+  end
 
-  def duty(name, val_bin) when is_binary(name) and is_binary(val_bin) do
-    if String.contains?(val_bin, ".") do
-      {float_part, _} = Float.parse(val_bin)
-      duty(name, float_part)
-    else
-      {int_part, _} = Integer.parse(val_bin)
-      duty(name, int_part)
+  # (3 of 3) name, cmd_map and opts specified as unique arguments
+  # NOTE: opts can contain notify_when_released: true to enter a receive loop waiting for ack
+  def execute(name, cmd_map, opts) when is_binary(name) and is_map(cmd_map) and is_list(opts) do
+    # ensure the alias name is in the map
+    cmd_map = Map.put_new(cmd_map, :name, name)
+
+    # if the caller is willing to wait for the ack add notify_when_released
+    opts = (opts[:wait_for_ack] && opts ++ [notify_when_released: true]) || opts
+
+    txn_rc = Repo.transaction(fn -> status(name) |> Execute.execute(name, cmd_map, opts) end)
+
+    # is the caller willing to wait for the ack?
+    will_wait = (opts[:wait_for_ack] && :wait_for_ack) || false
+
+    case txn_rc do
+      {:ok, {:pending, res}} when will_wait == :wait_for_ack -> wait_for_ack(res)
+      {:ok, res} -> res
+      error -> {:invalid, [name, " execute failed: ", inspect(error)]}
     end
   end
 
-  def duty(name, val) when is_binary(name) and is_number(val),
-    do: Alias.duty(name, duty: val)
+  @deprecated "use execute/1 or execute/2 instead"
+  def execute_action(_), do: :execute_action_removed
 
-  defdelegate duty(name, opts), to: Alias
-  defdelegate duty_names_begin_with(patterm, opts \\ []), to: Alias
-
-  @doc delegate_to: {Example, :cmd, 2}
-  defdelegate example_cmd(type \\ :random, opts \\ []), to: Example, as: :cmd
-
-  @doc """
-    Generic execute for general purpose use
-
-    ```elixir
-      # general purpose use
-      PulseWidth.execute(%{cmd: :on, name: "device alias"})
-
-      # set pwm to 50% of max
-      PulseWidth.execute(%{cmd: :duty, name: "device alias", number: 0.50})
-
-      # set pwm to custom cmd
-      cmd = %{}
-      PulseWidth.execute(%{cmd: cmd, name: "device alias"}})
-    ```
-
-  """
-  @doc since: "0.9.9"
-  def execute(%{cmd: cmd, name: name} = action) do
-    opts = action[:opts] || []
-
-    case cmd do
-      :on -> on(name)
-      :off -> off(name)
-      :duty -> duty(name, action[:number])
-      cmd -> Alias.cmd_direct(name, cmd, opts)
-    end
-  end
-
-  @doc """
-    Execute an action
-
-    ```elixir
-      # direct support for Helen Worker actions
-      action = %{worker_cmd: :on, worker: %{name: "device alias"}}
-      PulseWidth.execute_action(action)
-
-      # set pwm to 50% of max
-      action = %{worker_cmd: :duty, worker: %{name: "device alias"}, number: 0.50}
-      PulseWidth.execute_action(action)
-
-      # set pwm to custom cmd
-      action = %{worker_cmd: %{...}, worker: %{name: "device alias"}}
-      PulseWidth.execute_action(action)
-    ```
-  """
-  @doc since: "0.0.27"
-  def execute_action(%{worker_cmd: cmd, worker: %{name: name}} = action) do
-    case cmd do
-      :on -> on(name)
-      :off -> off(name)
-      :duty -> duty(name, action[:number])
-      _cmd -> Alias.cmd_direct(name, action[:custom], [])
-    end
-  end
-
-  @doc delegate_to: {Alias, :exists?, 1}
   defdelegate exists?(name), to: Alias
 
-  @doc """
-    Handles all aspects of processing messages for PulseWidth
+  defdelegate handle_message(msg_in), to: Msg, as: :handle
 
-     - if the message hasn't been processed, then attempt to
-  """
+  defdelegate names, to: Alias, as: :names
+  defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
-  @doc since: "0.0.21"
-  def handle_message(%{processed: false, type: "pwm"} = msg_in) do
-    # the with begins with processing the message through DB.Device.upsert/1
-    with %{device: device} = msg <- Device.upsert(msg_in),
-         # was the upset a success?
-         {:ok, %Device{}} <- device,
-         # technically the message has been processed at this point
-         msg <- Map.put(msg, :processed, true),
-         # PulseWidth does not write any data to the timeseries database
-         # (unlike Sensor, Remote) so simulate the write_rc success
-         # now send the augmented message to the timeseries database
-         msg <- Map.put(msg, :write_rc, {:processed, :ok}) do
-      msg
-    else
-      # if there was an error, add fault: <device_fault> to the message and
-      # the corresponding <device_fault>: <error> to signal to downstream
-      # functions there was an issue
-      error ->
-        Map.merge(msg_in, %{
-          processed: true,
-          fault: :pwm_fault,
-          pwm_fault: error
-        })
+  defdelegate notify_as_needed(msg), to: Notify
+  defdelegate notify_map, to: Notify
+  defdelegate notify_register(name), to: Notify
+  defdelegate notify_restart(opts \\ []), to: Notify, as: :restart
+  defdelegate notify_state, to: Notify, as: :state
+
+  def off(name, opts \\ []) when is_binary(name) do
+    %{cmd: "off", name: name, opts: opts} |> execute()
+  end
+
+  def off_names_begin_with(pattern, opts \\ []) do
+    names = Alias.names_begin_with(pattern)
+
+    for name <- names do
+      off(name, opts)
     end
   end
 
-  # if the primary handle_message does not match then simply return the msg
-  # since it wasn't for switch and/or has already been processed in the
-  # pipeline
-  def handle_message(%{} = msg_in), do: msg_in
-
-  @doc delegate_to: {Notify, :notify_as_needed, 1}
-  @doc since: "0.0.26"
-  defdelegate notify_as_needed(msg), to: Notify
-
-  @doc delegate_to: {Server, :notify_register, 1}
-  @doc since: "0.0.26"
-  defdelegate notify_register(name), to: Notify
-
-  @doc delegate_to: {Server, :notify_map, 0}
-  @doc since: "0.0.27"
-  defdelegate notify_map, to: Notify
-
-  @doc """
-    Retrieve a list of alias names
-  """
-  @doc since: "0.0.22"
-  defdelegate names, to: Alias, as: :names
-
-  @doc """
-    Retrieve a list of PulseWidth alias names that begin with a pattern
-  """
-
-  @doc since: "0.0.25"
-  defdelegate names_begin_with(pattern), to: Alias
-
-  @doc """
-    Set a PulseWidth Alias to minimum duty
-  """
-  @doc since: "0.0.25"
-  defdelegate off(name_or_id), to: Alias
-
-  @doc """
-    Set a PulseWidth Alias to maximum duty
-  """
-  @doc since: "0.0.25"
-  defdelegate on(name_or_id), to: Alias
-
-  @doc delegate_to: {Notify, :state, 0}
-  @doc since: "0.0.26"
-  defdelegate state, to: Notify
-
-  @doc """
-    Send a random command to a PulseWidth found by name or actual struct
-
-    PulseWidth.basic(name, basic: %{})
-  """
-  @doc since: "0.0.22"
-  def random(name_id_pwm, cmd_map, opts \\ []) do
-    Alias.cmd_direct(name_id_pwm, cmd_map, opts)
+  def on(name, opts \\ []) when is_binary(name) do
+    %{cmd: "on", name: name, opts: opts} |> execute()
   end
 
-  @doc """
-  Create and send a random command to a device via cli prompts
-  """
-  @doc since: "0.0.27"
-  defdelegate random_from_cli(name_or_id), to: Example
+  def status(name_or_id, opts \\ []) when is_list(opts) do
+    case Alias.find(name_or_id) do
+      %Alias{} = a -> Status.make_status(a, opts)
+      other -> other
+    end
+  end
 
-  @doc delegate_to: {Alias, :rename, 2}
-  @doc since: "0.0.27"
-  defdelegate rename(name_or_id, new_name), to: Alias
+  # (1 of 2) wait requested and cmd is pending
+  defp wait_for_ack(res) do
+    refid = res[:refid]
+    name = res[:name]
 
-  @doc delegate_to: {Notify, :restart, 1}
-  @doc since: "0.0.27"
-  defdelegate restart(opts \\ []), to: Notify
+    Logger.debug("waiting for ack: #{inspect(res, pretty: true)}")
+
+    {elapsed, res} =
+      :timer.tc(fn ->
+        receive do
+          {{PulseWidth.Broom, :ref_released}, ^refid, :acked} -> status(name)
+          {{PulseWidth.Broom, :ref_released}, ^refid, :orphaned} -> {:failed, "cmd orphaned"}
+        after
+          5000 -> {:failed, "wait for ack timeout"}
+        end
+      end)
+
+    put_in(res, [:ack_elapsed_us], elapsed)
+  end
 end

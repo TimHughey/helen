@@ -2,18 +2,28 @@ defmodule PulseWidth.DB.Alias do
   @moduledoc """
   Database implementation of PulseWidth Aliases
   """
-
+  require Logger
   use Ecto.Schema
+  use Timex
 
   alias PulseWidth.DB.Alias, as: Schema
   alias PulseWidth.DB.{Command, Device}
+  alias PulseWidth.Payload
+
+  require Ecto.Query
+  alias Ecto.Query
+
+  @pio_min 0
+  @ttl_default 2000
+  @ttl_min 50
 
   schema "pwm_alias" do
     field(:name, :string)
     field(:device_id, :integer)
+    field(:cmd, :string, default: "unknown")
     field(:description, :string, default: "<none>")
-    field(:capability, :string, default: "pwm")
-    field(:ttl_ms, :integer, default: 60_000)
+    field(:pio, :integer)
+    field(:ttl_ms, :integer, default: @ttl_default)
 
     belongs_to(:device, Device,
       source: :device_id,
@@ -30,53 +40,59 @@ defmodule PulseWidth.DB.Alias do
     timestamps(type: :utc_datetime_usec)
   end
 
-  @doc """
-  Set all PulseWidth aliased devices to off
-  """
-  @doc since: "0.0.25"
-  def all_off do
-    names_begin_with("") |> off()
+  def apply_changes(%Schema{} = a, changes) do
+    changeset(a, changes) |> Repo.update(returning: true)
   end
 
-  @doc """
-  Send a command map directly to a PulseWidth device.
-  """
-  @doc since: "0.0.27"
-  def cmd_direct(name_or_id, cmd_map, opts) do
-    case find(name_or_id) do
-      %Schema{device: %Device{} = d} = a ->
-        Device.record_cmd(d, a, cmd_map: cmd_map)
+  # (1 of 2) convert parms into a map
+  def changeset(%Schema{} = a, p) when is_list(p), do: changeset(a, Enum.into(p, %{}))
 
-      x when is_nil(x) ->
-        {:not_found, name_or_id}
-    end
-    |> Command.ack_immediate_if_needed(opts)
+  # (2 of 2) params are a map
+  def changeset(%Schema{} = a, p) when is_map(p) do
+    alias Common.DB
+    alias Ecto.Changeset
+
+    a
+    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.validate_required(columns(:required))
+    |> Changeset.validate_length(:name, min: 3, max: 32)
+    |> Changeset.validate_format(:name, DB.name_regex())
+    |> Changeset.validate_length(:description, max: 50)
+    |> Changeset.validate_length(:cmd, max: 32)
+    |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
+    |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
+    |> Changeset.unique_constraint(:name, [:name])
   end
 
-  @doc """
-    Create a PulseWidth alias to a device
-  """
-  @doc since: "0.0.25"
-  def create(%Device{id: id}, name, opts \\ [])
-      when is_binary(name) and is_list(opts) do
-    #
-    # grab keys of interest for upsert (if they exist) and populate the
-    # required parameters
-    #
-    Keyword.take(opts, [:description, :capability, :ttl_ms])
-    |> Enum.into(%{})
-    |> Map.merge(%{device_id: id, name: name, device_checked: true})
+  # helpers for changeset columns
+  def columns(:all) do
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
+
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
+  end
+
+  def columns(:cast), do: columns(:all)
+  def columns(:required), do: columns_all(only: [:device_id, :name, :pio])
+  def columns(:replace), do: columns_all(drop: [:name, :inserted_at])
+
+  def columns_all(opts) when is_list(opts) do
+    keep_set = MapSet.new(opts[:only] || columns(:all))
+    drop_set = MapSet.new(opts[:drop] || columns(:all))
+
+    MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
+  end
+
+  def create(%Device{id: id}, name, pio, opts \\ []) when is_binary(name) and is_list(opts) do
+    %{
+      device_id: id,
+      name: name,
+      pio: pio,
+      description: opts[:description] || "<none>",
+      ttl_ms: opts[:ttl_ms] || @ttl_default
+    }
     |> upsert()
   end
 
-  @doc """
-    Delete a PulseWidth Alias
-
-      ## Examples
-        iex> PulseWidth.DB.Alias.delete("sample pwm")
-
-  """
-  @doc since: "0.0.25"
   def delete(name_or_id) do
     with %Schema{} = x <- find(name_or_id),
          {:ok, %Schema{name: n}} <- Repo.delete(x) do
@@ -86,45 +102,6 @@ defmodule PulseWidth.DB.Alias do
     end
   end
 
-  def duty(name_or_id, opts \\ []) when is_list(opts) do
-    lazy = opts[:lazy] || true
-    duty = opts[:duty]
-
-    # if the duty opt was passed then an update is requested
-    with %Schema{device: %Device{} = d} = a <- find(name_or_id),
-         # lazy_check does all the heavy lifting
-         {:cmd_needed?, true, cmd_map} <- lazy_check(a, lazy, duty) do
-      Device.record_cmd(d, a, cmd_map: put_in(cmd_map, [:initial_opts], opts))
-    else
-      nil ->
-        {:not_found, name_or_id}
-
-      # lazy_check determined should only return the current value
-      {:cmd_needed?, false, dev_alias} ->
-        duty_now(dev_alias, opts)
-    end
-    |> Command.ack_immediate_if_needed(opts)
-  end
-
-  @doc """
-    Execute duty for a list of PulseWidth names that begin with a pattern
-
-    Simply pipelines names_begin_with/1 and duty/2
-
-      ## Examples
-        iex> PulseWidth.duty_names_begin_with("front porch", duty: 256)
-  """
-  @doc since: "0.0.11"
-  def duty_names_begin_with(pattern, opts)
-      when is_binary(pattern) and is_list(opts) do
-    for name <- names_begin_with(pattern), do: duty(name, opts)
-  end
-
-  @doc """
-  Is there a PulseWidth device (alias) with this name?
-  """
-
-  @doc since: "0.0.27"
   def exists?(name_or_id) do
     case find(name_or_id) do
       %Schema{} -> true
@@ -132,234 +109,126 @@ defmodule PulseWidth.DB.Alias do
     end
   end
 
-  @doc """
-    Get a %PulseWidth.DB.Alias{} by id or name
-
-    Same return values as Repo.get_by/2
-
-      1. nil if not found
-      2. %PulseWidth.DB.Alias{}
-
-      ## Examples
-        iex> PulseWidth.DB.Alias.find("sample pwm")
-        %PulseWidth.DB.Alias{}
-  """
-
-  @doc since: "0.0.25"
-  def find(name_or_id) do
-    check_args = fn
-      x when is_binary(x) -> [name: x]
-      x when is_integer(x) -> [id: x]
-      x -> {:bad_args, x}
-    end
-
-    import Repo, only: [get_by: 2, preload: 2]
-
-    with opts when is_list(opts) <- check_args.(name_or_id),
-         %Schema{} = found <- get_by(Schema, opts) do
-      found |> preload([:device])
-    else
-      x when is_tuple(x) -> x
+  # (1 of 2) find with proper opts
+  def find(opts) when is_list(opts) and opts != [] do
+    case Repo.get_by(Schema, opts) do
+      %Schema{} = x -> preload(x)
       x when is_nil(x) -> nil
-      x -> {:error, x}
     end
   end
 
-  @doc """
-    Retrieve PulseWidth Alias names
-  """
-  @doc since: "0.0.25"
-  def names do
-    import Ecto.Query, only: [from: 2]
-
-    from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+  # (2 of 2) validate param and build opts for find/2
+  def find(id_or_device) do
+    case id_or_device do
+      x when is_binary(x) -> find(name: x)
+      x when is_integer(x) -> find(id: x)
+      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
+    end
   end
 
-  @doc """
-    Retrieve pwm aliases names that begin with a pattern
-  """
+  def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
-  @doc since: "0.0.25"
+  def load_cmd_last(%Schema{} = a) do
+    Repo.preload(a, cmds: Query.from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
+  end
+
+  def load_device(%Schema{} = a), do: Repo.preload(a, [:device])
+
+  def names do
+    Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+  end
+
   def names_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-
     like_string = [pattern, "%"] |> IO.iodata_to_binary()
 
-    from(x in Schema,
-      where: like(x.name, ^like_string),
-      order_by: x.name,
-      select: x.name
-    )
-    |> Repo.all()
+    Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name) |> Repo.all()
   end
 
-  def off(list) when is_list(list) do
-    for l <- list do
-      off(l)
+  def preload(%Schema{} = x) do
+    Repo.preload(x, [:device]) |> preload_cmd_last()
+  end
+
+  def preload_cmd_last(%Schema{} = x) do
+    Repo.preload(x, cmds: Query.from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
+  end
+
+  def preload_unacked_cmds(%Schema{} = x) do
+    Repo.preload(x, cmds: Query.from(c in Command, where: c.acked == false))
+  end
+
+  # def record_cmd(%Schema{name: name} = a, cmd_map, opts) do
+
+  def record_cmd(name, cmd_map, opts) do
+    # load the record the cmd is associated with
+    a = find(name)
+
+    # add the command and put the name in the result map for upstream
+    result_map = Command.add(a, cmd_map, opts) |> put_in([:name], name)
+
+    # NOTE! create anonymous fn HERE to capture result_map for updating
+    add_to_result = fn [{k, v}] -> put_in(result_map, [k], v) end
+
+    case result_map do
+      # downstream supplied the cmd, update to align
+      %{cmd_rc: {:ok, _}, cmd_acked: rcmd} ->
+        [alias_rc: update_cmd(a, rcmd)] |> add_to_result.()
+
+      # send the cmd_map including the newly inserted cmd refid
+      %{cmd_rc: {:ok, new_cmd}} ->
+        pub_opts = [opts, refid: new_cmd.refid] |> List.flatten()
+
+        # ensure the device association is loaded for Payload.send_cmd/3
+        [pub_rc: load_device(a) |> Payload.send_cmd(cmd_map, pub_opts)] |> add_to_result.()
+
+      # something went wrong, let the caller sort it
+      error ->
+        error
     end
   end
 
-  def off(name) when is_binary(name) do
-    case find(name) do
-      %Schema{device: %Device{duty_min: min}} -> duty(name, duty: min)
-      _catchall -> {:not_found, name}
+  def status(%Schema{} = a, opts) do
+    %Schema{
+      cmd: cmd,
+      name: name,
+      device: %Device{last_seen_at: seen_at},
+      cmds: cmds,
+      updated_at: at,
+      ttl_ms: ttl_ms
+    } = load_device(a) |> load_cmd_last()
+
+    status = %{cmd: cmd, at: at}
+
+    %{name: name, seen_at: seen_at, ttl_ms: opts[:ttl_ms] || ttl_ms}
+    |> put_in([:cmd_reported], status)
+    |> Command.status(cmds)
+    |> ttl_check()
+  end
+
+  def status(x, _opts), do: %{not_found: true, invalid: inspect(x, pretty: true)}
+
+  defp update_cmd(%Schema{} = a, rcmd) do
+    a
+    |> changeset(%{cmd: rcmd})
+    |> Repo.update(returning: true)
+  end
+
+  def upsert(p) when is_map(p) do
+    changes = Map.take(p, columns(:all))
+    cs = changeset(%Schema{}, changes)
+
+    opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
+
+    case Repo.insert(cs, opts) do
+      {:ok, %Schema{}} = rc -> rc
+      {:error, e} -> {:error, inspect(e, pretty: true)}
     end
   end
 
-  def on(name) when is_binary(name) do
-    case find(name) do
-      %Schema{device: %Device{duty_max: max}} -> duty(name, duty: max)
-      _catchall -> {:not_found, name}
-    end
-  end
+  defp ttl_check(%{ttl_ms: ttl_ms, seen_at: seen_at} = m) do
+    # diff = DateTime.utc_now() |> DateTime.diff(seen_at, :millisecond)
 
-  def rename(%Schema{} = x, opts) when is_list(opts) do
-    name = Keyword.get(opts, :name)
+    ttl_dt = Timex.now() |> Timex.shift(milliseconds: ttl_ms * -1)
 
-    changes =
-      Keyword.take(opts, [
-        :name,
-        :description,
-        :capability,
-        :ttl_ms
-      ])
-      |> Enum.into(%{})
-
-    with {:args, true} <- {:args, is_binary(name)},
-         cs <- changeset(x, changes),
-         {cs, true} <- {cs, cs.valid?},
-         {:ok, sa} <- Repo.update(cs, returning: true) do
-      {:ok, sa}
-    else
-      {:args, false} -> {:bad_args, opts}
-      {%Ecto.Changeset{} = cs, false} -> {:invalid_changes, cs}
-      error -> error
-    end
-  end
-
-  @doc """
-  Rename a pwm alias
-
-    Optional opts:
-      description: <binary>         -- new description
-      ttl_ms:      <integer>        -- new ttl_ms
-      capability:  "pwm" | "toggle" -- support pwm (duty) or on/off only
-  """
-  @doc since: "0.0.25"
-  def rename(name_or_id, name, opts \\ []) when is_list(opts) do
-    # no need to guard name_or_id, find/1 handles it
-    with %Schema{} = x <- find(name_or_id),
-         {:ok, %Schema{name: n}} <- rename(x, name: name) do
-      {:ok, n}
-    else
-      error -> error
-    end
-  end
-
-  # upsert/1 confirms the minimum keys required and if the device to alias
-  # exists
-  def upsert(%{name: _, device_id: _} = m) do
-    upsert(%Schema{}, Map.put(m, :device_checked, true))
-  end
-
-  def upsert(catchall) do
-    {:bad_args, catchall}
-  end
-
-  # Alias.upsert/2 will update (or insert) a %Schema{} using the map passed
-  def upsert(
-        %Schema{} = x,
-        %{device_checked: true, name: _, device_id: _} = params
-      ) do
-    cs = changeset(x, Map.take(params, keys(:all)))
-
-    with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
-         # the keys on_conflict: and conflict_target: indicate the insert
-         # is an "upsert"
-         {:ok, %Schema{id: _id} = x} <-
-           Repo.insert(cs,
-             on_conflict: {:replace, keys(:replace)},
-             returning: true,
-             conflict_target: [:name]
-           ) do
-      {:ok, x}
-    else
-      {:cs_valid, false} -> {:invalid_changes, cs}
-      {:error, rc} -> {:error, rc}
-      error -> {:error, error}
-    end
-  end
-
-  def upsert(%Schema{}, %{device_checked: false, device: d}),
-    do: {:device_not_found, d}
-
-  ##
-  ## PRIVATE
-  ##
-
-  defp changeset(x, p) do
-    import Ecto.Changeset,
-      only: [
-        cast: 3,
-        validate_required: 2,
-        validate_format: 3,
-        validate_number: 3,
-        validate_inclusion: 3
-      ]
-
-    import Common.DB, only: [name_regex: 0]
-
-    cast(x, Enum.into(p, %{}), keys(:cast))
-    |> validate_required(keys(:required))
-    |> validate_format(:name, name_regex())
-    |> validate_number(:ttl_ms, greater_than_or_equal_to: 0)
-    |> validate_inclusion(:capability, ["pwm", "toggle"])
-  end
-
-  defp duty_now(%_{ttl_ms: ttl_ms, device: %_{duty: duty} = x}, opts) do
-    import Helen.Time.Helper, only: [ttl_expired?: 2]
-
-    if ttl_expired?(last_seen_at(x), opts[:ttl_ms] || ttl_ms),
-      do: {:ttl_expired, duty},
-      else: {:ok, duty}
-  end
-
-  # Keys For Updating, Creating a PulseWidth
-  defp keys(:all) do
-    drop =
-      [:__meta__, __schema__(:associations), __schema__(:primary_key)]
-      |> List.flatten()
-
-    %Schema{}
-    |> Map.from_struct()
-    |> Map.drop(drop)
-    |> Map.keys()
-    |> List.flatten()
-  end
-
-  defp keys(:cast), do: keys(:all)
-  defp keys(:required), do: [:name]
-  defp keys(:replace), do: keys_drop(:all, [:name])
-
-  defp keys_drop(base_keys, drop) do
-    base = keys(base_keys) |> MapSet.new()
-    remove = MapSet.new(drop)
-    MapSet.difference(base, remove) |> MapSet.to_list()
-  end
-
-  defp last_seen_at(%Device{last_seen_at: x}), do: x
-
-  defp lazy_check(%_{device: %_{duty: d} = device} = dev_alias, lazy, duty) do
-    import PulseWidth.Duty, only: [calculate: 2]
-    new_duty = calculate(device, duty)
-
-    cond do
-      # duty was not in the opts, this is a read
-      is_nil(new_duty) -> {:cmd_needed?, false, dev_alias}
-      # lazy requested and current duty == new duty
-      lazy == true and d == new_duty -> {:cmd_needed?, false, dev_alias}
-      # no match above means we need to send a cmd
-      true -> {:cmd_needed?, true, %{duty: new_duty}}
-    end
+    if Timex.before?(seen_at, ttl_dt), do: put_in(m, [:ttl_expired], true), else: m
   end
 end

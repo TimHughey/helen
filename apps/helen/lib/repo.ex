@@ -20,4 +20,27 @@ defmodule Repo do
   use Ecto.Repo,
     otp_app: :helen,
     adapter: Ecto.Adapters.Postgres
+
+  @impl true
+  def prepare_query(_operation, query, opts) do
+    if Repo.in_transaction?() == false do
+      # alias Ecto.Adapters.SQL
+      # sql = SQL.to_sql(operation, Repo, query)
+      # explain = Repo.explain(operation, query)
+      #
+      # [
+      #   "operation: ",
+      #   inspect(operation),
+      #   " query: ",
+      #   inspect(query),
+      #   " opts:",
+      #   inspect(opts)
+      # ] |> Logger.debug()
+      #
+      # ["explain:\n", explain, "\n"]
+      # |> Logger.debug()
+    end
+
+    {query, opts}
+  end
 end

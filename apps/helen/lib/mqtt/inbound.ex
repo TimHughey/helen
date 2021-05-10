@@ -62,7 +62,12 @@ defmodule Mqtt.Inbound do
   end
 
   @impl true
-  def handle_cast({:notified_waiter, ref}, s) do
+  def handle_cast({:notify_waiter, ref}, s) do
+    case get_in(s.roundtrip, [ref]) do
+      x when is_pid(x) and x != self() -> send(x, {{Mqtt.Inbound, :roundtrip}, ref})
+      _x -> nil
+    end
+
     %{s | roundtrip: Map.delete(s.roundtrip, ref)} |> noreply()
   end
 
@@ -91,7 +96,12 @@ defmodule Mqtt.Inbound do
          #       convert them to atoms
          msg <- Map.merge(msg, atomize_keys(r)),
          s <- add_roundtrip_ref_if_needed(s, msg[:roundtrip_ref]) do
-      incoming_msg(msg, s)
+      # add an empty list for downstream to populate with keys to check for faults after processing
+      # the msg.  all keys added to this list will be:
+      #  1. {:ok, processing results}
+      #  2. {:error, text}
+      #  3. {:failed, text}
+      put_in(msg, [:fault_checks], []) |> incoming_msg(s)
     else
       anything ->
         err_msg = ["parse failure:\n", inspect(anything)] |> IO.iodata_to_binary()
@@ -164,12 +174,8 @@ defmodule Mqtt.Inbound do
   defp add_roundtrip_ref_if_needed(s, _), do: s
 
   # (1 of 2) there is a waiter for the roundtrip ref
-  defp msg_post_process(%{roundtrip: roundtrip, roundtrip_ref: rt_ref} = msg)
-       when is_map_key(roundtrip, rt_ref) do
-    reply_to = get_in(roundtrip, [rt_ref])
-    send(reply_to, {{Mqtt.Inbound, :roundtrip}, rt_ref})
-
-    GenServer.cast(__MODULE__, {:notified_waiter, rt_ref})
+  defp msg_post_process(%{roundtrip_ref: ref} = msg) do
+    GenServer.cast(__MODULE__, {:notify_waiter, ref})
 
     check_msg_fault(msg)
   end
@@ -298,7 +304,7 @@ defmodule Mqtt.Inbound do
 
   def metadata(%{mtime: m, type: t, host: <<"ruth.", _rest::binary>>} = r)
       when is_integer(m) and m >= @mtime_min and is_binary(t) do
-    Map.merge(r, %{metadata: :ok, processed: false})
+    Map.merge(r, %{metadata: :ok, processed: false}) |> Map.delete(:mtime)
   end
 
   def metadata(bad) do

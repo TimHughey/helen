@@ -251,12 +251,12 @@ defmodule Reef.Temp.Server do
 
     # function to retrieve the value of the device
     value_fn = fn
-      :switch -> Switch.position(dev_name)
+      :switch -> Switch.status(dev_name)
       :sensor -> fahrenheit(dev_name, sensor_opts(opts))
     end
 
     state
-    |> check_pending_cmds_if_needed()
+    # |> check_pending_cmds_if_needed()
     # ensure the dev_name key contains a map
     |> update_in([:devices, dev_name], fn
       nil -> %{}
@@ -380,25 +380,25 @@ defmodule Reef.Temp.Server do
     end
   end
 
-  def dev_verify_switch_position(state, dev_name, expected_pos, sw_rc_now) do
-    case sw_rc_now do
-      {:ok, pos} when pos == expected_pos ->
-        state
-        |> update_in([:devices, dev_name], fn x ->
-          Map.drop(x, [:fault])
-        end)
+  # def dev_verify_switch_position(state, dev_name, expected_pos, sw_rc_now) do
+  #   case sw_rc_now do
+  #     {:ok, pos} when pos == expected_pos ->
+  #       state
+  #       |> update_in([:devices, dev_name], fn x ->
+  #         Map.drop(x, [:fault])
+  #       end)
+  #
+  #     {:ok, pos} when pos != expected_pos ->
+  #       state
+  #       |> put_in([:devices, dev_name, :fault], :position_mismatch)
+  #
+  #     unmatched ->
+  #       state
+  #       |> put_in([:devices, dev_name, :fault], unmatched)
+  #   end
+  # end
 
-      {:ok, pos} when pos != expected_pos ->
-        state
-        |> put_in([:devices, dev_name, :fault], :position_mismatch)
-
-      unmatched ->
-        state
-        |> put_in([:devices, dev_name, :fault], unmatched)
-    end
-  end
-
-  defp dev_ample_msgs?(state) do
+  def dev_ample_msgs?(state) do
     # unfold the required_devices and examine the devices seen thus far
     for {_type, required_name, _dev_opts} <- state[:devices_required],
         {dev_name, %{msg_count: msgs}}
@@ -409,15 +409,15 @@ defmodule Reef.Temp.Server do
     end
   end
 
-  defp dev_type(device) do
+  def dev_type(device) do
     case device do
       %_{cmds: _} -> :switch
       _x -> :switch
     end
   end
 
-  defp dev_value(dev_type, %{opts: opts} = state)
-       when dev_type in [:switch, :sensor] do
+  def dev_value(dev_type, %{opts: opts} = state)
+      when dev_type in [:switch, :sensor] do
     dev_name = get_in(opts, [dev_type, :name])
 
     case get_in(state, [:devices, dev_name, :value]) do
@@ -432,7 +432,7 @@ defmodule Reef.Temp.Server do
   ##
 
   # setup can be either a sensor name binary or
-  defp setpoint_val(%{devices: devices, opts: opts} = _state) do
+  def setpoint_val(%{devices: devices, opts: opts} = _state) do
     setpoint = opts[:setpoint]
 
     if is_binary(setpoint),
@@ -440,14 +440,14 @@ defmodule Reef.Temp.Server do
       else: setpoint
   end
 
-  defp sensor_opts(x) do
+  def sensor_opts(x) do
     # handle if passed an opts keyword list or the state
     # if not found in either then default to 30 seconds
     x[:sensor] || x[:opts][:sensor] || [since: "PT30S"]
   end
 
   # NOTE: obj in the dev_map is the actual Device schema
-  defp validate_seen(%{obj: obj, seen: seen}, opts) do
+  def validate_seen(%{obj: obj, seen: seen}, opts) do
     import Helen.Time.Helper, only: [between_ref_and_now: 2, scale: 2]
 
     case obj do
@@ -464,7 +464,7 @@ defmodule Reef.Temp.Server do
     end
   end
 
-  defp validate_all_seen(%{devices: devices, opts: opts} = state) do
+  def validate_all_seen(%{devices: devices, opts: opts} = state) do
     all_seen =
       for {_dev_name, %{} = dev_map} <- devices, reduce: true do
         false -> false
@@ -482,7 +482,7 @@ defmodule Reef.Temp.Server do
   # start up path (active or standby)
   # to prevent rapid cycling of the switch at startup ensure we have two or more
   # switch or sensor messages before attempting to control the temperature
-  defp control_temperature(%{ample_msgs: false} = state) do
+  def control_temperature(%{ample_msgs: false} = state) do
     if dev_ample_msgs?(state) do
       state
       |> put_in([:ample_msgs], true)
@@ -495,18 +495,18 @@ defmodule Reef.Temp.Server do
   # standby mode
   # the server continues to receive updates from sensors and switches
   # but takes no action relative to adjusting the temperature
-  defp control_temperature(%{server_mode: :standby} = s), do: s
+  def control_temperature(%{server_mode: :standby} = s), do: s
 
   # happy and normal path, both devices have been seen recently
-  defp control_temperature(
-         %{
-           server_mode: :active,
-           ample_msgs: true,
-           devices_seen: true,
-           opts: opts,
-           devices: devices
-         } = state
-       ) do
+  def control_temperature(
+        %{
+          server_mode: :active,
+          ample_msgs: true,
+          devices_seen: true,
+          opts: opts,
+          devices: devices
+        } = state
+      ) do
     import Helen.Time.Helper, only: [utc_now: 0]
     import Switch, only: [on: 1, off: 1]
 
@@ -552,9 +552,7 @@ defmodule Reef.Temp.Server do
   end
 
   # unhappy path, one or both devices are missing
-  defp control_temperature(
-         %{server_mode: :active, ample_msgs: true, devices_seen: false} = state
-       ) do
+  def control_temperature(%{server_mode: :active, ample_msgs: true, devices_seen: false} = state) do
     import Helen.Time.Helper, only: [utc_now: 0]
     import Switch, only: [off: 1]
 
@@ -570,28 +568,28 @@ defmodule Reef.Temp.Server do
   ## Device Map Helpers
   ##
 
-  defp check_pending_cmds_if_needed(state) do
-    import Switch, only: [acked?: 1]
+  # def check_pending_cmds_if_needed(state) do
+  #   import Switch, only: [acked?: 1]
+  #
+  #   for {dev_name, %{control: {:pending, pending_info}}} <- state[:devices],
+  #       reduce: state do
+  #     state ->
+  #       refid = pending_info[:refid]
+  #
+  #       if acked?(refid) do
+  #         sw_rc_now = Switch.position(dev_name)
+  #         expected = pending_info[:position]
+  #
+  #         state
+  #         |> put_in([:devices, dev_name, :control], sw_rc_now)
+  #         |> dev_verify_switch_position(dev_name, expected, sw_rc_now)
+  #       else
+  #         state
+  #       end
+  #   end
+  # end
 
-    for {dev_name, %{control: {:pending, pending_info}}} <- state[:devices],
-        reduce: state do
-      state ->
-        refid = pending_info[:refid]
-
-        if acked?(refid) do
-          sw_rc_now = Switch.position(dev_name)
-          expected = pending_info[:position]
-
-          state
-          |> put_in([:devices, dev_name, :control], sw_rc_now)
-          |> dev_verify_switch_position(dev_name, expected, sw_rc_now)
-        else
-          state
-        end
-    end
-  end
-
-  defp register_for_device_notifications(%{devices_required: devices} = state) do
+  def register_for_device_notifications(%{devices_required: devices} = state) do
     # unfold required devices and register for notification
     for {type, dev_name, notify_opts}
         when type in [:sensor, :switch] <- devices,
@@ -612,7 +610,7 @@ defmodule Reef.Temp.Server do
   ## State Helpers
   ##
 
-  defp build_and_put_devices_required(%{opts: opts} = state) do
+  def build_and_put_devices_required(%{opts: opts} = state) do
     for {k, dev_opts} when k in [:switch, :sensor, :setpoint] <- opts,
         reduce: state do
       state ->
@@ -643,7 +641,7 @@ defmodule Reef.Temp.Server do
     end
   end
 
-  defp build_and_put_device_maps(%{devices_required: dev_names} = state) do
+  def build_and_put_device_maps(%{devices_required: dev_names} = state) do
     # filter for only binary names to exclude setpoint which is
     # either a fixed value or a reference to a sensor
     for {_type, name, _opts}
@@ -663,7 +661,7 @@ defmodule Reef.Temp.Server do
     end
   end
 
-  defp handle_server_startup_mode(%{server_mode: mode} = state) do
+  def handle_server_startup_mode(%{server_mode: mode} = state) do
     import Switch, only: [off: 1]
 
     case mode do
@@ -680,13 +678,13 @@ defmodule Reef.Temp.Server do
     end
   end
 
-  defp loop_timeout(%{opts: opts}) do
+  def loop_timeout(%{opts: opts}) do
     import Helen.Time.Helper, only: [to_ms: 2]
 
     to_ms(opts[:timeout], "PT1M30S")
   end
 
-  defp update_last_timeout(s) do
+  def update_last_timeout(s) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     put_in(s[:last_timeout], utc_now())
@@ -697,7 +695,7 @@ defmodule Reef.Temp.Server do
   ## GenServer Receive Loop Hooks
   ##
 
-  defp timeout_hook(%{} = s) do
+  def timeout_hook(%{} = s) do
     noreply(s)
   end
 
@@ -705,8 +703,8 @@ defmodule Reef.Temp.Server do
   ## handle_* return helpers
   ##
 
-  defp continue(s, msg), do: {:noreply, s, {:continue, msg}}
-  defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-  defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
-  defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
+  def continue(s, msg), do: {:noreply, s, {:continue, msg}}
+  def noreply(s), do: {:noreply, s, loop_timeout(s)}
+  def reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
+  def reply(val, s), do: {:reply, val, s, loop_timeout(s)}
 end

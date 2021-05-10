@@ -14,6 +14,11 @@ defmodule GenNotify do
 
       use GenServer, restart: :transient, shutdown: 5000
 
+      def extract_dev_alias_from_msg(%{device: {:ok, %_{aliases: aliases}}}), do: aliases
+
+      def extract_dev_alias_from_msg(msg), do: []
+      defoverridable extract_dev_alias_from_msg: 1
+
       @doc false
       @impl true
       def init(args), do: GenNotify.init(args)
@@ -84,13 +89,6 @@ defmodule GenNotify do
       @doc false
       @impl true
       def handle_info(what, s), do: GenNotify.handle_info(what, s)
-
-      ##
-      ## PRIVATE
-      ##
-
-      @before_compile GenNotify
-      @after_compile GenNotify
     end
   end
 
@@ -126,7 +124,7 @@ defmodule GenNotify do
     # }
 
     # info for this registeration
-    registration_details = %{opts: [inteval: interval], last: epoch()}
+    registration_details = %{opts: [interval: interval], last: epoch()}
 
     state
     |> update_in([:notify_map, x], fn
@@ -196,8 +194,7 @@ defmodule GenNotify do
             # send the msg
             send(pid_key, {:notify, category, item})
 
-            new_pid_map =
-              Map.put(r_pid_map, pid_key, %{opts: o, last: utc_now()})
+            new_pid_map = Map.put(r_pid_map, pid_key, %{opts: o, last: utc_now()})
 
             new_notify_map = Map.put(r_notify_map, registered_name, new_pid_map)
 
@@ -235,27 +232,21 @@ defmodule GenNotify do
     loop_hook(state)
   end
 
-  def notify_as_needed(msg, dev_alias, mod) do
-    case dev_alias do
-      [] ->
-        nil
+  def notify_all(aliases, mod) do
+    aliases = List.wrap(aliases) |> List.flatten()
 
-      # single device alias
-      %_{name: _} = x ->
-        GenServer.cast(mod, {:notify, x})
-
-      # list of aliases
-      list_of_aliases when is_list(list_of_aliases) ->
-        for %_{name: _} = x <- list_of_aliases do
-          GenServer.cast(mod, {:notify, x})
-        end
-
-      _no_match ->
-        nil
+    for %_{name: name} = x <- aliases do
+      GenServer.cast(mod, {:notify, x})
+      name
     end
+  end
 
-    # always pass through the original message
-    msg
+  # NOTE:  notify_as_needed/3 is designed to be used in a pipeline so the
+  # original msg is always returned
+
+  # (1 of zzz) we have a list of aliases
+  def notify_as_needed(msg, aliases, mod) when is_list(aliases) do
+    put_in(msg, [:notifies], notify_all(aliases, mod))
   end
 
   def notify_register(opts, mod) when is_list(opts) do
@@ -268,7 +259,7 @@ defmodule GenNotify do
       {rc, monitor(mod)}
     else
       _bad_opts ->
-        {:bad_args, usage: [name: "name", notify_interval: [minutes: 1]]}
+        {:bad_args, usage: [name: "name", notify_interval: "PT1S"]}
     end
   end
 
@@ -303,12 +294,4 @@ defmodule GenNotify do
   defp noreply(s), do: {:noreply, s, loop_timeout(s)}
   defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
   defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
-
-  def __after_compile__(%{aliases: _aliases} = _env, _bytecode) do
-    # IO.puts(inspect(env, pretty: true))
-  end
-
-  defmacro __before_compile__(%{aliases: _aliases} = _env) do
-    # IO.puts(inspect(env, pretty: true))
-  end
 end

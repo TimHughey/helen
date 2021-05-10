@@ -4,6 +4,8 @@ defmodule Helen.Time.Helper do
 
   """
 
+  require Logger
+
   @default_tz Application.compile_env!(:helen, :default_tz) || "Etc/UTC"
 
   use Timex
@@ -41,24 +43,25 @@ defmodule Helen.Time.Helper do
     end
   end
 
-  @doc """
-    Returns a Timex Duration based on the opts or the defaults if the
-    the opts are invalid.
-  """
-  @doc since: "0.0.27"
-  def duration_from_list(opts, default) do
-    # grab only the opts that are valid for Timex.shift
-
-    case valid_duration_opts?(opts) do
-      true -> p_duration(opts)
-      false -> p_duration(default)
-    end
-  end
+  # @doc """
+  #   Returns a Timex Duration based on the opts or the defaults if the
+  #   the opts are invalid.
+  # """
+  # @doc since: "0.0.27"
+  # def duration_from_list(opts, default) do
+  #   # grab only the opts that are valid for Timex.shift
+  #
+  #   case valid_duration_opts?(opts) do
+  #     true -> p_duration(opts)
+  #     false -> p_duration(default)
+  #   end
+  # end
 
   def elapsed_ms(dt) do
-    case Timex.diff(utc_now(), dt) do
-      {:error, _} -> 0
-      d -> Duration.to_milliseconds(d, truncate: true)
+    case Timex.diff(utc_now(), dt, :milliseconds) do
+      ms when is_integer(ms) -> ms
+      %Duration{} = d -> Duration.to_milliseconds(d, truncate: true)
+      {:error, x} -> error(x, 0)
     end
   end
 
@@ -153,35 +156,35 @@ defmodule Helen.Time.Helper do
 
   def is_iso_duration?(_not_binary), do: false
 
-  @doc """
-  Convert a list of time options to milliseconds
-
-  Returns an integer.
-
-  ## Examples
-
-      iex> Helen.Time.Helper.list_to_ms([seconds: 1])
-      60000
-
-  """
-  @doc since: "0.0.27"
-  def list_to_ms(opts, defaults) do
-    # after hours of searching and not finding an existing capabiility
-    # in Timex we'll roll our own consisting of multiple Timex functions.
-
-    actual_opts =
-      cond do
-        valid_duration_opts?(opts) -> opts
-        valid_duration_opts?(defaults) -> defaults
-        true -> [weeks: 12]
-      end
-
-    ~U[0000-01-01 00:00:00Z]
-    |> Timex.shift(duration_opts(actual_opts))
-    |> Timex.to_gregorian_microseconds()
-    |> Duration.from_microseconds()
-    |> Duration.to_milliseconds(truncate: true)
-  end
+  # @doc """
+  # Convert a list of time options to milliseconds
+  #
+  # Returns an integer.
+  #
+  # ## Examples
+  #
+  #     iex> Helen.Time.Helper.list_to_ms([seconds: 1])
+  #     60000
+  #
+  # """
+  # @doc since: "0.0.27"
+  # def list_to_ms(opts, defaults) do
+  #   # after hours of searching and not finding an existing capabiility
+  #   # in Timex we'll roll our own consisting of multiple Timex functions.
+  #
+  #   actual_opts =
+  #     cond do
+  #       valid_duration_opts?(opts) -> opts
+  #       valid_duration_opts?(defaults) -> defaults
+  #       true -> [weeks: 12]
+  #     end
+  #
+  #   ~U[0000-01-01 00:00:00Z]
+  #   |> Timex.shift(duration_opts(actual_opts))
+  #   |> Timex.to_gregorian_microseconds()
+  #   |> Duration.from_microseconds()
+  #   |> Duration.to_milliseconds(truncate: true)
+  # end
 
   @doc """
   Return the current time in the specified timezone
@@ -200,28 +203,29 @@ defmodule Helen.Time.Helper do
 
   # (2 of 2) passed nil default to UTC
   def local_now(tz) when is_nil(tz), do: Timex.now(@default_tz)
+  def local_now(:default_tz), do: local_now(nil)
 
   # (3 of 3) passed a binary timezone name
   def local_now(tz) when is_binary(tz), do: Timex.now(tz)
 
-  @doc """
-  Calculate the remaining milliseconds given the finish datetime
-  """
-  @doc since: "0.0.27"
-  def remaining(finish_dt) do
-    elapsed(utc_now(), finish_dt)
-  end
-
-  @doc """
-  Calculate the remaining milliseconds given the start datetime and a duration
-  representing the total time.
-  """
-  @doc since: "0.0.27"
-  def remaining(start_at, total_duration) do
-    alias Timex.Duration
-
-    Duration.sub(total_duration, elapsed(start_at, utc_now())) |> Duration.abs()
-  end
+  # @doc """
+  # Calculate the remaining milliseconds given the finish datetime
+  # """
+  # @doc since: "0.0.27"
+  # def remaining(finish_dt) do
+  #   elapsed(utc_now(), finish_dt)
+  # end
+  #
+  # @doc """
+  # Calculate the remaining milliseconds given the start datetime and a duration
+  # representing the total time.
+  # """
+  # @doc since: "0.0.27"
+  # def remaining(start_at, total_duration) do
+  #   alias Timex.Duration
+  #
+  #   Duration.sub(total_duration, elapsed(start_at, utc_now())) |> Duration.abs()
+  # end
 
   @doc delegate_to: {Timex.Duration, :scale, 2}
   def scale(d, factor) do
@@ -247,7 +251,7 @@ defmodule Helen.Time.Helper do
     import Timex.Duration, only: [parse!: 1]
 
     case args do
-      l when is_list(l) -> shift(dt, milliseconds: list_to_ms(l, []))
+      # l when is_list(l) -> shift(dt, milliseconds: list_to_ms(l, []))
       d = %Duration{} -> shift(dt, duration: d)
       iso when is_binary(iso) -> add(dt, parse!(iso))
       ms when is_integer(ms) -> shift(dt, milliseconds: ms)
@@ -274,7 +278,7 @@ defmodule Helen.Time.Helper do
     import Timex.Duration, only: [invert: 1, parse!: 1]
 
     case args do
-      l when is_list(l) -> shift(dt, milliseconds: list_to_ms(l, []) * -1)
+      # l when is_list(l) -> shift(dt, milliseconds: list_to_ms(l, []) * -1)
       d = %Duration{} -> shift(dt, duration: invert(d))
       iso when is_binary(iso) -> subtract(dt, parse!(iso))
       ms when is_integer(ms) -> shift(dt, milliseconds: ms * -1)
@@ -282,22 +286,22 @@ defmodule Helen.Time.Helper do
     end
   end
 
-  @doc """
-  Subtracts a list of durations and returns the absolute value.
-
-  The durations can be either ISO binaries or `%Duration{}`
-
-  Returns a `%Duration{}`
-  """
-  @doc since: "0.0.27"
-  def subtract_list(d_list) when is_list(d_list) do
-    alias Timex.Duration
-
-    for d when is_binary(d) or is_struct(d) <- d_list,
-        reduce: Duration.zero() do
-      acc -> Duration.sub(acc, to_duration(d)) |> Duration.abs()
-    end
-  end
+  # @doc """
+  # Subtracts a list of durations and returns the absolute value.
+  #
+  # The durations can be either ISO binaries or `%Duration{}`
+  #
+  # Returns a `%Duration{}`
+  # """
+  # @doc since: "0.0.27"
+  # def subtract_list(d_list) when is_list(d_list) do
+  #   alias Timex.Duration
+  #
+  #   for d when is_binary(d) or is_struct(d) <- d_list,
+  #       reduce: Duration.zero() do
+  #     acc -> Duration.sub(acc, to_duration(d)) |> Duration.abs()
+  #   end
+  # end
 
   @doc """
   Convert the argument to a binary representation.
@@ -346,7 +350,7 @@ defmodule Helen.Time.Helper do
     alias Timex.Duration
 
     case d do
-      d when is_list(d) -> list_to_ms(d, []) |> Duration.from_milliseconds()
+      #  d when is_list(d) -> list_to_ms(d, []) |> Duration.from_milliseconds()
       %Duration{} = x -> x
       x when is_binary(x) -> Duration.parse!(x)
       _no_match -> Duration.zero()
@@ -382,34 +386,34 @@ defmodule Helen.Time.Helper do
     |> Duration.to_milliseconds(truncate: true)
   end
 
-  @doc """
-  Convert the argument to seconds.
-
-  Takes an ISO formatted duration binary and an optional default value.
-  The default value is used when the first argument is nil.  Useful for
-  situations where a configuration does not exist.
-
-  Raises if neither the first argument or the default can not be parse.  The
-  default is an empty binary when not supplied.
-
-  Returns an integer representing the seconds.
-
-  ## Examples
-
-      iex> Helen.Time.Helper.to_seconds("PT1M")
-      60
-
-  """
-  @doc since: "0.0.27"
-  def to_seconds(args, default \\ "") do
-    alias Timex.Duration
-
-    case args do
-      nil -> to_duration(default)
-      args -> to_duration(args)
-    end
-    |> Duration.to_seconds(truncate: true)
-  end
+  # @doc """
+  # Convert the argument to seconds.
+  #
+  # Takes an ISO formatted duration binary and an optional default value.
+  # The default value is used when the first argument is nil.  Useful for
+  # situations where a configuration does not exist.
+  #
+  # Raises if neither the first argument or the default can not be parse.  The
+  # default is an empty binary when not supplied.
+  #
+  # Returns an integer representing the seconds.
+  #
+  # ## Examples
+  #
+  #     iex> Helen.Time.Helper.to_seconds("PT1M")
+  #     60
+  #
+  # """
+  # @doc since: "0.0.27"
+  # def to_seconds(args, default \\ "") do
+  #   alias Timex.Duration
+  #
+  #   case args do
+  #     nil -> to_duration(default)
+  #     args -> to_duration(args)
+  #   end
+  #   |> Duration.to_seconds(truncate: true)
+  # end
 
   @doc """
   Validates if a ttl has expired
@@ -493,18 +497,11 @@ defmodule Helen.Time.Helper do
   def valid_ms?(args) do
     alias Timex.Duration
 
-    case args do
-      nil ->
-        false
+    args = args || "not a duration"
 
-      arg when is_binary(arg) ->
-        case Duration.parse(args) do
-          {:ok, _} -> true
-          _failed -> false
-        end
-
-      _arg ->
-        false
+    case Duration.parse(args) do
+      {:ok, _} -> true
+      _failed -> false
     end
   end
 
@@ -620,15 +617,15 @@ defmodule Helen.Time.Helper do
   ## PRIVATE
   ##
 
-  defp p_duration(opts) do
-    # after hours of searching and not finding an existing capabiility
-    # in Timex we'll roll our own consisting of multiple Timex functions.
-
-    ~U[0000-01-01 00:00:00Z]
-    |> Timex.shift(duration_opts(opts))
-    |> Timex.to_gregorian_microseconds()
-    |> Duration.from_microseconds()
-  end
+  # defp p_duration(opts) do
+  #   # after hours of searching and not finding an existing capabiility
+  #   # in Timex we'll roll our own consisting of multiple Timex functions.
+  #
+  #   ~U[0000-01-01 00:00:00Z]
+  #   |> Timex.shift(duration_opts(opts))
+  #   |> Timex.to_gregorian_microseconds()
+  #   |> Duration.from_microseconds()
+  # end
 
   defp duration_opts(opts) do
     case opts do
@@ -651,5 +648,20 @@ defmodule Helen.Time.Helper do
       _o ->
         []
     end
+  end
+
+  defp error(e, val) do
+    [
+      "error:\n",
+      inspect(e, pretty: true),
+      "\n",
+      Process.info(self(), :current_stacktrace) |> inspect(pretty: true),
+      "\n"
+    ]
+    |> Logger.error()
+
+    ["returned default value: ", inspect(val, pretty: true)] |> Logger.warn()
+
+    val
   end
 end

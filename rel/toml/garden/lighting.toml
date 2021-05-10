@@ -3,8 +3,7 @@ timeout = "PT10.333S"
 tz = "America/New_York"
 
 [cmd.fade_bright]
-description = "fade bright"
-cmd = "random"
+type = "random"
 min = 256
 max = 2048
 primes = 35
@@ -13,8 +12,7 @@ step = 31
 priority = 7
 
 [cmd.fade_dim]
-description = "fade bright"
-cmd = "random"
+type = "random"
 min = 256
 max = 1024
 primes = 35

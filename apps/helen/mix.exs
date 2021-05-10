@@ -114,7 +114,8 @@ defmodule Helen.Mixfile do
       {:deep_merge, "~> 1.0"},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.10", only: :test}
+      {:excoveralls, "~> 0.10", only: :test},
+      {:ruth_sim, in_umbrella: true, only: [:dev, :test]}
     ]
   end
 

@@ -256,22 +256,7 @@ defmodule Sensor.DB.Device do
     end
   end
 
-  @doc """
-  Upsert (insert or update) a Sensor.Schemas.Device
-
-  input:
-    message from an external source or or a map with necessary keys:
-      %{device: string, host: string, dev_latency_us: integer, mtime: integer}
-
-  returns input message populated with:
-     device: the results of upsert/2
-       {:ok, %Sensor.Schemas.Device{}}
-       {:invalid_changes, %Changeset{}}
-       {:error, actual error results from upsert/2}
-  """
-
-  @doc since: "0.0.15"
-  def upsert(%{device: _, host: _, dev_latency_us: _} = msg) do
+  def upsert(%{device: _} = msg) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     params = [:device, :host, :dev_latency_us, :last_seen_at]

@@ -2,6 +2,8 @@
 # and its dependencies with the aid of the Mix.Config module.
 import Config
 
+local_secrets = [System.user_home(), "devel", "shell", "local"]
+
 config :agnus,
   day_info: [cache_file: "priv/agnus.json"]
 
@@ -23,3 +25,4 @@ config :logger,
 import_config "garden/config.exs"
 import_config "helen/config.exs"
 import_config "ui/config.exs"
+import_config "ruth_sim/config.exs"

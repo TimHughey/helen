@@ -232,7 +232,7 @@ defmodule Remote.DB.Remote do
 
   input:
     a. message from an external source or or a map with necessary keys:
-       %{device: string, host: string, dev_latency_us: integer, mtime: integer}
+       %{device: string, host: string}
 
   returns input message populated with:
    a. device: the results of upsert/2
@@ -242,7 +242,7 @@ defmodule Remote.DB.Remote do
   """
 
   @doc since: "0.0.15"
-  def upsert(%{host: _, name: _, mtime: _mtime} = msg) do
+  def upsert(%{host: _, name: _} = msg) do
     import Helen.Time.Helper, only: [from_unix: 1, utc_now: 0]
 
     params = [

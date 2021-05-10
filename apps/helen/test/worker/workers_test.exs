@@ -68,12 +68,6 @@ defmodule HelenWorkersTest do
     assert_receive {:test, %{cmd: :sleep, token: ^token}}, 100
   end
 
-  # test "can execute the 'tell' action", %{wc: wc, token:} do
-  #   alias Reef.Captain.Server, as: Captain
-  #
-  #
-  # end
-
   test "the truth will set you free" do
     assert true
   end

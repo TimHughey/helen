@@ -5,7 +5,7 @@ import Config
 config :logger,
   # level: :debug
   # level: :warn
-  console: [format: "$date $time $message\n"],
+  # console: [format: "$date $time $message\n"],
   level: :info
 
 config :helen,
@@ -22,11 +22,6 @@ config :helen, Mqtt.Client,
     password: "** set in prod.secret.exs",
     server: {Tortoise.Transport.Tcp, host: "** set in prod.secret.exs", port: 1883},
     keep_alive: 15
-  ]
-
-config :helen, Mqtt.Inbound,
-  log: [
-    engine_metrics: false
   ]
 
 config :helen, Fact.Influx,

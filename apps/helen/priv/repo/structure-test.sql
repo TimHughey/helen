@@ -29,10 +29,11 @@ CREATE TABLE public.pwm_alias (
     name character varying(255) NOT NULL,
     device_id bigint,
     description character varying(50) DEFAULT '<none>'::character varying,
-    capability character varying(20) DEFAULT 'pwm'::character varying NOT NULL,
     ttl_ms integer DEFAULT 60000 NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    pio integer NOT NULL,
+    cmd character varying(32) DEFAULT 'unknown'::character varying NOT NULL
 );
 
 
@@ -61,7 +62,6 @@ ALTER SEQUENCE public.pwm_alias_id_seq OWNED BY public.pwm_alias.id;
 
 CREATE TABLE public.pwm_cmd (
     id bigint NOT NULL,
-    device_id bigint,
     refid uuid,
     acked boolean DEFAULT false NOT NULL,
     orphan boolean DEFAULT false NOT NULL,
@@ -70,6 +70,7 @@ CREATE TABLE public.pwm_cmd (
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
+    cmd character varying(32),
     alias_id bigint
 );
 
@@ -101,14 +102,11 @@ CREATE TABLE public.pwm_device (
     id bigint NOT NULL,
     device character varying(255) NOT NULL,
     host character varying(255) NOT NULL,
-    duty integer DEFAULT 0 NOT NULL,
-    duty_max integer DEFAULT 4095 NOT NULL,
-    duty_min integer DEFAULT 0 NOT NULL,
     dev_latency_us integer DEFAULT 0,
     last_seen_at timestamp without time zone,
-    last_cmd_at timestamp without time zone,
-    inserted_at timestamp(0) without time zone NOT NULL,
-    updated_at timestamp(0) without time zone NOT NULL
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    pio_count integer NOT NULL
 );
 
 
@@ -366,7 +364,8 @@ CREATE TABLE public.switch_alias (
     pio integer NOT NULL,
     ttl_ms integer DEFAULT 60000,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    remote_cmd character varying(255) DEFAULT 'unknown'::character varying NOT NULL
 );
 
 
@@ -390,12 +389,11 @@ ALTER SEQUENCE public.switch_alias_id_seq OWNED BY public.switch_alias.id;
 
 
 --
--- Name: switch_command; Type: TABLE; Schema: public; Owner: -
+-- Name: switch_cmd; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.switch_command (
+CREATE TABLE public.switch_cmd (
     id bigint NOT NULL,
-    device_id bigint,
     refid uuid NOT NULL,
     acked boolean DEFAULT false NOT NULL,
     orphan boolean DEFAULT false NOT NULL,
@@ -404,15 +402,16 @@ CREATE TABLE public.switch_command (
     ack_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    alias_id bigint
+    alias_id bigint,
+    cmd character varying(32)
 );
 
 
 --
--- Name: switch_command_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: switch_cmd_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.switch_command_id_seq
+CREATE SEQUENCE public.switch_cmd_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -421,10 +420,10 @@ CREATE SEQUENCE public.switch_command_id_seq
 
 
 --
--- Name: switch_command_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: switch_cmd_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.switch_command_id_seq OWNED BY public.switch_command.id;
+ALTER SEQUENCE public.switch_cmd_id_seq OWNED BY public.switch_cmd.id;
 
 
 --
@@ -435,13 +434,11 @@ CREATE TABLE public.switch_device (
     id bigint NOT NULL,
     device character varying(255) NOT NULL,
     host character varying(255) NOT NULL,
-    states jsonb NOT NULL,
     dev_latency_us integer DEFAULT 0 NOT NULL,
-    ttl_ms integer DEFAULT 60000 NOT NULL,
     last_seen_at timestamp without time zone NOT NULL,
-    last_cmd_at timestamp without time zone NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    pio_count integer DEFAULT 8 NOT NULL
 );
 
 
@@ -591,10 +588,10 @@ ALTER TABLE ONLY public.switch_alias ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
--- Name: switch_command id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: switch_cmd id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.switch_command ALTER COLUMN id SET DEFAULT nextval('public.switch_command_id_seq'::regclass);
+ALTER TABLE ONLY public.switch_cmd ALTER COLUMN id SET DEFAULT nextval('public.switch_cmd_id_seq'::regclass);
 
 
 --
@@ -699,11 +696,11 @@ ALTER TABLE ONLY public.switch_alias
 
 
 --
--- Name: switch_command switch_command_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: switch_cmd switch_cmd_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.switch_command
-    ADD CONSTRAINT switch_command_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.switch_cmd
+    ADD CONSTRAINT switch_cmd_pkey PRIMARY KEY (id);
 
 
 --
@@ -756,6 +753,13 @@ CREATE INDEX pwm_cmd_acked_index ON public.pwm_cmd USING btree (acked);
 --
 
 CREATE INDEX pwm_cmd_alias_id_index ON public.pwm_cmd USING btree (alias_id);
+
+
+--
+-- Name: pwm_cmd_inserted_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pwm_cmd_inserted_at_index ON public.pwm_cmd USING brin (inserted_at);
 
 
 --
@@ -843,13 +847,6 @@ CREATE INDEX switch_alias_device_id_index ON public.switch_alias USING btree (de
 
 
 --
--- Name: switch_alias_name_hash_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX switch_alias_name_hash_index ON public.switch_alias USING hash (name);
-
-
---
 -- Name: switch_alias_name_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -857,52 +854,52 @@ CREATE UNIQUE INDEX switch_alias_name_index ON public.switch_alias USING btree (
 
 
 --
--- Name: switch_command_acked_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_cmd_acked_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_acked_index ON public.switch_command USING btree (acked);
-
-
---
--- Name: switch_command_alias_id_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX switch_command_alias_id_index ON public.switch_command USING btree (alias_id);
+CREATE INDEX switch_cmd_acked_index ON public.switch_cmd USING btree (acked);
 
 
 --
--- Name: switch_command_orphan_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_cmd_alias_id_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_orphan_index ON public.switch_command USING btree (orphan);
-
-
---
--- Name: switch_command_refid_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX switch_command_refid_index ON public.switch_command USING btree (refid);
+CREATE INDEX switch_cmd_alias_id_index ON public.switch_cmd USING btree (alias_id);
 
 
 --
--- Name: switch_command_sent_at_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_cmd_inserted_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX switch_command_sent_at_index ON public.switch_command USING btree (sent_at);
-
-
---
--- Name: switch_device_device_hash_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX switch_device_device_hash_index ON public.switch_device USING hash (device);
+CREATE INDEX switch_cmd_inserted_at_index ON public.switch_cmd USING brin (inserted_at);
 
 
 --
--- Name: switch_device_device_index; Type: INDEX; Schema: public; Owner: -
+-- Name: switch_cmd_refid_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX switch_device_device_index ON public.switch_device USING btree (device);
+CREATE UNIQUE INDEX switch_cmd_refid_index ON public.switch_cmd USING btree (refid);
+
+
+--
+-- Name: switch_cmd_sent_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_cmd_sent_at_index ON public.switch_cmd USING brin (sent_at);
+
+
+--
+-- Name: switch_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX switch_device_id_index ON public.switch_device USING btree (id);
+
+
+--
+-- Name: switch_device_unique_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX switch_device_unique_index ON public.switch_device USING btree (device);
 
 
 --
@@ -932,15 +929,7 @@ ALTER TABLE ONLY public.pwm_alias
 --
 
 ALTER TABLE ONLY public.pwm_cmd
-    ADD CONSTRAINT pwm_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.pwm_alias(id);
-
-
---
--- Name: pwm_cmd pwm_cmd_pwm_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.pwm_cmd
-    ADD CONSTRAINT pwm_cmd_pwm_id_fkey FOREIGN KEY (device_id) REFERENCES public.pwm_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT pwm_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.pwm_alias(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -968,19 +957,11 @@ ALTER TABLE ONLY public.switch_alias
 
 
 --
--- Name: switch_command switch_command_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: switch_cmd switch_cmd_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.switch_command
-    ADD CONSTRAINT switch_command_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id) ON UPDATE SET NULL ON DELETE CASCADE;
-
-
---
--- Name: switch_command switch_command_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.switch_command
-    ADD CONSTRAINT switch_command_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.switch_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE ONLY public.switch_cmd
+    ADD CONSTRAINT switch_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.switch_alias(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1083,3 +1064,25 @@ INSERT INTO public."schema_migrations" (version) VALUES (20210112020809);
 INSERT INTO public."schema_migrations" (version) VALUES (20210112021115);
 INSERT INTO public."schema_migrations" (version) VALUES (20210422175619);
 INSERT INTO public."schema_migrations" (version) VALUES (20210422184410);
+INSERT INTO public."schema_migrations" (version) VALUES (20210423114322);
+INSERT INTO public."schema_migrations" (version) VALUES (20210423173102);
+INSERT INTO public."schema_migrations" (version) VALUES (20210423210752);
+INSERT INTO public."schema_migrations" (version) VALUES (20210424025741);
+INSERT INTO public."schema_migrations" (version) VALUES (20210424215626);
+INSERT INTO public."schema_migrations" (version) VALUES (20210425111302);
+INSERT INTO public."schema_migrations" (version) VALUES (20210425155030);
+INSERT INTO public."schema_migrations" (version) VALUES (20210425164121);
+INSERT INTO public."schema_migrations" (version) VALUES (20210425165702);
+INSERT INTO public."schema_migrations" (version) VALUES (20210425170202);
+INSERT INTO public."schema_migrations" (version) VALUES (20210425182014);
+INSERT INTO public."schema_migrations" (version) VALUES (20210426163156);
+INSERT INTO public."schema_migrations" (version) VALUES (20210426164714);
+INSERT INTO public."schema_migrations" (version) VALUES (20210426165842);
+INSERT INTO public."schema_migrations" (version) VALUES (20210426232924);
+INSERT INTO public."schema_migrations" (version) VALUES (20210426233059);
+INSERT INTO public."schema_migrations" (version) VALUES (20210429024800);
+INSERT INTO public."schema_migrations" (version) VALUES (20210429212232);
+INSERT INTO public."schema_migrations" (version) VALUES (20210430120412);
+INSERT INTO public."schema_migrations" (version) VALUES (20210430121001);
+INSERT INTO public."schema_migrations" (version) VALUES (20210507003858);
+INSERT INTO public."schema_migrations" (version) VALUES (20210507025645);

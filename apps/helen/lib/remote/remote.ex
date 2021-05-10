@@ -74,7 +74,7 @@ defmodule Remote do
       # this isn't technically a failure however we do want to signal to
       # the caller something is amiss
       {msg, {:processed, :no_match} = write_rc} ->
-        ["no match: ", inspect(msg, pretty: true)] |> IO.puts()
+        Logger.debug(["no match: ", inspect(msg, pretty: true)])
 
         Map.merge(msg, %{
           processed: true,
@@ -191,23 +191,6 @@ defmodule Remote do
   defdelegate profile_find(name_or_id), to: DB.Profile, as: :find
   defdelegate profile_reload(varies), to: DB.Profile, as: :reload
   defdelegate profile_names, to: DB.Profile, as: :names
-
-  @doc """
-    Output the Profile Payload for a Remote
-  """
-  @doc since: "0.0.21"
-  def profile_payload_puts(name_or_id) do
-    with %Schema{profile: pname} = rem <- find(name_or_id),
-         # find the profile assigned to this remote
-         {:pfile, %Profile{} = profile} <- {:pfile, profile_find(pname)},
-         # create the payload using the remote and profile
-         cmd <- Profile.create_profile_payload(rem, profile) do
-      ["\n", "payload = ", inspect(cmd, pretty: true), "\n"]
-      |> IO.puts()
-    else
-      _error -> {:not_found, name_or_id}
-    end
-  end
 
   defdelegate profile_to_external_map(name),
     to: DB.Profile,

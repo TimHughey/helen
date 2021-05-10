@@ -1,33 +1,54 @@
 defmodule Switch.Msg do
   @moduledoc false
 
-  def handle(%{processed: false, type: "switch"} = msg_in) do
-    alias Switch.DB.Device
-    alias Switch.Notify
+  alias Switch.DB.Device
+  alias Switch.{Notify, States}
 
-    # the with begins with processing the message through DB.Device.upsert/1
-    with %{device: switch_device} = msg <- Device.upsert(msg_in),
-         # was the upset a success?
-         {:ok, %Device{}} <- switch_device,
-         # technically the message has been processed at this point
-         msg <- put_in(msg.processed, true),
-         # send any notifications requested
-         msg <- Notify.notify_as_needed(msg) do
-      # Switch does not write any data to the timeseries database
-      # (unlike Sensor, Remote) so simulate the write_rc success
-      put_in(msg, [:write_rc], {:processed, :ok})
-    else
-      # if there was an error, add fault: <device_fault> to the message and
-      # the corresponding <device_fault>: <error> to signal to downstream
-      # functions there was an issue
-      error ->
-        x = %{processed: true, fault: :switch_fault, switch_fault: error}
-        Map.merge(msg_in, x)
+  @fault_key __MODULE__
+
+  # (1 of 2) nominal case
+  def handle(%{processed: false, type: "switch"} = msg_in) do
+    res = Repo.transaction(fn -> wrapped(msg_in) end, [])
+
+    case res do
+      {:ok, msg_out} -> msg_out
+      {:failed, error} -> put_processed_error(msg_in, inspect(error, pretty: true))
     end
   end
 
-  # if the primary handle_message does not match then simply return the msg
+  # (2 of 2) if the primary handle_message does not match then simply return the msg
   # since it wasn't for switch and/or has already been processed in the
   # pipeline
   def handle(%{} = msg_in), do: msg_in
+
+  def put_processed_error(msg, error) do
+    put_in(msg.processed, true)
+    |> put_in([:fault], @fault_key)
+    |> put_in([@fault_key], error)
+  end
+
+  def validate_success(msg) do
+    validate_keys = [:device, :states_rc, :cmd_rc]
+
+    valid? = fn x ->
+      Enum.all?(x, fn
+        {_key, []} -> true
+        {_key, {rc, _}} when rc == :ok -> true
+      end)
+    end
+
+    if Map.take(msg, validate_keys) |> valid?.() do
+      put_in(msg.processed, true)
+    else
+      put_processed_error(msg, ":device, :states_rc or :cmd_rc failed validation")
+    end
+  end
+
+  def wrapped(msg_in) do
+    msg_in
+    |> Device.upsert()
+    |> States.incoming_states()
+    |> Notify.notify_as_needed()
+    |> validate_success()
+  end
 end

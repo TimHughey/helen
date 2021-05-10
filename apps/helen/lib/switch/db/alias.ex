@@ -5,15 +5,19 @@ defmodule Switch.DB.Alias do
   use Ecto.Schema
 
   alias Switch.DB.Alias, as: Schema
-  alias Switch.DB.Command, as: Command
-  alias Switch.DB.Device, as: Device
+  alias Switch.DB.{Command, Device}
+
+  @pio_min 0
+  @ttl_default 60_000
+  @ttl_min 1
 
   schema "switch_alias" do
     field(:name, :string)
     field(:device_id, :integer)
+    field(:remote_cmd, :string, default: "unknown")
     field(:description, :string, default: "<none>")
     field(:pio, :integer)
-    field(:ttl_ms, :integer, default: 60_000)
+    field(:ttl_ms, :integer, default: @ttl_default)
 
     belongs_to(:device, Device,
       source: :device_id,
@@ -30,31 +34,73 @@ defmodule Switch.DB.Alias do
     timestamps(type: :utc_datetime_usec)
   end
 
-  @doc """
-    Create a Switch alias to a device and specific pio
-  """
-  @doc since: "0.0.25"
-  def create(%Device{id: id}, name, pio, opts \\ [])
-      when is_binary(name) and is_integer(pio) and pio >= 0 and is_list(opts) do
-    #
-    # grab keys of interest for the schema (if they exist) and populate the
-    # required parameters from the function call
-    #
-    Keyword.take(opts, [:description, :ttl_ms])
-    |> Enum.into(%{})
-    |> Map.merge(%{device_id: id, name: name, pio: pio, device_checked: true})
+  # def active_cmd(%Schema{} = x) do
+  #   case preload(x) do
+  #     %Schema{cmds: cmds} = x -> {x, Command.active_cmd(cmds)}
+  #     x -> {x, :unknown}
+  #   end
+  # end
+
+  def apply_reported_cmd(%Schema{} = a, cmd) do
+    import Command, only: [map_cmd: 1]
+    changeset(a, remote_cmd: map_cmd(cmd)) |> Repo.update(returning: true)
+  end
+
+  # unique to this schema
+  def assemble_state(%Schema{pio: pio} = a) do
+    %{pio: pio, state: nil} |> map_cmd_for_state(a)
+  end
+
+  # (1 of 2) convert parms into a map
+  def changeset(%Schema{} = a, p) when is_list(p), do: changeset(a, Enum.into(p, %{}))
+
+  # (2 of 2) params are a map
+  def changeset(%Schema{} = a, p) when is_map(p) do
+    alias Ecto.Changeset
+    import Common.DB, only: [name_regex: 0]
+
+    a
+    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.validate_required(columns(:required))
+    |> Changeset.validate_format(:name, name_regex())
+    |> Changeset.validate_inclusion(:remote_cmd, ["off", "on", "unknown"])
+    |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
+    |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
+    |> Changeset.unique_constraint(:name, [:name])
+  end
+
+  # helpers for changeset columns
+  def columns(:all) do
+    import List, only: [flatten: 1]
+    import Map, only: [drop: 2, from_struct: 1, keys: 1]
+
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> flatten()
+
+    %Schema{} |> from_struct() |> drop(these_cols) |> keys() |> flatten()
+  end
+
+  def columns(:cast), do: columns(:all)
+  def columns(:required), do: columns_all(only: [:device_id, :name, :pio])
+  def columns(:replace), do: columns_all(drop: [:name, :inserted_at])
+
+  def columns_all(opts) when is_list(opts) do
+    keep_set = MapSet.new(opts[:only] || columns(:all))
+    drop_set = MapSet.new(opts[:drop] || columns(:all))
+
+    MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
+  end
+
+  def create(%Device{id: id}, name, pio, opts \\ []) when is_binary(name) and is_list(opts) do
+    %{
+      device_id: id,
+      name: name,
+      pio: pio,
+      description: opts[:description] || "<none>",
+      ttl_ms: opts[:ttl_ms] || @ttl_default
+    }
     |> upsert()
   end
 
-  @doc """
-    Delete a Switch Alias
-
-      ## Examples
-        iex> Switch.DB.Alias.delete("sample switch")
-
-  """
-
-  @doc since: "0.0.23"
   def delete(name_or_id) do
     with %Schema{} = x <- find(name_or_id),
          {:ok, %Schema{name: n}} <- Repo.delete(x) do
@@ -64,431 +110,135 @@ defmodule Switch.DB.Alias do
     end
   end
 
-  @doc """
-    Does the name or id exist?
-
-    Returns a boolean.
-
-      ## Examples
-        iex> Switch.DB.Alias.exists?("sample switch")
-        true
-  """
-  @doc since: "0.0.21"
   def exists?(name_or_id) do
-    import Repo, only: [get_by: 2]
-
-    filter_fn = fn
-      x when is_binary(x) -> [name: name_or_id]
-      x when is_integer(x) -> [id: name_or_id]
-      _x -> nil
-    end
-
-    with filter when is_list(filter) <- filter_fn.(name_or_id),
-         %Schema{id: id} when is_integer(id) <- get_by(Schema, filter) do
-      true
-    else
+    case find(name_or_id) do
+      %Schema{} -> true
       _anything -> false
     end
   end
 
-  @doc """
-    Get a %Switch.DB.Alias{} by id or name
+  # (1 of 2) find with proper opts
+  def find(opts) when is_list(opts) and opts != [] do
+    import Repo, only: [get_by: 2]
 
-    Same return values as `Repo.get_by/2`
-
-      ## Examples
-        iex> Switch.DB.Alias.find("sample switch")
-        %Switch.DB.Alias{}
-  """
-
-  @doc since: "0.0.21"
-  def find(name_or_id) do
-    check_args = fn
-      x when is_binary(x) -> [name: x]
-      x when is_integer(x) -> [id: x]
-      x -> {:bad_args, x}
-    end
-
-    import Repo, only: [get_by: 2, preload: 2]
-
-    with opts when is_list(opts) <- check_args.(name_or_id),
-         %Schema{} = found <- get_by(Schema, opts) do
-      found |> preload([:device])
-    else
-      x when is_tuple(x) -> x
+    case get_by(Schema, opts) do
+      %Schema{} = x -> preload(x)
       x when is_nil(x) -> nil
-      x -> {:error, x}
     end
   end
 
-  @doc """
-    Retrieve Switch Alias names
-  """
-  @doc since: "0.0.22"
+  # (2 of 2) validate param and build opts for find/2
+  def find(id_or_device) do
+    case id_or_device do
+      x when is_binary(x) -> find(name: x)
+      x when is_integer(x) -> find(id: x)
+      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
+    end
+  end
+
+  def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
+
+  def load_last_cmd(%Schema{} = a) do
+    import Ecto.Query, only: [from: 2]
+
+    Repo.preload(a, cmds: from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
+  end
+
+  def load_device(%Schema{} = a), do: Repo.preload(a, [:device])
+
+  # unique to this schema
+  def map_cmd_for_state(base, %Schema{remote_cmd: cmd}) do
+    map_cmd_fn = fn
+      x when x in ["off", :off, "unknown", :unknown] -> put_in(base.state, false)
+      x when x in ["on", :on] -> put_in(base.state, true)
+    end
+
+    map_cmd_fn.(cmd)
+  end
+
   def names do
     import Ecto.Query, only: [from: 2]
 
     from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
   end
 
-  @doc """
-    Retrieve switch aliases names that begin with a pattern
-  """
-
-  @doc since: "0.0.22"
   def names_begin_with(pattern) when is_binary(pattern) do
     import Ecto.Query, only: [from: 2]
 
     like_string = [pattern, "%"] |> IO.iodata_to_binary()
 
-    from(x in Schema,
-      where: like(x.name, ^like_string),
-      order_by: x.name,
-      select: x.name
-    )
-    |> Repo.all()
+    from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name) |> Repo.all()
   end
 
-  @doc """
-    Switch the device PIO for the Alias to true
-  """
-  @doc since: "0.0.22"
-  def on(name_or_id, opts \\ []) when is_list(opts),
-    do: position(name_or_id, [position: true] ++ opts)
-
-  @doc """
-    Switch the device PIO for the Alias to false
-
-    extra options:
-      :wait_for_pid      -> PID of process that is expected to terminate
-      :check_interval_ms -> interval between checks if PID is alive
-      :timeout_ms        -> max milliseconds to wait for PID to terminate
-  """
-  @doc since: "0.0.22"
-  def off(name_id_or_list, opts \\ [])
-
-  def off(name_list, opts) when is_list(name_list) and is_list(opts) do
-    for s <- name_list, do: off(s, opts)
+  def preload(%Schema{} = x) do
+    Repo.preload(x, [:device]) |> preload_last_cmd()
   end
 
-  def off(name_or_id, opts) when is_list(opts) do
-    pid = Keyword.get(opts, :wait_for_pid)
-    check_interval_ms = Keyword.get(opts, :check_interval_ms, 10)
-    max_checks = Keyword.get(opts, :timeout_ms, 1000) / check_interval_ms
+  def preload_last_cmd(%Schema{} = x) do
+    import Ecto.Query, only: [from: 2]
 
-    # if :pid_check_out isn't in the opts default to zero so the with
-    # match is passed on the first check
-    checks = Keyword.get(opts, :pid_check_count, 0)
-
-    with {:pid_is_nil, false} <- {:pid_is_nil, is_nil(pid)},
-         {:alive, true} <- {:alive, Process.alive?(pid)},
-         {:checks, count} when count < max_checks <- {:checks, checks} do
-      Process.sleep(check_interval_ms)
-
-      # add (or increment) :pid_check_count and recurse
-      opts = Keyword.update(opts, :pid_check_count, 1, fn x -> x + 1 end)
-      off(name_or_id, opts)
-    else
-      {:checks, count} when count >= max_checks ->
-        {:timeout, name_or_id}
-
-      _anything ->
-        # pid not in opts or pid already terminated
-
-        # ensure we don't pass along any opts related to the pid check
-        opts =
-          Keyword.drop(opts, [
-            :wait_for_pid,
-            :check_interval_ms,
-            :timeout_ms,
-            :pid_check_count
-          ])
-
-        position(name_or_id, [position: false] ++ opts)
-    end
+    Repo.preload(x, cmds: from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
   end
 
-  @doc """
-    Switch off the device aliases that begin with a pattern.
+  def preload_unacked_cmds(%Schema{} = x) do
+    import Ecto.Query, only: [from: 2]
 
-    See off/2 for available options that will be applied to all device aliases.
-  """
-  @doc since: "0.0.27"
-  def off_names_begin_with(pattern, opts \\ [])
-      when is_binary(pattern) and is_list(opts) do
-    names_begin_with(pattern) |> off(opts)
+    Repo.preload(x, cmds: from(c in Command, where: c.acked == false))
   end
 
-  def position(name, opts \\ [])
+  def record_cmd(%Schema{name: name} = a, cmd, opts) do
+    import Command, only: [add: 3]
+    import Switch.Payload, only: [send_cmd: 3]
 
-  def position(name, opts) when is_binary(name) and is_list(opts) do
-    sa = find(name)
+    # send_cmd needs the device
+    a = load_device(a)
 
-    if is_nil(sa), do: {:not_found, name}, else: position(sa, opts)
-  end
+    # add the command, then send the payload
+    case add(a, cmd, opts) do
+      %{cmd: {:ok, %Command{refid: refid}}} ->
+        pub_rc = send_cmd(a, cmd, opts ++ [refid: refid])
+        {:pending, [name: name, cmd: cmd[:cmd], refid: refid, pub_rc: pub_rc]}
 
-  def position(
-        %Schema{pio: pio, ttl_ms: ttl_ms, device: %Device{} = sd} = sa,
-        opts
-      )
-      when is_list(opts) do
-    # accept either :lazy or :force
-    lazy = opts[:lazy] || true
-    lazy = opts[:force] || lazy
-
-    position = opts[:position]
-    cmd_map = %{pio: pio, state: position, initial_opts: opts}
-
-    with {:ok, curr_position} <- Device.pio_state(sd, pio),
-         # if the position opt was passed then an update is requested
-         {:position, {:opt, true}} <-
-           {:position, {:opt, is_boolean(position)}},
-
-         # the most typical scenario... lazy is true and current position
-         # does not match the requsted position
-         {:lazy, true, false} <-
-           {:lazy, lazy, position == curr_position} do
-      # the requested position does not match the current posiion so
-      # call Device.record_cmd/2 to publish the cmd to the host
-      Device.record_cmd(sd, sa, cmd_map: cmd_map)
-    else
-      {:position, {:opt, false}} ->
-        # position change not included in opts, just return current position
-        Device.pio_state(sd, pio, opts ++ [ttl_ms: ttl_ms])
-
-      {:lazy, true, true} ->
-        # requested lazy and requested position matches current position
-        # nothing to do here... just return the position
-        Device.pio_state(sd, pio, opts ++ [ttl_ms: ttl_ms])
-
-      {:lazy, _lazy_or_not, _true_or_false} ->
-        # regardless if lazy or not the current position does not match
-        # the requested position so change the position
-        Device.record_cmd(sd, sa, cmd_map: cmd_map)
-
-      {:ttl_expired, _pos} = rc ->
-        rc
-
-      catchall ->
-        catchall
-    end
-    |> Command.ack_immediate_if_needed(opts)
-  end
-
-  def rename(%Schema{} = x, opts) when is_list(opts) do
-    name = Keyword.get(opts, :name)
-
-    changes =
-      Keyword.take(opts, [
-        :name,
-        :description,
-        :ttl_ms
-      ])
-      |> Enum.into(%{})
-
-    with {:args, true} <- {:args, is_binary(name)},
-         cs <- changeset(x, changes),
-         {cs, true} <- {cs, cs.valid?},
-         {:ok, sa} <- Repo.update(cs, returning: true) do
-      {:ok, sa}
-    else
-      {:args, false} -> {:bad_args, opts}
-      {%Ecto.Changeset{} = cs, false} -> {:invalid_changes, cs}
-      error -> error
-    end
-  end
-
-  @doc """
-  Rename a switch alias
-
-    Optional opts:
-      description: <binary>   -- new description
-      ttl_ms:      <integer>  -- new ttl_ms
-  """
-  @doc since: "0.0.23"
-  def rename(name_or_id, name, opts \\ []) when is_list(opts) do
-    # no need to guard name_or_id, find/1 handles it
-    with %Schema{} = x <- find(name_or_id),
-         {:ok, %Schema{name: n}} <- rename(x, name: name) do
-      {:ok, n}
-    else
-      error -> error
-    end
-  end
-
-  @doc """
-  Toggle the device PIO for the alias on <-> off
-  """
-  @doc since: "0.0.22"
-  def toggle(name_or_id, opts \\ []) do
-    case position(name_or_id) do
-      {:ok, true} -> position(name_or_id, [position: false] ++ opts)
-      {:ok, false} -> position(name_or_id, [position: true] ++ opts)
-      error -> error
-    end
-  end
-
-  def update(name_or_id, opts) when is_list(opts) do
-    case find(name_or_id) do
-      %Schema{name: name} = x -> rename(x, [name: name] ++ opts)
-      _not_found -> {:not_found, name_or_id}
-    end
-  end
-
-  # upsert/1 confirms the minimum keys required and if the device to alias
-  # exists
-  def upsert(%{name: _, device_id: _, pio: _} = m) do
-    upsert(%Schema{}, Map.put(m, :device_checked, true))
-  end
-
-  def upsert(catchall) do
-    Logger.warn(["upsert/1 bad args: ", inspect(catchall, pretty: true)])
-    {:bad_args, catchall}
-  end
-
-  # Alias.upsert/2 will update (or insert) a %Schema{} using the map passed
-  def upsert(
-        %Schema{} = x,
-        %{device_checked: true, name: _, device_id: _, pio: _pio} = params
-      ) do
-    cs = changeset(x, Map.take(params, possible_changes()))
-
-    replace_cols = [
-      :description,
-      :device_id,
-      :pio,
-      :ttl_ms,
-      :updated_at
-    ]
-
-    with {:cs_valid, true} <- {:cs_valid, cs.valid?()},
-         # the keys on_conflict: and conflict_target: indicate the insert
-         # is an "upsert"
-         {:ok, %Schema{id: _id} = x} <-
-           Repo.insert(cs,
-             on_conflict: {:replace, replace_cols},
-             returning: true,
-             conflict_target: [:name]
-           ) do
-      {:ok, x}
-    else
-      {:cs_valid, false} ->
-        {:invalid_changes, cs}
-
-      {:error, rc} ->
-        {:error, rc}
+      %{cmd: {_, _} = rc} ->
+        {:failed, {:add_cmd, rc}}
 
       error ->
-        error
+        {:record_cmd_failed, error}
     end
-    |> check_result(x, __ENV__)
   end
 
-  def upsert(
-        %Schema{},
-        %{
-          device_checked: false,
-          name: _,
-          device: device,
-          device_id: _device_id,
-          pio: pio
-        }
-      ),
-      do: {:device_not_found, {device, pio}}
+  # unique to this Schema
+  def status(%Schema{} = a, opts) do
+    import Helen.Time.Helper, only: [ttl_check: 1]
+    import Command, only: [map_cmd: 1]
 
-  #
-  # PRIVATE
-  #
+    %Schema{
+      remote_cmd: remote_cmd,
+      name: name,
+      device: %Device{last_seen_at: seen_at},
+      cmds: cmds,
+      updated_at: at,
+      ttl_ms: ttl_ms
+    } = load_device(a) |> load_last_cmd()
 
-  defp caller(%{function: {func, arity}}),
-    do: [Atom.to_string(func), "/", Integer.to_string(arity)]
+    status = %{cmd: map_cmd(remote_cmd), at: at}
 
-  defp changeset(x, params) when is_list(params) do
-    changeset(x, Enum.into(params, %{}))
+    %{name: name, seen_at: seen_at, ttl_ms: opts[:ttl_ms] || ttl_ms}
+    |> put_in([:remote_cmd], status)
+    |> Command.status(cmds)
+    |> ttl_check()
   end
 
-  defp changeset(x, params) when is_map(params) do
-    import Ecto.Changeset,
-      only: [
-        cast: 3,
-        validate_required: 2,
-        validate_format: 3,
-        validate_number: 3,
-        unique_constraint: 3
-      ]
+  def status(x, _opts), do: %{not_found: true, invalid: inspect(x, pretty: true)}
 
-    import Common.DB, only: [name_regex: 0]
+  def upsert(p) when is_map(p) do
+    cs = changeset(%Schema{}, Map.take(p, columns(:all)))
 
-    cast(x, params, cast_changes())
-    |> validate_required(possible_changes())
-    |> validate_format(:name, name_regex())
-    |> validate_number(:pio,
-      greater_than_or_equal_to: 0
-    )
-    |> validate_number(:ttl_ms,
-      greater_than_or_equal_to: 0
-    )
-    |> unique_constraint(:name, [:name])
-  end
+    opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
 
-  defp check_result(res, x, env) do
-    case res do
-      # all is well, simply return the res
-      {:ok, %Schema{}} ->
-        true
-
-      {:invalid_changes, cs} ->
-        Logger.warn([
-          caller(env),
-          " invalid changes: ",
-          inspect(cs, pretty: true)
-        ])
-
-      {:error, rc} ->
-        Logger.warn([
-          caller(env),
-          " failed rc: ",
-          inspect(rc, pretty: true),
-          " for: ",
-          inspect(x, pretty: true)
-        ])
-
-      true ->
-        Logger.warn([
-          caller(env),
-          " error: ",
-          inspect(res, pretty: true),
-          " for: ",
-          inspect(x, pretty: true)
-        ])
+    case Repo.insert(cs, opts) do
+      {:ok, %Schema{}} = rc -> rc
+      {:error, e} -> {:error, inspect(e, pretty: true)}
     end
-
-    res
   end
-
-  #
-  # Changeset Functions
-  #
-
-  #
-  # Changeset Lists
-  #
-
-  defp cast_changes,
-    do: [
-      :name,
-      :description,
-      :device_id,
-      :pio,
-      :ttl_ms
-    ]
-
-  defp possible_changes,
-    do: [
-      :name,
-      :description,
-      :device_id,
-      :pio,
-      :ttl_ms
-    ]
 end

@@ -20,4 +20,6 @@
 # create the default Remote Profile
 # Remote.Profile.Schema.create("default")
 
+PulseWidthTestHelper.delete_all_devices()
+
 ExUnit.start()

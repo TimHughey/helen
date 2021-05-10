@@ -29,7 +29,7 @@ defmodule Broom do
   @callback cmds_tracked :: [cmd]
   @callback default_opts :: Keyword.t()
   @callback find_refid(term) :: {:ok, term} | {term, term}
-  @callback insert_and_track(Ecto.Changeset.t()) :: track_result
+  @callback insert_and_track(Ecto.Changeset.t(), Keyword.t()) :: track_result
 
   @callback orphan(cmd) ::
               {:orphan, {:ok, Ecto.Schema.t()}}
@@ -38,6 +38,7 @@ defmodule Broom do
   @callback orphan_list(term) :: [term]
   @callback reload(cmd) :: Ecto.Schema.t()
   @callback release(msg) :: msg
+  @callback report_metrics(Keyword.t()) :: :ok
   @callback start_link(list) :: term
   @callback update(cmd, opts) :: {:ok, cmd} | {term, term}
 
@@ -89,12 +90,7 @@ defmodule Broom do
     quote location: :keep, bind_quoted: [opts: opts] do
       @behaviour Broom
 
-      def broom do
-        parts = [[Module.split(__MODULE__) |> hd()], "Broom"] |> List.flatten()
-        Module.concat(parts)
-      end
-
-      defoverridable broom: 0
+      def broom, do: Broom.make_module_name(__MODULE__)
 
       def child_spec(args) do
         %{start: {_, :start_link, x}} = spec = Broom.child_spec(args)
@@ -102,42 +98,32 @@ defmodule Broom do
         %{spec | start: {__MODULE__, :start_link, x}}
       end
 
-      defoverridable child_spec: 1
-
       def cmd_counts_reset(opts \\ [:orphaned, :errors]) when is_list(opts) do
         Broom.counts_reset(broom(), opts)
       end
 
-      defoverridable cmd_counts_reset: 1
-
       def cmd_counts, do: Broom.tracked_counts(broom())
-      defoverridable cmd_counts: 0
 
       def cmds_tracked, do: Broom.tracked_cmds(broom())
-      defoverridable cmds_tracked: 0
 
       def default_opts, do: []
-      defoverridable default_opts: 0
 
       def find_refid(ref) when is_binary(ref) do
         preloads = __MODULE__.__schema__(:associations)
         Repo.get_by(__MODULE__, refid: ref) |> Repo.preload(preloads)
       end
 
-      defoverridable find_refid: 1
-
       @doc """
         Default implementation of insert_and_track/1 that calls
-        Broom.insert_and_track(broom(), cs)
+        Broom.insert_and_track(cs, opts, broom())
 
         ## Override notes:
           1. Typical reason to override is when some action (e.g. altering
              the changeset) prior to insert and track.
           2. When overriden, be certain to call Broom.insert_and_track/2
-             the expected map
+             with the altered changeset
       """
-      def insert_and_track(cs), do: Broom.insert_and_track(broom(), cs)
-      defoverridable insert_and_track: 1
+      def insert_and_track(cs, opts), do: Broom.insert_and_track(cs, opts, broom())
 
       def orphan(%{acked: false} = cmd) do
         import Helen.Time.Helper, only: [utc_now: 0]
@@ -146,8 +132,6 @@ defmodule Broom do
         {:orphan, update(cmd, acked: true, ack_at: utc_now(), orphan: true)}
       end
 
-      defoverridable orphan: 1
-
       def orphan_list(opts \\ []) when is_list(opts) do
         import Ecto.Query, only: [from: 2]
         import Helen.Time.Helper, only: [utc_shift_past: 1]
@@ -155,7 +139,7 @@ defmodule Broom do
         # sent before passed as an option will override the app env config
         # if not passed in then grab it from the config
         # finally, as a last resort use the hardcoded value
-        sent_before_opts = Keyword.take(opts, [:sent_before, "PT31S"])
+        sent_before_opts = Keyword.take(opts, [:sent_before, "PT3.1S"])
         preloads = __MODULE__.__schema__(:associations)
 
         before = utc_shift_past(sent_before_opts)
@@ -167,10 +151,7 @@ defmodule Broom do
         |> Repo.preload(preloads)
       end
 
-      defoverridable orphan_list: 1
-
       def release(msg), do: Broom.release(broom(), msg)
-      defoverridable release: 1
 
       @doc """
         Reload a device command.
@@ -187,53 +168,28 @@ defmodule Broom do
         |> preload(__MODULE__.__schema__(:associations))
       end
 
-      defoverridable reload: 1
+      def start_link(_opts), do: default_opts() |> Broom.make_opts(__MODULE__) |> Broom.start_link()
 
-      def start_link(opts) do
-        base_opts =
-          Application.get_application(__MODULE__)
-          |> Application.get_env(__MODULE__, default_opts())
+      def report_metrics(opts \\ []), do: Broom.report_metrics_now(broom(), opts)
 
-        # override any opts from config or local default
-        opts =
-          Keyword.merge(base_opts, opts)
-          |> Keyword.merge(module: __MODULE__, name: broom())
-
-        Broom.start_link(opts)
-      end
-
-      defoverridable start_link: 1
-
-      # @before_compile Broom
+      defoverridable Broom
     end
   end
-
-  #
-  # defmacro __before_compile__(%{aliases: _aliases} = _env) do
-  #
-  # end
 
   ##
   ## GenServer Start and Init
   ##
 
+  @impl true
   def init(args) do
-    state = %{
-      opts: args,
-      tasks: [],
-      tracker: %{},
-      timers: [],
-      counts: [orphaned: 0, tracked: 0, released: 0, errors: 0],
-      opts_vsn: 0
-    }
+    counts = [orphaned: 0, tracked: 0, released: 0, errors: 0]
 
-    {:ok, state |> schedule_metrics()}
+    %{opts: args, tracker: %{}, counts: counts, metrics_timer: :never, metrics_rc: :never}
+    |> schedule_metrics()
+    |> reply_ok()
   end
 
-  def start_link(opts) do
-    name = Keyword.get(opts, :name)
-    GenServer.start_link(Broom, opts, name: name)
-  end
+  def start_link(opts), do: GenServer.start_link(Broom, opts, name: opts[:name])
 
   ##
   ## Broom Public API
@@ -246,30 +202,15 @@ defmodule Broom do
     {:acked, ack, cmd}
   end
 
-  def insert_and_track(server, %Ecto.Changeset{} = cs) do
-    with {:cs_valid, true, _cs} <- {:cs_valid, cs.valid?, cs},
-         {:ok, %_{acked: acked} = cmd} = cmd_rc <- Repo.insert(cs, returning: true) do
-      # if the cmd is already acked no need to track it
-      if acked do
-        %{cmd: {:ok, cmd}}
-      else
-        track(server, %{cmd: cmd_rc})
-      end
-    else
-      {:cs_valid, false, cs} -> {:invalid_cs, cs}
-      error -> {:error, error}
-    end
+  def insert_and_track(cs, opts, server) do
+    cs
+    |> insert(opts)
+    |> track(server, opts)
+    |> add_cmd_immediate_to_track_result_if_needed()
   end
 
-  def release(server, %{cmd: {rc, _cmd} = cmd_rc} = msg) do
-    case rc do
-      :ok ->
-        rc = GenServer.cast(server, {:release, msg})
-        Map.put(msg, :broom_release, rc)
-
-      _ ->
-        Map.put(msg, :broom_release, cmd_rc)
-    end
+  def insert(%Ecto.Changeset{valid?: true} = cs, _opts) do
+    Repo.insert(cs, returning: true)
   end
 
   @doc """
@@ -280,11 +221,65 @@ defmodule Broom do
     GenServer.call(server, {:count_reset, opts})
   end
 
-  def track(server, %{cmd: {:ok, cmd}} = msg) when is_struct(cmd) do
-    rc = GenServer.cast(server, {:track, msg})
+  def make_module_name(mod) do
+    ([Module.split(mod) |> hd()] ++ ["Broom"]) |> Module.concat()
+  end
 
-    # return the msg passed, track is intended for use in a pipeline
-    Map.put(msg, :broom_track, rc)
+  def make_opts(default_opts, mod) do
+    base_opts = [module: mod, name: make_module_name(mod)]
+
+    case Application.get_env(:helen, mod, []) do
+      [] -> base_opts ++ default_opts
+      x when is_list(x) -> base_opts ++ x
+    end
+  end
+
+  # NOTE!
+  # as of 2021-05-05 this function contains backward compatible code
+  # matching on cmd_rc is the intended final implementation
+  def release(server, msg) do
+    put_broom_rc = fn x -> put_in(msg, [:broom_rc], x) end
+
+    case msg do
+      %{cmd_rc: {:ok, cmd}} when is_struct(cmd) ->
+        GenServer.cast(server, {:release, cmd.refid})
+        put_broom_rc.({:requested, cmd.refid})
+
+      %{cmd_rc: {:ok, text}} when is_binary(text) ->
+        put_broom_rc.({:ok, text})
+
+      %{cmd: {:ok, cmd}} when is_struct(cmd) ->
+        GenServer.cast(server, {:release, cmd.refid})
+        put_broom_rc.({:requested_release, cmd.refid})
+
+      _ ->
+        put_broom_rc.({:ok, "unmatched release, will handle via orphan timer"})
+    end
+  end
+
+  def report_metrics_now(server, opts) do
+    GenServer.call(server, {:report_metrics, opts})
+  end
+
+  # (1 of 2) the insert was a success
+  def track({:ok, schema} = cmd_rc, server, opts) do
+    # create a map to populate as the server msg and as the return value
+    msg = %{cmd_rc: cmd_rc, broom_rc: nil, server: server, opts: opts}
+
+    # when the requestor is willing to wait for the ack we call the server, otherwise we cast
+    # a tuple is returned (for consistency) regardless of call or cast
+    call_track = fn
+      true -> GenServer.call(server, {:track, msg})
+      false -> {GenServer.cast(server, {:track, msg}), [track_requested: schema.refid]}
+    end
+
+    notify = opts[:notify_when_released] || false
+    %{msg | broom_rc: notify |> call_track.()}
+  end
+
+  # (2 of 2) insert failed
+  def track(rc, server, opts) do
+    %{cmd_rc: rc, broom_rc: {:failed, "insert failed, unable to track"}, server: server, opts: opts}
   end
 
   def tracked_cmds(server) do
@@ -299,7 +294,7 @@ defmodule Broom do
   ## GenServer handle_* implementation
   ##
 
-  @doc false
+  @impl true
   def handle_call({:count_reset, opts}, _from, %{counts: counts} = s) do
     new_counts = for(x <- opts, do: Keyword.new() |> Keyword.put(x, 0)) |> List.flatten()
 
@@ -308,32 +303,38 @@ defmodule Broom do
     {:reply, :ok, %{s | counts: counts}}
   end
 
-  @doc false
-  def handle_cast({:release, %{cmd: {_rc, %{refid: r}}}}, %{tracker: t} = s) do
-    tracker = Map.drop(t, [r])
-    state = Map.put(s, :tracker, tracker)
-
-    {:noreply, increment_count(state, :released)}
+  @impl true
+  def handle_call({:track, %{cmd_rc: {_, schema}}}, {pid, _ref}, s) do
+    handle_track(schema, pid, s) |> reply({:will_notify, schema.refid})
   end
 
-  @doc false
-  def handle_cast({:track, %{cmd: {_rc, cmd}}}, %{opts: opts} = s) do
-    import Helen.Time.Helper, only: [to_ms: 2]
+  @impl true
+  def handle_call({:report_metrics, opts}, _from, s) do
+    # if opts contains a new report metrics option then put it in the state
+    interval = opts[:interval] || s.opts[:metrics]
 
-    ms = to_ms(opts[:orphan][:sent_before], "PT3M")
-
-    %{refid: refid, __struct__: schema} = cmd
-    timer = Process.send_after(self(), {:possible_orphan, refid}, ms)
-
-    track_map = %{refid: refid, cmd: cmd, schema: schema, timer: timer}
-    tracker = Map.put(s[:tracker], refid, track_map)
-
-    s = increment_count(s, :tracked)
-
-    {:noreply, Map.merge(s, %{tracker: tracker})}
+    %{s | opts: Keyword.replace(s.opts, :metrics, interval)}
+    |> report_metrics()
+    |> schedule_metrics
+    |> reply({:ok, interval})
   end
 
-  @doc false
+  @impl true
+  # NOTE!  new as of 2021-05-05
+  # release an acked cmd matching on the cmd_rc (cmd update) result
+  def handle_cast({:release, refid}, s) when is_binary(refid) do
+    s
+    |> remove_from_tracker(refid, :acked)
+    |> increment_count(:released)
+    |> noreply()
+  end
+
+  @impl true
+  def handle_cast({:track, %{cmd_rc: {_, schema}}}, s) do
+    handle_track(schema, nil, s) |> noreply()
+  end
+
+  @impl true
   def handle_info({:possible_orphan, ref}, %{} = s) do
     # the timeout msg for a command has arrived and we must determine if:
     #
@@ -346,28 +347,50 @@ defmodule Broom do
          # double check nothing crossed in the night
          {:acked, false, cmd} <- acked?(tm[:cmd]),
          # it's an orphan, update the counts and remove it from the tracker
-         s <- increment_count(s, :orphaned) |> remove_from_tracker(ref),
+         s <- increment_count(s, :orphaned) |> remove_from_tracker(ref, :orphaned),
          {:orphan, {:ok, _cmd}} <- orphan(cmd) do
       {:noreply, s}
     else
       # the refid wasn't in the tracker, not an orphan
       nil -> {:noreply, s}
       # glad we double checked, not an orphan after all
-      {:acked, true, _cmd} -> {:noreply, remove_from_tracker(s, ref)}
+      {:acked, true, _cmd} -> {:noreply, remove_from_tracker(s, ref, :acked)}
       # some other error has occurred, store it in the state
       error -> {:noreply, store_update_error(s, ref, error)}
     end
   end
 
-  @doc false
-  def handle_info({:report_metrics, opts_vsn}, %{} = s) do
-    if opts_vsn == s[:opts_vsn] do
-      {:noreply, report_metrics(s) |> schedule_metrics()}
-    else
-      # the opts have changed (message opts_vsn != state opts_vsn) so skip
-      # this report and simply schedule the next (using the new opts)
-      {:noreply, schedule_metrics(s)}
+  @impl true
+  def handle_info(:report_metrics, s) do
+    %{s | metrics_timer: nil} |> report_metrics() |> schedule_metrics() |> noreply()
+  end
+
+  ##
+  ##
+  ## Private
+  ##
+  ##
+
+  # when the inserted command is already acked then add cmd as a signal for upstream
+  defp add_cmd_immediate_to_track_result_if_needed(%{cmd_rc: rc} = res) do
+    case rc do
+      {:ok, %{acked: true, cmd: cmd}} -> put_in(res, [:cmd_acked], cmd)
+      _ -> res
     end
+  end
+
+  defp handle_track(inserted_cmd, reply_to, %{opts: opts} = s) do
+    import Helen.Time.Helper, only: [to_ms: 2]
+
+    ms = opts[:orphan][:sent_before] |> to_ms("PT15S")
+
+    %{refid: refid, __struct__: schema} = inserted_cmd
+    timer = Process.send_after(self(), {:possible_orphan, refid}, ms)
+
+    track_map = %{refid: refid, cmd: inserted_cmd, schema: schema, timer: timer, reply_to: reply_to}
+    tracker = Map.put(s[:tracker], refid, track_map)
+
+    increment_count(s, :tracked) |> put_in([:tracker], tracker)
   end
 
   defp increment_count(%{counts: c} = s, key) when is_atom(key) do
@@ -384,25 +407,26 @@ defmodule Broom do
 
     cmd = apply(schema, :reload, [cmd])
 
-    {:orphan,
-     apply(schema, :update, [
-       cmd,
-       [acked: true, ack_at: utc_now(), orphan: true]
-     ])}
+    {:orphan, apply(schema, :update, [cmd, [acked: true, ack_at: utc_now(), orphan: true]])}
   end
 
-  defp remove_from_tracker(%{tracker: t} = s, ref) do
-    %{s | tracker: Map.drop(t, [ref])}
+  defp remove_from_tracker(%{tracker: t, opts: opts} = s, ref, disposition) do
+    case t[ref] do
+      %{reply_to: pid} when is_pid(pid) -> send(pid, {{opts[:name], :ref_released}, ref, disposition})
+      _ -> nil
+    end
+
+    %{s | tracker: Map.delete(t, ref)}
   end
 
-  defp report_metrics(%{counts: counts, opts: opts} = state) do
+  defp report_metrics(%{counts: counts, opts: opts} = s) do
     import Fact.Influx, only: [write: 2]
     import Helen.Time.Helper, only: [unix_now: 1]
 
     datapoint_map = %{
       points: [
         %{
-          measurement: "switch",
+          measurement: "broom",
           fields: Enum.into(counts, %{}),
           tags: %{mod: Atom.to_string(opts[:module])},
           timestamp: unix_now(:nanosecond)
@@ -410,30 +434,35 @@ defmodule Broom do
       ]
     }
 
-    write_rc = write(datapoint_map, precision: :nanosecond)
-
-    Map.put(state, :last_datapoint_write, write_rc)
+    %{s | metrics_rc: write(datapoint_map, precision: :nanosecond)}
   end
 
-  defp schedule_metrics(%{opts_vsn: v, opts: opts} = state) do
+  defp schedule_metrics(%{opts: opts} = state) do
     import Helen.Time.Helper, only: [to_ms: 2]
 
-    ms = to_ms(opts[:timeout], "PT5M")
-    Process.send_after(self(), {:report_metrics, v}, ms)
+    cancel_timer_if_needed = fn
+      %{metrics_timer: x} = s when is_reference(x) ->
+        Process.cancel_timer(x)
+        %{s | metrics_timer: nil}
 
-    state
+      s ->
+        s
+    end
+
+    start_timer = fn x -> Process.send_after(self(), :report_metrics, to_ms(x, "P365D")) end
+
+    case {opts[:metrics], cancel_timer_if_needed.(state)} do
+      {x, s} when is_binary(x) -> %{s | metrics_timer: start_timer.(x)}
+      {_, s} -> s
+    end
   end
 
   defp store_update_error(%{errors: e} = s, ref, error) do
     %{s | errors: Map.put(e, ref, error)} |> increment_count(:errors)
   end
 
-  # def update(%{__struct__: schema} = cmd, opts) when is_list(opts) do
-  #   set = Keyword.take(opts, possible_changes()) |> Enum.into(%{})
-  #   cs = changeset(cmd, set)
-  #
-  #   if cs.valid?,
-  #     do: {:ok, Repo.update!(cs, returning: true)},
-  #     else: {:invalid_changes, cs}
-  # end
+  defp noreply(s), do: {:noreply, s}
+  defp reply(%{tracker: _} = s, res), do: {:reply, res, s}
+  defp reply(res, %{tracker: _} = s), do: {:reply, res, s}
+  defp reply_ok(s), do: {:ok, s}
 end

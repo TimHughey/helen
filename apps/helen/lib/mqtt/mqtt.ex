@@ -62,17 +62,24 @@ defmodule Mqtt do
     Map.delete(msg, :pack_rc) |> put_in([:payload], payload)
   end
 
-  def wait_for_roundtrip_ref(ref) do
+  def wait_for_roundtrip(%{roundtrip_ref: ref} = ctx) do
+    ctx |> put_in([:roundtrip_rc], wait_for_roundtrip(ref)) |> Map.delete(:roundtrip_ref)
+  end
+
+  def wait_for_roundtrip(ctx) when is_map(ctx), do: ctx
+
+  def wait_for_roundtrip(ref) when is_binary(ref) do
     case GenServer.call(Mqtt.Inbound, {:wait_for_roundtrip_ref, ref}) do
       :already_received ->
-        ref
+        {:already_received, ref}
 
       :added_to_waiters ->
         receive do
-          {{Mqtt.Inbound, :roundtrip}, ^ref} when is_binary(ref) -> ref
+          {{Mqtt.Inbound, :roundtrip}, ^ref} when is_binary(ref) ->
+            {:waited_and_received, ref}
         after
-          1000 ->
-            IO.puts("roundtrip reference never received")
+          10_000 ->
+            {:roundtrip_timeout, ref}
         end
     end
   end

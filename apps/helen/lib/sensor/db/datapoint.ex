@@ -89,12 +89,7 @@ defmodule Sensor.DB.DataPoint do
   def save(msg) when is_map(msg),
     do: Map.put(msg, :device, {:error, :badmsg})
 
-  defp insert(
-         %Device{id: _id} = device,
-         %{mtime: _mtime} = _msg,
-         params
-       )
-       when is_list(params) or is_map(params) do
+  defp insert(%Device{id: _id} = device, _msg, params) when is_list(params) or is_map(params) do
     # make certain the params are a map and
     # add the device we'll associate with
     params = Enum.into(params, %{}) |> Map.put(:device, device)

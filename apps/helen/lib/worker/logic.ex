@@ -280,7 +280,7 @@ defmodule Helen.Worker.Logic do
 
     state = Workers.execute(state)
 
-    # IO.puts("execute cmd_rc: #{inspect(cmd_rc(state), pretty: true)}")
+    Logger.debug("execute cmd_rc: #{inspect(cmd_rc(state), pretty: true)}")
 
     case cmd_rc(state) do
       # if this action is processed via a message and a message is expected
@@ -364,9 +364,14 @@ defmodule Helen.Worker.Logic do
 
   def handle_logic_msg(%{token: msg_token} = msg, %{token: token} = state)
       when msg_token == token do
-    # IO.puts("++++++++++++++++\n")
-    # IO.puts(inspect(Map.drop(msg, [:worker_cache]), pretty: true))
-    # IO.puts("\n----------------")
+    """
+
+    +++++++++++++++
+    #{inspect(Map.drop(msg, [:worker_cache]), pretty: true)}
+    ---------------
+
+    """
+    |> Logger.debug()
 
     case msg do
       %{via_msg: true, via_msg_at: :at_start} ->
@@ -510,9 +515,7 @@ defmodule Helen.Worker.Logic do
 
       [action | _rest] ->
         actions_to_execute_update(state, fn x -> tl(x) end)
-        |> pending_action_put(
-          Workers.make_action(:logic, workers, action, state)
-        )
+        |> pending_action_put(Workers.make_action(:logic, workers, action, state))
         |> execute_actions_if_needed()
     end
   end
@@ -628,9 +631,7 @@ defmodule Helen.Worker.Logic do
         change_mode(state, mode)
 
       unmatched ->
-        Logger.info(
-          "#{registered_name()} unknown startup mode #{inspect(unmatched)}"
-        )
+        Logger.info("#{registered_name()} unknown startup mode #{inspect(unmatched)}")
 
         state
     end
