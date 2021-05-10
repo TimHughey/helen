@@ -7,90 +7,51 @@ defmodule Helen.Application do
   use Application
   require Logger
 
+  @start_opts [strategy: :rest_for_one, name: Helen.Supervisor, max_restarts: 100, max_seconds: 5]
+  @log_init Application.compile_env(:helen, [Helen.Application, :log, :init], false)
+
   @doc """
     Starts Helen Supervisor
   """
   @doc since: "0.0.3"
   @impl true
   def start(:normal, args) do
-    import Application, only: [get_env: 3]
+    Logger.info(["application starting, working directory: ", "#{inspect(File.cwd(), pretty: true)}"])
 
-    Logger.info([
-      "application starting, ",
-      "working directory: ",
-      "#{inspect(File.cwd(), pretty: true)}"
-    ])
+    # only start the Repo db passwd is configured
 
-    # only start if there are children to supervise and the Repo db passwd
-    # exists in the environment
-    with {:children, [_ | _] = c} <- {:children, children_list()},
-         repo_config <- get_env(:helen, Repo, []),
-         db_passwd <- Keyword.get(repo_config, :password),
-         {:db_passwd, true} <- {:db_passwd, is_binary(db_passwd)} do
-      # we have children to start and the Repo db passwd is set
-      log_if_needed(args, c)
+    repo_config = Application.get_env(:helen, Repo, [])
 
-      Supervisor.start_link(c,
-        strategy: :rest_for_one,
-        name: Helen.Supervisor,
-        max_restarts: 100,
-        max_seconds: 5
-      )
-    else
-      {:children, []} -> {:error, :no_children}
-      {:db_passwd, false} -> {:error, :db_passwd_missing}
-      error -> {:error, error}
+    case repo_config[:password] || :db_passwd_missing do
+      db_passwd when is_binary(db_passwd) ->
+        mods = mods_to_start()
+        log_start(args, mods)
+        Supervisor.start_link(mods, @start_opts)
+
+      x ->
+        {:error, x}
     end
   end
 
-  def default_opts, do: @type(start_type :: :normal)
-  @type args :: term
+  # def default_opts, do: @type(start_type :: :normal)
+  # @type args :: term
 
-  def which_children, do: Supervisor.which_children(Helen.Supervisor)
+  def children, do: Supervisor.which_children(Helen.Supervisor)
 
   ###
   ### PRIVATE
   ###
 
-  defp children_list do
-    import Application, only: [get_env: 2]
+  defp log_start(args, children) do
+    if @log_init do
+      num_children = (length(children) == 1 && "1 child") || "#{to_string(children)} children"
+      vsn = args[:version] || "unknown"
 
-    make_tuple = fn
-      mod, args when is_nil(args) -> {mod, []}
-      mod, args -> {mod, Keyword.get(args, :initial_args, [])}
-    end
-
-    for mod <- modules_to_start() do
-      make_tuple.(mod, get_env(:helen, mod))
+      Logger.info(["starting supervisor, version=", vsn, " with ", num_children])
     end
   end
 
-  defp log_if_needed(args, children) do
-    import Application, only: [get_env: 3]
-
-    children_str =
-      case length(children) do
-        x when x == 1 -> "1 child"
-        x -> "#{Integer.to_string(x)} children"
-      end
-
-    log =
-      get_env(:helen, Helen.Application, [])
-      |> Keyword.get(:log, [])
-      |> Keyword.get(:init, true)
-
-    if log,
-      do:
-        [
-          "starting supervisor version=\"",
-          Keyword.get(args, :version, "unknown"),
-          "\" with #{children_str}"
-        ]
-        |> IO.iodata_to_binary()
-        |> Logger.info()
-  end
-
-  defp modules_to_start do
+  defp mods_to_start do
     if only_repo?() do
       [Repo]
     else
