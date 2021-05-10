@@ -10,7 +10,17 @@ defmodule RuthSim do
     end
   end
 
-  def freshen(ctx), do: ctx |> PwmSim.freshen() |> SwitchKeeper.freshen()
+  def freshen(ctx) do
+    case ctx do
+      %{type: "pwm"} -> PwmSim.freshen(ctx)
+      %{type: "switch"} -> SwitchSim.freshen(ctx)
+    end
+  end
 
-  def make_device(ctx), do: ctx |> RuthSim.Mqtt.add_roundtrip_ref() |> PwmSim.make_device()
+  def make_device(ctx) do
+    ctx
+    |> RuthSim.Mqtt.add_roundtrip_ref()
+    |> PwmSim.make_device()
+    |> SwitchSim.make_device()
+  end
 end

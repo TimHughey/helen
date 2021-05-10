@@ -13,6 +13,8 @@ defmodule PulseWidthTest do
   setup_all do
     on_exit(fn -> PulseWidth.cmd_counts_reset([:orphaned, :errors]) end)
 
+    Helper.delete_all_devices()
+
     # populate keys we always want in the ctx then make the default device
     ctx = %{type: "pwm", execute_rc: %{}, alias_create: [], setup_all: true} |> Helper.make_device()
 

@@ -1,16 +1,13 @@
 defmodule Switch do
-  @moduledoc ~S"""
-  Switch
-
-  Primary entry module for all Switch functionality.
+  @moduledoc """
+    The Switch module provides the public API for Switch devices.
   """
+
+  require Logger
+  use Timex
 
   alias Switch.DB.{Alias, Command, Device}
   alias Switch.{Execute, Msg, Notify, Status}
-
-  #
-  ## Public API
-  #
 
   defdelegate acked?(refid), to: Command
 
@@ -29,34 +26,74 @@ defmodule Switch do
   end
 
   defdelegate alias_find(name_or_id), to: Alias, as: :find
+
   defdelegate cmd_counts, to: Command
-  defdelegate cmd_counts_reset(opts \\ []), to: Command
+  defdelegate cmd_counts_reset(opts), to: Command
   defdelegate cmds_tracked, to: Command
 
   defdelegate delete(name_or_id), to: Alias, as: :delete
   defdelegate device_find(device_or_id), to: Device, as: :find
   defdelegate devices_begin_with(pattern \\ ""), to: Device
 
-  defdelegate execute(cmd), to: Execute
-  defdelegate execute(cmd, opts), to: Execute
+  # (1 of 2) single arg entry point, extract name and opts
+  def execute(%{name: name} = cmd_map) do
+    opts = cmd_map[:opts] || []
+    cmd_map = Map.delete(cmd_map, :opts)
 
-  @deprecated "Use execute/2 instead"
-  def execute_action(%{worker_cmd: cmd, worker: %{name: name}}),
-    do: execute(%{cmd: cmd, name: name})
+    execute(name, cmd_map, opts)
+  end
 
-  defdelegate exists?(name_or_id), to: Alias, as: :exists?
+  # (2 of 2) prevent crashes
+  def execute(cmd_map) when is_map(cmd_map) do
+    {:invalid, "cmd map must include name"}
+  end
 
-  defdelegate handle_message(msg), to: Msg, as: :handle
+  # (3 of 3) name, cmd_map and opts specified as unique arguments
+  # NOTE: opts can contain notify_when_released: true to enter a receive loop waiting for ack
+  def execute(name, cmd_map, opts) when is_binary(name) and is_map(cmd_map) and is_list(opts) do
+    # ensure the alias name is in the map
+    cmd_map = Map.put_new(cmd_map, :name, name)
+
+    # if the caller is willing to wait for the ack add notify_when_released
+    opts = (opts[:wait_for_ack] && opts ++ [notify_when_released: true]) || opts
+
+    txn_rc =
+      Repo.transaction(fn ->
+        res = status(name) |> Execute.execute(name, cmd_map, opts)
+
+        Logger.info(["\n", inspect(res, pretty: true)])
+
+        res
+      end)
+
+    # is the caller willing to wait for the ack?
+    will_wait = (opts[:wait_for_ack] && :wait_for_ack) || false
+
+    case txn_rc do
+      {:ok, {:pending, res}} when will_wait == :wait_for_ack -> wait_for_ack(res)
+      {:ok, res} -> res
+      error -> {:invalid, [name, " execute failed: ", inspect(error)]}
+    end
+  end
+
+  @deprecated "use execute/1 or execute/2 instead"
+  def execute_action(_), do: :execute_action_removed
+
+  defdelegate exists?(name), to: Alias
+
+  defdelegate handle_message(msg_in), to: Msg, as: :handle
 
   defdelegate names, to: Alias, as: :names
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
   defdelegate notify_as_needed(msg), to: Notify
-  defdelegate notify_register(name), to: Notify
   defdelegate notify_map, to: Notify
+  defdelegate notify_register(name), to: Notify
+  defdelegate notify_restart(opts \\ []), to: Notify, as: :restart
+  defdelegate notify_state, to: Notify, as: :state
 
   def off(name, opts \\ []) when is_binary(name) do
-    %{cmd: :off, name: name} |> execute(opts)
+    %{cmd: "off", name: name, opts: opts} |> execute()
   end
 
   def off_names_begin_with(pattern, opts \\ []) do
@@ -68,54 +105,33 @@ defmodule Switch do
   end
 
   def on(name, opts \\ []) when is_binary(name) do
-    %{cmd: :on, name: name} |> execute(opts)
+    %{cmd: "on", name: name, opts: opts} |> execute()
   end
 
-  @deprecated "Use execute/2 instead"
-  def position(_name, _opts \\ []), do: :position_removed
-  #   case opts[:ensure] || false do
-  #     true -> position_ensure(name, opts)
-  #     false -> Alias.position(name, opts)
-  #   end
-  # end
-
-  # defp position_ensure(name, opts) do
-  #   pos_wanted = Keyword.get(opts, :position)
-  #   {rc, pos_current} = sw_rc = Alias.position(name)
-  #
-  #   with {:switch, :ok} <- {:switch, rc},
-  #        {:ensure, true} <- {:ensure, pos_wanted == pos_current} do
-  #     # position is correct, return it
-  #     sw_rc
-  #   else
-  #     # there was a problem with the switch, return
-  #     {:switch, _error} ->
-  #       sw_rc
-  #
-  #     # switch does not match desired position, force it
-  #     {:ensure, false} ->
-  #       # force the position change
-  #       opts = Keyword.put(opts, :lazy, false)
-  #       Alias.position(name, opts)
-  #   end
-  # end
-
-  defdelegate restart(opts \\ []), to: Notify
-  defdelegate state, to: Notify
-
   def status(name_or_id, opts \\ []) when is_list(opts) do
-    import Alias, only: [find: 1]
-    import Status, only: [make_status: 2]
-
-    case find(name_or_id) do
-      %Alias{} = a -> make_status(a, opts)
+    case Alias.find(name_or_id) do
+      %Alias{} = a -> Status.make_status(a, opts)
       other -> other
     end
   end
 
-  @deprecated "Use execute/2 instead"
-  def toggle(_name_or_id), do: :toggle_removed
+  # (1 of 2) wait requested and cmd is pending
+  defp wait_for_ack(res) do
+    refid = res[:refid]
+    name = res[:name]
 
-  @deprecated "Use execute/2 instead"
-  def toggle(_name_or_id, _opts), do: :toggle_removed
+    Logger.debug("waiting for ack: #{inspect(res, pretty: true)}")
+
+    {elapsed, res} =
+      :timer.tc(fn ->
+        receive do
+          {{Switch.Broom, :ref_released}, ^refid, :acked} -> status(name)
+          {{Switch.Broom, :ref_released}, ^refid, :orphaned} -> {:failed, "cmd orphaned"}
+        after
+          5000 -> {:failed, "wait for ack timeout"}
+        end
+      end)
+
+    put_in(res, [:ack_elapsed_us], elapsed)
+  end
 end

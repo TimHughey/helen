@@ -13,11 +13,13 @@ defmodule PwmKeeper do
   end
 
   # (2 of 3) find the device from a ctx, freshen it then put in the ctx for pipeline
-  def freshen(%{device: device} = ctx) when is_map(ctx) do
+  def freshen(%{tyep: "pwm", device: device} = ctx) when is_map(ctx) do
     sim = load(device) |> freshen()
 
     put_in(ctx, [:sim], sim)
   end
+
+  def freshen(passthrough), do: passthrough
 
   def known do
     Agent.get(__MODULE__, fn s -> MapSet.to_list(s) end)

@@ -39,10 +39,8 @@ defmodule Switch.Command.Fact do
   end
 
   def write_metric(%{cmd_rc: {:ok, cmd}, device: {:ok, device}, msg_recv_dt: recv_dt} = msg) do
-    import Fact.Influx, only: [write: 2]
-
     metric = assemble_metric(device, cmd, recv_dt)
-    rc = write(metric, precision: :nanosecond, async: true)
+    rc = Fact.Influx.write(metric, precision: :nanosecond, async: true)
 
     put_in(msg, [:metric_rc], {rc, metric})
   end

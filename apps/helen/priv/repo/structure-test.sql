@@ -365,7 +365,7 @@ CREATE TABLE public.switch_alias (
     ttl_ms integer DEFAULT 60000,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    remote_cmd character varying(255) DEFAULT 'unknown'::character varying NOT NULL
+    cmd character varying(255) DEFAULT 'unknown'::character varying NOT NULL
 );
 
 
@@ -1086,3 +1086,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20210430120412);
 INSERT INTO public."schema_migrations" (version) VALUES (20210430121001);
 INSERT INTO public."schema_migrations" (version) VALUES (20210507003858);
 INSERT INTO public."schema_migrations" (version) VALUES (20210507025645);
+INSERT INTO public."schema_migrations" (version) VALUES (20210510013226);

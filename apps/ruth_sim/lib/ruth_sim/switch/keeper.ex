@@ -1,23 +1,29 @@
 defmodule SwitchKeeper do
+  require Logger
   use Agent
 
   defstruct known: %{}
 
-  def start_link(_initial_value) do
-    Agent.start_link(fn -> %__MODULE__{} end, name: __MODULE__)
+  def start_link(_) do
+    Agent.start_link(fn -> MapSet.new() end, name: __MODULE__)
   end
 
-  # (1 of 2) freshen request is for SwitchSim
-  def freshen(%{type: "pwm"} = ctx) do
-    # freshen the device
-    ctx
+  # (1 of 3) freshen a SwitchSim
+  def freshen(%SwitchSim{} = sim) do
+    %{sim | mtime: EasyTime.unix_now(:second)} |> save()
   end
 
-  # (2 of 2) freshen request not for SwitchSim
+  # (2 of 3) find the device from a ctx, freshen it then put in the ctx for pipeline
+  def freshen(%{type: "switch", device: device} = ctx) when is_map(ctx) do
+    sim = load(device) |> freshen()
+
+    put_in(ctx, [:sim], sim)
+  end
+
   def freshen(passthrough), do: passthrough
 
   def known do
-    Agent.get(__MODULE__, fn s -> s.known end)
+    Agent.get(__MODULE__, fn s -> MapSet.to_list(s) end)
   end
 
   def load(dev_name) do
@@ -27,6 +33,12 @@ defmodule SwitchKeeper do
         _ -> false
       end)
     end)
+  end
+
+  def save(%SwitchSim{} = sim) do
+    Agent.update(__MODULE__, fn s -> MapSet.put(s, sim) end)
+    Logger.debug(["\n", inspect(known(), pretty: true)])
+    sim
   end
 
   # always used in a pipeline so return the passed arg
@@ -39,7 +51,10 @@ defmodule SwitchKeeper do
       states: msg.states
     }
 
-    Agent.update(__MODULE__, fn s -> MapSet.put(s, sim) end)
+    Logger.debug(["\n", inspect(msg, pretty: true), "\n", inspect(sim, pretty: true)])
+
+    save(sim)
+
     msg
   end
 end

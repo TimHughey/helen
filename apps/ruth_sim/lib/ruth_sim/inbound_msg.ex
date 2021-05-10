@@ -1,7 +1,7 @@
 defmodule RuthSim.InboundMsg do
   alias RuthSim.InboundMsg.Server
 
-  @dev_type_to_mod %{"pwm" => PwmSim.ExecCmd, "switch" => SwitchSim}
+  @dev_type_to_mod %{"pwm" => PwmSim.ExecCmd, "switch" => SwitchSim.ExecCmd}
 
   def process({:ok, unpacked}, dev_type) do
     Server.cast({:process_msg, @dev_type_to_mod[dev_type], unpacked})

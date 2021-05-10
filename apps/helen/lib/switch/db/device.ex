@@ -1,9 +1,14 @@
 defmodule Switch.DB.Device do
   @moduledoc """
-  Database functionality for Switch Device
+  Database implementation of Switch devices
   """
 
+  require Logger
+  use Timex
+
   use Ecto.Schema
+  require Ecto.Query
+  alias Ecto.Query
 
   alias Switch.DB.Alias, as: Alias
   alias Switch.DB.Device, as: Schema
@@ -20,29 +25,30 @@ defmodule Switch.DB.Device do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def aliases(%Schema{} = d) do
+    load_aliases(d).aliases
+  end
+
   # (1 of 2) convert parms into a map
   def changeset(%Schema{} = d, p) when is_list(p), do: changeset(d, Enum.into(p, %{}))
 
   # (2 of 2) params are a map
   def changeset(%Schema{} = d, p) when is_map(p) do
-    import Common.DB, only: [name_regex: 0]
+    alias Common.DB
     alias Ecto.Changeset
 
     d
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
-    |> Changeset.validate_format(:device, name_regex())
-    |> Changeset.validate_format(:host, name_regex())
+    |> Changeset.validate_format(:device, DB.name_regex())
+    |> Changeset.validate_format(:host, DB.name_regex())
     |> Changeset.validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
   end
 
   def columns(:all) do
-    import List, only: [flatten: 1]
-    import Map, only: [drop: 2, from_struct: 1, keys: 1]
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
 
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> flatten()
-
-    %Schema{} |> from_struct() |> drop(these_cols) |> keys() |> flatten()
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
   end
 
   def columns(:cast), do: columns(:all)
@@ -57,12 +63,9 @@ defmodule Switch.DB.Device do
   end
 
   def devices_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-    import IO, only: [iodata_to_binary: 1]
+    like_string = IO.iodata_to_binary([pattern, "%"])
 
-    like_string = iodata_to_binary([pattern, "%"])
-
-    from(x in Schema,
+    Query.from(x in Schema,
       where: like(x.device, ^like_string),
       order_by: x.device,
       select: x.device
@@ -72,9 +75,7 @@ defmodule Switch.DB.Device do
 
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
-    import Repo, only: [get_by: 2]
-
-    case get_by(Schema, opts) do
+    case Repo.get_by(Schema, opts) do
       %Schema{} = x -> preload(x)
       x when is_nil(x) -> nil
     end
@@ -93,32 +94,23 @@ defmodule Switch.DB.Device do
     Enum.find(aliases, nil, fn dev_alias -> Alias.for_pio?(dev_alias, pio) end)
   end
 
-  def make_remote_states(%Schema{} = d) do
-    import Alias, only: [assemble_state: 1]
-    %Schema{aliases: aliases} = reload(d)
-
-    for %Alias{} = a <- aliases, do: assemble_state(a)
+  # (1 of 2) load aliases for a schema
+  def load_aliases(%Schema{} = d) do
+    if Ecto.assoc_loaded?(d.aliases), do: d, else: Repo.preload(d, [:aliases])
   end
 
-  # (1 of 2) load aliases if needed
-  def load_aliases({rc, %Schema{} = d}) when rc == :ok do
-    if Ecto.assoc_loaded?(d.aliases) do
-      {rc, d}
-    else
-      {rc, Repo.preload(d, [:aliases])}
+  # (2 of 2) handle use in a pipeline
+  def load_aliases({rc, schema_or_error}) do
+    case {rc, schema_or_error} do
+      {:ok, %Schema{} = d} -> {:ok, load_aliases(d)}
+      {rc, x} -> {rc, x}
     end
   end
 
-  # (2 of 2) previous query failed, pass through
-  def load_aliases(x), do: x
-
   def pio_aliased?(%Schema{id: id, pio_count: pio_count}, pio) when pio < pio_count do
-    import Ecto.Query, only: [from: 2]
-    import Repo, only: [get_by: 2]
+    d = Repo.get_by(Schema, id: id)
 
-    d = get_by(Schema, id: id)
-
-    case Repo.preload(d, aliases: from(a in Alias, where: a.pio == ^pio)) do
+    case Repo.preload(d, aliases: Query.from(a in Alias, where: a.pio == ^pio)) do
       %Schema{aliases: []} -> false
       %Schema{aliases: x} when is_list(x) -> true
     end
@@ -128,21 +120,13 @@ defmodule Switch.DB.Device do
 
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
 
-  def reload(%Schema{id: id}) do
-    import Repo, only: [get!: 2]
-
-    get!(Schema, id) |> preload()
-  end
-
   # (1 of 2) receive the inbound msg, grab the keys of interest
   def upsert(%{device: _, host: _} = msg) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
     want = [:device, :host, :pio_count, :dev_latency_us, :last_seen_at]
 
-    p = Map.take(msg, want) |> put_in([:last_seen_at], utc_now())
+    p = Map.take(msg, want) |> put_in([:last_seen_at], Timex.now())
 
-    put_in(msg, [:device], upsert(%Schema{}, p))
+    put_in(msg, [:device], upsert(%Schema{}, p)) |> Map.drop([:dev_latency_us, :pio_count])
   end
 
   # (2 of 2) perform the actual insert with conflict check (upsert)

@@ -162,10 +162,8 @@ defmodule Broom do
       """
       @doc since: "0.0.24"
       def reload(%{id: id} = cmd) when is_struct(cmd) do
-        import Repo, only: [get_by!: 2, preload: 2]
-
-        get_by!(__MODULE__, id: id)
-        |> preload(__MODULE__.__schema__(:associations))
+        Repo.get_by!(__MODULE__, id: id)
+        |> Repo.preload(__MODULE__.__schema__(:associations))
       end
 
       def start_link(_opts), do: default_opts() |> Broom.make_opts(__MODULE__) |> Broom.start_link()

@@ -1,54 +1,64 @@
 defmodule Switch.Msg do
-  @moduledoc false
+  require Logger
 
-  alias Switch.DB.Device
+  alias Switch.DB.{Command, Device}
   alias Switch.{Notify, States}
 
-  @fault_key __MODULE__
+  # @debug true
 
-  # (1 of 2) nominal case
   def handle(%{processed: false, type: "switch"} = msg_in) do
-    res = Repo.transaction(fn -> wrapped(msg_in) end, [])
+    # pass the results of the wrapped txn and the original msg for final deposition
+    :timer.tc(fn -> Repo.transaction(fn -> wrapped(msg_in) end, []) end) |> finalize_msg(msg_in) |> log()
+  end
 
-    case res do
-      {:ok, msg_out} -> msg_out
-      {:failed, error} -> put_processed_error(msg_in, inspect(error, pretty: true))
+  defp add_fault_checks(msg) do
+    %{msg | fault_checks: [msg.fault_checks, :switch_rc, :device, :states_rc, :cmd_rc] |> List.flatten()}
+  end
+
+  defp finalize_msg(txn_res, msg_in) do
+    case txn_res do
+      {elapsed, {:ok, msg_final}} ->
+        success_rc = {:ok, [elapsed_ms: elapsed / 1000.0]}
+
+        msg_final |> put_switch_rc(success_rc) |> Switch.notify_as_needed()
+
+      {_elapsed, error} ->
+        failed_rc = {:failed, inspect(error, pretty: true)}
+        msg_in |> put_switch_rc(failed_rc)
     end
   end
 
-  # (2 of 2) if the primary handle_message does not match then simply return the msg
-  # since it wasn't for switch and/or has already been processed in the
-  # pipeline
-  def handle(%{} = msg_in), do: msg_in
+  defp message_processed(msg), do: %{msg | processed: true}
 
-  def put_processed_error(msg, error) do
-    put_in(msg.processed, true)
-    |> put_in([:fault], @fault_key)
-    |> put_in([@fault_key], error)
-  end
+  defp log(%{fault_checks: checks} = ctx) do
+    for check <- checks do
+      case get_in(ctx, [check]) do
+        {:ok, _} ->
+          :no_fault
 
-  def validate_success(msg) do
-    validate_keys = [:device, :states_rc, :cmd_rc]
-
-    valid? = fn x ->
-      Enum.all?(x, fn
-        {_key, []} -> true
-        {_key, {rc, _}} when rc == :ok -> true
-      end)
+        {rc, fault} ->
+          [
+            "#{inspect(check)} fault detected: #{inspect(rc)}\n",
+            (is_binary(fault) && fault) || inspect(fault, pretty: true),
+            "\n"
+          ]
+          |> Logger.warn()
+      end
     end
 
-    if Map.take(msg, validate_keys) |> valid?.() do
-      put_in(msg.processed, true)
-    else
-      put_processed_error(msg, ":device, :states_rc or :cmd_rc failed validation")
-    end
+    # @debug && ["\n", inspect(ctx, pretty: true), "\n"] |> Logger.info()
+    ctx
   end
 
-  def wrapped(msg_in) do
+  defp put_switch_rc(msg, what), do: put_in(msg, [:switch_rc], what) |> message_processed()
+
+  defp wrapped(msg_in) do
     msg_in
+    |> add_fault_checks()
     |> Device.upsert()
-    |> States.incoming_states()
+    |> States.inbound_msg()
     |> Notify.notify_as_needed()
-    |> validate_success()
+    |> Command.ack_if_needed()
+    |> Command.release()
   end
 end
