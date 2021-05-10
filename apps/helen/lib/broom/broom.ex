@@ -443,7 +443,7 @@ defmodule Broom do
     cancel_timer_if_needed = fn
       %{metrics_timer: x} = s when is_reference(x) ->
         Process.cancel_timer(x)
-        %{s | metrics_timer: nil}
+        %{s | metrics_timer: :canceled}
 
       s ->
         s
