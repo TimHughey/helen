@@ -256,6 +256,8 @@ defmodule PulseWidthTest do
     restart_rc = PulseWidth.notify_restart()
     should_be_ok_tuple(restart_rc)
 
+    assert PulseWidth.notify_alive?()
+
     notify_map = PulseWidth.notify_map()
     fail = pretty("should be a map", notify_map)
     assert is_map(notify_map), fail
@@ -267,8 +269,8 @@ defmodule PulseWidthTest do
   @tag name: "GenNotify Notification Test"
   @tag cmd_map: %{cmd: "on", opts: @wait_for_ack}
   test "can PulseWidth notify when device changes", ctx do
-    rc = PulseWidth.notify_register(name: ctx.name, notify_interval: "PT1S")
-    should_be_ok_tuple(rc)
+    rc = PulseWidth.notify_register(name: ctx.name, notify_interval: "PT1S", link: false)
+    should_be_ok_tuple_with_val(rc, :nolink)
 
     PulseWidth.off(ctx.name)
 

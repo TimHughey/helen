@@ -2,7 +2,7 @@ defmodule GenDevice do
   defmacro __using__(use_opts) do
     # credo:disable-for-next-line
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
-      use GenServer, restart: :transient, shutdown: 7000
+      use GenServer, shutdown: 2000
       use GenDevice.Logic
 
       import GenDevice.State

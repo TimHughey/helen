@@ -10,9 +10,6 @@ defmodule Switch.Supervisor do
     alias Switch.DB.Command, as: Command
     alias Switch.Notify, as: Notify
 
-    Supervisor.init([Notify, Command],
-      strategy: :one_for_one,
-      name: __MODULE__
-    )
+    Supervisor.init([Notify, Command], strategy: :one_for_one, name: __MODULE__)
   end
 end

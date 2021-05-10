@@ -5,7 +5,7 @@ defmodule Reef.FirstMate.Server do
 
   use Timex
 
-  use GenServer, restart: :transient, shutdown: 5000
+  use GenServer, shutdown: 2000
   use Helen.Worker.Logic
 
   ##

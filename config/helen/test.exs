@@ -51,7 +51,6 @@ config :helen, Repo,
   loggers: [{Ecto.LogEntry, :log, [:debug]}]
 
 config :helen, Switch.DB.Command,
-  # NOTE:  Timex.shift/2 is used to convert sent_before into a UTC Datetime
   orphan: [
     at_startup: true,
     sent_before: "PT1S"

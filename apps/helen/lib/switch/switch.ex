@@ -86,6 +86,7 @@ defmodule Switch do
   defdelegate names, to: Alias, as: :names
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
+  defdelegate notify_alive?, to: Notify, as: :alive?
   defdelegate notify_as_needed(msg), to: Notify
   defdelegate notify_map, to: Notify
   defdelegate notify_register(name), to: Notify

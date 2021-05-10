@@ -12,7 +12,7 @@ defmodule GenNotify do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
       @behaviour GenNotify
 
-      use GenServer, restart: :transient, shutdown: 5000
+      use GenServer, shutdown: 2000
 
       def extract_dev_alias_from_msg(%{device: {:ok, %_{aliases: aliases}}}), do: aliases
 
@@ -24,13 +24,13 @@ defmodule GenNotify do
       def init(args), do: GenNotify.init(args)
 
       @doc false
-      def start_link(opts) do
-        GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-      end
+      def start_link(opts), do: GenNotify.start_link(__MODULE__, opts)
 
       ##
       ## Public API
       ##
+
+      def alive?, do: GenNotify.alive?(__MODULE__)
 
       def notify_as_needed(msg) do
         # call the user defined function to extract the device alias(es)
@@ -81,36 +81,26 @@ defmodule GenNotify do
       @doc false
       @impl true
       def handle_cast(what, s), do: GenNotify.handle_cast(what, s)
-
-      @doc false
-      @impl true
-      def handle_continue(what, s), do: GenNotify.handle_continue(what, s)
-
-      @doc false
-      @impl true
-      def handle_info(what, s), do: GenNotify.handle_info(what, s)
     end
   end
+
+  require Logger
 
   #
   # GenNotify Implementation
   #
 
+  def alive?(mod) do
+    if GenServer.whereis(mod), do: true, else: false
+  end
+
   def init(args) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state =
-      %{last_timeout: utc_now(), opts: args, notify_map: %{}}
-      |> loop_put_timeout()
-
-    {:ok, state, 100}
+    %{opts: args, notify_map: %{}} |> reply_ok()
   end
 
   def handle_call(:state, _from, s), do: reply(s, s)
 
-  def handle_call({:notify_register, x, interval}, {pid, _ref}, state) do
-    import Helen.Time.Helper, only: [epoch: 0]
-
+  def handle_call({:notify_register, requester, interval}, {pid, _ref}, s) do
     # NOTE:  shape of s (state) relevant for this function
     #
     # s = %{
@@ -124,16 +114,12 @@ defmodule GenNotify do
     # }
 
     # info for this registeration
-    registration_details = %{opts: [interval: interval], last: epoch()}
+    registration_details = %{opts: [interval: interval], last: DateTime.from_unix!(0)}
 
-    state
-    |> update_in([:notify_map, x], fn
-      # create a new map containing only this pid
-      nil -> %{pid => registration_details}
-      # there is already a registration for this name, add this new one
-      %{} = map -> Map.put(map, pid, registration_details)
-    end)
-    |> reply(:ok)
+    # add the requestors identifier to the notify map
+    notify_map = Map.put_new(s.notify_map, requester, %{})
+
+    %{s | notify_map: put_in(notify_map, [requester, pid], registration_details)} |> reply(:ok)
   end
 
   def handle_cast({:notify, seen_list}, %{notify_map: _notify_map} = s) do
@@ -218,20 +204,6 @@ defmodule GenNotify do
     |> noreply()
   end
 
-  def handle_continue(:bootstrap, s) do
-    noreply(s)
-  end
-
-  def handle_info(:timeout, s) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    state =
-      Map.update(s, :loops, 1, &(&1 + 1))
-      |> Map.put(:last_timeout, utc_now())
-
-    loop_hook(state)
-  end
-
   def notify_all(aliases, mod) do
     aliases = List.wrap(aliases) |> List.flatten()
 
@@ -249,19 +221,32 @@ defmodule GenNotify do
     put_in(msg, [:notifies], notify_all(aliases, mod))
   end
 
+  # (1 of 3) opts are a list. provide defaults for missing args and convert to map
   def notify_register(opts, mod) when is_list(opts) do
-    with name when is_binary(name) <- opts[:name],
-         interval when is_list(opts) <- opts[:notify_interval] do
-      import Process, only: [monitor: 1]
+    # defaults
+    [link: true, notify_interval: "PT1S"]
+    |> Keyword.merge(opts)
+    |> notify_register(opts[:name], mod)
+  end
 
-      rc = GenServer.call(mod, {:notify_register, name, interval})
+  # (2 of 3) opts contains the minimum required args
+  def notify_register(opts, name, mod) when is_binary(name) do
+    register = fn -> GenServer.call(mod, {:notify_register, name, opts[:notify_interval]}) end
 
-      {rc, monitor(mod)}
-    else
-      _bad_opts ->
-        {:bad_args, usage: [name: "name", notify_interval: "PT1S"]}
+    # 1. GenServer is local (has a pid) then register and link by default
+    # 2. GenServer is local and link explictly set to false
+    # 3. GenServer not alive
+    # 4. GenServer is remote, link not possible
+    case {GenServer.whereis(mod), Keyword.take(opts, [:link])} do
+      {pid, [link: true]} when is_pid(pid) -> {register.(), Process.link(pid) && :linked}
+      {pid, [link: false]} when is_pid(pid) -> {register.(), :nolink}
+      {nil, _} -> {:no_server, mod}
+      {_remote, _unable_to_link} -> {register.(), :nolink}
     end
   end
+
+  # (3 of 3) missing :name or something else
+  def notify_register(_, _name, _mod), do: {:bad_args, usage: [name: "name", notify_interval: "PT1S"]}
 
   def restart(opts \\ [], mod) do
     # the Supervisor is the base of the module name with Supervisor appended
@@ -277,21 +262,13 @@ defmodule GenNotify do
     Supervisor.start_child(sup_mod, {mod, opts})
   end
 
-  defp loop_hook(%{} = s) do
-    noreply(s)
+  def start_link(mod, opts) do
+    Logger.debug(["starting ", inspect(mod)])
+    GenServer.start_link(mod, opts, name: mod)
   end
 
-  defp loop_put_timeout(%{opts: opts} = s) do
-    import Helen.Time.Helper, only: [to_ms: 1]
-
-    ms = (opts[:loop_timeout] || "PT1M") |> to_ms()
-
-    Map.put(s, :loop_timeout_ms, ms)
-  end
-
-  defp loop_timeout(%{loop_timeout_ms: ms}), do: ms
-
-  defp noreply(s), do: {:noreply, s, loop_timeout(s)}
-  defp reply(s, val) when is_map(s), do: {:reply, val, s, loop_timeout(s)}
-  defp reply(val, s), do: {:reply, val, s, loop_timeout(s)}
+  defp noreply(s), do: {:noreply, s}
+  defp reply(s, val) when is_map(s), do: {:reply, val, s}
+  defp reply(val, s), do: {:reply, val, s}
+  defp reply_ok(s), do: {:ok, s}
 end

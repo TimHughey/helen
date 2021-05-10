@@ -6,7 +6,7 @@ defmodule Reef.Temp.Server do
 
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
-      use GenServer, restart: :transient, shutdown: 7000
+      use GenServer, shutdown: 2000
 
       alias Reef.Temp.Server
 
@@ -72,9 +72,9 @@ defmodule Reef.Temp.Server do
   ## Reef Temp Server Implementation
   ##
 
-  def init(module, args) do
-    import Helen.Time.Helper, only: [utc_now: 0]
+  require Logger
 
+  def init(module, args) do
     # just in case we were passed a map?!?
     args = Enum.into(args, [])
 
@@ -87,7 +87,7 @@ defmodule Reef.Temp.Server do
       standby_reason: :none,
       ample_msgs: false,
       status: :startup,
-      status_at: utc_now(),
+      status_at: DateTime.utc_now(),
       devices_seen: :never,
       devices_required: [],
       devices: %{}
@@ -246,13 +246,10 @@ defmodule Reef.Temp.Server do
         %{opts: opts} = state
       )
       when dev_type in [:sensor, :switch] do
-    import Helen.Time.Helper, only: [utc_now: 0]
-    import Sensor, only: [fahrenheit: 2]
-
     # function to retrieve the value of the device
     value_fn = fn
       :switch -> Switch.status(dev_name)
-      :sensor -> fahrenheit(dev_name, sensor_opts(opts))
+      :sensor -> Sensor.fahrenheit(dev_name, sensor_opts(opts))
     end
 
     state
@@ -266,7 +263,7 @@ defmodule Reef.Temp.Server do
     # stuff the value of the device into the state
     |> put_in([:devices, dev_name, :value], value_fn.(dev_type))
     # note when this device was last seen
-    |> put_in([:devices, dev_name, :seen], utc_now())
+    |> put_in([:devices, dev_name, :seen], DateTime.utc_now())
     # update the number of messages received for this dev type
     |> update_in([:devices, dev_name, :msg_count], fn
       nil -> 1
@@ -286,6 +283,19 @@ defmodule Reef.Temp.Server do
     update_last_timeout(s)
     |> timeout_hook()
   end
+
+  # def handle_info(_mod, {:DOWN, _ref, :process, {mod, _}, reason}, s) do
+  #   # if the notification servers are stopping then we should too
+  #   case {mod, reason} do
+  #     {mod, :shutdown} ->
+  #       Logger.debug("shutting down because #{inspect(mod)} has shutdown")
+  #       {:stop, :shutdown, s}
+  #
+  #     {mod, reason} ->
+  #       Logger.warn("unhandled :DOWN reason: #{inspect(mod)} #{inspect(reason)}")
+  #       noreply(s)
+  #   end
+  # end
 
   def terminate(_module, _reason, %{opts: opts}) do
     import Switch, only: [off: 2]
@@ -590,6 +600,11 @@ defmodule Reef.Temp.Server do
   # end
 
   def register_for_device_notifications(%{devices_required: devices} = state) do
+    check_registration = fn
+      {:ok, _} -> nil
+      rc -> Logger.warn("failed to register: #{inspect(rc)}")
+    end
+
     # unfold required devices and register for notification
     for {type, dev_name, notify_opts}
         when type in [:sensor, :switch] <- devices,
@@ -597,8 +612,8 @@ defmodule Reef.Temp.Server do
       state ->
         rc =
           case type do
-            :switch -> Switch.notify_register(notify_opts)
-            :sensor -> Sensor.notify_register(notify_opts)
+            :switch -> Switch.notify_register(notify_opts) |> check_registration.()
+            :sensor -> Sensor.notify_register(notify_opts) |> check_registration.()
           end
 
         state

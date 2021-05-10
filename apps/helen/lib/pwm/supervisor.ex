@@ -10,9 +10,6 @@ defmodule PulseWidth.Supervisor do
     alias PulseWidth.DB.Command, as: Command
     alias PulseWidth.Notify, as: Notify
 
-    Supervisor.init([Notify, Command],
-      strategy: :one_for_one,
-      name: __MODULE__
-    )
+    Supervisor.init([Notify, Command], strategy: :one_for_one, name: __MODULE__)
   end
 end

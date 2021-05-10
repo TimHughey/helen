@@ -3,7 +3,7 @@ defmodule Reef.Captain.Server do
   Orchestration of Reef Activities (e.g. salt mix, cleaning)
   """
 
-  use GenServer, restart: :transient, shutdown: 7000
+  use GenServer, shutdown: 2000
   use Helen.Worker.Logic
 
   ##
