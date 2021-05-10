@@ -96,7 +96,7 @@ defmodule Switch.Execute do
   end
 
   defp validate_cmd_map(%{name: _} = cmd_map) do
-    Logger.info(["\n", inspect(cmd_map, pretty: true)])
+    Logger.debug(["\n", inspect(cmd_map, pretty: true)])
 
     case cmd_map do
       %{cmd: c} when c in ["on", "off"] -> :valid
@@ -107,9 +107,4 @@ defmodule Switch.Execute do
   end
 
   defp validate_cmd_map(_cmap), do: {:invalid, "must contain :name"}
-
-  defp log(x) do
-    #  ["\n", inspect(x, pretty: true), "\n"] |> Logger.info()
-    x
-  end
 end

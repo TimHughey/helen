@@ -46,7 +46,7 @@ defmodule Switch.Msg do
       end
     end
 
-    # @debug && ["\n", inspect(ctx, pretty: true), "\n"] |> Logger.info()
+    Logger.debug(["\n", inspect(ctx, pretty: true)])
     ctx
   end
 

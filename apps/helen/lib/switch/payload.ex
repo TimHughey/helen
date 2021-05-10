@@ -40,7 +40,7 @@ defmodule Switch.Payload do
       exec: prune_cmd_map(cmd_map) |> List.wrap()
     }
 
-    Logger.info(["\n", inspect(x, pretty: true)])
+    Logger.debug(["\n", inspect(x, pretty: true)])
 
     x
   end

@@ -61,7 +61,7 @@ defmodule Switch do
       Repo.transaction(fn ->
         res = status(name) |> Execute.execute(name, cmd_map, opts)
 
-        Logger.info(["\n", inspect(res, pretty: true)])
+        Logger.debug(["\n", inspect(res, pretty: true)])
 
         res
       end)

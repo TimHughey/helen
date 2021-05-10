@@ -42,7 +42,7 @@ defmodule SwitchTestHelper do
     ensure_current = fn %{name: name} = ctx ->
       for _x <- 1..10, reduce: Switch.status(name) do
         %{ttl_expired: true} ->
-          ["ttl expired after freshen: ", name, " (will retry)"] |> Logger.info()
+          ["ttl expired after freshen: ", name, " (will retry)"] |> Logger.debug()
           Process.sleep(50)
           {ctx, Switch.status(name)}
 
