@@ -88,7 +88,7 @@ defmodule SwitchTest do
   # NOTE: above name is automatically added to the cmd map during test setup
   @tag cmd_map: %{cmd: "on", opts: @wait_for_ack}
   test "can Switch detect pending cmds", ctx do
-    cmd_map = %{cmd: "on", name: ctx.name}
+    cmd_map = %{cmd: "off", name: ctx.name}
     execute_rc = Switch.execute(cmd_map)
     should_be_tuple_with_rc(execute_rc, :pending)
 
