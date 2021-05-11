@@ -63,7 +63,6 @@ defmodule Lights.Logic do
     end
   end
 
-  # (1 of y)
   def run_job(%{start: %{at: start_at}, finish: %{at: finish_at}} = cmap, s) do
     import Timex, only: [between?: 4]
     import Lights.Helpers, only: [now: 1]

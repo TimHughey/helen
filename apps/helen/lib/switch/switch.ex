@@ -36,38 +36,28 @@ defmodule Switch do
   defdelegate devices_begin_with(pattern \\ ""), to: Device
 
   # (1 of 2) single arg entry point, extract name and opts
-  def execute(%{name: name} = cmd_map) do
-    opts = cmd_map[:opts] || []
-    cmd_map = Map.delete(cmd_map, :opts)
-
-    execute(name, cmd_map, opts)
-  end
-
-  # (2 of 2) prevent crashes
   def execute(cmd_map) when is_map(cmd_map) do
-    {:invalid, "cmd map must include name"}
+    case cmd_map do
+      %{name: name, opts: opts} = x -> execute(name, Map.delete(x, :opts), opts)
+      %{name: name} = x -> execute(name, x, [])
+      _x -> {:invalid, "cmd map must include name"}
+    end
   end
 
-  # (3 of 3) name, cmd_map and opts specified as unique arguments
+  # (2 of 2) name, cmd_map and opts specified as unique arguments
   # NOTE: opts can contain notify_when_released: true to enter a receive loop waiting for ack
   def execute(name, cmd_map, opts) when is_binary(name) and is_map(cmd_map) and is_list(opts) do
-    # ensure the alias name is in the map
-    cmd_map = Map.put_new(cmd_map, :name, name)
-
-    # if the caller is willing to wait for the ack add notify_when_released
-    opts = (opts[:wait_for_ack] && opts ++ [notify_when_released: true]) || opts
+    {will_wait, opts} = make_execute_opts(opts)
 
     txn_rc =
       Repo.transaction(fn ->
-        res = status(name) |> Execute.execute(name, cmd_map, opts)
+        # ensure the alias name is in the map
+        res = status(name) |> Execute.execute(name, Map.put_new(cmd_map, :name, name), opts)
 
         Logger.debug(["\n", inspect(res, pretty: true)])
 
         res
       end)
-
-    # is the caller willing to wait for the ack?
-    will_wait = (opts[:wait_for_ack] && :wait_for_ack) || false
 
     case txn_rc do
       {:ok, {:pending, res}} when will_wait == :wait_for_ack -> wait_for_ack(res)
@@ -81,7 +71,9 @@ defmodule Switch do
 
   defdelegate exists?(name), to: Alias
 
-  defdelegate handle_message(msg_in), to: Msg, as: :handle
+  def handle_message(msg_in) do
+    msg_in |> Msg.handle() |> Alfred.just_saw(__MODULE__)
+  end
 
   defdelegate names, to: Alias, as: :names
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
@@ -116,7 +108,19 @@ defmodule Switch do
     end
   end
 
-  # (1 of 2) wait requested and cmd is pending
+  ##
+  ## Private
+  ##
+
+  defp make_execute_opts(opts) do
+    # if the caller is willing to wait for the ack add notify_when_released
+    opts = (opts[:wait_for_ack] && opts ++ [notify_when_released: true]) || opts
+    # is the caller willing to wait for the ack?
+    will_wait = (opts[:wait_for_ack] && :wait_for_ack) || false
+
+    {will_wait, opts}
+  end
+
   defp wait_for_ack(res) do
     refid = res[:refid]
     name = res[:name]

@@ -1,4 +1,4 @@
-defmodule DevicesTest do
+defmodule GardenDevicesTest do
   use ExUnit.Case, async: true
 
   @moduletag :devices

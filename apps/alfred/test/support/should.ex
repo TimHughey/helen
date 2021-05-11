@@ -1,8 +1,8 @@
-defmodule HelenTestShould do
+defmodule AlfredTestShould do
   defmacro __using__(_opts) do
     quote do
-      import HelenTestPretty
-      import HelenTestShould
+      import AlfredTestPretty
+      import AlfredTestShould
     end
   end
 

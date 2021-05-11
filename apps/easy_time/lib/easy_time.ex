@@ -39,6 +39,14 @@ defmodule EasyTime do
     Timex.epoch() |> Timex.to_datetime()
   end
 
+  # new!
+  def expired?(%DateTime{} = check_dt, ms) when ms >= 0 do
+    utc_now = DateTime.utc_now()
+    diff_ms = DateTime.diff(utc_now, check_dt, :millisecond)
+
+    diff_ms >= ms
+  end
+
   def expired?(reference, duration) do
     end_dt = Timex.shift(reference, milliseconds: to_ms(duration))
     Timex.after?(utc_now(), end_dt)
@@ -78,6 +86,14 @@ defmodule EasyTime do
   @doc delegate_to: {Duration, :scale, 2}
   def scale(d, factor) do
     d |> to_duration() |> Duration.scale(factor)
+  end
+
+  # new!
+  def seen_at_expired?(%_{seen_at: seen_at, ttl_ms: ttl_ms}) do
+    utc_now = DateTime.utc_now()
+    diff_ms = DateTime.diff(utc_now, seen_at, :millisecond)
+
+    diff_ms >= ttl_ms
   end
 
   def shift_future(dt, args) do

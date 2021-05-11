@@ -44,30 +44,13 @@ defmodule Helen.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      mod:
-        {Helen.Application,
-         [
-           version: "#{project() |> Keyword.get(:version)}",
-           git_vsn: "#{git_describe()}"
-         ]},
-      extra_applications: [
-        :logger,
-        :runtime_tools,
-        :parse_trans,
-        :httpoison,
-        :observer,
-        :agnus
-      ],
+      mod: {Helen.Application, [version: "#{project()[:version]}", git_vsn: "#{git_describe()}"]},
+      extra_applications: [:logger, :runtime_tools, :parse_trans, :httpoison, :observer, :agnus],
       env: []
     ]
   end
 
-  def deploy_paths,
-    do: [
-      dev: "/tmp/helen/dev",
-      test: "/tmp/helen/test",
-      prod: "/usr/local/helen"
-    ]
+  def deploy_paths, do: [dev: "/tmp/helen/dev", test: "/tmp/helen/test", prod: "/usr/local/helen"]
 
   def docs do
     [
@@ -76,20 +59,11 @@ defmodule Helen.Mixfile do
         Devices: [PulseWidth, Remote, Sensor, Switch],
         Servers: [Reef]
       ],
-      nest_modules_by_prefix: [
-        Helen,
-        Mqtt,
-        PulseWidth,
-        Reef,
-        Sensor,
-        Switch,
-        Remote
-      ]
+      nest_modules_by_prefix: [Helen, Mqtt, PulseWidth, Reef, Sensor, Switch, Remote]
     ]
   end
 
-  def stage_paths,
-    do: [prod: "/tmp"]
+  def stage_paths, do: [prod: "/tmp"]
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/common", "test/support"]
@@ -112,6 +86,7 @@ defmodule Helen.Mixfile do
       {:msgpax, "~> 2.0"},
       {:agnus, "~> 0.1.0"},
       {:deep_merge, "~> 1.0"},
+      {:alfred, in_umbrella: true},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
@@ -157,9 +132,8 @@ defmodule Helen.Mixfile do
   defp package do
     [
       name: "helen",
-      files: ~w(config extra lib priv rel special test
-            .credo.exs .formatter.exs mix.exs
-            COPYING* README* LICENSE* CHANGELOG*),
+      files: ~w(config extra lib priv rel special test .credo.exs .formatter.exs mix.exs COPYING*
+                README* LICENSE* CHANGELOG*),
       links: %{"GitHub" => "https://github.com/TimHughey/helen"},
       maintainers: ["Tim Hughey"],
       licenses: ["LGPL-3.0-or-later"]
@@ -176,27 +150,16 @@ defmodule Helen.Mixfile do
   defp sym_link_data(release) do
     {:ok, home} = System.fetch_env("HOME")
 
-    %{
-      build_path:
-        Path.join([
-          home,
-          "devel",
-          "helen",
-          "_build",
-          Atom.to_string(Mix.env())
-        ]),
-      tarball: "#{release.name}-#{release.version}.tar.gz",
-      sym_link: "helen.tar.gz"
-    }
+    build_path = [home, "devel", "helen", "_build", to_string(Mix.env())] |> Path.join()
+    tarball = "#{release.name}-#{release.version}.tar.gz"
+
+    %{build_path: build_path, tarball: tarball, sym_link: "helen.tar.gz"}
   end
 
   defp sym_link_to_tar_rm(release) do
     link = sym_link_data(release)
 
-    System.cmd("rm", ["-f", link.tarball],
-      cd: link.build_path,
-      stderr_to_stdout: true
-    )
+    System.cmd("rm", ["-f", link.tarball], cd: link.build_path, stderr_to_stdout: true)
 
     release
   end
@@ -204,10 +167,7 @@ defmodule Helen.Mixfile do
   defp sym_link_to_tar(release) do
     link = sym_link_data(release)
 
-    System.cmd("ln", ["-sf", link.tarball, link.sym_link],
-      cd: link.build_path,
-      stderr_to_stdout: true
-    )
+    System.cmd("ln", ["-sf", link.tarball, link.sym_link], cd: link.build_path, stderr_to_stdout: true)
 
     release
   end

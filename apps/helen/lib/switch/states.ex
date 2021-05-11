@@ -28,8 +28,8 @@ defmodule Switch.States do
       changes = find_state_map.(a.pio)
 
       case Alias.apply_changes(a, changes) do
-        {:ok, %Alias{} = x} -> [name: x.name, success: true, cmd: x.cmd]
-        {:error, text} -> [name: a.name, success: false, error: text]
+        {:ok, %Alias{} = x} -> %{name: x.name, success: true, cmd: x.cmd}
+        {:error, text} -> %{name: a.name, success: false, error: text}
       end
     end
   end

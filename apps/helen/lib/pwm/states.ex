@@ -8,9 +8,14 @@ defmodule PulseWidth.States do
   # device aliases (as needed)
   def inbound_msg(in_msg) do
     case in_msg do
-      %{states: []} -> put_states_rc(in_msg, {:failed, "inbound msg states == []"})
-      %{states: in_sm, device: {:ok, d}} -> apply_state_maps(d, in_sm) |> put_states_rc(in_msg)
-      _ -> put_states_rc(in_msg, {:failed, "inbound msg :state key not found or device update failed"})
+      %{states: []} ->
+        put_states_rc(in_msg, {:failed, "inbound msg states == []"})
+
+      %{states: in_sm, device: {:ok, d}} ->
+        apply_state_maps(d, in_sm) |> put_states_rc(in_msg)
+
+      _ ->
+        put_states_rc(in_msg, {:failed, "inbound msg :state key not found or device update failed"})
     end
   end
 
@@ -28,8 +33,8 @@ defmodule PulseWidth.States do
       changes = find_state_map.(a.pio)
 
       case Alias.apply_changes(a, changes) do
-        {:ok, %Alias{} = x} -> [name: x.name, success: true, cmd: x.cmd]
-        {:error, text} -> [name: a.name, success: false, error: text]
+        {:ok, %Alias{} = x} -> %{name: x.name, success: true, cmd: x.cmd, schema: x}
+        {:error, text} -> %{name: a.name, success: false, error: text}
       end
     end
   end
