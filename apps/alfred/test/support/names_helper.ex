@@ -2,7 +2,7 @@ defmodule NamesTestHelper do
   alias Alfred.NamesAgent
 
   # (1 of 2) make name is requested
-  def make_names(%{names: count} = ctx) when is_integer(count) do
+  def make_names(%{make_names: count} = ctx) when is_integer(count) do
     ctx = put_in(ctx, [:names], []) |> put_in([:names_count], count)
 
     %{ctx | names: create_names(count)}
@@ -12,22 +12,22 @@ defmodule NamesTestHelper do
   def make_names(ctx), do: Map.delete(ctx, :names)
 
   # (1 of 2) make names map requested and names are available
-  def make_names_list(%{names: _} = ctx) do
-    put_in(ctx, [:names_list], create_names_list(ctx))
+  def make_seen(%{make_names: _} = ctx) do
+    put_in(ctx, [:seen_list], create_seen_list(ctx))
   end
 
   # (2 0f 2) make names map not requested, ensure names map doesn't exist
-  def make_names_list(ctx), do: ctx
+  def make_seen(ctx), do: ctx
 
   def just_saw(ctx) do
     just_saw = fn x ->
-      NamesAgent.just_saw(x.names_list, ctx.module)
+      NamesAgent.just_saw(x.seen_list, ctx.module)
       ctx
     end
 
     case ctx do
       %{just_saw: :auto} = x ->
-        put_in(x, [:make_names_list], true) |> make_names_list() |> just_saw.()
+        put_in(x, [:make_seen], true) |> make_seen() |> just_saw.()
 
       ctx ->
         ctx
@@ -36,7 +36,7 @@ defmodule NamesTestHelper do
 
   def random_name(ctx) do
     case ctx do
-      %{names: n} = x when is_list(n) -> put_in(x, [:random_name], Enum.take_random(n, 1) |> hd())
+      %{names: [_ | _] = n} = x -> put_in(x, [:random_name], Enum.take_random(n, 1) |> hd())
       x -> x
     end
   end
@@ -48,7 +48,7 @@ defmodule NamesTestHelper do
     end
   end
 
-  defp create_names_list(ctx) do
+  defp create_seen_list(ctx) do
     for name <- ctx.names do
       base = %{name: name, ttl_ms: ctx[:ttl_ms] || 100}
 

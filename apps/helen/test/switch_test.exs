@@ -243,51 +243,6 @@ defmodule SwitchTest do
     should_be_non_empty_list(pattern_names)
   end
 
-  @tag device: "switch/simulated-epsilon"
-  @tag make_alias: true
-  @tag pio: :any
-  @tag name: "GenNotify Basic Test"
-  test "can Switch get the GenNotify server state, restart and the notify map", ctx do
-    Switch.on(ctx.name, @wait_for_ack)
-
-    state = Switch.notify_state()
-    should_be_non_empty_map(state)
-
-    restart_rc = Switch.notify_restart()
-    should_be_ok_tuple(restart_rc)
-
-    assert Switch.notify_alive?()
-
-    notify_map = Switch.notify_map()
-    fail = pretty("should be a map", notify_map)
-    assert is_map(notify_map), fail
-  end
-
-  @tag device: "switch/simulated-notify"
-  @tag make_alias: true
-  @tag pio: :any
-  @tag name: "GenNotify Notification Test"
-  @tag cmd_map: %{cmd: "on", opts: @wait_for_ack}
-  test "can Switch notify when device changes", ctx do
-    rc = Switch.notify_register(name: ctx.name, notify_interval: "PT1S", link: false)
-    should_be_ok_tuple_with_val(rc, :nolink)
-
-    Switch.off(ctx.name)
-
-    recv_notification = fn ->
-      receive do
-        {:notify, _category, _item} = recv -> recv
-        recv -> recv
-      after
-        5000 -> :timeout
-      end
-    end
-
-    recv = recv_notification.()
-    fail = pretty("should be a three element tuple {:notify, :gennotify, %Alias{}}", recv)
-    assert {:notify, :gennotify, %Alias{}} = recv, fail
-  end
-
   test "can Switch Broom report metrics" do
     rc = Switch.DB.Command.report_metrics(interval: "PT30S")
 

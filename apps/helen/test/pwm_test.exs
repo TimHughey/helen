@@ -243,51 +243,6 @@ defmodule PulseWidthTest do
     should_be_non_empty_list(pattern_names)
   end
 
-  @tag device: "pwm/simulated-epsilon"
-  @tag make_alias: true
-  @tag pio: :any
-  @tag name: "GenNotify Basic Test"
-  test "can PulseWidth get the GenNotify server state, restart and the notify map", ctx do
-    PulseWidth.on(ctx.name, @wait_for_ack)
-
-    state = PulseWidth.notify_state()
-    should_be_non_empty_map(state)
-
-    restart_rc = PulseWidth.notify_restart()
-    should_be_ok_tuple(restart_rc)
-
-    assert PulseWidth.notify_alive?()
-
-    notify_map = PulseWidth.notify_map()
-    fail = pretty("should be a map", notify_map)
-    assert is_map(notify_map), fail
-  end
-
-  @tag device: "pwm/simulated-notify"
-  @tag make_alias: true
-  @tag pio: :any
-  @tag name: "GenNotify Notification Test"
-  @tag cmd_map: %{cmd: "on", opts: @wait_for_ack}
-  test "can PulseWidth notify when device changes", ctx do
-    rc = PulseWidth.notify_register(name: ctx.name, notify_interval: "PT1S", link: false)
-    should_be_ok_tuple_with_val(rc, :nolink)
-
-    PulseWidth.off(ctx.name)
-
-    recv_notification = fn ->
-      receive do
-        {:notify, _category, _item} = recv -> recv
-        recv -> recv
-      after
-        5000 -> :timeout
-      end
-    end
-
-    recv = recv_notification.()
-    fail = pretty("should be a three element tuple {:notify, :gennotify, %Alias{}}", recv)
-    assert {:notify, :gennotify, %Alias{}} = recv, fail
-  end
-
   test "can PulseWidth Broom report metrics" do
     rc = PulseWidth.DB.Command.report_metrics(interval: "PT30S")
 

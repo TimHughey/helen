@@ -10,7 +10,7 @@ defmodule SwitchKeeper do
 
   # (1 of 3) freshen a SwitchSim
   def freshen(%SwitchSim{} = sim) do
-    %{sim | mtime: EasyTime.unix_now(:second)} |> save()
+    %{sim | mtime: System.os_time(:second)} |> save()
   end
 
   # (2 of 3) find the device from a ctx, freshen it then put in the ctx for pipeline

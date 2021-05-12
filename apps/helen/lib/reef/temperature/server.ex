@@ -240,16 +240,13 @@ defmodule Reef.Temp.Server do
     |> noreply()
   end
 
-  def handle_info(
-        _module,
-        {:notify, dev_type, %_{name: dev_name} = obj},
-        %{opts: opts} = state
-      )
-      when dev_type in [:sensor, :switch] do
+  def handle_info(_module, {Alfred, _ref, {:notify, dev_name} = obj}, %{opts: _opts} = state) do
     # function to retrieve the value of the device
     value_fn = fn
-      :switch -> Switch.status(dev_name)
-      :sensor -> Sensor.fahrenheit(dev_name, sensor_opts(opts))
+      # Switch.status(dev_name)
+      :switch -> nil
+      # Sensor.fahrenheit(dev_name, sensor_opts(opts))
+      :sensor -> nil
     end
 
     state
@@ -261,7 +258,7 @@ defmodule Reef.Temp.Server do
     end)
     |> put_in([:devices, dev_name, :obj], obj)
     # stuff the value of the device into the state
-    |> put_in([:devices, dev_name, :value], value_fn.(dev_type))
+    |> put_in([:devices, dev_name, :value], value_fn.(:switch))
     # note when this device was last seen
     |> put_in([:devices, dev_name, :seen], DateTime.utc_now())
     # update the number of messages received for this dev type
@@ -602,22 +599,17 @@ defmodule Reef.Temp.Server do
   def register_for_device_notifications(%{devices_required: devices} = state) do
     check_registration = fn
       {:ok, _} -> nil
-      rc -> Logger.warn("failed to register: #{inspect(rc)}")
+      {:failed, msg} -> Logger.warn("failed to register: #{msg}")
     end
 
     # unfold required devices and register for notification
-    for {type, dev_name, notify_opts}
-        when type in [:sensor, :switch] <- devices,
-        reduce: state do
+    for {_type, dev_name, notify_opts} <- devices, reduce: state do
       state ->
-        rc =
-          case type do
-            :switch -> Switch.notify_register(notify_opts) |> check_registration.()
-            :sensor -> Sensor.notify_register(notify_opts) |> check_registration.()
-          end
+        put_rc = fn x -> put_in(state, [:devices, dev_name, :notify_monitor], x) end
 
-        state
-        |> put_in([:devices, dev_name, :notify_monitor], rc)
+        opts = [interval: notify_opts[:notify_interval]]
+
+        Alfred.notify_register(dev_name, opts) |> check_registration.() |> put_rc.()
     end
   end
 

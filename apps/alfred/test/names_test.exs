@@ -14,29 +14,29 @@ defmodule AlfredNamesTest do
   setup ctx do
     ctx
     |> Helper.make_names()
-    |> Helper.make_names_list()
+    |> Helper.make_seen()
     |> Helper.just_saw()
     |> Helper.random_name()
   end
 
-  @tag names: 10
+  @tag make_names: 10
   test "can Alfred.NamesAgent create a unique sequence of names", ctx do
     should_be_non_empty_list(ctx.names)
   end
 
-  @tag names: 10
-  @tag make_names_list: true
+  @tag make_names: 10
+  @tag make_seen: true
   test "can Alfred.NamesAgent create list of name maps", ctx do
-    should_be_non_empty_list(ctx.names_list)
+    should_be_non_empty_list(ctx.seen_list)
 
     first_name = hd(ctx.names)
-    first_entry = hd(ctx.names_list)
+    first_entry = hd(ctx.seen_list)
 
-    fail = pretty("first entry in names list should be for #{first_name}", ctx.names_list)
+    fail = pretty("first entry in names list should be for #{first_name}", ctx.seen_list)
     assert first_name == first_entry.name, fail
   end
 
-  @tag names: 10
+  @tag make_names: 10
   @tag just_saw: :auto
   test "can NamesAgent.just saw() add a name list", %{random_name: random_name} do
     res = NamesAgent.get(random_name)
@@ -44,7 +44,7 @@ defmodule AlfredNamesTest do
     should_be_struct(res, KnownName)
   end
 
-  @tag names: 10
+  @tag make_names: 10
   @tag just_saw: :auto
   @tag ttl_ms: 5
   test "can NamesAgent.get() prune expired entries", ctx do
@@ -64,5 +64,16 @@ defmodule AlfredNamesTest do
     res = NamesAgent.get(not_expire)
     fail = pretty("#{not_expire} should have not expired", res)
     assert %KnownName{} = res, fail
+  end
+
+  @tag make_names: 10
+  @tag just_saw: :auto
+  @tag ttl_ms: 5
+  test "can NamesAgent.get() return a list of all known names", _ctx do
+    all = NamesAgent.known()
+    should_be_non_empty_list(all)
+
+    first_known = hd(all)
+    should_be_struct(first_known, KnownName)
   end
 end

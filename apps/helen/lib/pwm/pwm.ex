@@ -7,7 +7,7 @@ defmodule PulseWidth do
   use Timex
 
   alias PulseWidth.DB.{Alias, Command, Device}
-  alias PulseWidth.{Execute, Msg, Notify, Status}
+  alias PulseWidth.{Execute, Msg, Status}
 
   defdelegate acked?(refid), to: Command
 
@@ -85,13 +85,6 @@ defmodule PulseWidth do
 
   defdelegate names, to: Alias, as: :names
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
-
-  defdelegate notify_alive?, to: Notify, as: :alive?
-  defdelegate notify_as_needed(msg), to: Notify
-  defdelegate notify_map, to: Notify
-  defdelegate notify_register(name), to: Notify
-  defdelegate notify_restart(opts \\ []), to: Notify, as: :restart
-  defdelegate notify_state, to: Notify, as: :state
 
   def off(name, opts \\ []) when is_binary(name) do
     %{cmd: "off", name: name, opts: opts} |> execute()

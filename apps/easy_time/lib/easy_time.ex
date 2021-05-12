@@ -4,40 +4,40 @@ defmodule EasyTime do
   use Timex
   alias Timex.Duration
 
-  def add_list(d_list) when is_list(d_list) do
-    for d <- d_list, reduce: Duration.zero() do
-      acc -> Duration.add(acc, to_duration(d))
-    end
-  end
+  # def add_list(d_list) when is_list(d_list) do
+  #   for d <- d_list, reduce: Duration.zero() do
+  #     acc -> Duration.add(acc, to_duration(d))
+  #   end
+  # end
 
-  def elapsed_ms(dt) do
-    case Timex.diff(utc_now(), dt) do
-      {:error, _} -> 0
-      d -> Duration.to_milliseconds(d, truncate: true)
-    end
-  end
+  # def elapsed_ms(dt) do
+  #   case Timex.diff(utc_now(), dt) do
+  #     {:error, _} -> 0
+  #     d -> Duration.to_milliseconds(d, truncate: true)
+  #   end
+  # end
 
-  def elapsed(start, finish) do
-    # must pass the latest datetime to Timex.diff as the first
-    # argument to get a positive duration
-    case Timex.diff(finish, start, :duration) do
-      {:error, _error} -> Duration.zero()
-      duration -> duration
-    end
-  end
+  # def elapsed(start, finish) do
+  #   # must pass the latest datetime to Timex.diff as the first
+  #   # argument to get a positive duration
+  #   case Timex.diff(finish, start, :duration) do
+  #     {:error, _error} -> Duration.zero()
+  #     duration -> duration
+  #   end
+  # end
 
-  def elapsed?(%Duration{} = max, check) when is_list(check) do
-    to_ms(max) <= to_ms(add_list(check))
-  end
+  # def elapsed?(%Duration{} = max, check) when is_list(check) do
+  #   to_ms(max) <= to_ms(add_list(check))
+  # end
+  #
+  # def elapsed?(%DateTime{} = reference, %Duration{} = duration) do
+  #   end_dt = Timex.shift(reference, milliseconds: to_ms(duration))
+  #   Timex.after?(utc_now(), end_dt)
+  # end
 
-  def elapsed?(%DateTime{} = reference, %Duration{} = duration) do
-    end_dt = Timex.shift(reference, milliseconds: to_ms(duration))
-    Timex.after?(utc_now(), end_dt)
-  end
-
-  def epoch do
-    Timex.epoch() |> Timex.to_datetime()
-  end
+  # def epoch do
+  #   Timex.epoch() |> Timex.to_datetime()
+  # end
 
   # new!
   def expired?(%DateTime{} = check_dt, ms) when ms >= 0 do
@@ -47,14 +47,14 @@ defmodule EasyTime do
     diff_ms >= ms
   end
 
-  def expired?(reference, duration) do
-    end_dt = Timex.shift(reference, milliseconds: to_ms(duration))
-    Timex.after?(utc_now(), end_dt)
-  end
+  # def expired?(reference, duration) do
+  #   end_dt = Timex.shift(reference, milliseconds: to_ms(duration))
+  #   Timex.after?(utc_now(), end_dt)
+  # end
 
-  def from_unix(mtime) do
-    DateTime.from_unix!(mtime, :microsecond)
-  end
+  # def from_unix(mtime) do
+  #   DateTime.from_unix!(mtime, :microsecond)
+  # end
 
   def is_iso_duration?(arg) when is_binary(arg) do
     case Duration.parse(arg) do
@@ -63,7 +63,7 @@ defmodule EasyTime do
     end
   end
 
-  def is_iso_duration?(_not_binary), do: false
+  # def is_iso_duration?(_not_binary), do: false
 
   # (1 of 2) passed a state, look in opts for :tz
   def local_now(s) when is_map(s), do: get_in(s, [:opts, :tz]) |> local_now()
@@ -74,19 +74,26 @@ defmodule EasyTime do
   # (3 of 3) passed a binary timezone name
   def local_now(tz) when is_binary(tz), do: Timex.now(tz)
 
-  @doc since: "0.0.27"
-  def remaining(finish_dt) do
-    elapsed(utc_now(), finish_dt)
+  def iso8601_duration_to_ms(binary) when is_binary(binary) do
+    case Duration.parse(binary) do
+      {:ok, x} -> Duration.to_milliseconds(x, truncate: true)
+      {:error, msg} -> {:failed, msg}
+    end
   end
 
-  def remaining(start_at, total_duration) do
-    Duration.sub(total_duration, elapsed(start_at, utc_now())) |> Duration.abs()
-  end
+  # @doc since: "0.0.27"
+  # def remaining(finish_dt) do
+  #   elapsed(utc_now(), finish_dt)
+  # end
 
-  @doc delegate_to: {Duration, :scale, 2}
-  def scale(d, factor) do
-    d |> to_duration() |> Duration.scale(factor)
-  end
+  # def remaining(start_at, total_duration) do
+  #   Duration.sub(total_duration, elapsed(start_at, utc_now())) |> Duration.abs()
+  # end
+  #
+  # @doc delegate_to: {Duration, :scale, 2}
+  # def scale(d, factor) do
+  #   d |> to_duration() |> Duration.scale(factor)
+  # end
 
   # new!
   def seen_at_expired?(%_{seen_at: seen_at, ttl_ms: ttl_ms}) do
@@ -128,33 +135,33 @@ defmodule EasyTime do
     end
   end
 
-  def subtract_list(d_list) when is_list(d_list) do
-    for d when is_binary(d) or is_struct(d) <- d_list,
-        reduce: Duration.zero() do
-      acc -> Duration.sub(acc, to_duration(d)) |> Duration.abs()
-    end
-  end
+  # def subtract_list(d_list) when is_list(d_list) do
+  #   for d when is_binary(d) or is_struct(d) <- d_list,
+  #       reduce: Duration.zero() do
+  #     acc -> Duration.sub(acc, to_duration(d)) |> Duration.abs()
+  #   end
+  # end
 
-  def to_binary(arg) do
-    case arg do
-      %DateTime{} = x ->
-        Timex.to_datetime(x, "America/New_York")
-        |> Timex.format!("%a, %b %e, %Y %H:%M:%S", :strftime)
-
-      %Duration{seconds: secs} = x when secs > 900 ->
-        Duration.to_minutes(x, truncate: true)
-        |> Duration.from_minutes()
-        |> Timex.format_duration(:humanized)
-
-      %Duration{} = x ->
-        Duration.to_seconds(x, truncate: true)
-        |> Duration.from_seconds()
-        |> Timex.format_duration(:humanized)
-
-      x ->
-        inspect(x, pretty: true)
-    end
-  end
+  # def to_binary(arg) do
+  #   case arg do
+  #     %DateTime{} = x ->
+  #       Timex.to_datetime(x, "America/New_York")
+  #       |> Timex.format!("%a, %b %e, %Y %H:%M:%S", :strftime)
+  #
+  #     %Duration{seconds: secs} = x when secs > 900 ->
+  #       Duration.to_minutes(x, truncate: true)
+  #       |> Duration.from_minutes()
+  #       |> Timex.format_duration(:humanized)
+  #
+  #     %Duration{} = x ->
+  #       Duration.to_seconds(x, truncate: true)
+  #       |> Duration.from_seconds()
+  #       |> Timex.format_duration(:humanized)
+  #
+  #     x ->
+  #       inspect(x, pretty: true)
+  #   end
+  # end
 
   def to_duration(d) do
     case d do
@@ -219,39 +226,39 @@ defmodule EasyTime do
     Timex.before?(at, ttl_dt)
   end
 
-  @doc since: "0.0.27"
-  def valid_ms?(args) do
-    case args do
-      nil ->
-        false
+  # @doc since: "0.0.27"
+  # def valid_ms?(args) do
+  #   case args do
+  #     nil ->
+  #       false
+  #
+  #     arg when is_binary(arg) ->
+  #       case Duration.parse(args) do
+  #         {:ok, _} -> true
+  #         _failed -> false
+  #       end
+  #
+  #     _arg ->
+  #       false
+  #   end
+  # end
 
-      arg when is_binary(arg) ->
-        case Duration.parse(args) do
-          {:ok, _} -> true
-          _failed -> false
-        end
+  # def unix_now do
+  #   Timex.now() |> DateTime.to_unix(:microsecond)
+  # end
 
-      _arg ->
-        false
-    end
-  end
+  # def unix_now(unit, opts \\ []) when is_atom(unit) do
+  #   now = Timex.now() |> DateTime.to_unix(unit)
+  #
+  #   (opts[:as] == :string && Integer.to_string(now)) || now
+  # end
 
-  def unix_now do
-    Timex.now() |> DateTime.to_unix(:microsecond)
-  end
+  # def utc_now do
+  #   Timex.now()
+  # end
 
-  def unix_now(unit, opts \\ []) when is_atom(unit) do
-    now = Timex.now() |> DateTime.to_unix(unit)
+  def utc_shift(args), do: shift_future(DateTime.utc_now(), args)
+  def utc_shift_past(args), do: shift_past(DateTime.utc_now(), args)
 
-    (opts[:as] == :string && Integer.to_string(now)) || now
-  end
-
-  def utc_now do
-    Timex.now()
-  end
-
-  def utc_shift(args), do: shift_future(utc_now(), args)
-  def utc_shift_past(args), do: shift_past(utc_now(), args)
-
-  def zero, do: Duration.zero()
+  # def zero, do: Duration.zero()
 end

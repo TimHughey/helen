@@ -11,7 +11,7 @@ defmodule SwitchSim do
   defstruct device: @default_device,
             host: RemoteSim.default_host(),
             remote_name: RemoteSim.default_name(),
-            mtime: EasyTime.unix_now(:second),
+            mtime: System.os_time(:second),
             pio_count: @pios,
             states: @default_states
 
@@ -28,7 +28,7 @@ defmodule SwitchSim do
     end
 
     # apply the exec cmd and update the mtime because this device has changed
-    %SwitchSim{d | states: update_states.(), mtime: EasyTime.unix_now(:second)}
+    %SwitchSim{d | states: update_states.(), mtime: System.os_time(:second)}
     # save the updated device
     |> SwitchKeeper.save()
   end
@@ -111,7 +111,7 @@ defmodule SwitchSim do
       device: ctx[:device] || default_device(),
       host: ctx[:host] || RemoteSim.default_host(),
       remote_name: ctx[:remote_name] || RemoteSim.default_name(),
-      mtime: EasyTime.unix_now(:second),
+      mtime: System.os_time(:second),
       pio_count: ctx[:pios] || @pios,
       states: make_states(ctx)
     }

@@ -8,8 +8,7 @@ defmodule PulseWidth.Supervisor do
   @impl true
   def init(_args) do
     alias PulseWidth.DB.Command, as: Command
-    alias PulseWidth.Notify, as: Notify
 
-    Supervisor.init([Notify, Command], strategy: :one_for_one, name: __MODULE__)
+    Supervisor.init([Command], strategy: :one_for_one, name: __MODULE__)
   end
 end

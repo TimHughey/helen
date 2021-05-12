@@ -9,19 +9,26 @@ defmodule Alfred.NamesAgent do
     Agent.start_link(fn -> %State{} end, name: This)
   end
 
+  def exists?(name) when is_binary(name) do
+    case get(name) do
+      %KnownName{} -> true
+      _ -> false
+    end
+  end
+
   def get(name) when is_binary(name) do
     Agent.get_and_update(This, State, :get_name_entry, [name])
   end
 
   def known do
-    Agent.get(This, fn %State{known_map: x} -> x end)
+    Agent.get(This, State, :all_known, [])
   end
 
-  def just_saw(raw_list, mod) when is_list(raw_list) and is_atom(mod) do
+  def just_saw([%{} | _] = raw_list, mod) when is_atom(mod) do
     Agent.update(This, State, :update_known, [make_known_names(raw_list, mod)])
   end
 
-  def just_saw(raw_list, %DateTime{} = seen_at, mod) when is_list(raw_list) and is_atom(mod) do
+  def just_saw([%{} | _] = raw_list, %DateTime{} = seen_at, mod) when is_atom(mod) do
     Agent.update(This, State, :update_known, [make_known_names(raw_list, mod, seen_at)])
   end
 
@@ -29,7 +36,7 @@ defmodule Alfred.NamesAgent do
     Agent.get_and_update(This, State, :store_and_return_pid, [])
   end
 
-  defp make_known_names(list, mod, seen_at \\ nil) do
+  defp make_known_names(list, mod, seen_at \\ DateTime.utc_now()) do
     for %{name: name} = map when is_binary(name) <- list do
       case map do
         # schema has pio, it's mutable

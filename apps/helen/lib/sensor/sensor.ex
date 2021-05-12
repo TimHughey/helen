@@ -11,7 +11,6 @@ defmodule Sensor do
   """
 
   alias Sensor.DB.{Alias, DataPoint, Device}
-  alias Sensor.Notify
 
   @doc """
     Public API for creating a Sensor Alias
@@ -95,13 +94,6 @@ defmodule Sensor do
   end
 
   @doc """
-  Register the caller's pid to receive notifications when the named sensor
-  is updated by handle_message
-  """
-  @doc since: "0.0.26"
-  defdelegate notify_register(name), to: Notify
-
-  @doc """
     Public API for renaming a Sensor Alias
   """
   @doc since: "0.0.23"
@@ -179,10 +171,6 @@ defmodule Sensor do
     end
   end
 
-  @doc delegate_to: {Notify, :restart, 1}
-  @doc since: "0.0.27"
-  defdelegate restart(opts \\ []), to: Notify
-
   @doc """
   Return a list of devices that are not aliased ordered by inserted at desc
   """
@@ -215,7 +203,7 @@ defmodule Sensor do
          # technically the message has been processed at this point
          msg <- Map.put(msg, :processed, true),
          # send any notifications requested
-         msg <- Notify.notify_as_needed(msg),
+         # msg <- Notify.notify_as_needed(msg),
          # now send the augmented message to the timeseries database
          msg <- Influx.handle_message(msg),
          write_rc <- Map.get(msg, :write_rc),

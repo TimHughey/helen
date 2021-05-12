@@ -2,7 +2,7 @@ defmodule PulseWidth.Msg do
   require Logger
 
   alias PulseWidth.DB.{Command, Device}
-  alias PulseWidth.{Notify, States}
+  alias PulseWidth.States
 
   # @debug true
 
@@ -55,7 +55,7 @@ defmodule PulseWidth.Msg do
       {elapsed, {:ok, msg_final}} ->
         success_rc = {:ok, [elapsed_ms: elapsed / 1000.0]}
 
-        msg_final |> put_pwm_rc(success_rc) |> PulseWidth.notify_as_needed()
+        msg_final |> put_pwm_rc(success_rc)
 
       {_elapsed, error} ->
         failed_rc = {:failed, inspect(error, pretty: true)}
@@ -92,7 +92,6 @@ defmodule PulseWidth.Msg do
     |> add_fault_checks()
     |> Device.upsert()
     |> States.inbound_msg()
-    |> Notify.notify_as_needed()
     |> Command.ack_if_needed()
     |> Command.release()
   end

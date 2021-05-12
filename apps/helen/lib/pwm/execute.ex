@@ -103,9 +103,4 @@ defmodule PulseWidth.Execute do
   end
 
   defp validate_cmd_map(_cmap), do: {:invalid, "must contain :name"}
-
-  defp log(x) do
-    #  ["\n", inspect(x, pretty: true), "\n"] |> Logger.info()
-    x
-  end
 end

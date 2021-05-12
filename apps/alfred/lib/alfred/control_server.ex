@@ -10,7 +10,7 @@ defmodule Alfred.ControlServer do
   end
 
   def start_link(_opts) do
-    Logger.info(["starting ", inspect(Mod)])
+    Logger.debug(["starting ", inspect(Mod)])
     GenServer.start_link(Mod, [], name: Mod)
   end
 

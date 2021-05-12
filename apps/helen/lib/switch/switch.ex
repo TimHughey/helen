@@ -7,7 +7,7 @@ defmodule Switch do
   use Timex
 
   alias Switch.DB.{Alias, Command, Device}
-  alias Switch.{Execute, Msg, Notify, Status}
+  alias Switch.{Execute, Msg, Status}
 
   defdelegate acked?(refid), to: Command
 
@@ -77,13 +77,6 @@ defmodule Switch do
 
   defdelegate names, to: Alias, as: :names
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
-
-  defdelegate notify_alive?, to: Notify, as: :alive?
-  defdelegate notify_as_needed(msg), to: Notify
-  defdelegate notify_map, to: Notify
-  defdelegate notify_register(name), to: Notify
-  defdelegate notify_restart(opts \\ []), to: Notify, as: :restart
-  defdelegate notify_state, to: Notify, as: :state
 
   def off(name, opts \\ []) when is_binary(name) do
     %{cmd: "off", name: name, opts: opts} |> execute()

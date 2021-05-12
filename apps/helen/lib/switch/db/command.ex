@@ -99,15 +99,6 @@ defmodule Switch.DB.Command do
   end
 
   def columns(:cast), do: columns(:all)
-  # def columns(:required), do: columns_all(only: [:cmd, :sent_at, :alias_id])
-  # def columns(:update), do: columns_all(drop: [:alias_id])
-  #
-  # def columns_all(opts) when is_list(opts) do
-  #   keep_set = MapSet.new(opts[:only] || columns(:all))
-  #   drop_set = MapSet.new(opts[:drop] || columns(:all))
-  #
-  #   MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
-  # end
 
   # Broom default opts
   def default_opts,

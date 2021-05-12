@@ -3,7 +3,7 @@ defmodule Alfred do
   Alfred - Master of devices
   """
 
-  alias Alfred.NamesAgent
+  alias Alfred.{NamesAgent, Notify}
 
   def just_saw(%{states_rc: states_rc, device: {:ok, device}} = in_msg, mod) do
     {_rc, results} = states_rc
@@ -17,4 +17,5 @@ defmodule Alfred do
   end
 
   defdelegate known, to: NamesAgent
+  defdelegate notify_register(name, opts), to: Notify, as: :register
 end

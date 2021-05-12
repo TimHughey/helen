@@ -9,7 +9,7 @@ defmodule PwmSim.Report do
             host: "unset",
             remote_name: nil,
             type: "pwm",
-            mtime: EasyTime.unix_now(:second),
+            mtime: System.os_time(:second),
             states: [],
             pio_count: 0,
             dev_latency_us: 0,

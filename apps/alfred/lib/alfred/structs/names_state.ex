@@ -4,6 +4,10 @@ defmodule Alfred.NamesAgentState do
 
   defstruct known_map: %{}, pid: nil
 
+  def all_known(%State{known_map: known_map}) do
+    for {_name, %Name{} = known_name} <- known_map, do: known_name
+  end
+
   def get_name_entry(%State{} = s, name) do
     s = prune_expired(s)
 

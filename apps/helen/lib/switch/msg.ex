@@ -2,7 +2,7 @@ defmodule Switch.Msg do
   require Logger
 
   alias Switch.DB.{Command, Device}
-  alias Switch.{Notify, States}
+  alias Switch.States
 
   # @debug true
 
@@ -20,7 +20,7 @@ defmodule Switch.Msg do
       {elapsed, {:ok, msg_final}} ->
         success_rc = {:ok, [elapsed_ms: elapsed / 1000.0]}
 
-        msg_final |> put_switch_rc(success_rc) |> Switch.notify_as_needed()
+        msg_final |> put_switch_rc(success_rc)
 
       {_elapsed, error} ->
         failed_rc = {:failed, inspect(error, pretty: true)}
@@ -57,7 +57,6 @@ defmodule Switch.Msg do
     |> add_fault_checks()
     |> Device.upsert()
     |> States.inbound_msg()
-    |> Notify.notify_as_needed()
     |> Command.ack_if_needed()
     |> Command.release()
   end
