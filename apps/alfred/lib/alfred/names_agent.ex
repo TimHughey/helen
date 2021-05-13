@@ -24,58 +24,52 @@ defmodule Alfred.NamesAgent do
     Agent.get(This, State, :all_known, [])
   end
 
-  # (1 of 2) raw list of seen names and a DateTime to use as a common seen at for all
-  def just_saw([%{} | _] = raw_list, %DateTime{} = seen_at, mod) when is_atom(mod) do
-    Agent.update(This, State, :update_known, [make_known_names(raw_list, mod, seen_at)])
+  # (1 of 2) raw list of maps representing seen names
+  def just_saw([%{} | _] = raw_list) do
+    Agent.update(This, State, :update_known, [make_known_names(raw_list)])
   end
 
-  # (2 of 2) empty or unmatched list, update the known names primarily to prune expired
-  def just_saw(_raw_list, _seen_at, mod) when is_atom(mod) do
-    Agent.update(This, State, :update_known, [[]])
-  end
+  # (2 of 2)
+  def just_saw([]), do: :empty_seen_list
 
   def pid do
     Agent.get_and_update(This, State, :store_and_return_pid, [])
   end
 
-  defp make_known_names(list, mod, %DateTime{} = seen_at) do
-    for %{name: name} = map when is_binary(name) <- list do
-      case map do
-        # schema has pio, it's mutable
-        %_{pio: _, ttl_ms: ttl_ms} ->
-          %KnownName{
-            name: name,
-            mod: mod,
-            # if :pio exists this is a mutable device
-            mutable: true,
-            seen_at: seen_at,
-            ttl_ms: ttl_ms
-          }
+  # (1 od 2) list of structs
+  defp make_known_names([%{__struct__: _} | _] = seen_list) do
+    # when the struct has cmds it is mutable.  conversely, when it has datapoints it is not
+    mutable? = fn
+      %_{cmds: _} -> true
+      %_{datapoints: _} -> false
+    end
 
-        # schema does not have pio, immutable
-        %_{ttl_ms: ttl_ms} ->
-          %KnownName{
-            name: name,
-            mod: mod,
-            # if :pio exists this is a mutable device
-            mutable: false,
-            seen_at: seen_at,
-            ttl_ms: ttl_ms
-          }
+    # the callback module is the first level of the struct
+    callback_mod = fn %{__struct__: x} -> Module.split(x) |> Enum.take(1) |> Module.concat() end
 
-        # plain map, use defaults for missing keys
-        %{name: name} = x ->
-          # if :pio exists this is a mutable device
-          mutable = x[:mutable] || (x[:pio] && true)
+    for seen <- seen_list do
+      %KnownName{
+        name: seen.name,
+        callback_mod: callback_mod.(seen),
+        # if :pio exists this is a mutable device
+        mutable: mutable?.(seen),
+        seen_at: seen.updated_at,
+        ttl_ms: seen.ttl_ms
+      }
+    end
+  end
 
-          %KnownName{
-            name: name,
-            mod: mod,
-            mutable: mutable,
-            seen_at: x[:seen_at] || DateTime.utc_now(),
-            ttl_ms: x[:ttl_ms] || 30_000
-          }
-      end
+  # (2 of 2) list of plain seen maps, must have name and callback mod
+  # will default to immutable if not specified
+  defp make_known_names(seen_list) when is_list(seen_list) do
+    for %{name: name, callback_mod: mod} = seen <- seen_list do
+      %KnownName{
+        name: name,
+        callback_mod: mod,
+        mutable: seen[:mutable] || false,
+        seen_at: seen[:seen_at] || DateTime.utc_now(),
+        ttl_ms: seen[:ttl_ms] || 30_000
+      }
     end
   end
 end

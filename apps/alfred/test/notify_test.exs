@@ -34,7 +34,7 @@ defmodule AlfredNotifyTest do
     {:ok, notify_to} = rc
     should_be_struct(notify_to, NotifyTo)
 
-    NamesAgent.just_saw(ctx.seen_list, __MODULE__)
+    NamesAgent.just_saw(ctx.seen_list)
     [%KnownName{name: notify_to.name}] |> Notify.notify()
 
     notify_ref = notify_to.ref
@@ -67,7 +67,8 @@ defmodule AlfredNotifyTest do
         false
     end
 
-    NamesAgent.just_saw(ctx.seen_list, __MODULE__)
+    # simulate the inbound msg map
+    %{states_rc: {:ok, ctx.seen_list}} |> Alfred.just_saw()
     [%KnownName{name: ctx.random_name}] |> Notify.notify()
 
     # implict test via logging

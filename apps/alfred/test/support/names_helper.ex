@@ -21,7 +21,7 @@ defmodule NamesTestHelper do
 
   def just_saw(ctx) do
     just_saw = fn x ->
-      NamesAgent.just_saw(x.seen_list, DateTime.utc_now(), ctx.module)
+      NamesAgent.just_saw(x.seen_list)
       ctx
     end
 
@@ -49,10 +49,15 @@ defmodule NamesTestHelper do
   end
 
   defp create_seen_list(ctx) do
-    for name <- ctx.names do
-      base = %{name: name, ttl_ms: ctx[:ttl_ms] || 100}
+    random_mutable = fn x ->
+      case :rand.uniform(2) do
+        1 -> put_in(x, [:cmds], [])
+        2 -> put_in(x, [:datapoints], [])
+      end
+    end
 
-      if :rand.uniform(2) == 1, do: put_in(base, [:pio], 0), else: base
+    for name <- ctx.names do
+      %{name: name, ttl_ms: ctx[:ttl_ms] || 100, callback_mod: ctx.module} |> random_mutable.()
     end
   end
 end

@@ -52,7 +52,7 @@ defmodule AlfredNamesTest do
     not_expire = ctx.names |> Enum.at(1)
 
     # update one KnownName to a longer ttl
-    [%{name: not_expire, ttl_ms: 1000}] |> NamesAgent.just_saw(ctx.module)
+    [%{name: not_expire, ttl_ms: 1000, callback_mod: ctx.module}] |> NamesAgent.just_saw()
 
     # pass time so ttl expires
     Process.sleep(ctx.ttl_ms + 2)

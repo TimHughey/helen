@@ -18,24 +18,25 @@ defmodule Alfred do
   # NOTE: opts can contain notify_when_released: true to enter a receive loop waiting for ack
   def execute(name, cmd_map, opts) when is_binary(name) and is_map(cmd_map) and is_list(opts) do
     case NamesAgent.get(name) do
-      %KnownName{mod: mod, mutable: true} -> mod.execute(name, cmd_map, opts)
+      %KnownName{callback_mod: cb_mod, mutable: true} -> cb_mod.execute(name, cmd_map, opts)
       %KnownName{mutable: false} -> {:failed, "#{in_quotes(name)} is immutable"}
       nil -> {:failed, "unknown: #{in_quotes(name)}"}
     end
   end
 
   # (1 of 2) process seen names from the inbound msg pipeline
-  def just_saw(%{states_rc: {:ok, results}, device: {:ok, device}} = in_msg) do
+  #          use the alias_rc which equates to a KnownName
+  def just_saw(%{states_rc: {:ok, results}} = in_msg) do
     put_rc = fn x -> put_in(in_msg, [:alfred_rc], {x, []}) end
 
     make_seen_list = fn schemas ->
-      for %{schema: x} <- schemas do
+      for %{schema: x, success: true} <- schemas do
         x
       end
     end
 
     make_seen_list.(results)
-    |> NamesAgent.just_saw(device.last_seen_at, in_msg.msg_handler)
+    |> NamesAgent.just_saw()
     |> put_rc.()
   end
 
@@ -57,7 +58,7 @@ defmodule Alfred do
 
   def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case NamesAgent.get(name) do
-      %KnownName{mod: mod} -> mod.status(name, opts)
+      %KnownName{callback_mod: cb_mod} -> cb_mod.status(name, opts)
       nil -> {:failed, "unknown: #{in_quotes(name)}"}
     end
   end
