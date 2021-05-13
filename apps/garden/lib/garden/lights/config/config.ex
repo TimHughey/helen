@@ -1,9 +1,7 @@
 defmodule Lights.Config do
   @moduledoc false
 
-  import Application, only: [compile_env!: 2]
-
-  @suninfo_wait_ms compile_env!(:garden, :suninfo_wait_ms) || 1000
+  @suninfo_wait_ms Application.compile_env!(:garden, [Lights, :suninfo_wait_ms]) || 1000
 
   # (1 of 2) entry for ensuring suninfo is available
   def ensure_suninfo(cfg_file) do
