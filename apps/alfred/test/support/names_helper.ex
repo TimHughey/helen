@@ -21,7 +21,7 @@ defmodule NamesTestHelper do
 
   def just_saw(ctx) do
     just_saw = fn x ->
-      NamesAgent.just_saw(x.seen_list, ctx.module)
+      NamesAgent.just_saw(x.seen_list, DateTime.utc_now(), ctx.module)
       ctx
     end
 

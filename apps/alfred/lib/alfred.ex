@@ -24,15 +24,24 @@ defmodule Alfred do
     end
   end
 
-  def just_saw(%{states_rc: states_rc, device: {:ok, device}} = in_msg, mod) do
-    {_rc, results} = states_rc
-    seen = for %{schema: x} <- results, do: x
+  # (1 of 2) process seen names from the inbound msg pipeline
+  def just_saw(%{states_rc: {:ok, results}, device: {:ok, device}} = in_msg) do
+    put_rc = fn x -> put_in(in_msg, [:alfred_rc], {x, []}) end
 
-    %_{last_seen_at: seen_at} = device
+    make_seen_list = fn schemas ->
+      for %{schema: x} <- schemas do
+        x
+      end
+    end
 
-    NamesAgent.just_saw(seen, seen_at, mod)
+    make_seen_list.(results)
+    |> NamesAgent.just_saw(device.last_seen_at, in_msg.msg_handler)
+    |> put_rc.()
+  end
 
-    in_msg
+  # (2 of 2) unable to match inbound msg
+  def just_saw(in_msg) do
+    put_in(in_msg, [:alfred_rc], {:failed, "unable to determine seen list"})
   end
 
   defdelegate known, to: NamesAgent

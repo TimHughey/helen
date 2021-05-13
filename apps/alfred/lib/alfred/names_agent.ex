@@ -24,19 +24,21 @@ defmodule Alfred.NamesAgent do
     Agent.get(This, State, :all_known, [])
   end
 
-  def just_saw([%{} | _] = raw_list, mod) when is_atom(mod) do
-    Agent.update(This, State, :update_known, [make_known_names(raw_list, mod)])
-  end
-
+  # (1 of 2) raw list of seen names and a DateTime to use as a common seen at for all
   def just_saw([%{} | _] = raw_list, %DateTime{} = seen_at, mod) when is_atom(mod) do
     Agent.update(This, State, :update_known, [make_known_names(raw_list, mod, seen_at)])
+  end
+
+  # (2 of 2) empty or unmatched list, update the known names primarily to prune expired
+  def just_saw(_raw_list, _seen_at, mod) when is_atom(mod) do
+    Agent.update(This, State, :update_known, [[]])
   end
 
   def pid do
     Agent.get_and_update(This, State, :store_and_return_pid, [])
   end
 
-  defp make_known_names(list, mod, seen_at \\ DateTime.utc_now()) do
+  defp make_known_names(list, mod, %DateTime{} = seen_at) do
     for %{name: name} = map when is_binary(name) <- list do
       case map do
         # schema has pio, it's mutable

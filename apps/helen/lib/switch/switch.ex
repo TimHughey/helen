@@ -72,7 +72,7 @@ defmodule Switch do
   defdelegate exists?(name), to: Alias
 
   def handle_message(msg_in) do
-    msg_in |> Msg.handle() |> Alfred.just_saw(__MODULE__)
+    msg_in |> put_in([:msg_handler], __MODULE__) |> Msg.handle() |> Alfred.just_saw()
   end
 
   defdelegate names, to: Alias, as: :names
