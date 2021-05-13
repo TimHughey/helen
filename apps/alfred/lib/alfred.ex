@@ -25,24 +25,14 @@ defmodule Alfred do
   end
 
   # (1 of 2) process seen names from the inbound msg pipeline
-  #          use the alias_rc which equates to a KnownName
-  def just_saw(%{states_rc: {:ok, results}} = in_msg) do
-    put_rc = fn x -> put_in(in_msg, [:alfred_rc], {x, []}) end
+  def just_saw(in_msg) do
+    put_rc = fn x -> put_in(in_msg, [:alfred_rc], x) end
 
-    make_seen_list = fn schemas ->
-      for %{schema: x, success: true} <- schemas do
-        x
-      end
-    end
-
-    make_seen_list.(results)
+    in_msg
+    |> get_seen_names_from_in_msg()
+    |> make_seen_list()
     |> NamesAgent.just_saw()
     |> put_rc.()
-  end
-
-  # (2 of 2) unable to match inbound msg
-  def just_saw(in_msg) do
-    put_in(in_msg, [:alfred_rc], {:failed, "unable to determine seen list"})
   end
 
   defdelegate known, to: NamesAgent
@@ -60,6 +50,21 @@ defmodule Alfred do
     case NamesAgent.get(name) do
       %KnownName{callback_mod: cb_mod} -> cb_mod.status(name, opts)
       nil -> {:failed, "unknown: #{in_quotes(name)}"}
+    end
+  end
+
+  defp get_seen_names_from_in_msg(in_msg) do
+    case in_msg do
+      %{states_rc: {:ok, x}} -> x
+      %{datapoints_rc: {:ok, x}} -> x
+      _x -> {:failed, "unable to determine seen list"}
+    end
+  end
+
+  defp make_seen_list(results) do
+    case results do
+      [%_{} | _] = schemas -> for %{schema: x, success: true} <- schemas, do: x
+      previous_rc -> previous_rc
     end
   end
 

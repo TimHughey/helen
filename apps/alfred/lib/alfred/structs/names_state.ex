@@ -19,6 +19,13 @@ defmodule Alfred.NamesAgentState do
     {found, s}
   end
 
+  def just_saw(%State{} = s, seen_list) do
+    results =
+      Enum.reduce(seen_list, [], fn %Name{name: x}, acc -> [x | acc] |> List.flatten() end)
+
+    {{:ok, results}, update_known(s, seen_list)}
+  end
+
   def store_and_return_pid(%State{} = s) do
     s = %State{s | pid: self()}
 
@@ -41,7 +48,7 @@ defmodule Alfred.NamesAgentState do
     }
   end
 
-  def update_known(%State{} = s, list) do
+  defp update_known(%State{} = s, list) do
     %State{
       s
       | # replace or add each %KnownName{} to the known map

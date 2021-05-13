@@ -24,13 +24,16 @@ defmodule Alfred.NamesAgent do
     Agent.get(This, State, :all_known, [])
   end
 
-  # (1 of 2) raw list of maps representing seen names
+  # (1 of 3) raw list of maps representing seen names
   def just_saw([%{} | _] = raw_list) do
-    Agent.update(This, State, :update_known, [make_known_names(raw_list)])
+    Agent.get_and_update(This, State, :just_saw, [make_known_names(raw_list)])
   end
 
-  # (2 of 2)
-  def just_saw([]), do: :empty_seen_list
+  # (2 of 3) empty lists are ok
+  def just_saw([]), do: {:ok, []}
+
+  # (3 of 3) previous function in pipeline error
+  def just_saw(previous_rc), do: previous_rc
 
   def pid do
     Agent.get_and_update(This, State, :store_and_return_pid, [])
