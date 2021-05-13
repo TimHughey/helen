@@ -1,3 +1,3 @@
 defmodule Alfred.ControlServerState do
-  defstruct controls: %{}
+  defstruct timeout: %{last: nil, ms: 1000}, token: make_ref()
 end

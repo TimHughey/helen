@@ -9,6 +9,8 @@ defmodule PulseWidth do
   alias PulseWidth.DB.{Alias, Command, Device}
   alias PulseWidth.{Execute, Msg, Status}
 
+  @behaviour Alfred.Mutable
+
   defdelegate acked?(refid), to: Command
 
   def alias_create(device_or_id, name, pio, opts \\ []) do
@@ -36,14 +38,7 @@ defmodule PulseWidth do
   defdelegate devices_begin_with(pattern \\ ""), to: Device
 
   # (1 of 2) single arg entry point, extract name and opts
-  def execute(%{name: name} = cmd_map) do
-    opts = cmd_map[:opts] || []
-    cmd_map = Map.delete(cmd_map, :opts)
-
-    execute(name, cmd_map, opts)
-  end
-
-  # (1 of 2) single arg entry point, extract name and opts
+  @impl true
   def execute(cmd_map) when is_map(cmd_map) do
     case cmd_map do
       %{name: name, opts: opts} = x -> execute(name, Map.delete(x, :opts), opts)
@@ -54,6 +49,7 @@ defmodule PulseWidth do
 
   # (2 of 2) name, cmd_map and opts specified as unique arguments
   # NOTE: opts can contain notify_when_released: true to enter a receive loop waiting for ack
+  @impl true
   def execute(name, cmd_map, opts) when is_binary(name) and is_map(cmd_map) and is_list(opts) do
     {will_wait, opts} = make_execute_opts(opts)
 
@@ -77,6 +73,7 @@ defmodule PulseWidth do
   @deprecated "use execute/1 or execute/2 instead"
   def execute_action(_), do: :execute_action_removed
 
+  @impl true
   defdelegate exists?(name), to: Alias
 
   def handle_message(msg_in) do
@@ -86,6 +83,7 @@ defmodule PulseWidth do
   defdelegate names, to: Alias, as: :names
   defdelegate names_begin_with(patten), to: Alias, as: :names_begin_with
 
+  @impl true
   def off(name, opts \\ []) when is_binary(name) do
     %{cmd: "off", name: name, opts: opts} |> execute()
   end
@@ -98,10 +96,12 @@ defmodule PulseWidth do
     end
   end
 
+  @impl true
   def on(name, opts \\ []) when is_binary(name) do
     %{cmd: "on", name: name, opts: opts} |> execute()
   end
 
+  @impl true
   def status(name_or_id, opts \\ []) when is_list(opts) do
     case Alias.find(name_or_id) do
       %Alias{} = a -> Status.make_status(a, opts)

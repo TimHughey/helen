@@ -3,5 +3,9 @@ defmodule Garden do
   Documentation for `Garden`.
   """
 
-  def hello, do: :ok
+  def help,
+    do: """
+
+
+    """
 end

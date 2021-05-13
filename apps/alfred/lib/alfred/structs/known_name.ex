@@ -4,4 +4,12 @@ defmodule Alfred.KnownName do
             mutable: false,
             seen_at: DateTime.utc_now(),
             ttl_ms: 30_000
+
+  @type t :: %__MODULE__{
+          name: String.t(),
+          mod: module(),
+          mutable: boolean(),
+          seen_at: DateTime.t(),
+          ttl_ms: pos_integer()
+        }
 end
