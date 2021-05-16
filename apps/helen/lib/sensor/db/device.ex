@@ -4,9 +4,10 @@ defmodule Sensor.DB.Device do
   """
 
   use Ecto.Schema
+  require Ecto.Query
+  alias Ecto.Query
 
   alias Sensor.DB.Alias, as: Alias
-  alias Sensor.DB.DataPoint, as: DataPoint
   alias Sensor.DB.Device, as: Schema
 
   schema "sensor_device" do
@@ -15,93 +16,86 @@ defmodule Sensor.DB.Device do
     field(:dev_latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
 
-    has_many(:datapoints, DataPoint)
-
-    has_one(:_alias_, Alias, references: :id, foreign_key: :device_id)
+    has_many(:aliases, Alias)
 
     timestamps(type: :utc_datetime_usec)
   end
 
-  def changeset(x, p) when is_map(p) or is_list(p) do
-    import Ecto.Changeset,
-      only: [
-        cast: 3,
-        validate_required: 2,
-        validate_format: 3,
-        validate_number: 3
-      ]
+  @stale_default_ms 60_000
 
-    import Common.DB, only: [name_regex: 0]
+  def changeset(x, p) do
+    alias Common.DB
+    alias Ecto.Changeset
 
-    cast(x, Enum.into(p, %{}), keys(:cast))
-    |> validate_required(keys(:required))
-    |> validate_format(:device, name_regex())
-    |> validate_format(:host, name_regex())
-    |> validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
+    x
+    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.validate_required(columns(:required))
+    |> Changeset.validate_format(:device, DB.name_regex())
+    |> Changeset.validate_format(:host, DB.name_regex())
+    |> Changeset.validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
   end
 
-  @doc """
-  Deletes devices that were last updated before UTC now shifted backward by opts.
+  def columns(:all) do
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
 
-  Returns a list of the deleted devices.
-
-  ## Examples
-
-      iex> Sensor.DB.Device.delete_unavailable([days: 7])
-      ["dead_device1", "dead_device2"]
-
-  """
-  @doc since: "0.0.27"
-  def delete_unavailable(opts) do
-    import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
-    import Ecto.Query, only: [from: 2]
-    import Repo, only: [all: 1]
-
-    case valid_duration_opts?(opts) do
-      true ->
-        before = utc_shift_past(opts)
-
-        from(x in Schema, where: x.updated_at < ^before)
-        |> all()
-        |> delete()
-
-      false ->
-        {:bad_args, opts}
-    end
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
   end
 
-  defp delete(x) do
-    for %Schema{id: id, device: dev_name} = dev when is_integer(id) <-
-          [x] |> List.flatten() do
-      case Repo.delete(dev, timeout: 5 * 60 * 1000) do
-        {:ok, %Schema{device: deleted_name}} -> {:ok, deleted_name}
-        rc -> {:failed, dev_name, rc}
-      end
-    end
+  def columns(:cast), do: columns(:all)
+  def columns(:required), do: columns_all(drop: [:inserted_at, :updated_at])
+  def columns(:replace), do: columns_all(drop: [:device, :inserted_at])
+
+  def columns_all(opts) when is_list(opts) do
+    keep_set = MapSet.new(opts[:only] || columns(:all))
+    drop_set = MapSet.new(opts[:drop] || columns(:all))
+
+    MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
   end
 
-  @doc """
-    Retrieve sensor device names
-  """
+  # @doc """
+  # Deletes devices that were last updated before UTC now shifted backward by opts.
+  #
+  # Returns a list of the deleted devices.
+  #
+  # ## Examples
+  #
+  #     iex> Sensor.DB.Device.delete_unavailable([days: 7])
+  #     ["dead_device1", "dead_device2"]
+  #
+  # """
+  # @doc since: "0.0.27"
+  # def delete_unavailable(opts) do
+  #   import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
+  #   import Ecto.Query, only: [from: 2]
+  #   import Repo, only: [all: 1]
+  #
+  #   case valid_duration_opts?(opts) do
+  #     true ->
+  #       before = utc_shift_past(opts)
+  #
+  #       from(x in Schema, where: x.updated_at < ^before)
+  #       |> all()
+  #       |> delete()
+  #
+  #     false ->
+  #       {:bad_args, opts}
+  #   end
+  # end
+  #
+  # defp delete(x) do
+  #   for %Schema{id: id, device: dev_name} = dev when is_integer(id) <-
+  #         [x] |> List.flatten() do
+  #     case Repo.delete(dev, timeout: 5 * 60 * 1000) do
+  #       {:ok, %Schema{device: deleted_name}} -> {:ok, deleted_name}
+  #       rc -> {:failed, dev_name, rc}
+  #     end
+  #   end
+  # end
 
-  @doc since: "0.0.19"
-  def devices do
-    import Ecto.Query, only: [from: 2]
-
-    from(x in Schema, select: x.device, order_by: x.device) |> Repo.all()
-  end
-
-  @doc """
-    Retrieve sensor device names that begin with a pattern
-  """
-
-  @doc since: "0.0.19"
   def devices_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
+    like_string = IO.iodata_to_binary([pattern, "%"])
 
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
-
-    from(x in Schema,
+    Query.from(x in Schema,
       where: like(x.device, ^like_string),
       order_by: x.device,
       select: x.device
@@ -109,221 +103,126 @@ defmodule Sensor.DB.Device do
     |> Repo.all()
   end
 
-  @doc """
-    Get a sensor alias by id or name
-
-    Same return values as Repo.get_by/2
-
-      1. nil if not found
-      2. %Sensor.Schemas.Alias{}
-
-      ## Examples
-        iex> Sensor.DB.Alias.find("default")
-        %Sensor.Schemas.Alias{}
-  """
-
-  @doc since: "0.0.16"
-  def find(id_or_name) when is_integer(id_or_name) or is_binary(id_or_name) do
-    check_args = fn
-      x when is_binary(x) -> [device: x]
-      x when is_integer(x) -> [id: x]
-      x -> {:bad_args, x}
-    end
-
-    import Repo, only: [get_by: 2, preload: 2]
-
-    with opts when is_list(opts) <- check_args.(id_or_name),
-         %Schema{} = found <- get_by(Schema, opts) |> preload([:_alias_]) do
-      found
-    else
-      x when is_tuple(x) -> x
+  # (1 of 2) find with proper opts
+  def find(opts) when is_list(opts) and opts != [] do
+    case Repo.get_by(Schema, opts) do
+      %Schema{} = x -> preload(x)
       x when is_nil(x) -> nil
-      x -> {:error, x}
     end
   end
 
-  def keys(:all),
-    do:
-      Map.from_struct(%Schema{})
-      |> Map.drop([:__meta__, :_alias_, :id, :datapoints])
-      |> Map.keys()
-      |> List.flatten()
-
-  def keys(:cast), do: keys(:all)
-
-  # defp keys(:upsert), do: keys_drop(:all, [:id, :device])
-
-  def keys(:replace),
-    do: keys_drop(:all, [:device, :inserted_at])
-
-  def keys(:required),
-    do: keys_drop(:cast, [:updated_at, :inserted_at])
-
-  defp keys_drop(base_keys, drop),
-    do:
-      MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
-      |> MapSet.to_list()
-
-  @doc """
-  Loads datapoints for a device
-  """
-  @doc since: "0.0.16"
-  def load_datapoints(%Schema{} = dev, opts) do
-    import Ecto.Query, only: [from: 2]
-    import Repo, only: [preload: 2]
-
-    since = since(opts)
-
-    q =
-      from(dp in DataPoint,
-        where: dp.reading_at >= ^since,
-        order_by: [desc: dp.reading_at]
-      )
-
-    dev |> preload(datapoints: q) |> preload(:_alias_)
-  end
-
-  @doc """
-  Reload a %Sensor.DB.Device{}
-  """
-
-  @doc since: "0.0.16"
-  def reload(args) do
-    import Repo, only: [get!: 2, preload: 2]
-
-    case args do
-      # results of a Repo function
-      {:ok, %Schema{id: id}} -> get!(Schema, id) |> preload(:_alias_)
-      # an existing struct
-      %Schema{id: id} -> get!(Schema, id) |> preload(:_alias_)
-      # something we can't handle
-      id when is_integer(id) -> get!(Schema, id) |> preload(:_alias_)
-      args -> {:error, args}
+  # (2 of 2) validate param and build opts for find/2
+  def find(id_or_device) do
+    case id_or_device do
+      x when is_binary(x) -> find(device: x)
+      x when is_integer(x) -> find(id: x)
+      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
     end
   end
 
-  @doc """
-  Return a list of Devices that are not aliased (no Sensor Alias)
-  """
-  @doc since: "0.0.27"
-  def unaliased do
-    import Repo, only: [all: 1, preload: 2]
-    import Ecto.Query, only: [from: 2]
+  def find_check_stale(id_or_device, opts) do
+    stale_ms = EasyTime.iso8601_duration_to_ms(opts[:device_stale_after]) || @stale_default_ms
 
-    q =
-      from(x in Schema,
-        order_by: [desc: x.inserted_at]
-      )
-
-    # need to wrap the Repo.all/1 in a list in case the limit is 1
-    for dev <- all(q) do
-      case preload(dev, [:_alias_]) do
-        %Schema{_alias_: nil, device: d, inserted_at: at} -> [{d, at}]
-        _no_alias -> []
-      end
-    end
-    |> List.flatten()
-  end
-
-  @doc """
-  Selects devices that were last updated before UTC now shifted backward by opts.
-
-  Returns a list of the devices.
-
-  ## Examples
-
-      iex> Sensor.DB.Device.unavailable([days: 7])
-      ["dead_device1", "dead_device2"]
-
-  """
-  @doc since: "0.0.27"
-  def unavailable(opts) do
-    import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
-    import Ecto.Query, only: [from: 2]
-    import Repo, only: [all: 1]
-
-    case valid_duration_opts?(opts) do
-      true ->
-        before = utc_shift_past(opts)
-        query = from(x in Schema, where: x.updated_at < ^before)
-
-        for %Schema{device: device, updated_at: last_update} <- all(query) do
-          {device, last_update}
-        end
-
-      false ->
-        {:bad_args, opts}
+    case find(id_or_device) do
+      nil -> {:device, nil}
+      %Schema{} = d -> stale_check(d, stale_ms)
     end
   end
 
-  def upsert(%{device: _} = msg) do
-    import Helen.Time.Helper, only: [utc_now: 0]
-
-    params = [:device, :host, :dev_latency_us, :last_seen_at]
-
-    # create a map of defaults for keys that may not exist in the msg
-    params_default = %{last_seen_at: utc_now()}
-
-    # assemble a map of changes
-    # NOTE:  the second map passed to Map.merge/2 replaces duplicate keys
-    #        in the first map.  in this case we want all available data from
-    #        the message however if some isn't available we provide it via
-    #        changes_default
-    params = Map.merge(params_default, Map.take(msg, params))
-
-    # assemble the return message with the results of upsert/2
-    Map.put(msg, :device, upsert(%Schema{}, params))
+  # (1 of 2) load aliases for a schema
+  def load_aliases(%Schema{} = d) do
+    Repo.preload(d, [:aliases])
   end
 
-  def upsert(msg) when is_map(msg),
-    do: Map.put(msg, :device, {:error, :badmsg})
+  # (2 of 2) handle use in a pipeline
+  def load_aliases({rc, schema_or_error}) do
+    case {rc, schema_or_error} do
+      {:ok, %Schema{} = d} -> {:ok, load_aliases(d)}
+      {rc, x} -> {rc, x}
+    end
+  end
 
-  def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
-    import Repo, only: [preload: 2]
+  def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
 
-    # make certain the params are a map
-    params = Enum.into(params, %{})
+  # (1 of 2) receive the inbound msg, grab the keys of interest
+  def upsert(%{device: _, host: _} = msg) do
+    want = [:device, :host, :dev_latency_us, :last_seen_at]
 
+    p = Map.take(msg, want) |> Map.put_new(:last_seen_at, DateTime.utc_now())
+
+    put_in(msg, [:device], upsert(%Schema{}, p)) |> Map.drop([:dev_latency_us])
+  end
+
+  # (2 of 2) perform the actual insert with conflict check (upsert)
+  def upsert(%Schema{} = d, p) when is_map(p) do
     # assemble the opts for upsert
     # check for conflicts on :device
-    # if there is a conflict only replace keys(:replace)
-    opts = [
-      on_conflict: {:replace, keys(:replace)},
-      returning: true,
-      conflict_target: [:device]
-    ]
+    # if there is a conflict only replace specified columns
+    opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:device]]
 
-    cs = changeset(x, params)
+    changeset(d, p) |> Repo.insert(opts) |> load_aliases()
+  end
 
-    with {cs, true} <- {cs, cs.valid?},
-         {:ok, %Schema{id: _id} = dev} <- Repo.insert(cs, opts) do
-      {:ok, dev |> preload(:_alias_)}
-    else
-      {cs, false} ->
-        {:invalid_changes, cs}
+  defp stale_check(%Schema{last_seen_at: seen_at} = d, stale_ms) do
+    stale_dt = DateTime.utc_now() |> DateTime.add(stale_ms * -1, :millisecond)
 
-      {:error, rc} ->
-        {:error, rc}
-
-      error ->
-        {:error, error}
+    case DateTime.compare(seen_at, stale_dt) do
+      :lt -> {:device_stale, [device: d.device, stale_ms: stale_ms]}
+      x when x in [:gt, :eq] -> {:device, d}
     end
   end
 
-  def upsert(_x, params) do
-    {:error, params}
-  end
+  # @doc """
+  # Return a list of Devices that are not aliased (no Sensor Alias)
+  # """
+  # @doc since: "0.0.27"
+  # def unaliased do
+  #   import Repo, only: [all: 1, preload: 2]
+  #   import Ecto.Query, only: [from: 2]
+  #
+  #   q =
+  #     from(x in Schema,
+  #       order_by: [desc: x.inserted_at]
+  #     )
+  #
+  #   # need to wrap the Repo.all/1 in a list in case the limit is 1
+  #   for dev <- all(q) do
+  #     case preload(dev, [:_alias_]) do
+  #       %Schema{_alias_: nil, device: d, inserted_at: at} -> [{d, at}]
+  #       _no_alias -> []
+  #     end
+  #   end
+  #   |> List.flatten()
+  # end
 
-  defp since(opts) do
-    import Helen.Time.Helper, only: [utc_shift_past: 1]
-
-    possible_opts = Keyword.take(opts, [:since, :since_secs])
-
-    case possible_opts do
-      [{:since, val} | _tail] -> val
-      [{:since_secs, val} | _tail] -> val * 1000
-      _x -> "PT2M"
-    end
-    |> utc_shift_past()
-  end
+  # @doc """
+  # Selects devices that were last updated before UTC now shifted backward by opts.
+  #
+  # Returns a list of the devices.
+  #
+  # ## Examples
+  #
+  #     iex> Sensor.DB.Device.unavailable([days: 7])
+  #     ["dead_device1", "dead_device2"]
+  #
+  # """
+  # @doc since: "0.0.27"
+  # def unavailable(opts) do
+  #   import Helen.Time.Helper, only: [utc_shift_past: 1, valid_duration_opts?: 1]
+  #   import Ecto.Query, only: [from: 2]
+  #   import Repo, only: [all: 1]
+  #
+  #   case valid_duration_opts?(opts) do
+  #     true ->
+  #       before = utc_shift_past(opts)
+  #       query = from(x in Schema, where: x.updated_at < ^before)
+  #
+  #       for %Schema{device: device, updated_at: last_update} <- all(query) do
+  #         {device, last_update}
+  #       end
+  #
+  #     false ->
+  #       {:bad_args, opts}
+  #   end
+  # end
 end

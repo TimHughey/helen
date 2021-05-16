@@ -3,7 +3,13 @@ defmodule RuthSim.Mqtt do
 
   @default_server MqttClient
 
-  def add_roundtrip_ref(ctx), do: put_in(ctx, [:roundtrip_ref], Ecto.UUID.generate())
+  def add_roundtrip_ref(ctx, opts \\ [wait_for_roundtrip: true]) do
+    if opts[:wait_for_roundtrip] == true do
+      put_in(ctx, [:roundtrip_ref], Ecto.UUID.generate())
+    else
+      ctx
+    end
+  end
 
   def call(%{pack_rc: {_rc, reason}}) do
     Logger.warn("publish call failed: #{reason}")

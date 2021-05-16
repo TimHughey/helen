@@ -11,7 +11,7 @@ defmodule Alfred.NamesAgent do
 
   def exists?(name) when is_binary(name) do
     case get(name) do
-      %KnownName{} -> true
+      %KnownName{pruned: false} -> true
       _ -> false
     end
   end
@@ -39,8 +39,23 @@ defmodule Alfred.NamesAgent do
     Agent.get_and_update(This, State, :store_and_return_pid, [])
   end
 
-  # (1 od 2) list of structs
-  defp make_known_names([%{__struct__: _} | _] = seen_list) do
+  def delete(name) do
+    case Agent.get_and_update(This, State, :prune_one, [name]) do
+      {:pruned, name} -> {:ok, [deleted: true, name: name]}
+      {x, name} -> {x, [alfred: :unknown, name: name]}
+    end
+  end
+
+  # defp log_and_passthrough(what, msg) do
+  #   require Logger
+  #
+  #   [msg, "\n", inspect(what, pretty: true), "\n"] |> Logger.info()
+  #
+  #   what
+  # end
+
+  # (1 od 2) list containing schemas (structs)
+  defp make_known_names([%{schema: x} | _] = seen_list) when is_struct(x) do
     # when the struct has cmds it is mutable.  conversely, when it has datapoints it is not
     mutable? = fn
       %_{cmds: _} -> true
@@ -50,14 +65,14 @@ defmodule Alfred.NamesAgent do
     # the callback module is the first level of the struct
     callback_mod = fn %{__struct__: x} -> Module.split(x) |> Enum.take(1) |> Module.concat() end
 
-    for seen <- seen_list do
+    for %{schema: schema} <- seen_list do
       %KnownName{
-        name: seen.name,
-        callback_mod: callback_mod.(seen),
+        name: schema.name,
+        callback_mod: callback_mod.(schema),
         # if :pio exists this is a mutable device
-        mutable: mutable?.(seen),
-        seen_at: seen.updated_at,
-        ttl_ms: seen.ttl_ms
+        mutable: mutable?.(schema),
+        seen_at: schema.updated_at,
+        ttl_ms: schema.ttl_ms
       }
     end
   end

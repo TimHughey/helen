@@ -81,6 +81,8 @@ defmodule EasyTime do
     end
   end
 
+  def iso8601_duration_to_ms(binary) when is_nil(binary), do: nil
+
   # @doc since: "0.0.27"
   # def remaining(finish_dt) do
   #   elapsed(utc_now(), finish_dt)

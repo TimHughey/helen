@@ -6,297 +6,193 @@ defmodule Sensor.DB.Alias do
   use Ecto.Schema
 
   alias Sensor.DB.Alias, as: Schema
-  alias Sensor.DB.Device
+  alias Sensor.DB.{DataPoint, Device}
+
+  require Ecto.Query
+  alias Ecto.Query
+
+  @ttl_default_ms 60_000
+  @ttl_min 1
 
   schema "sensor_alias" do
     field(:name, :string)
-    field(:device_id, :integer)
     field(:description, :string, default: "<none>")
-    field(:type, :string, default: "auto")
-    field(:ttl_ms, :integer, default: 60_000)
+    field(:ttl_ms, :integer, default: @ttl_default_ms)
 
-    belongs_to(:device, Device,
-      source: :device_id,
-      references: :id,
-      foreign_key: :device_id,
-      define_field: false
-    )
+    belongs_to(:device, Device)
+    has_many(:datapoints, DataPoint)
 
     timestamps(type: :utc_datetime_usec)
   end
 
-  @doc false
-  def changeset(x, p) when is_map(p) do
-    import Ecto.Changeset,
-      only: [
-        cast: 3,
-        validate_required: 2,
-        validate_format: 3,
-        validate_number: 3
-      ]
+  # def apply_changes(%Schema{} = a, changes) do
+  #   changeset(a, changes) |> Repo.update(returning: true)
+  # end
 
-    import Common.DB, only: [name_regex: 0]
+  def assign_device(%Schema{} = a, %Device{} = device) do
+    changes = %{device_id: device.id}
 
-    cast(x, p, keys(:cast))
-    |> validate_required(keys(:required))
-    |> validate_format(:name, name_regex())
-    |> validate_number(:ttl_ms, greater_than_or_equal_to: 0)
-  end
-
-  def create(%Device{id: id}, name, opts \\ [])
-      when (is_binary(name) and is_list(opts)) or is_map(opts) do
-    opts = Enum.into(opts, [])
-    #
-    # grab keys of interest for the schema (if they exist) and populate the
-    # required parameters from the function call
-    #
-    params =
-      Keyword.take(opts, [:description, :type, :ttl_ms])
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-      |> Enum.into(%{})
-      |> Map.merge(%{device_id: id, name: name, device_checked: true})
-
-    upsert(%Schema{}, params)
-  end
-
-  @doc """
-    Unalias a device by deleting the alias.
-
-    Same return values as Repo.get_by/2
-  """
-  @doc since: "0.0.28"
-  def delete(id_or_name) do
-    case find(id_or_name) do
-      %Schema{} = found -> Repo.delete(found)
-      x -> {:not_found, x}
+    case changeset(a, changes) |> Repo.update(returning: true) do
+      {:ok, %Schema{} = revised} -> {:ok, [name: revised.name, device: revised.device]}
+      error -> error
     end
   end
 
-  @doc """
-    Get a sensor alias by id or name
+  # (1 of 2) convert parms into a map
+  # def changeset(%Schema{} = a, p) when is_list(p), do: changeset(a, Enum.into(p, %{}))
 
-    Same return values as Repo.get_by/2
+  # (2 of 2) params are a map
+  def changeset(%Schema{} = a, p) when is_map(p) do
+    alias Common.DB
+    alias Ecto.Changeset
 
-      1. nil if not found
-      2. %Sensor.Schemas.Alias{}
+    a
+    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.validate_required(columns(:required))
+    |> Changeset.validate_length(:name, min: 3, max: 32)
+    |> Changeset.validate_format(:name, DB.name_regex())
+    |> Changeset.validate_length(:description, max: 50)
+    |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
+    |> Changeset.unique_constraint(:name, [:name])
+  end
 
-      ## Examples
-        iex> Sensor.DB.Alias.find("default")
-        %Sensor.Schemas.Alias{}
-  """
+  # helpers for changeset columns
+  def columns(:all) do
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
 
-  @doc since: "0.0.16"
-  def find(id_or_name) do
-    check_args = fn
-      x when is_binary(x) -> [name: x]
-      x when is_integer(x) -> [id: x]
-      x -> {:bad_args, x}
-    end
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
+  end
 
-    import Repo, only: [get_by: 2, preload: 2]
+  def columns(:cast), do: columns(:all)
+  def columns(:required), do: columns_all(only: [:device_id, :name])
+  def columns(:replace), do: columns_all(drop: [:name, :inserted_at])
 
-    with opts when is_list(opts) <- check_args.(id_or_name),
-         %Schema{} = found <- get_by(Schema, opts) |> preload([:device]) do
-      found
+  def columns_all(opts) when is_list(opts) do
+    keep_set = MapSet.new(opts[:only] || columns(:all))
+    drop_set = MapSet.new(opts[:drop] || columns(:all))
+
+    MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
+  end
+
+  def create(%Device{id: id}, name, opts \\ []) when is_binary(name) and is_list(opts) do
+    %{
+      device_id: id,
+      name: name,
+      description: opts[:description] || "<none>",
+      ttl_ms: opts[:ttl_ms] || @ttl_default_ms
+    }
+    |> upsert()
+  end
+
+  def delete(name_or_id) do
+    with %Schema{} = a <- find(name_or_id) |> load_datapoint_ids(),
+         {:ok, count} <- DataPoint.purge(a, :all),
+         {:ok, %Schema{name: n}} <- Repo.delete(a) do
+      {:ok, [name: n, datapoints: count]}
     else
-      x when is_tuple(x) -> x
-      x when is_nil(x) -> nil
-      x -> {:error, x}
+      nil -> {:unknown, name_or_id}
+      error -> error
     end
   end
 
-  @doc false
-  def keys(:all),
-    do:
-      Map.from_struct(%Schema{})
-      |> Map.drop([:__meta__, :id, :device])
-      |> Map.keys()
-      |> List.flatten()
+  def device_name(%Schema{} = a), do: load_device(a).device.device
 
-  @doc false
-  def keys(:cast), do: keys(:all)
-
-  @doc false
-  def keys(:replace),
-    do: keys_drop(:all, [:name, :inserted_at])
-
-  @doc false
-  def keys(:required),
-    do:
-      keys_drop(:cast, [
-        :description,
-        :type,
-        :ttl_ms,
-        :updated_at,
-        :inserted_at
-      ])
-
-  @doc false
-  defp keys_drop(base_keys, drop),
-    do:
-      MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
-      |> MapSet.to_list()
-
-  @doc """
-    Retrieve sensor alias names
-  """
-
-  @doc since: "0.0.8"
-  def names do
-    import Ecto.Query, only: [from: 2]
-
-    from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+  def exists?(name_or_id) do
+    case find(name_or_id) do
+      %Schema{} -> true
+      _anything -> false
+    end
   end
 
-  @doc """
-    Retrieve sensor alias names that begin with a pattern
-  """
+  # (1 of 2) find with proper opts
+  def find(opts) when is_list(opts) and opts != [] do
+    case Repo.get_by(Schema, opts) do
+      %Schema{} = x -> load_device(x)
+      x when is_nil(x) -> nil
+    end
+  end
 
-  @doc since: "0.0.19"
+  # (2 of 2) validate param and build opts for find/2
+  def find(id_or_device) do
+    case id_or_device do
+      x when is_binary(x) -> find(name: x)
+      x when is_integer(x) -> find(id: x)
+      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
+    end
+  end
+
+  def names do
+    Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+  end
+
   def names_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-
     like_string = [pattern, "%"] |> IO.iodata_to_binary()
 
-    from(s in Schema,
-      where: like(s.name, ^like_string),
-      order_by: s.name,
-      select: s.name
-    )
-    |> Repo.all()
+    Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name) |> Repo.all()
   end
 
-  @doc """
-    Reload a previously loaded sensor alias
+  # def record_datapoint(name, datapoint_map) do
+  #   # load the record the cmd is associated with
+  #   a = find(name)
+  #
+  #   # add the command and put the name in the result map for upstream
+  #   result_map = DataPoint.add(a, datapoint_map) |> put_in([:name], name)
+  #
+  #   # NOTE! create anonymous fn HERE to capture result_map for updating
+  #   add_to_result = fn [{k, v}] -> put_in(result_map, [k], v) end
+  #
+  #   # when datapoint insert good mark alias as updated for downstream
+  #   case result_map do
+  #     %{datapoint_rc: {:ok, _}} -> [alias_rc: mark_as_updated(a)] |> add_to_result.()
+  #     something_went_wrong -> something_went_wrong
+  #   end
+  # end
 
-    Leverages Repo.get!/2 and raises on failure
-
-    ## Examples
-      iex> Sensor.DB.Alias.reload(1)
-      %Sensor.Schemas.Alias{}
-  """
-
-  @doc since: "0.0.16"
-  def reload(opt) do
-    handle_args = fn
-      {:ok, %Schema{id: id}} -> id
-      %Schema{id: id} -> id
-      id when is_integer(id) -> id
-      x -> x
-    end
-
-    import Repo, only: [get!: 2]
-
-    case handle_args.(opt) do
-      id when is_integer(id) -> get!(Schema, id)
-      x -> {:error, x}
-    end
-  end
-
-  @doc false
-  def rename(%Schema{} = x, opts) when is_list(opts) do
-    name = Keyword.get(opts, :name)
-
-    changes =
-      Keyword.take(opts, [
-        :name,
-        :description,
-        :ttl_ms
-      ])
-      |> Enum.into(%{})
-
-    with {:args, true} <- {:args, is_binary(name)},
-         cs <- changeset(x, changes),
-         {cs, true} <- {cs, cs.valid?},
-         {:ok, sa} <- Repo.update(cs, returning: true) do
-      {:ok, sa}
-    else
-      {:args, false} -> {:bad_args, opts}
-      {%Ecto.Changeset{} = cs, false} -> {:invalid_changes, cs}
+  def rename(%Schema{} = a, changes) when is_map(changes) do
+    case changeset(a, changes) |> Repo.update(returning: true) do
+      {:ok, %Schema{} = revised} -> {:ok, [name: revised.name, was: a.name]}
       error -> error
     end
   end
 
-  @doc """
-  Rename a Sensor alias
+  # @doc """
+  # Replace a Sensor by assigning the existing Alias to a different Device.
+  # """
+  # @doc since: "0.0.27"
+  # def replace(name_or_id, dev_name_or_id) do
+  #   with {:alias, %Schema{} = a} <- {:alias, find(name_or_id)},
+  #        {:dev, %Device{id: dev_id}} <- {:dev, Device.find(dev_name_or_id)},
+  #        {:ok, %Schema{}} <- update(a, [device_id: dev_id], []) do
+  #     {:ok, dev_name_or_id}
+  #   else
+  #     {:alias, rc} -> {:alias_error, rc}
+  #     {:dev, rc} -> {:device_error, rc}
+  #     rc -> rc
+  #   end
+  # end
 
-      Optional opts:
-      description: <binary>   -- new description
-      ttl_ms:      <integer>  -- new ttl_ms
-  """
-  @doc since: "0.0.23"
-  def rename(name_or_id, name, opts \\ []) when is_list(opts) do
-    # no need to guard name_or_id, find/1 handles it
-    with %Schema{} = x <- find(name_or_id),
-         {:ok, %Schema{name: n}} <- rename(x, name: name) do
-      {:ok, n}
-    else
-      error -> error
+  def upsert(p) when is_map(p) do
+    changes = Map.take(p, columns(:all))
+    cs = changeset(%Schema{}, changes)
+
+    opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
+
+    case Repo.insert(cs, opts) do
+      {:ok, %Schema{}} = rc -> rc
+      {:error, e} -> {:error, inspect(e, pretty: true)}
     end
   end
 
-  @doc """
-  Replace a Sensor by assigning the existing Alias to a different Device.
-  """
-  @doc since: "0.0.27"
-  def replace(name_or_id, dev_name_or_id) do
-    with {:alias, %Schema{} = a} <- {:alias, find(name_or_id)},
-         {:dev, %Device{id: dev_id}} <- {:dev, Device.find(dev_name_or_id)},
-         {:ok, %Schema{}} <- update(a, [device_id: dev_id], []) do
-      {:ok, dev_name_or_id}
-    else
-      {:alias, rc} -> {:alias_error, rc}
-      {:dev, rc} -> {:device_error, rc}
-      rc -> rc
-    end
+  defp load_datapoint_ids(schema_or_nil) do
+    q = Query.from(dp in DataPoint, select: [:id])
+    Repo.preload(schema_or_nil, [datapoints: q], force: true)
   end
 
-  def update(%Schema{} = x, params, opts)
-      when is_map(params) or is_list(params) do
-    # make certain the params are a map passed to changeset
-    cs = changeset(x, Enum.into(params, %{}))
+  defp load_device(%Schema{} = a), do: Repo.preload(a, [:device])
 
-    with {cs, true} <- {cs, cs.valid?},
-         {:ok, %Schema{id: _id} = x} <- Repo.update(cs, opts) do
-      {:ok, x}
-    else
-      {cs, false} ->
-        {:invalid_changes, cs}
-
-      {:error, rc} ->
-        {:error, rc}
-
-      error ->
-        {:error, error}
-    end
-  end
-
-  def upsert(%Schema{} = x, params) when is_map(params) or is_list(params) do
-    # make certain the params are a map
-    params = Enum.into(params, %{})
-    # assemble the opts for upsert
-    # check for conflicts on :device
-    # if there is a conflict only replace keys(:replace)
-    opts = [
-      on_conflict: {:replace, keys(:replace)},
-      returning: true,
-      conflict_target: [:name]
-    ]
-
-    cs = changeset(x, params)
-
-    with {cs, true} <- {cs, cs.valid?},
-         {:ok, %Schema{id: _id} = x} <- Repo.insert(cs, opts) do
-      {:ok, x}
-    else
-      {cs, false} ->
-        {:invalid_changes, cs}
-
-      {:error, rc} ->
-        {:error, rc}
-
-      error ->
-        {:error, error}
-    end
-  end
+  # defp mark_as_updated(%Schema{} = a) do
+  #   a
+  #   |> changeset(%{updated_at: DateTime.utc_now()})
+  #   |> Repo.update(returning: true)
+  # end
 end

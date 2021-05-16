@@ -38,8 +38,6 @@ defmodule PwmSim do
 
   # (1 of 2) ctx contains necessary flags and info
   def freshen(%{type: "pwm", freshen: true, device: device} = ctx) do
-    alias PwmSim.Report
-
     put_rc = fn x -> put_in(ctx, [:freshen_rc], x) end
 
     extras = %{roundtrip_ref: Ecto.UUID.generate()}

@@ -18,7 +18,8 @@ defmodule RuthSim.Application do
       {RuthSim.InboundMsg.Server, nil},
       {MqttClient, client_opts()},
       {PwmKeeper, nil},
-      {SwitchKeeper, nil}
+      {SwitchKeeper, nil},
+      {SensorKeeper, nil}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

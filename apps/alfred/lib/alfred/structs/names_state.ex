@@ -40,12 +40,29 @@ defmodule Alfred.NamesAgentState do
             known_map ->
               # if expired remove the %Name{} from the known map
               if EasyTime.seen_at_expired?(entry) do
-                Map.delete(known_map, key)
+                %{known_map | key => %Name{entry | pruned: true}}
+                # entry = %Name{entry | pruned: true}
+                # put_in(known_map, [key], entry)
+                # Map.delete(known_map, key)
               else
                 known_map
               end
           end
     }
+  end
+
+  def prune_one(%State{known_map: known_map} = s, name) do
+    # NOTE:  the case generates the required {result, state} tuple for get_and_update/2
+    case get_in(known_map, [name]) do
+      %Name{} = x ->
+        updated_name = %Name{x | pruned: true}
+        updated_known_map = put_in(known_map, [name], updated_name)
+
+        {{:pruned, name}, %State{s | known_map: updated_known_map}}
+
+      nil ->
+        {{:unknown, name}, s}
+    end
   end
 
   defp update_known(%State{} = s, list) do

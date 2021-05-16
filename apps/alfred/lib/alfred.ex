@@ -5,6 +5,16 @@ defmodule Alfred do
 
   alias Alfred.{KnownName, NamesAgent, Notify}
 
+  # is a name available (aka unknown)
+  def available(name) do
+    case is_name_known?(name) do
+      false -> {:alfred, :available, name}
+      true -> {:alfred, :taken, NamesAgent.get(name)}
+    end
+  end
+
+  defdelegate delete(name), to: NamesAgent
+
   # (1 of 2) accept a single arg, ensure it contains name and extract opts if needed
   def execute(cmd_map) when is_map(cmd_map) do
     case cmd_map do
@@ -24,6 +34,8 @@ defmodule Alfred do
     end
   end
 
+  defdelegate is_name_known?(name), to: NamesAgent, as: :exists?
+
   # (1 of 2) process seen names from the inbound msg pipeline
   def just_saw(in_msg) do
     put_rc = fn x -> put_in(in_msg, [:alfred_rc], x) end
@@ -33,9 +45,10 @@ defmodule Alfred do
     |> make_seen_list()
     |> NamesAgent.just_saw()
     |> put_rc.()
+    |> log_and_passthrough("just_saw:")
   end
 
-  defdelegate known, to: NamesAgent
+  defdelegate known(), to: NamesAgent
   defdelegate notify_register(name, opts), to: Notify, as: :register
 
   def off(name, opts \\ []) when is_binary(name) do
@@ -59,6 +72,13 @@ defmodule Alfred do
       %{datapoints_rc: {:ok, x}} -> x
       _x -> {:failed, "unable to determine seen list"}
     end
+  end
+
+  defp log_and_passthrough(what, msg) do
+    require Logger
+    [msg, "\n", inspect(what, pretty: true), "\n"] |> Logger.debug()
+
+    what
   end
 
   defp make_seen_list(results) do

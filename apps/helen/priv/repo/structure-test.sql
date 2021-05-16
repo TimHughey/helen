@@ -258,7 +258,6 @@ CREATE TABLE public.sensor_alias (
     name character varying(255) NOT NULL,
     device_id bigint,
     description character varying(50) DEFAULT '<none>'::character varying,
-    type character varying(20) DEFAULT 'auto'::character varying NOT NULL,
     ttl_ms integer DEFAULT 60000 NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -290,12 +289,10 @@ ALTER SEQUENCE public.sensor_alias_id_seq OWNED BY public.sensor_alias.id;
 
 CREATE TABLE public.sensor_datapoint (
     id bigint NOT NULL,
-    temp_f real,
-    temp_c real,
-    relhum real,
-    capacitance real,
-    reading_at timestamp without time zone,
-    device_id bigint
+    temp_c double precision,
+    relhum double precision,
+    alias_id bigint,
+    reading_at timestamp without time zone NOT NULL
 );
 
 
@@ -819,10 +816,17 @@ CREATE UNIQUE INDEX sensor_alias_name_index ON public.sensor_alias USING btree (
 
 
 --
+-- Name: sensor_datapoint_alias_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sensor_datapoint_alias_id_index ON public.sensor_datapoint USING btree (alias_id);
+
+
+--
 -- Name: sensor_datapoint_reading_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX sensor_datapoint_reading_at_index ON public.sensor_datapoint USING btree (reading_at);
+CREATE INDEX sensor_datapoint_reading_at_index ON public.sensor_datapoint USING brin (reading_at);
 
 
 --
@@ -941,11 +945,11 @@ ALTER TABLE ONLY public.sensor_alias
 
 
 --
--- Name: sensor_datapoint sensor_datapoint_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: sensor_datapoint sensor_datapoint_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sensor_datapoint
-    ADD CONSTRAINT sensor_datapoint_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.sensor_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT sensor_datapoint_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.sensor_alias(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -1087,3 +1091,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20210430121001);
 INSERT INTO public."schema_migrations" (version) VALUES (20210507003858);
 INSERT INTO public."schema_migrations" (version) VALUES (20210507025645);
 INSERT INTO public."schema_migrations" (version) VALUES (20210510013226);
+INSERT INTO public."schema_migrations" (version) VALUES (20210513233348);

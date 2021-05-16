@@ -3,114 +3,67 @@ defmodule Sensor.DB.DataPoint do
   Database functionality for Sensor DataPoint
   """
 
-  use Ecto.Schema
+  require Logger
 
-  alias Sensor.DB.{DataPoint, Device}
+  use Ecto.Schema
+  require Ecto.Query
+  alias Ecto.Query
+
+  alias Sensor.DB.Alias
+  alias Sensor.DB.DataPoint, as: Schema
 
   schema "sensor_datapoint" do
-    field(:temp_f, :float)
     field(:temp_c, :float)
     field(:relhum, :float)
-    field(:capacitance, :float)
     field(:reading_at, :utc_datetime_usec)
 
-    belongs_to(:device, Device)
-
-    # timestamps(type: :utc_datetime_usec)
+    belongs_to(:alias, Alias)
   end
 
-  @doc """
-  Returns the average of a specific field (column) from a list of %DataPoints{}
-  """
+  def add(%Alias{} = a, dp_map) do
+    # associate the new command with the Alias
+    new_dp = Ecto.build_assoc(a, :datapoints)
 
-  @doc since: "0.9.19"
-  def avg_of(datapoints, column)
-      when is_list(datapoints) and
-             column in [:temp_f, :temp_c, :relhum, :capacitance] do
-    vals =
-      Enum.into(datapoints, [], fn
-        %DataPoint{} = dp -> Map.get(dp, column)
-        _x -> nil
-      end)
+    cs = Map.take(dp_map, [:temp_c, :relhum]) |> put_in([:reading_at], DateTime.utc_now())
 
-    with count when count > 0 <- Enum.count(vals),
-         true <- Enum.all?(vals, &is_number/1) do
-      Float.round(Enum.sum(vals) / count, 3)
-    else
-      _anything -> nil
+    changeset(new_dp, cs) |> Repo.insert(returning: true)
+  end
+
+  # (1 of 2) insure changes are a map
+  # def changeset(%Schema{} = c, changes) when is_list(changes) do
+  #   changeset(c, Enum.into(changes, %{}))
+  # end
+
+  def changeset(%Schema{} = c, changes) when is_map(changes) do
+    alias Ecto.Changeset
+
+    c
+    |> Changeset.cast(changes, columns(:cast))
+    |> Changeset.validate_required([:temp_c, :reading_at, :alias_id])
+    |> Changeset.validate_number(:temp_c, greater_than: -30.0, less_than: 55.0)
+    |> Changeset.validate_number(:relhum, greater_than: 0.0, less_than_or_equal_to: 100.0)
+  end
+
+  def purge(%Alias{datapoints: datapoints}, :all) do
+    all_ids = Enum.map(datapoints, fn %Schema{id: id} -> id end)
+    batches = Enum.chunk_every(all_ids, 10)
+
+    for batch <- batches, reduce: {:ok, 0} do
+      {:ok, acc} ->
+        q = Query.from(dp in Schema, where: dp.id in ^batch)
+
+        {deleted, _} = Repo.delete_all(q)
+
+        {:ok, acc + deleted}
     end
   end
 
-  @doc since: "0.0.16"
-  def changeset(x, %{device: device} = p) when is_map(p) do
-    import Ecto.Changeset,
-      only: [
-        cast: 3,
-        put_assoc: 3,
-        validate_required: 2
-      ]
+  # helpers for changeset columns
+  defp columns(:all) do
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
 
-    cast(x, p, keys(:cast))
-    |> put_assoc(:device, device)
-    |> validate_required(keys(:required))
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
   end
 
-  @doc since: "0.0.16"
-  def keys(:all),
-    do:
-      Map.from_struct(%DataPoint{})
-      |> Map.drop([:__meta__])
-      |> Map.keys()
-      |> List.flatten()
-
-  def keys(:cast), do: keys_refine(:all, [:id, :device])
-  def keys(:cast_assoc), do: [:device]
-
-  # defp keys(:upsert), do: keys_refine(:all, [:id, :device])
-  def keys(:required), do: [:device, :reading_at]
-
-  defp keys_refine(base_keys, drop),
-    do:
-      MapSet.difference(MapSet.new(keys(base_keys)), MapSet.new(drop))
-      |> MapSet.to_list()
-
-  def save(%Device{} = dev, %{msg_recv_dt: reading_at} = msg) do
-    # NOTE:  we only check for :device and :msg_recv_dt as they are
-    #        the critical pieces of information for potentially saving
-    #        a sensor datapoint
-
-    params =
-      Map.take(msg, [:temp_f, :temp_c, :relhum, :capacitance])
-      |> Map.put(:reading_at, reading_at)
-
-    Map.put(msg, :sensor_datapoint, insert(dev, msg, params))
-  end
-
-  def save(msg) when is_map(msg),
-    do: Map.put(msg, :device, {:error, :badmsg})
-
-  defp insert(%Device{id: _id} = device, _msg, params) when is_list(params) or is_map(params) do
-    # make certain the params are a map and
-    # add the device we'll associate with
-    params = Enum.into(params, %{}) |> Map.put(:device, device)
-
-    # assemble the opts for insert
-    opts = [returning: true]
-
-    cs = changeset(%DataPoint{}, params)
-
-    with {cs, true} <- {cs, cs.valid?},
-         {:ok, %DataPoint{id: _} = datap} <- Repo.insert(cs, opts) do
-      {:ok, datap}
-    else
-      {cs, false} ->
-        {:invalid_changes, cs}
-
-      {:error, rc} ->
-        {:error, rc}
-
-      error ->
-        {:error, error}
-    end
-  end
+  defp columns(:cast), do: columns(:all)
 end
