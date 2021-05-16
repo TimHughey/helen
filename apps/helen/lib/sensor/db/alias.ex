@@ -131,23 +131,6 @@ defmodule Sensor.DB.Alias do
     Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name) |> Repo.all()
   end
 
-  # def record_datapoint(name, datapoint_map) do
-  #   # load the record the cmd is associated with
-  #   a = find(name)
-  #
-  #   # add the command and put the name in the result map for upstream
-  #   result_map = DataPoint.add(a, datapoint_map) |> put_in([:name], name)
-  #
-  #   # NOTE! create anonymous fn HERE to capture result_map for updating
-  #   add_to_result = fn [{k, v}] -> put_in(result_map, [k], v) end
-  #
-  #   # when datapoint insert good mark alias as updated for downstream
-  #   case result_map do
-  #     %{datapoint_rc: {:ok, _}} -> [alias_rc: mark_as_updated(a)] |> add_to_result.()
-  #     something_went_wrong -> something_went_wrong
-  #   end
-  # end
-
   def rename(%Schema{} = a, changes) when is_map(changes) do
     case changeset(a, changes) |> Repo.update(returning: true) do
       {:ok, %Schema{} = revised} -> {:ok, [name: revised.name, was: a.name]}
