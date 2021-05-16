@@ -36,7 +36,7 @@ defmodule Sensor.DataPoints do
       end
     end
 
-    # 1. delete the processed states
+    # 1. delete the processed datapoints
     # 2. add datapoints_rc for final validation
     msg = Map.delete(msg, :datapoints) |> put_in([:datapoints_rc], {:ok, []})
 
@@ -50,7 +50,7 @@ defmodule Sensor.DataPoints do
   defp store_datapoints(aliases, datapoint_list) do
     for %Alias{} = a <- aliases, datapoint_map <- datapoint_list do
       case DataPoint.add(a, datapoint_map) do
-        {:ok, %DataPoint{}} -> %{name: a.name, success: true, schema: a}
+        {:ok, %DataPoint{} = x} -> %{name: a.name, success: true, schema: a, datapoint: x}
         {:error, text} -> %{name: a.name, success: false, error: text}
       end
     end

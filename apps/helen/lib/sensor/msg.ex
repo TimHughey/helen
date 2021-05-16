@@ -1,7 +1,9 @@
 defmodule Sensor.Msg do
   require Logger
 
+  alias Sensor.DataPoint.Fact
   alias Sensor.DataPoints
+
   alias Sensor.DB.Device
 
   @results_rc_key :sensor_rc
@@ -13,7 +15,10 @@ defmodule Sensor.Msg do
     msg_ready = add_fault_checks(msg_in)
 
     # pass msg_ready to make_rc for use in the event of txn failure
-    :timer.tc(fn -> wrapped_txn(msg_ready) end, []) |> make_rc(msg_ready) |> check_faults()
+    :timer.tc(fn -> wrapped_txn(msg_ready) end, [])
+    |> make_rc(msg_ready)
+    |> Fact.write_metric()
+    |> check_faults()
   end
 
   # (2 or 2) pass through unmatched messages
@@ -28,6 +33,8 @@ defmodule Sensor.Msg do
   # NOTE! this function passes through msg_out unchanged
   defp check_faults(%{fault_checks: checks} = msg_out) do
     for check <- checks, do: get_in(msg_out, [check]) |> log_fault(check)
+
+    Logger.info([inspect(msg_out, pretty: true)])
 
     msg_out
   end
