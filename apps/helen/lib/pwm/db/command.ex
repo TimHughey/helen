@@ -2,8 +2,11 @@ defmodule PulseWidth.DB.Command do
   @moduledoc false
 
   use Ecto.Schema
-  use Broom
+  use BroomOld
   use Timex
+
+  require Ecto.Query
+  alias Ecto.Query
 
   alias PulseWidth.Command.Fact
   alias PulseWidth.DB.Command, as: Schema
@@ -40,12 +43,12 @@ defmodule PulseWidth.DB.Command do
   def ack_if_needed(%{cmdack: true, refid: refid, msg_recv_dt: recv_dt, device: {:ok, %Device{}}} = msg) do
     put_cmd_rc = fn x -> Map.drop(msg, [:cmdack, :refid]) |> put_in([:cmd_rc], x) end
 
-    base_opts = [acked: true, ack_at: Timex.now()]
-
     case find_refid(refid) do
       %Schema{sent_at: sent_at} = cmd_to_ack ->
+        rt_latency_us = Timex.diff(recv_dt, sent_at, :microsecond)
+
         cmd_to_ack
-        |> update(base_opts ++ [rt_latency_us: Timex.diff(recv_dt, sent_at, :microsecond)])
+        |> update(%{acked: true, ack_at: DateTime.utc_now(), rt_latency_us: rt_latency_us})
         |> put_cmd_rc.()
         |> Fact.write_metric()
 
@@ -65,20 +68,20 @@ defmodule PulseWidth.DB.Command do
     # associate the new command with the Alias
     new_cmd = Ecto.build_assoc(a, :cmds)
 
-    base_cs = [sent_at: Timex.now(), cmd: cmd]
+    base_cs = %{sent_at: DateTime.utc_now(), cmd: cmd}
 
     if opts[:ack] == :immediate do
-      acked_cs = [acked: true, orphan: false, rt_latency_us: 0, ack_at: Timex.now()]
-      changeset(new_cmd, base_cs ++ acked_cs) |> insert_and_track(opts)
+      acked_cs = Map.merge(base_cs, %{acked: true, orphan: false, rt_latency_us: 0, ack_at: base_cs.sent_at})
+      changeset(new_cmd, acked_cs) |> insert_and_track(opts)
     else
       changeset(new_cmd, base_cs) |> insert_and_track(opts)
     end
   end
 
   # (1 of 2) insure changes are a map
-  def changeset(%Schema{} = c, changes) when is_list(changes) do
-    changeset(c, Enum.into(changes, %{}))
-  end
+  # def changeset(%Schema{} = c, changes) when is_list(changes) do
+  #   changeset(c, Enum.into(changes, %{}))
+  # end
 
   def changeset(%Schema{} = c, changes) when is_map(changes) do
     alias Ecto.Changeset
@@ -100,13 +103,27 @@ defmodule PulseWidth.DB.Command do
 
   def columns(:cast), do: columns(:all)
 
-  # Broom default opts
+  # BroomOld default opts
   def default_opts,
     do: [
       orphan: [startup_check: true, sent_before: "PT12S", older_than: "PT1M"],
       purge: [at_startup: true, interval: "PT2M", older_than: "PT7D"],
       metrics: "PT1M"
     ]
+
+  def purge(%Alias{cmds: cmds}, :all) do
+    all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
+    batches = Enum.chunk_every(all_ids, 10)
+
+    for batch <- batches, reduce: {:ok, 0} do
+      {:ok, acc} ->
+        q = Query.from(c in Schema, where: c.id in ^batch)
+
+        {deleted, _} = Repo.delete_all(q)
+
+        {:ok, acc + deleted}
+    end
+  end
 
   def put_status(m, status), do: put_in(m, [:cmd_last], status)
 
@@ -136,16 +153,16 @@ defmodule PulseWidth.DB.Command do
     put_status(m, %{cmd: "unknown", invalid: true, at: Timex.now()})
   end
 
-  def update(refid, opts) when is_binary(refid) and is_list(opts) do
-    changes = Keyword.take(opts, columns(:update))
+  def update(refid, changes) when is_binary(refid) do
+    wanted_changes = Map.take(changes, columns(:update))
 
     case find_refid(refid) do
-      %Schema{} = c -> changeset(c, changes) |> update()
+      %Schema{} = c -> changeset(c, wanted_changes) |> update()
       _ -> {:not_found, refid}
     end
   end
 
-  def update(%Schema{} = c, changes) when is_list(changes) do
+  def update(%Schema{} = c, changes) do
     changeset(c, changes) |> update()
   end
 

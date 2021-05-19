@@ -2,11 +2,7 @@
 # and its dependencies with the aid of the Mix.Config module.
 import Config
 
-config :helen,
-  feeds: [
-    prefix: "test",
-    rpt: {"test/r/#", 0}
-  ]
+config :helen, feeds: [prefix: "test", rpt: {"test/r/#", 0}]
 
 config :helen, Mqtt.Client,
   tort_opts: [

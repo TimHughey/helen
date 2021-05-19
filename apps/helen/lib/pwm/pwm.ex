@@ -132,8 +132,8 @@ defmodule PulseWidth do
     {elapsed, res} =
       :timer.tc(fn ->
         receive do
-          {{PulseWidth.Broom, :ref_released}, ^refid, :acked} -> status(name)
-          {{PulseWidth.Broom, :ref_released}, ^refid, :orphaned} -> {:failed, "cmd orphaned"}
+          {{PulseWidth.BroomOld, :ref_released}, ^refid, :acked} -> status(name)
+          {{PulseWidth.BroomOld, :ref_released}, ^refid, :orphaned} -> {:failed, "cmd orphaned"}
         after
           5000 -> {:failed, "wait for ack timeout"}
         end

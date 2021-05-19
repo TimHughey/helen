@@ -34,7 +34,7 @@ defmodule Sensor.Msg do
   defp check_faults(%{fault_checks: checks} = msg_out) do
     for check <- checks, do: get_in(msg_out, [check]) |> log_fault(check)
 
-    Logger.info([inspect(msg_out, pretty: true)])
+    Logger.debug([inspect(msg_out, pretty: true)])
 
     msg_out
   end

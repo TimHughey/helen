@@ -243,7 +243,7 @@ defmodule SwitchTest do
     should_be_non_empty_list(pattern_names)
   end
 
-  test "can Switch Broom report metrics" do
+  test "can Switch BroomOld report metrics" do
     rc = Switch.DB.Command.report_metrics(interval: "PT30S")
 
     should_be_ok_tuple_with_val(rc, "PT30S")

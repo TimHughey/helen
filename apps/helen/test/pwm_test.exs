@@ -199,7 +199,7 @@ defmodule PulseWidthTest do
   @tag device: "pwm/simulated-delta"
   @tag make_alias: true
   @tag pio: :any
-  @tag name: "Status Test"
+  @tag name: "Pulse Width Status Test"
   @tag ttl_ms: 5000
   @tag cmd_map: %{cmd: "on", opts: [wait_for_ack: true]}
   test "can get Pulse Width status", ctx do
@@ -216,7 +216,7 @@ defmodule PulseWidthTest do
   @tag device: "pwm/simulated-epsilon"
   @tag make_alias: true
   @tag pio: :any
-  @tag name: "Delete Test"
+  @tag name: "Pulse Width Delete Test"
   test "can PulseWidth delete an alias (with bonus duplicate alias test)", ctx do
     PulseWidth.on(ctx.name, @wait_for_ack)
 
@@ -226,7 +226,21 @@ defmodule PulseWidthTest do
     should_contain_key(res, :exists)
 
     res = PulseWidth.delete(ctx.name)
-    should_be_ok_tuple_with_val(res, ctx.name)
+    should_be_ok_tuple(res)
+
+    {:ok, list} = res
+
+    should_be_non_empty_list(list)
+    should_contain(list, name: ctx.name)
+    should_contain(list, commands: 1)
+
+    available = Alfred.available(ctx.name)
+    fail = pretty("Alfred should return \"#{ctx.name}\" is available", available)
+    assert available, fail
+
+    exists = PulseWidth.exists?(ctx.name)
+    fail = pretty("PulseWidth \"#{ctx.name}\" should not exist", exists)
+    refute exists, fail
   end
 
   @tag device: "pwm/simulated-epsilon"
@@ -243,7 +257,7 @@ defmodule PulseWidthTest do
     should_be_non_empty_list(pattern_names)
   end
 
-  test "can PulseWidth Broom report metrics" do
+  test "can PulseWidth BroomOld report metrics" do
     rc = PulseWidth.DB.Command.report_metrics(interval: "PT30S")
 
     should_be_ok_tuple_with_val(rc, "PT30S")

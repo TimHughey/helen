@@ -1,7 +1,7 @@
 defmodule PulseWidth.Status do
   use Timex
 
-  alias PulseWidth.DB.Alias
+  alias PulseWidth.DB.{Alias, Command}
 
   # (2 of 5) ttl is expired
   def check_cmd(%{ttl_expired: true, seen_at: seen_at} = m) do
@@ -59,7 +59,7 @@ defmodule PulseWidth.Status do
   def compare(_status, _cmd, _opts), do: :not_equal
 
   def make_status(%Alias{} = a, opts) do
-    Alias.status(a, opts) |> check_cmd()
+    status(a, opts) |> check_cmd()
   end
 
   defp elapsed_ms(dt) do
@@ -77,5 +77,35 @@ defmodule PulseWidth.Status do
 
   defp put_status(m, [{k, v}]) do
     put_in(m, [k], v)
+  end
+
+  defp status(%Alias{} = a, opts) do
+    # %Schema{
+    #   cmd: a.cmd,
+    #   name: name,
+    #   device: %Device{last_seen_at: seen_at},
+    #   cmds: cmds,
+    #   updated_at: at,
+    #   ttl_ms: ttl_ms
+    # } = load_device(a) |> load_last_cmd()
+
+    %{
+      name: a.name,
+      seen_at: a.device.last_seen_at,
+      ttl_ms: opts[:ttl_ms] || a.ttl_ms,
+      cmd_reported: %{cmd: a.cmd, at: a.updated_at}
+    }
+    |> Command.status(a.cmds)
+    |> ttl_check()
+  end
+
+  defp status(x, _opts), do: %{not_found: true, invalid: inspect(x, pretty: true)}
+
+  defp ttl_check(%{ttl_ms: ttl_ms, seen_at: seen_at} = m) do
+    # diff = DateTime.utc_now() |> DateTime.diff(seen_at, :millisecond)
+
+    ttl_dt = Timex.now() |> Timex.shift(milliseconds: ttl_ms * -1)
+
+    if Timex.before?(seen_at, ttl_dt), do: put_in(m, [:ttl_expired], true), else: m
   end
 end

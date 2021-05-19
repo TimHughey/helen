@@ -123,8 +123,8 @@ defmodule Switch do
     {elapsed, res} =
       :timer.tc(fn ->
         receive do
-          {{Switch.Broom, :ref_released}, ^refid, :acked} -> status(name)
-          {{Switch.Broom, :ref_released}, ^refid, :orphaned} -> {:failed, "cmd orphaned"}
+          {{Switch.BroomOld, :ref_released}, ^refid, :acked} -> status(name)
+          {{Switch.BroomOld, :ref_released}, ^refid, :orphaned} -> {:failed, "cmd orphaned"}
         after
           5000 -> {:failed, "wait for ack timeout"}
         end

@@ -1,4 +1,4 @@
-defmodule Broom do
+defmodule BroomOld do
   @moduledoc """
   Tracks and handles device command timeouts
   """
@@ -88,23 +88,23 @@ defmodule Broom do
   @doc false
   defmacro __using__(opts) do
     quote location: :keep, bind_quoted: [opts: opts] do
-      @behaviour Broom
+      @behaviour BroomOld
 
-      def broom, do: Broom.make_module_name(__MODULE__)
+      def broom, do: BroomOld.make_module_name(__MODULE__)
 
       def child_spec(args) do
-        %{start: {_, :start_link, x}} = spec = Broom.child_spec(args)
+        %{start: {_, :start_link, x}} = spec = BroomOld.child_spec(args)
 
         %{spec | start: {__MODULE__, :start_link, x}}
       end
 
       def cmd_counts_reset(opts \\ [:orphaned, :errors]) when is_list(opts) do
-        Broom.counts_reset(broom(), opts)
+        BroomOld.counts_reset(broom(), opts)
       end
 
-      def cmd_counts, do: Broom.tracked_counts(broom())
+      def cmd_counts, do: BroomOld.tracked_counts(broom())
 
-      def cmds_tracked, do: Broom.tracked_cmds(broom())
+      def cmds_tracked, do: BroomOld.tracked_cmds(broom())
 
       def default_opts, do: []
 
@@ -115,21 +115,21 @@ defmodule Broom do
 
       @doc """
         Default implementation of insert_and_track/1 that calls
-        Broom.insert_and_track(cs, opts, broom())
+        BroomOld.insert_and_track(cs, opts, broom())
 
         ## Override notes:
           1. Typical reason to override is when some action (e.g. altering
              the changeset) prior to insert and track.
-          2. When overriden, be certain to call Broom.insert_and_track/2
+          2. When overriden, be certain to call BroomOld.insert_and_track/2
              with the altered changeset
       """
-      def insert_and_track(cs, opts), do: Broom.insert_and_track(cs, opts, broom())
+      def insert_and_track(cs, opts), do: BroomOld.insert_and_track(cs, opts, broom())
 
       def orphan(%{acked: false} = cmd) do
         import Helen.Time.Helper, only: [utc_now: 0]
 
         cmd = reload(cmd)
-        {:orphan, update(cmd, acked: true, ack_at: utc_now(), orphan: true)}
+        {:orphan, update(cmd, %{acked: true, ack_at: utc_now(), orphan: true})}
       end
 
       def orphan_list(opts \\ []) when is_list(opts) do
@@ -151,7 +151,7 @@ defmodule Broom do
         |> Repo.preload(preloads)
       end
 
-      def release(msg), do: Broom.release(broom(), msg)
+      def release(msg), do: BroomOld.release(broom(), msg)
 
       @doc """
         Reload a device command.
@@ -166,11 +166,11 @@ defmodule Broom do
         |> Repo.preload(__MODULE__.__schema__(:associations))
       end
 
-      def start_link(_opts), do: default_opts() |> Broom.make_opts(__MODULE__) |> Broom.start_link()
+      def start_link(_opts), do: default_opts() |> BroomOld.make_opts(__MODULE__) |> BroomOld.start_link()
 
-      def report_metrics(opts \\ []), do: Broom.report_metrics_now(broom(), opts)
+      def report_metrics(opts \\ []), do: BroomOld.report_metrics_now(broom(), opts)
 
-      defoverridable Broom
+      defoverridable BroomOld
     end
   end
 
@@ -187,10 +187,10 @@ defmodule Broom do
     |> reply_ok()
   end
 
-  def start_link(opts), do: GenServer.start_link(Broom, opts, name: opts[:name])
+  def start_link(opts), do: GenServer.start_link(BroomOld, opts, name: opts[:name])
 
   ##
-  ## Broom Public API
+  ## BroomOld Public API
   ##
 
   def acked?(%{__struct__: schema} = c) when is_struct(c) do
@@ -220,7 +220,7 @@ defmodule Broom do
   end
 
   def make_module_name(mod) do
-    ([Module.split(mod) |> hd()] ++ ["Broom"]) |> Module.concat()
+    ([Module.split(mod) |> hd()] ++ ["BroomOld"]) |> Module.concat()
   end
 
   def make_opts(default_opts, mod) do
@@ -398,14 +398,15 @@ defmodule Broom do
 
   ##
   ## NOTE
-  ## to ensure separation of concerns we only allow Broom to orphan a command
+  ## to ensure separation of concerns we only allow BroomOld to orphan a command
   ##
   defp orphan(%{__struct__: schema} = cmd) do
     import Helen.Time.Helper, only: [utc_now: 0]
 
     cmd = apply(schema, :reload, [cmd])
+    changes = %{acked: true, ack_at: utc_now(), orphan: true}
 
-    {:orphan, apply(schema, :update, [cmd, [acked: true, ack_at: utc_now(), orphan: true]])}
+    {:orphan, apply(schema, :update, [cmd, changes])}
   end
 
   defp remove_from_tracker(%{tracker: t, opts: opts} = s, ref, disposition) do

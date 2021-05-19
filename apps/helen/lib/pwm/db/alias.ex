@@ -94,13 +94,17 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def delete(name_or_id) do
-    with %Schema{} = x <- find(name_or_id),
-         {:ok, %Schema{name: n}} <- Repo.delete(x) do
-      {:ok, n}
+    with %Schema{} = a <- find(name_or_id) |> load_command_ids(),
+         {:ok, count} <- Command.purge(a, :all),
+         {:ok, %Schema{name: n}} <- Repo.delete(a) do
+      {:ok, [name: n, commands: count]}
     else
+      nil -> {:unknown, name_or_id}
       error -> error
     end
   end
+
+  def device_name(%Schema{} = a), do: load_device(a).device.device
 
   def exists?(name_or_id) do
     case find(name_or_id) do
@@ -112,7 +116,7 @@ defmodule PulseWidth.DB.Alias do
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
     case Repo.get_by(Schema, opts) do
-      %Schema{} = x -> preload(x)
+      %Schema{} = x -> load_device(x) |> load_last_cmd()
       x when is_nil(x) -> nil
     end
   end
@@ -128,32 +132,15 @@ defmodule PulseWidth.DB.Alias do
 
   def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
-  def load_cmd_last(%Schema{} = a) do
-    Repo.preload(a, cmds: Query.from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
-  end
-
-  def load_device(%Schema{} = a), do: Repo.preload(a, [:device])
-
   def names do
     Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
   end
 
   def names_begin_with(pattern) when is_binary(pattern) do
     like_string = [pattern, "%"] |> IO.iodata_to_binary()
+    q = Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
 
-    Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name) |> Repo.all()
-  end
-
-  def preload(%Schema{} = x) do
-    Repo.preload(x, [:device]) |> preload_cmd_last()
-  end
-
-  def preload_cmd_last(%Schema{} = x) do
-    Repo.preload(x, cmds: Query.from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
-  end
-
-  def preload_unacked_cmds(%Schema{} = x) do
-    Repo.preload(x, cmds: Query.from(c in Command, where: c.acked == false))
+    Repo.all(q)
   end
 
   # def record_cmd(%Schema{name: name} = a, cmd_map, opts) do
@@ -186,30 +173,8 @@ defmodule PulseWidth.DB.Alias do
     end
   end
 
-  def status(%Schema{} = a, opts) do
-    %Schema{
-      cmd: cmd,
-      name: name,
-      device: %Device{last_seen_at: seen_at},
-      cmds: cmds,
-      updated_at: at,
-      ttl_ms: ttl_ms
-    } = load_device(a) |> load_cmd_last()
-
-    status = %{cmd: cmd, at: at}
-
-    %{name: name, seen_at: seen_at, ttl_ms: opts[:ttl_ms] || ttl_ms}
-    |> put_in([:cmd_reported], status)
-    |> Command.status(cmds)
-    |> ttl_check()
-  end
-
-  def status(x, _opts), do: %{not_found: true, invalid: inspect(x, pretty: true)}
-
   defp update_cmd(%Schema{} = a, rcmd) do
-    a
-    |> changeset(%{cmd: rcmd})
-    |> Repo.update(returning: true)
+    changeset(a, %{cmd: rcmd}) |> Repo.update(returning: true)
   end
 
   def upsert(p) when is_map(p) do
@@ -224,11 +189,18 @@ defmodule PulseWidth.DB.Alias do
     end
   end
 
-  defp ttl_check(%{ttl_ms: ttl_ms, seen_at: seen_at} = m) do
-    # diff = DateTime.utc_now() |> DateTime.diff(seen_at, :millisecond)
-
-    ttl_dt = Timex.now() |> Timex.shift(milliseconds: ttl_ms * -1)
-
-    if Timex.before?(seen_at, ttl_dt), do: put_in(m, [:ttl_expired], true), else: m
+  defp load_command_ids(schema_or_nil) do
+    q = Query.from(c in Command, select: [:id])
+    Repo.preload(schema_or_nil, [cmds: q], force: true)
   end
+
+  defp load_device(%Schema{} = a), do: Repo.preload(a, [:device])
+
+  defp load_last_cmd(%Schema{} = x) do
+    Repo.preload(x, cmds: Query.from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
+  end
+
+  # defp load_unacked_cmds(%Schema{} = x) do
+  #   Repo.preload(x, cmds: Query.from(c in Command, where: c.acked == false))
+  # end
 end

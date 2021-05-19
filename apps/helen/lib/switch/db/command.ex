@@ -2,7 +2,7 @@ defmodule Switch.DB.Command do
   @moduledoc false
 
   use Ecto.Schema
-  use Broom
+  use BroomOld
   use Timex
 
   alias Switch.Command.Fact
@@ -100,7 +100,7 @@ defmodule Switch.DB.Command do
 
   def columns(:cast), do: columns(:all)
 
-  # Broom default opts
+  # BroomOld default opts
   def default_opts,
     do: [
       orphan: [startup_check: true, sent_before: "PT12S", older_than: "PT1M"],
