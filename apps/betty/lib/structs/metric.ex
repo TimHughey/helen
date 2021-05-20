@@ -8,7 +8,7 @@ defmodule Betty.Metric do
       mm
       | fields: map_values(mm.fields),
         tags: map_values(mm.tags),
-        timestamp: System.os_time(:nanosecond)
+        timestamp: mm.timestamp || System.os_time(:nanosecond)
     }
     |> Map.from_struct()
   end
@@ -26,6 +26,7 @@ defmodule Betty.Metric do
         {k, false} -> {k, 0}
         {k, mod} when k in [:mod, :module] and is_atom(mod) -> {k, mod_to_string(mod)}
         {k, val} when is_atom(val) -> {k, to_string(val)}
+        {k, val} when is_float(val) -> {k, Float.round(val, 3)}
         kv -> kv
       end
     end
