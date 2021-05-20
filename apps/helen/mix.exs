@@ -87,6 +87,7 @@ defmodule Helen.Mixfile do
       {:agnus, "~> 0.1.0"},
       {:deep_merge, "~> 1.0"},
       {:alfred, in_umbrella: true},
+      {:betty, in_umbrella: true},
       {:broom, in_umbrella: true},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},

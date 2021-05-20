@@ -8,12 +8,11 @@ defmodule Sensor.DataPoint.Fact do
     for %{datapoint: datapoint, schema: %Alias{} = schema} <- results, reduce: msg_out do
       %{metric_rc: {_, acc}} = msg_out ->
         metric = assemble_metric(device, schema.name, datapoint, msg.msg_recv_dt)
-        rc = Fact.Influx.write(metric, precision: :nanosecond, async: true)
 
-        points = get_in(metric, [:points])
-        metrics = [points, acc] |> List.flatten()
+        rc = Betty.write_metric(metric)
+        acc = [metric | acc] |> List.flatten()
 
-        %{msg_out | metric_rc: {rc, metrics}}
+        %{msg_out | metric_rc: {rc, acc}}
     end
   end
 
@@ -22,28 +21,24 @@ defmodule Sensor.DataPoint.Fact do
     put_in(msg, [:metric_rc], {:ok, []})
   end
 
-  defp as_fahrenheit(temp_c), do: (temp_c * 1.8 + 32.0) |> Float.round(3)
+  defp as_fahrenheit(temp_c), do: temp_c * 1.8 + 32.0
 
   defp assemble_metric(device, name, datapoint, recv_dt) do
-    %{
-      points: [
-        %{
-          measurement: "sensor",
-          fields: fields(datapoint),
-          tags: tags(device, name),
-          timestamp: DateTime.to_unix(recv_dt, :nanosecond)
-        }
-      ]
+    %Betty.Metric{
+      measurement: "sensor",
+      fields: fields(datapoint),
+      tags: tags(device, name),
+      timestamp: DateTime.to_unix(recv_dt, :nanosecond)
     }
   end
 
   # (1 of 2) this datapoint has temperature and humidity
-  defp fields(%DataPoint{temp_c: tc, relhum: rh}) when is_float(tc) and is_float(rh) do
+  defp fields(%DataPoint{temp_c: tc, relhum: rh}) when is_number(tc) and is_number(rh) do
     %{temp_c: tc, temp_f: as_fahrenheit(tc), relhum: rh}
   end
 
   # (1 of 2) this datapoint only has temperature
-  defp fields(%DataPoint{temp_c: tc}) when is_float(tc) do
+  defp fields(%DataPoint{temp_c: tc}) when is_number(tc) do
     %{temp_c: tc, temp_f: as_fahrenheit(tc)}
   end
 
