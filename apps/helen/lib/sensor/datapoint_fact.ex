@@ -9,7 +9,7 @@ defmodule Sensor.DataPoint.Fact do
       %{metric_rc: {_, acc}} = msg_out ->
         metric = assemble_metric(device, schema.name, datapoint, msg.msg_recv_dt)
 
-        rc = Betty.write_metric(metric)
+        {rc, metric} = Betty.write_metric(metric)
         acc = [metric | acc] |> List.flatten()
 
         %{msg_out | metric_rc: {rc, acc}}
