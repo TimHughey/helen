@@ -45,6 +45,6 @@ defmodule Betty do
     instream_opts = [precision: :nanosecond, async: true]
 
     # now erite the point to the timeseries database
-    Connection.write(points_map, instream_opts)
+    {Connection.write(points_map, instream_opts), points_map}
   end
 end

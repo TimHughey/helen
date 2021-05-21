@@ -34,6 +34,9 @@ defmodule BettyTest do
   test "can Betty write a %Metric{} to the database", _ctx do
     mm = %Betty.Metric{measurement: "betty", fields: %{val: true, mod: __MODULE__}, tags: %{test: true}}
 
-    assert :ok == Betty.write_metric(mm), "Betty.write_metric(mm) should return :ok"
+    metric_rc = Betty.write_metric(mm)
+
+    fail = "metric rc should be a ok tuple with a map: #{inspect(metric_rc)}"
+    assert {:ok, %{}} = metric_rc, fail
   end
 end
