@@ -145,7 +145,7 @@ defmodule Switch.DB.Command do
     end
   end
 
-  def update(%Schema{} = c, changes) when is_list(changes) do
+  def update(%Schema{} = c, changes) do
     changeset(c, changes) |> update()
   end
 
