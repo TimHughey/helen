@@ -1,19 +1,18 @@
 defmodule Broom do
+  require Logger
+
   defmacro __using__(use_opts) do
     # here we inject code into the using module so it can be started in a supervision tree
     # running an instance of Broom.Server
     quote location: :keep do
       require Broom
+      @behaviour Broom.Behaviour
 
       alias Broom.TrackerEntry
 
-      # (1 of 2) provided a Broom Opts struct, use it
-      def child_spec(%{} = broom_opts) do
+      def child_spec(broom_opts) do
         Broom.make_child_spec(unquote(__CALLER__.module), unquote(use_opts), broom_opts)
       end
-
-      # (2 of 2) use a default Broom Opts
-      def child_spec(_), do: child_spec(%Broom.Opts{})
     end
   end
 
@@ -22,14 +21,26 @@ defmodule Broom do
   ##
 
   defmacro change_metrics_interval(new_interval) do
-    quote location: :keep, bind_quoted: [mod: __CALLER__.module, new_interval: new_interval] do
-      Broom.call({:change_metrics_interval, new_interval}, mod)
+    quote bind_quoted: [mod: __CALLER__.module, new_interval: new_interval] do
+      Broom.via_mod_change_metrics_interval(mod, new_interval)
     end
   end
 
   defmacro counts do
-    quote location: :keep, bind_quoted: [mod: __CALLER__.module] do
-      Broom.call({:counts}, mod)
+    quote bind_quoted: [mod: __CALLER__.module] do
+      Broom.via_mod_counts(mod)
+    end
+  end
+
+  defmacro counts_reset(opts) do
+    quote bind_quoted: [mod: __CALLER__.module, opts: opts] do
+      Broom.via_mod_counts_reset(mod, opts)
+    end
+  end
+
+  defmacro get_refid_tracker_entry(refid) do
+    quote bind_quoted: [mod: __CALLER__.module, refid: refid] do
+      Broom.via_mod_get_refid_tracker_entry(mod, refid)
     end
   end
 
@@ -41,15 +52,15 @@ defmodule Broom do
     Supervisor.child_spec({Broom.Server, start_args}, id: start_args.server.id)
   end
 
-  defmacro release(what) do
-    quote location: :keep do
-      Broom.Release.db_result(unquote(__CALLER__.module), unquote(what))
+  defmacro release(db_result_or_refid) do
+    quote bind_quoted: [mod: __CALLER__.module, db_result_or_refid: db_result_or_refid] do
+      Broom.via_mod_release(mod, db_result_or_refid)
     end
   end
 
   defmacro track(what, opts) do
-    quote location: :keep do
-      Broom.Track.db_result(unquote(__CALLER__.module), unquote(what), unquote(opts))
+    quote bind_quoted: [mod: __CALLER__.module, what: what, opts: opts] do
+      Broom.via_mod_track(mod, what, opts)
     end
   end
 
@@ -74,5 +85,39 @@ defmodule Broom do
       x when is_pid(x) -> {GenServer.cast(x, msg), msg}
       _ -> {:no_server, mod}
     end
+  end
+
+  ##
+  ## function invocation using a passed module
+  ##
+
+  @doc false
+  def via_mod_get_refid_tracker_entry(mod, refid) do
+    {:get_refid_entry, refid} |> Broom.call(mod)
+  end
+
+  @doc false
+  def via_mod_change_metrics_interval(mod, new_interval) do
+    {:change_metrics_interval, new_interval} |> Broom.call(mod)
+  end
+
+  @doc false
+  def via_mod_counts(mod) do
+    {:counts} |> Broom.call(mod)
+  end
+
+  @doc false
+  def via_mod_counts_reset(mod, opts) do
+    {:counts_reset, opts} |> Broom.call(mod)
+  end
+
+  @doc false
+  def via_mod_release(mod, db_result_or_refid) do
+    {:release, db_result_or_refid} |> Broom.call(mod)
+  end
+
+  @doc false
+  def via_mod_track(mod, what, opts) do
+    Broom.Track.db_result(mod, what, opts)
   end
 end

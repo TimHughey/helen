@@ -1,29 +1,27 @@
 defmodule Broom.Metrics do
+  require Logger
+
   alias __MODULE__
 
   alias Broom.Counts
+  alias Broom.MetricsOpts
 
   @interval_default_ms 300_000
 
   defstruct interval_ms: @interval_default_ms, last_at: :never, rc: :never, timer: :never
 
-  def has_interval_changed?(%Metrics{} = m1, %Metrics{} = m2) do
-    m1.interval_ms != m2.interval_ms
-  end
+  @type last_at() :: DateTime.t() | :never
+  @type metrics_rc() :: :never | tuple()
+  @type metrics_timer() :: :never | :unscheduled | reference()
+  @type t :: %__MODULE__{
+          interval_ms: pos_integer(),
+          last_at: last_at(),
+          rc: metrics_rc(),
+          timer: metrics_timer()
+        }
 
-  def put_interval_ms(%Metrics{} = m, interval) when is_binary(interval) do
-    case EasyTime.iso8601_duration_to_ms(interval) do
-      {:ok, ms} -> %Metrics{m | interval_ms: ms}
-      _ -> m
-    end
-  end
-
-  def schedule_first(interval) when is_binary(interval) do
-    %Metrics{} |> put_interval_ms(interval) |> schedule()
-  end
-
-  def schedule(%Metrics{} = m) do
-    cancel_timer_if_needed(m) |> start_timer()
+  def init(%MetricsOpts{} = metrics_opts) do
+    %Metrics{interval_ms: metrics_opts.interval |> EasyTime.iso8601_duration_to_ms()} |> schedule()
   end
 
   def report(%Metrics{} = m, mod, %Counts{} = c) do
@@ -33,12 +31,10 @@ defmodule Broom.Metrics do
     |> schedule()
   end
 
-  def update_interval(%Metrics{} = m, iso8601) do
-    # if the interval can be parsed then return the original iso8601 value and the updated metrics
-    case EasyTime.iso8601_duration_to_ms(iso8601) do
-      ms when is_integer(ms) -> {:ok, iso8601, %Metrics{m | interval_ms: ms}}
-      {:failed, msg} -> {:failed, msg}
-    end
+  def update_opts(%Metrics{} = m, %MetricsOpts{} = new_opts) do
+    %Metrics{m | interval_ms: new_opts.interval |> EasyTime.iso8601_duration_to_ms()}
+    |> cancel_timer_if_needed()
+    |> schedule()
   end
 
   # (1 of 2)
@@ -51,7 +47,11 @@ defmodule Broom.Metrics do
   # (2 of 2)
   defp cancel_timer_if_needed(m), do: m
 
+  defp schedule(%Metrics{} = m) do
+    cancel_timer_if_needed(m) |> start_timer()
+  end
+
   defp start_timer(%Metrics{} = m) do
-    %Metrics{timer: Process.send_after(self(), :report_metrics, m.interval_ms)}
+    %Metrics{m | timer: Process.send_after(self(), :report_metrics, m.interval_ms)}
   end
 end

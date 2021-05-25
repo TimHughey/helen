@@ -5,6 +5,13 @@ defmodule Broom.Counts do
 
   defstruct tracked: 0, released: 0, orphaned: 0, errors: 0
 
+  @type t :: %__MODULE__{
+          tracked: non_neg_integer(),
+          released: non_neg_integer(),
+          orphaned: non_neg_integer(),
+          errors: non_neg_integer()
+        }
+
   def increment(key, %Counts{} = c) when is_map_key(c, key) do
     new_count = Map.get(c, key) + 1
     Map.put(c, key, new_count)
@@ -12,8 +19,8 @@ defmodule Broom.Counts do
 
   def released_entry(%Entry{} = te, %Counts{} = c) do
     case te do
-      %Entry{acked: true} -> increment(:released, c)
       %Entry{orphaned: true} -> increment(:orphaned, c)
+      %Entry{acked: true} -> increment(:released, c)
       _ -> increment(:errors, c)
     end
   end

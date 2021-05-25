@@ -1,22 +1,26 @@
 defmodule Broom.Release do
-  alias Broom.State
+  require Logger
 
-  def db_result(mod, {_rc, _schwma} = x) do
-    server_pid = GenServer.whereis(mod)
+  alias Broom.{State, Tracker, TrackerEntry}
 
-    case {server_pid, x} do
-      {nil, _} -> {:no_server, mod}
-      {pid, {:ok, %_{refid: refid}}} -> {GenServer.cast(pid, {:release, refid}), refid}
-      {:error, _x} -> {:failed, "received an error tuple"}
+  def handle_release(db_result_or_tracker_entry, %State{} = s) do
+    case db_result_or_tracker_entry do
+      %TrackerEntry{} = te -> State.release_entry(te, s)
+      %_{acked: _} = schema -> release_via_schema(schema, s)
+      {:ok, %_{acked: _} = schema} -> release_via_schema(schema, s)
+      {:error, e} -> log_error_and_return_without_release(e, s)
     end
   end
 
-  def handle_release(refid, %State{} = s) do
-    alias Broom.{Tracker, TrackerEntry}
+  defp log_error_and_return_without_release(e, %State{} = s) do
+    Logger.warn(["\n", inspect(e, pretty: true)])
+    s
+  end
 
-    case Tracker.get_refid_entry(s.tracker, refid) do
-      %TrackerEntry{} = te -> State.release_entry(s, te)
-      _ -> s
-    end
+  defp release_via_schema(%_{refid: refid} = schema, %State{} = s) do
+    refid
+    |> Tracker.get_refid_entry(s.tracker)
+    |> TrackerEntry.apply_db_result(schema)
+    |> State.release_entry(s)
   end
 end

@@ -63,7 +63,7 @@ defmodule EasyTime do
     end
   end
 
-  # def is_iso_duration?(_not_binary), do: false
+  def is_iso_duration?(_not_binary), do: false
 
   # (1 of 2) passed a state, look in opts for :tz
   def local_now(s) when is_map(s), do: get_in(s, [:opts, :tz]) |> local_now()
@@ -82,6 +82,16 @@ defmodule EasyTime do
   end
 
   def iso8601_duration_to_ms(_what), do: nil
+
+  def iso8601_duration_to_ms(iso8601, default_ms)
+      when is_binary(iso8601) and is_integer(default_ms) do
+    case Duration.parse(iso8601) do
+      {:ok, x} -> Duration.to_milliseconds(x, truncate: true)
+      {:error, _msg} -> default_ms
+    end
+  end
+
+  def iso8601_duration_to_ms(_, default_ms) when is_integer(default_ms), do: default_ms
 
   # @doc since: "0.0.27"
   # def remaining(finish_dt) do

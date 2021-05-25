@@ -1,7 +1,6 @@
 defmodule BroomTestShould do
   defmacro __using__(_opts) do
     quote do
-      import BroomTestPretty
       import BroomTestShould
     end
   end
@@ -166,4 +165,6 @@ defmodule BroomTestShould do
       refute is_map_key(x, :ttl_expired), fail
     end
   end
+
+  def pretty(msg, x), do: [msg, "\n", inspect(x, pretty: true)] |> IO.iodata_to_binary()
 end

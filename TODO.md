@@ -1,5 +1,9 @@
 # Fat Helen and Ruth To Do List
 
+## In Flight Changes
+
+[ ] Switch and PulseWidth must load the Command Alias association
+
 ## Alfred
 
 [ ] validate just seen alias names match existing known name
@@ -7,8 +11,12 @@
 
 ## Broom
 
+[X] rename BroomTester.Commands to BroomTester.Execute to create reference implementation
+[ ] write typespecs for all structs and callbacks
+[X] implement Broom behaviour
 [ ] implement cmd purging
 [ ] implement startup orphan check
+[ ] add error logging for invalid iso8601 durations
 
 ## Garden Lighting
 
