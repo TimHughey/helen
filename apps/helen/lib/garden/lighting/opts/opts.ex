@@ -35,12 +35,12 @@ defmodule Garden.Lighting.Opts do
           device: "indoor garden alpha",
           schedule: [
             day: [
-              sun_ref: :nautical_twilight_begin,
+              sun_ref: :sunrise,
               before: "PT0S",
               cmd: :on
             ],
             night: [
-              sun_ref: :nautical_twilight_begin,
+              sun_ref: :sunrise,
               after: "PT16H",
               cmd: :off
             ]

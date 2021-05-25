@@ -1,5 +1,5 @@
 %{
-  "agnus": {:hex, :agnus, "0.1.1", "0401e4158e75b874d4563735cadf742e7137ed9f6c5667ab0cc71d17e1c318d6", [:mix], [{:httpoison, "~> 1.6", [hex: :httpoison, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: false]}, {:timex, "~> 3.0", [hex: :timex, repo: "hexpm", optional: false]}], "hexpm", "bad76b08f3bc0f5cd3c95baaefe31e67e08a895ba4a2bb4709cdf9adee689a73"},
+  "agnus": {:hex, :agnus, "0.1.2", "24d213942e1663f5936d71979be0b455bc3264938211d1f2987f2709e8ebb130", [:mix], [{:httpoison, "~> 1.6", [hex: :httpoison, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: false]}, {:timex, "~> 3.0", [hex: :timex, repo: "hexpm", optional: false]}], "hexpm", "052d5bfd08441165b3f5de30a767773a1b4d270a3306b8c397e18abaf153a865"},
   "artificery": {:hex, :artificery, "0.4.1", "90b1fcedb9034853b36dbea2174f9fc1172bd50b0686a723178103def5c9c1c8", [:mix], [], "hexpm"},
   "bunt": {:hex, :bunt, "0.2.0", "951c6e801e8b1d2cbe58ebbd3e616a869061ddadcc4863d0a2182541acae9a38", [:mix], [], "hexpm", "7af5c7e09fe1d40f76c8e4f9dd2be7cebd83909f31fee7cd0e9eadc567da8353"},
   "certifi": {:hex, :certifi, "2.6.1", "dbab8e5e155a0763eea978c913ca280a6b544bfa115633fa20249c3d396d9493", [:rebar3], [], "hexpm", "524c97b4991b3849dd5c17a631223896272c6b0af446778ba4675a1dff53bb7e"},
