@@ -7,6 +7,7 @@ defmodule Broom.DB.Alias do
 
   alias __MODULE__, as: Schema
   alias Broom.DB.{Command, Device}
+  alias BroomRepo, as: Repo
 
   @pio_min 0
   @ttl_default 2000
@@ -41,11 +42,19 @@ defmodule Broom.DB.Alias do
     |> upsert()
   end
 
-  defp changeset(%Schema{} = a, p) when is_map(p) do
+  def update_cmd(alias_id, cmd) do
+    schema = Repo.get!(Schema, alias_id)
+
+    %{cmd: cmd}
+    |> changeset(schema)
+    |> Repo.update!()
+  end
+
+  defp changeset(changes, %Schema{} = a) do
     alias Ecto.Changeset
 
     a
-    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required(columns(:required))
     |> Changeset.validate_length(:name, min: 3, max: 32)
     |> Changeset.validate_length(:description, max: 50)
@@ -73,15 +82,11 @@ defmodule Broom.DB.Alias do
     MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
   end
 
-  defp upsert(p) when is_map(p) do
-    changes = Map.take(p, columns(:all))
-    cs = changeset(%Schema{}, changes)
+  defp upsert(params) when is_map(params) do
+    insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
 
-    opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
-
-    case BroomRepo.insert(cs, opts) do
-      {:ok, %Schema{}} = rc -> rc
-      {:error, e} -> {:error, inspect(e, pretty: true)}
-    end
+    params
+    |> changeset(%Schema{})
+    |> Repo.insert(insert_opts)
   end
 end

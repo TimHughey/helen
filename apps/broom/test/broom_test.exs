@@ -2,6 +2,8 @@ defmodule BroomTest do
   use ExUnit.Case
   use BroomTestShould
 
+  alias BroomRepo, as: Repo
+
   # setup common ctx keys for map matching / updates
   @moduletag [
     broom: true,
@@ -128,6 +130,22 @@ defmodule BroomTest do
       assert DateTime.compare(te.sent_at, te.tracked_at) == :lt, fail
       assert DateTime.compare(te.acked_at, te.released_at) == :lt, fail
 
+      # check the actual Command
+      cmd_schema = Repo.get!(Broom.DB.Command, te.schema_id)
+      fail = pretty("Command validation failed", cmd_schema)
+      assert cmd_schema.acked == true, fail
+      refute cmd_schema.orphaned, fail
+      assert cmd_schema.rt_latency_us > 0, fail
+      assert DateTime.compare(cmd_schema.sent_at, cmd_schema.acked_at) == :lt, fail
+      assert DateTime.compare(cmd_schema.acked_at, te.released_at) == :lt, fail
+
+      # check the actual Alias
+      alias_schema = Repo.get!(Broom.DB.Alias, te.alias_id)
+      fail = pretty("Alias validation failed", alias_schema)
+      assert alias_schema.cmd == cmd_schema.cmd, fail
+      assert DateTime.compare(alias_schema.updated_at, cmd_schema.acked_at) == :gt, fail
+      assert DateTime.compare(alias_schema.updated_at, te.released_at) == :lt, fail
+
       dump_tracked_refs(ctx)
     end
 
@@ -165,6 +183,22 @@ defmodule BroomTest do
       # valid *_at fields describe processing sequence
       assert DateTime.compare(te.sent_at, te.tracked_at) == :lt, fail
       assert DateTime.compare(te.acked_at, te.released_at) == :lt, fail
+
+      # check the actual Command
+      cmd_schema = Repo.get!(Broom.DB.Command, te.schema_id)
+      fail = pretty("Command validation failed", cmd_schema)
+      assert cmd_schema.acked == true, fail
+      assert cmd_schema.orphaned, fail
+      assert cmd_schema.rt_latency_us > 0, fail
+      assert DateTime.compare(cmd_schema.sent_at, cmd_schema.acked_at) == :lt, fail
+      assert DateTime.compare(cmd_schema.acked_at, te.released_at) == :lt, fail
+
+      # check the actual Alias
+      alias_schema = Repo.get!(Broom.DB.Alias, te.alias_id)
+      fail = pretty("Alias validation failed", alias_schema)
+      assert alias_schema.cmd != cmd_schema.cmd, fail
+      assert DateTime.compare(alias_schema.updated_at, cmd_schema.acked_at) == :lt, fail
+      assert DateTime.compare(alias_schema.updated_at, te.released_at) == :lt, fail
 
       dump_tracked_refs(ctx)
     end

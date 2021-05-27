@@ -90,7 +90,6 @@ defmodule Broom.TrackerEntry do
       schema_id: tm.schema.id
     }
     |> start_track_timeout_timer()
-    |> release_immediately_if_needed()
   end
 
   def older_than?(%Entry{} = te, %DateTime{} = old_at) do
@@ -109,14 +108,11 @@ defmodule Broom.TrackerEntry do
     te
   end
 
-  # if the Entry is acked at time of creation then immediately cast ourself a msg to release it
-  defp release_immediately_if_needed(%Entry{} = te) do
-    if te.acked, do: GenServer.cast(self(), {:release, te})
-
-    te
-  end
-
   defp start_track_timeout_timer(%Entry{} = te) do
-    %Entry{te | timer: Process.send_after(self(), {:track_timeout, te}, te.track_timeout_ms)}
+    # set track timeout to zero when the entry is already acked to trigger the immediate
+    # track timeout handling and release
+    timeout_ms = if te.acked, do: 0, else: te.track_timeout_ms
+
+    %Entry{te | timer: Process.send_after(self(), {:track_timeout, te}, timeout_ms)}
   end
 end

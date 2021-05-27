@@ -8,6 +8,7 @@ defmodule Broom.DB.Command do
 
   alias __MODULE__, as: Schema
   alias Broom.DB.Alias
+  alias BroomRepo, as: Repo
 
   schema "broom_cmd" do
     field(:refid, :string)
@@ -23,24 +24,18 @@ defmodule Broom.DB.Command do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def ack_now(%Schema{} = cmd_to_ack, acked_at) do
+  def ack_now(%Schema{} = cmd_to_ack, disposition) when disposition in [:ack, :orphan] do
+    # ensure we have an acked_at
+    acked_at = cmd_to_ack.acked_at || DateTime.utc_now()
+
     %{
       acked: true,
       acked_at: acked_at,
+      orphaned: disposition == :orphan,
       rt_latency_us: DateTime.diff(acked_at, cmd_to_ack.sent_at, :microsecond)
     }
     |> changeset(cmd_to_ack)
-    |> BroomRepo.update(returning: true)
-    |> load_alias()
-  end
-
-  def ack_now(id_or_refid, acked_at) do
-    clause = if is_integer(id_or_refid), do: [id: id_or_refid], else: [refid: id_or_refid]
-
-    case BroomRepo.get_by(Schema, clause) do
-      %Schema{} = c -> ack_now(c, acked_at)
-      nil -> {:ok, "unknown id or refid: #{id_or_refid}"}
-    end
+    |> Repo.update!(returning: true)
   end
 
   def add(%Alias{} = a, %{cmd: cmd}, opts) do
@@ -60,34 +55,11 @@ defmodule Broom.DB.Command do
     |> BroomRepo.insert(returning: true)
   end
 
-  def load_alias(schema_or_tuple) do
-    case schema_or_tuple do
-      {:ok, %Schema{} = c} -> {:ok, BroomRepo.preload(c, [:alias])}
-      %Schema{} = c -> BroomRepo.preload(c, [:alias])
-      passthrough -> passthrough
-    end
-  end
-
-  def orphan_now(%Schema{} = cmd_to_orphan) do
-    %{orphaned: true, acked: true, acked_at: DateTime.utc_now()}
-    |> changeset(cmd_to_orphan)
-    |> BroomRepo.update(returning: true)
-  end
-
-  def orphan_now(cmd_id_to_orphan) do
-    case BroomRepo.get(Schema, cmd_id_to_orphan) do
-      %Schema{} = c -> orphan_now(c)
-      nil -> {:not_found, "unknown cmd id: #{cmd_id_to_orphan}"}
-    end
-  end
-
   # (1 of 2) support pipeline where the change map is first arg
-  defp changeset(changes, %Schema{} = c) when is_map(changes), do: changeset(c, changes)
-
-  defp changeset(%Schema{} = c, changes) when is_map(changes) do
+  defp changeset(changes, %Schema{} = cmd_schema) do
     alias Ecto.Changeset
 
-    c
+    cmd_schema
     |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required([:cmd, :sent_at, :alias_id])
     # the cmd should be a minimum of two characters (e.g. "on")
@@ -97,8 +69,7 @@ defmodule Broom.DB.Command do
 
   # helpers for changeset columns
   defp columns(:all) do
-    these_cols =
-      [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
 
     %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
   end
