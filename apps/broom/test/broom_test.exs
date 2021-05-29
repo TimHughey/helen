@@ -1,6 +1,6 @@
 defmodule BroomTest do
   use ExUnit.Case
-  use BroomTestShould
+  use Should
 
   alias BroomRepo, as: Repo
 
@@ -331,13 +331,10 @@ defmodule BroomTest do
 
     p = %{ident: ident, host: h, pios: pios, last_seen_at: now, latency_us: us}
 
-    device_rc = Device.upsert(p)
-    should_be_ok_tuple(device_rc)
+    device = Device.upsert(p)
+    should_be_schema(device, Device)
 
-    device_struct = elem(device_rc, 1)
-    should_be_struct(device_struct, Device)
-
-    %{ctx | device_struct: device_struct}
+    %{ctx | device_struct: device}
   end
 
   defp dump_state(ctx) do

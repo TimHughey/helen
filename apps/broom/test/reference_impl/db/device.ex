@@ -64,6 +64,6 @@ defmodule Broom.DB.Device do
       conflict_target: [:ident]
     ]
 
-    changeset(%Schema{}, p) |> BroomRepo.insert(opts) |> load_aliases()
+    changeset(%Schema{}, p) |> BroomRepo.insert!(opts)
   end
 end
