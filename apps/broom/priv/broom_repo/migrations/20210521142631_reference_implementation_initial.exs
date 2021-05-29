@@ -3,16 +3,16 @@ defmodule BroomRepo.Migrations.ReferenceImplementationInitial do
 
   def change do
     create table(:broom_device) do
-      add(:device, :string, size: 128, null: false)
+      add(:ident, :string, size: 128, null: false)
       add(:host, :string, size: 128, null: false)
-      add(:pio_count, :integer, null: false)
-      add(:dev_latency_us, :integer, default: 0)
+      add(:pios, :integer, null: false)
+      add(:latency_us, :integer, default: 0)
       add(:last_seen_at, :utc_datetime_usec)
 
       timestamps(type: :utc_datetime_usec)
     end
 
-    create(index(:broom_device, [:device], name: "broom_device_index", unique: true))
+    create(index(:broom_device, [:ident], name: "broom_device_ident_index", unique: true))
 
     create table(:broom_alias) do
       add(:name, :string, size: 128, null: false)

@@ -7,10 +7,10 @@ defmodule Broom.DB.Device do
   alias Broom.DB.Alias
 
   schema "broom_device" do
-    field(:device, :string)
+    field(:ident, :string)
     field(:host, :string)
-    field(:pio_count, :integer)
-    field(:dev_latency_us, :integer, default: 0)
+    field(:pios, :integer)
+    field(:latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
 
     has_many(:aliases, Alias, foreign_key: :device_id)
@@ -27,7 +27,7 @@ defmodule Broom.DB.Device do
     d
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
-    |> Changeset.validate_number(:dev_latency_us, greater_than_or_equal_to: 0)
+    |> Changeset.validate_number(:latency_us, greater_than_or_equal_to: 0)
   end
 
   def columns(:all) do
@@ -38,7 +38,7 @@ defmodule Broom.DB.Device do
 
   def columns(:cast), do: columns(:all)
   def columns(:required), do: columns_all(drop: [:inserted_at, :updated_at])
-  def columns(:replace), do: columns_all(drop: [:device, :inserted_at])
+  def columns(:replace), do: columns_all(drop: [:ident, :inserted_at])
 
   def columns_all(opts) when is_list(opts) do
     keep_set = MapSet.new(opts[:only] || columns(:all))
@@ -56,12 +56,12 @@ defmodule Broom.DB.Device do
 
   def upsert(p) when is_map(p) do
     # assemble the opts for upsert
-    # check for conflicts on :device
+    # check for conflicts on :ident
     # if there is a conflict only replace specified columns
     opts = [
       on_conflict: {:replace, columns(:replace)},
       returning: true,
-      conflict_target: [:device]
+      conflict_target: [:ident]
     ]
 
     changeset(%Schema{}, p) |> BroomRepo.insert(opts) |> load_aliases()

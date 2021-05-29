@@ -100,10 +100,10 @@ ALTER SEQUENCE public.broom_cmd_id_seq OWNED BY public.broom_cmd.id;
 
 CREATE TABLE public.broom_device (
     id bigint NOT NULL,
-    device character varying(128) NOT NULL,
+    ident character varying(128) NOT NULL,
     host character varying(128) NOT NULL,
-    pio_count integer NOT NULL,
-    dev_latency_us integer DEFAULT 0,
+    pios integer NOT NULL,
+    latency_us integer DEFAULT 0,
     last_seen_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -207,10 +207,10 @@ CREATE UNIQUE INDEX broom_cmd_refid_index ON public.broom_cmd USING btree (refid
 
 
 --
--- Name: broom_device_index; Type: INDEX; Schema: public; Owner: -
+-- Name: broom_device_ident_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX broom_device_index ON public.broom_device USING btree (device);
+CREATE UNIQUE INDEX broom_device_ident_index ON public.broom_device USING btree (ident);
 
 
 --

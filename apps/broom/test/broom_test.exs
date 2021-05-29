@@ -57,8 +57,7 @@ defmodule BroomTest do
   describe "Broom.track/2" do
     setup [:create_device, :create_alias, :create_cmd, :track_cmd, :wait_for_notification]
 
-    @tag alias_name: "Track with Release Ack"
-    @tag pio: 1
+    @tag alias_opts: [name: "Track with Release Ack", pio: 1]
     @tag dump_tracked_refs: false
     @tag cmd_disposition: :ack
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 2]
@@ -95,8 +94,7 @@ defmodule BroomTest do
       dump_tracked_refs(ctx)
     end
 
-    @tag alias_name: "Track with Immediate Ack"
-    @tag pio: 2
+    @tag alias_opts: [name: "Track with Immediate Ack", pio: 2]
     @tag dump_tracked_refs: false
     @tag cmd_disposition: :ack
     @tag cmd_opts: [ack: :immediate]
@@ -149,8 +147,7 @@ defmodule BroomTest do
       dump_tracked_refs(ctx)
     end
 
-    @tag alias_name: "Track with Orphan Ack"
-    @tag pio: 3
+    @tag alias_opts: [name: "Track with Orphan Ack", pio: 3]
     @tag dump_tracked_refs: false
     @tag cmd_disposition: :orphan
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 0]
@@ -203,8 +200,7 @@ defmodule BroomTest do
       dump_tracked_refs(ctx)
     end
 
-    @tag alias_name: "Track with Release"
-    @tag pio: 4
+    @tag alias_opts: [name: "Track with Release", pio: 3]
     @tag dump_tracked_refs: false
     @tag cmd_disposition: :ack
     test "can support refid access and release via db result", ctx do
@@ -272,8 +268,7 @@ defmodule BroomTest do
       dump_tracked_refs(ctx)
     end
 
-    @tag alias_name: "Change Metrics"
-    @tag pio: 5
+    @tag alias_opts: [name: "Change Metrics", pio: 5]
     @tag dump_tracked_refs: false
     @tag dump_state: false
     @tag cmd_disposition: :orphan
@@ -308,15 +303,13 @@ defmodule BroomTest do
     %{ctx | cmd_struct: elem(cmd_rc, 1)}
   end
 
-  defp create_alias(ctx) do
+  defp create_alias(ctx) when is_map_key(ctx, :alias_opts) do
     alias Broom.DB.Alias
 
-    alias_name = ctx[:alias_name] || "Broom Default Alias"
-    pio = ctx[:alias_pio] || 0
-    desc = ctx[:alias_description] || ctx[:describe] || "Default"
-    ttl_ms = ctx[:alias_ttl_ms] || 3000
+    default_opts = [decription: "default", ttl_ms: 3000]
+    alias_opts = Keyword.merge(ctx.alias_opts, default_opts)
 
-    alias_rc = Alias.create(device(ctx), alias_name, pio, description: desc, ttl_ms: ttl_ms)
+    alias_rc = Alias.create(ctx.device_struct, alias_opts)
     should_be_ok_tuple(alias_rc)
 
     alias_struct = elem(alias_rc, 1)
@@ -325,16 +318,18 @@ defmodule BroomTest do
     %{ctx | alias_struct: alias_struct, alias_name: alias_struct.name}
   end
 
+  defp create_alias(ctx), do: ctx
+
   defp create_device(ctx) do
     alias Broom.DB.Device
 
-    name = ctx[:dev_name] || "broom/default-device"
+    ident = ctx[:dev_ident] || "broom/default-device"
     h = ctx[:dev_host] || "broom-host"
     pios = ctx[:dev_pios] || 8
     now = ctx[:dev_last_seen_at] || DateTime.utc_now()
     us = ctx[:dev_latency_us] || :rand.uniform(10_000) + 10_000
 
-    p = %{device: name, host: h, pio_count: pios, last_seen_at: now, dev_latency_us: us}
+    p = %{ident: ident, host: h, pios: pios, last_seen_at: now, latency_us: us}
 
     device_rc = Device.upsert(p)
     should_be_ok_tuple(device_rc)
@@ -344,9 +339,6 @@ defmodule BroomTest do
 
     %{ctx | device_struct: device_struct}
   end
-
-  defp device(ctx), do: ctx.device_struct
-  # defp device_name(ctx), do: ctx.device_struct.device
 
   defp dump_state(ctx) do
     if ctx[:dump_state] do

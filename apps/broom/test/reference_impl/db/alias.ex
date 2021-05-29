@@ -31,15 +31,16 @@ defmodule Broom.DB.Alias do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def create(%Device{id: id}, name, pio, opts \\ []) when is_binary(name) and is_list(opts) do
+  def create(%Device{} = device, opts) do
+    dev_alias = Ecto.build_assoc(device, :aliases)
+
     %{
-      device_id: id,
-      name: name,
-      pio: pio,
+      name: opts[:name],
+      pio: opts[:pio],
       description: opts[:description] || "<none>",
       ttl_ms: opts[:ttl_ms] || @ttl_default
     }
-    |> upsert()
+    |> upsert(dev_alias)
   end
 
   def update_cmd(alias_id, cmd) do
@@ -82,11 +83,11 @@ defmodule Broom.DB.Alias do
     MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
   end
 
-  defp upsert(params) when is_map(params) do
+  defp upsert(params, %Schema{} = device) when is_map(params) do
     insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
 
     params
-    |> changeset(%Schema{})
+    |> changeset(device)
     |> Repo.insert(insert_opts)
   end
 end
