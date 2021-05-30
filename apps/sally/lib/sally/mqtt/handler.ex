@@ -40,9 +40,22 @@ defmodule Sally.Mqtt.Handler do
     reply_ok(s)
   end
 
-  def handle_message([_env, "r", src_host] = topic, payload, s) do
-    %MsgIn{payload: payload, topic: topic, host: src_host, msg_recv_at: DateTime.utc_now()}
+  def handle_message([env, "r", src_host, type], payload, s) do
+    %MsgIn{
+      payload: payload,
+      env: env,
+      host: src_host,
+      type: type,
+      at: DateTime.utc_now()
+    }
+    |> MsgIn.preprocess()
     |> InboundMsg.handoff_msg()
+
+    reply_ok(s)
+  end
+
+  def handle_message(topic, _payload, s) do
+    Logger.warn("unhandled topic: #{Enum.join(topic, "/")}")
 
     reply_ok(s)
   end

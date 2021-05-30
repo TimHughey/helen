@@ -18,7 +18,8 @@ config :sally, Sally.InboundMsg.Server,
     {"pwm", Sally.PulseWidth},
     {"switch", Sally.Switch},
     {"sensor", Sally.Sensor},
-    {"remote", Sally.Remote}
+    {"remote", Sally.Remote},
+    {"test", Sally.MsgInTest}
   ]
 
 if config_env() in [:dev, :test] do
