@@ -55,7 +55,7 @@ defmodule Helen.Application do
     if only_repo?() do
       [Repo]
     else
-      [Repo, Fact.Supervisor, Mqtt.Supervisor, Switch.Supervisor, PulseWidth.Supervisor, Reef.Supervisor]
+      [Repo, Fact.Supervisor, Mqtt.Supervisor, PulseWidth.Execute, Switch.Supervisor, Reef.Supervisor]
     end
   end
 

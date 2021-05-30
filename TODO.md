@@ -14,6 +14,7 @@
 [X] rename BroomTester.Commands to BroomTester.Execute to create reference implementation
 [ ] write typespecs for all structs and callbacks
 [X] implement Broom behaviour
+[ ] implement auto ack of pending cmds at shutdown
 [ ] implement cmd purging
 [ ] implement startup orphan check
 [ ] add error logging for invalid iso8601 durations

@@ -1,8 +1,8 @@
 defmodule PulseWidth.Msg do
   require Logger
 
-  alias PulseWidth.DB.{Command, Device}
-  alias PulseWidth.States
+  alias PulseWidth.DB.Device
+  alias PulseWidth.{Execute, States}
 
   # @debug true
 
@@ -81,7 +81,7 @@ defmodule PulseWidth.Msg do
       end
     end
 
-    # @debug && ["\n", inspect(ctx, pretty: true), "\n"] |> Logger.info()
+    Logger.debug(["\n", inspect(ctx, pretty: true), "\n"])
     ctx
   end
 
@@ -92,7 +92,6 @@ defmodule PulseWidth.Msg do
     |> add_fault_checks()
     |> Device.upsert()
     |> States.inbound_msg()
-    |> Command.ack_if_needed()
-    |> Command.release()
+    |> Execute.ack_if_needed()
   end
 end

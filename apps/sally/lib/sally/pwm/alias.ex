@@ -1,17 +1,16 @@
-defmodule PulseWidth.DB.Alias do
+defmodule Sally.PulseWidth.DB.Alias do
   @moduledoc """
-  Database implementation of PulseWidth Aliases
+  Database implementation of Sally.PulseWidth Aliases
   """
   require Logger
+
   use Ecto.Schema
-  use Timex
-
-  alias PulseWidth.DB.Alias, as: Schema
-  alias PulseWidth.DB.{Command, Device}
-  alias PulseWidth.Payload
-
   require Ecto.Query
   alias Ecto.Query
+
+  alias Sally.PulseWidth.DB.Alias, as: Schema
+  alias Sally.PulseWidth.DB.{Command, Device}
+  alias SallyRepo, as: Repo
 
   @pio_min 0
   @ttl_default 2000
@@ -24,29 +23,20 @@ defmodule PulseWidth.DB.Alias do
     field(:pio, :integer)
     field(:ttl_ms, :integer, default: @ttl_default)
 
-    belongs_to(:device, Device, source: :device_id, references: :id, foreign_key: :device_id)
-    has_many(:cmds, Command, references: :id, foreign_key: :alias_id)
+    belongs_to(:device, Device)
+    has_many(:cmds, Command, references: :id, foreign_key: :alias_id, preload_order: [desc: :sent_at])
 
     timestamps(type: :utc_datetime_usec)
   end
 
-  def apply_changes(%Schema{} = a, changes) do
-    changeset(a, changes) |> Repo.update(returning: true)
-  end
-
-  # (1 of 2) convert parms into a map
-  def changeset(%Schema{} = a, p) when is_list(p), do: changeset(a, Enum.into(p, %{}))
-
-  # (2 of 2) params are a map
-  def changeset(%Schema{} = a, p) when is_map(p) do
-    alias Common.DB
+  def changeset(changes, %Schema{} = a) do
     alias Ecto.Changeset
 
     a
-    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required(columns(:required))
     |> Changeset.validate_length(:name, min: 3, max: 32)
-    |> Changeset.validate_format(:name, DB.name_regex())
+    |> Changeset.validate_format(:name, name_regex())
     |> Changeset.validate_length(:description, max: 50)
     |> Changeset.validate_length(:cmd, max: 32)
     |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
@@ -72,15 +62,16 @@ defmodule PulseWidth.DB.Alias do
     MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
   end
 
-  def create(%Device{id: id}, name, pio, opts \\ []) when is_binary(name) and is_list(opts) do
+  def create(%Device{} = device, opts) do
+    dev_alias = Ecto.build_assoc(device, :aliases)
+
     %{
-      device_id: id,
-      name: name,
-      pio: pio,
+      name: opts[:name],
+      pio: opts[:pio],
       description: opts[:description] || "<none>",
       ttl_ms: opts[:ttl_ms] || @ttl_default
     }
-    |> upsert()
+    |> upsert(dev_alias)
   end
 
   def delete(name_or_id) do
@@ -133,48 +124,12 @@ defmodule PulseWidth.DB.Alias do
     Repo.all(q)
   end
 
-  # def record_cmd(name, cmd_map, opts) do
-  #   # load the record the cmd is associated with
-  #   a = find(name)
-  #
-  #   # add the command and put the name in the result map for upstream
-  #   result_map = Command.add(a, cmd_map, opts) |> put_in([:name], name)
-  #
-  #   # NOTE! create anonymous fn HERE to capture result_map for updating
-  #   add_to_result = fn [{k, v}] -> put_in(result_map, [k], v) end
-  #
-  #   case result_map do
-  #     # downstream supplied the cmd, update to align
-  #     %{cmd_rc: {:ok, _}, cmd_acked: rcmd} ->
-  #       [alias_rc: update_cmd(a, rcmd)] |> add_to_result.()
-  #
-  #     # send the cmd_map including the newly inserted cmd refid
-  #     %{cmd_rc: {:ok, new_cmd}} ->
-  #       pub_opts = [opts, refid: new_cmd.refid] |> List.flatten()
-  #
-  #       # ensure the device association is loaded for Payload.send_cmd/3
-  #       [pub_rc: load_device(a) |> Payload.send_cmd(cmd_map, pub_opts)] |> add_to_result.()
-  #
-  #     # something went wrong, let the caller sort it
-  #     error ->
-  #       error
-  #   end
-  # end
+  def update_cmd(alias_id, cmd) do
+    schema = Repo.get!(Schema, alias_id)
 
-  def update_cmd(%Schema{} = a, acked_cmd) do
-    changeset(a, %{cmd: acked_cmd}) |> Repo.update(returning: true)
-  end
-
-  def upsert(p) when is_map(p) do
-    changes = Map.take(p, columns(:all))
-    cs = changeset(%Schema{}, changes)
-
-    opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
-
-    case Repo.insert(cs, opts) do
-      {:ok, %Schema{}} = rc -> rc
-      {:error, e} -> {:error, inspect(e, pretty: true)}
-    end
+    %{cmd: cmd}
+    |> changeset(schema)
+    |> Repo.update!()
   end
 
   defp load_command_ids(schema_or_nil) do
@@ -191,10 +146,22 @@ defmodule PulseWidth.DB.Alias do
   end
 
   def load_cmd_last(%Schema{} = x) do
-    Repo.preload(x, cmds: Query.from(d in Command, order_by: [desc: d.inserted_at], limit: 1))
+    Repo.preload(x, cmds: Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
   end
 
-  # defp load_unacked_cmds(%Schema{} = x) do
-  #   Repo.preload(x, cmds: Query.from(c in Command, where: c.acked == false))
-  # end
+  # validate name:
+  #  -starts with a ~ or alpha char
+  #  -contains a mix of:
+  #      alpha numeric, slash (/), dash (-), underscore (_), colon (:) and
+  #      spaces
+  #  -ends with an alpha char
+  defp name_regex, do: ~r'^[\\~\w]+[\w\\ \\/\\:\\.\\_\\-]{1,}[\w]$'
+
+  defp upsert(params, %Schema{} = device) when is_map(params) do
+    insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
+
+    params
+    |> changeset(device)
+    |> Repo.insert(insert_opts)
+  end
 end

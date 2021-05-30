@@ -2,86 +2,72 @@ defmodule PulseWidth.DB.Command do
   @moduledoc false
 
   use Ecto.Schema
-  use BroomOld
-  use Timex
 
   require Ecto.Query
   alias Ecto.Query
 
-  alias PulseWidth.Command.Fact
+  alias Alfred.ExecCmd
+  alias PulseWidth.DB.Alias
   alias PulseWidth.DB.Command, as: Schema
-  alias PulseWidth.DB.{Alias, Device}
 
   schema "pwm_cmd" do
     field(:refid, Ecto.UUID, autogenerate: true)
-    field(:alias_id, :id)
     field(:cmd, :string, default: "unknown")
     field(:acked, :boolean, default: false)
-    field(:orphan, :boolean, default: false)
-    field(:rt_latency_us, :integer)
+    field(:orphaned, :boolean, default: false)
+    field(:rt_latency_us, :integer, default: 0)
     field(:sent_at, :utc_datetime_usec)
-    field(:ack_at, :utc_datetime_usec)
+    field(:acked_at, :utc_datetime_usec)
 
-    belongs_to(:alias, Alias,
-      source: :alias_id,
-      references: :id,
-      foreign_key: :alias_id,
-      define_field: false
-    )
+    belongs_to(:alias, Alias, source: :alias_id, references: :id, foreign_key: :alias_id)
 
     timestamps(type: :utc_datetime_usec)
   end
 
-  def acked?(refid) do
-    cmd = find_refid(refid)
-
-    if is_nil(cmd), do: false, else: cmd.acked
-  end
-
-  # NOTE:
-  # original msg is augmented with ack results and returned for downstream processing
-  def ack_if_needed(%{cmdack: true, refid: refid, msg_recv_dt: recv_dt, device: {:ok, %Device{}}} = msg) do
-    put_cmd_rc = fn x -> Map.drop(msg, [:cmdack, :refid]) |> put_in([:cmd_rc], x) end
-
-    case find_refid(refid) do
+  def ack_now(refid, acked_at) do
+    case Repo.get_by(Schema, refid: refid) |> Repo.preload([:alias]) do
       %Schema{sent_at: sent_at} = cmd_to_ack ->
-        rt_latency_us = Timex.diff(recv_dt, sent_at, :microsecond)
+        latency = DateTime.diff(acked_at, sent_at, :microsecond)
+        now = DateTime.utc_now()
 
         cmd_to_ack
-        |> update(%{acked: true, ack_at: DateTime.utc_now(), rt_latency_us: rt_latency_us})
-        |> put_cmd_rc.()
-        |> Fact.write_metric()
+        |> changeset(%{acked: true, acked_at: now, rt_latency_us: latency})
+        |> Repo.update(returning: true)
 
       {:error, e} ->
-        put_cmd_rc.({:failed, "unable to find refid: #{inspect(e)}"})
+        {:failed, "unable to find refid: #{inspect(e)}"}
 
       # allow receipt of refid ack messages while passively processing the rpt topic
       # (e.g. testing by attaching to production reporting topic)
       nil ->
-        put_cmd_rc.({:ok, "unknown refid: #{refid}"})
+        {:ok, "unknown refid: #{refid}"}
     end
   end
 
-  def ack_if_needed(msg), do: put_in(msg, [:cmd_rc], {:ok, "ignored, not a cmdack"})
+  def add(%Alias{} = a, %ExecCmd{cmd: cmd}, opts) do
+    # associate the new command with the Alias
+    new_cmd = Ecto.build_assoc(a, :cmds)
+
+    # base changes for all new cmds
+    %{sent_at: DateTime.utc_now(), cmd: cmd}
+    |> ack_immediate_if_requested(opts[:ack] == :immediate)
+    |> changeset(new_cmd)
+    |> Repo.insert(returning: true)
+  end
 
   def add(%Alias{} = a, %{cmd: cmd}, opts) do
     # associate the new command with the Alias
     new_cmd = Ecto.build_assoc(a, :cmds)
 
-    base_cs = %{sent_at: DateTime.utc_now(), cmd: cmd}
-
-    if opts[:ack] == :immediate do
-      acked_cs = Map.merge(base_cs, %{acked: true, orphan: false, rt_latency_us: 0, ack_at: base_cs.sent_at})
-      changeset(new_cmd, acked_cs) |> insert_and_track(opts)
-    else
-      changeset(new_cmd, base_cs) |> insert_and_track(opts)
-    end
+    # base changes for all new cmds
+    %{sent_at: DateTime.utc_now(), cmd: cmd}
+    |> ack_immediate_if_requested(opts[:ack] == :immediate)
+    |> changeset(new_cmd)
+    |> Repo.insert(returning: true)
   end
 
-  # (1 of 2) insure changes are a map
-  # def changeset(%Schema{} = c, changes) when is_list(changes) do
-  #   changeset(c, Enum.into(changes, %{}))
-  # end
+  # (1 of 2) support pipeline where the change map is first arg
+  def changeset(changes, %Schema{} = c) when is_map(changes), do: changeset(c, changes)
 
   def changeset(%Schema{} = c, changes) when is_map(changes) do
     alias Ecto.Changeset
@@ -103,13 +89,9 @@ defmodule PulseWidth.DB.Command do
 
   def columns(:cast), do: columns(:all)
 
-  # BroomOld default opts
-  def default_opts,
-    do: [
-      orphan: [startup_check: true, sent_before: "PT12S", older_than: "PT1M"],
-      purge: [at_startup: true, interval: "PT2M", older_than: "PT7D"],
-      metrics: "PT1M"
-    ]
+  def orphan_now(%Schema{} = c) do
+    changeset(c, %{orphaned: true, acked: true, acked_at: DateTime.utc_now()}) |> Repo.update(returning: true)
+  end
 
   def purge(%Alias{cmds: cmds}, :all) do
     all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
@@ -134,42 +116,30 @@ defmodule PulseWidth.DB.Command do
   def status(m, cmds) when is_list(cmds), do: status(m, hd(cmds))
 
   # (2 of 5) acked cmd
-  def status(m, %Schema{acked: true, orphan: false} = c) when is_map(m) do
-    put_status(m, %{cmd: c.cmd, acked: true, ack_at: c.ack_at, rt_latency_us: c.rt_latency_us})
+  def status(m, %Schema{acked: true, orphaned: false} = c) when is_map(m) do
+    put_status(m, %{cmd: c.cmd, acked: true, acked_at: c.acked_at, rt_latency_us: c.rt_latency_us})
   end
 
   # (3 of 5) pending
   def status(m, %Schema{acked: false} = c) when is_map(m) do
-    put_status(m, %{cmd: c.cmd, pending: true, at: c.ack_at, refid: c.refid})
+    put_status(m, %{cmd: c.cmd, pending: true, at: c.acked_at, refid: c.refid})
   end
 
-  # (4 of 5) orphan
-  def status(m, %Schema{orphan: true} = c) do
-    put_status(m, %{cmd: "unknown", orphan: true, orphan_at: c.ack_at})
+  # (4 of 5) orphaned
+  def status(m, %Schema{orphaned: true} = c) do
+    put_status(m, %{cmd: "unknown", orphaned: true, orphaned_at: c.acked_at})
   end
 
   # (5 of 5)
   def status(m, _) do
-    put_status(m, %{cmd: "unknown", invalid: true, at: Timex.now()})
+    put_status(m, %{cmd: "unknown", invalid: true, at: DateTime.utc_now()})
   end
 
-  def update(refid, changes) when is_binary(refid) do
-    wanted_changes = Map.take(changes, columns(:update))
-
-    case find_refid(refid) do
-      %Schema{} = c -> changeset(c, wanted_changes) |> update()
-      _ -> {:not_found, refid}
-    end
+  # (1 of 2) ack immediate is requested, merge in the appropriate changes
+  defp ack_immediate_if_requested(changes, true) do
+    Map.merge(changes, %{acked: true, orphaned: false, acked_at: changes.sent_at})
   end
 
-  def update(%Schema{} = c, changes) do
-    changeset(c, changes) |> update()
-  end
-
-  def update(%Ecto.Changeset{} = cs) do
-    case cs do
-      %{valid?: true} -> {:ok, Repo.update!(cs, returning: true) |> Repo.preload([:alias])}
-      cs -> {:invalid_changes, cs}
-    end
-  end
+  # (2 of 2) nothing to see here
+  defp ack_immediate_if_requested(changes, _), do: changes
 end

@@ -11,7 +11,7 @@ defmodule PulseWidthTest do
   @wait_for_ack [wait_for_ack: true]
 
   setup_all do
-    on_exit(fn -> PulseWidth.cmd_counts_reset([:orphaned, :errors]) end)
+    on_exit(fn -> PulseWidth.track_stats_reset([:orphaned, :errors]) end)
 
     Helper.delete_all_devices()
 
@@ -36,8 +36,6 @@ defmodule PulseWidthTest do
   end
 
   setup ctx do
-    per_test = [:make_alias, :pio, :name, :cmd_map, :freshen, :freshen_rc, :roundtrip_rc]
-
     ctx
     |> debug("START OF SETUP CTX")
     |> Helper.make_device_if_needed()
@@ -46,9 +44,9 @@ defmodule PulseWidthTest do
     |> Helper.freshen_auto()
     |> Helper.execute_cmap()
     |> debug("END OF SETUP CTX")
-    |> Map.drop(per_test)
   end
 
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Create PulseWidth Alias"
@@ -62,6 +60,7 @@ defmodule PulseWidthTest do
   end
 
   # @tag device: "pwm/simulated-alpha"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Execute With Ack"
@@ -81,15 +80,18 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-beta"
+  @tag skip: false
+  @tag pwm_special: true
   @tag make_alias: true
   @tag pio: :any
   @tag freshen: true
   @tag name: "Execute Pending Test"
   # NOTE: above name is automatically added to the cmd map during test setup
-  @tag cmd_map: %{cmd: "fixed 50", type: "fixed", value: 0.5, opts: @wait_for_ack}
+  @tag cmd_map: %{cmd: "fixed 50", type: "fixed", value: 0.5}
   test "can Pulse Width detect pending cmds", ctx do
     cmd_map = %{cmd: "fixed 100", type: "fixed", val: "100", name: ctx.name}
     execute_rc = PulseWidth.execute(cmd_map)
+
     should_be_tuple_with_rc(execute_rc, :pending)
 
     {:pending, exec_details} = execute_rc
@@ -102,6 +104,7 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-beta"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Names Test"
@@ -112,22 +115,20 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-beta"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Command Count Test"
   @tag freshen: true
   @tag cmd_map: %{cmd: "85.6%", type: "fixed", fixed: "85.6", opts: [ack: :host]}
-  test "can Pulse Width get command counts" do
-    cmds = PulseWidth.cmd_counts()
-    fail = pretty("cmd count should be > 0", cmds)
-    assert cmds > 0, fail
+  test "can Pulse Width get track stats" do
+    stats = PulseWidth.track_stats()
 
-    tracked = PulseWidth.cmds_tracked()
-    fail = pretty("cmds tracked should be > 0", tracked)
-    assert tracked > 0, fail
+    should_be_struct(stats, Broom.Counts)
   end
 
   @tag device: "pwm/simulated3-gamma"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Custom Command Test"
@@ -140,7 +141,7 @@ defmodule PulseWidthTest do
          step_ms: 55,
          step: 13,
          priority: 7,
-         opts: [wait_for_ack: true]
+         opts: @wait_for_ack
        }
   test "can Pulse Width execute an extensive cmd map", ctx do
     status = PulseWidth.status(ctx.name)
@@ -148,24 +149,32 @@ defmodule PulseWidthTest do
     should_be_cmd_equal(status, ctx.cmd_map.cmd)
   end
 
-  # @tag skip: true
+  @tag skip: false
   @tag device: "pwm/blackhole"
   @tag host: "ruth.blackhole"
   @tag ttl_ms: 3000
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Black Hole"
-  @tag cmd_map: %{cmd: "on"}
+  @tag cmd_map: %{cmd: "on", opts: [track_timeout_ms: 2]}
   test "can PulseWidth broom handle orphans", ctx do
     # indirect test of :ignore_pending
-    PulseWidth.execute(%{name: ctx.name, cmd: "off", opts: [ignore_pending: true]})
+    PulseWidth.execute(%{
+      name: ctx.name,
+      cmd: "off",
+      opts: [ignore_pending: true, lazy: false, track_timeout_ms: 2]
+    })
 
-    status = PulseWidth.status(ctx.name, ignore_pending: true)
+    status = PulseWidth.status(ctx.name)
     should_be_non_empty_map(status)
 
     orphan_check = fn
-      %{cmd_last: %{orphan: true}} -> true
-      _ -> false
+      %{cmd_last: %{orphaned: true}} ->
+        true
+
+      status ->
+        IO.puts(["\nORPHAN CHECK NO MATCH:\n", inspect(status, pretty: true)])
+        false
     end
 
     for _x <- 1..1300, reduce: :start do
@@ -180,6 +189,7 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-ttl"
+  @tag skip: false
   @tag ttl_ms: 51
   @tag make_alias: true
   @tag pio: :any
@@ -197,13 +207,15 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-delta"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Pulse Width Status Test"
   @tag ttl_ms: 5000
-  @tag cmd_map: %{cmd: "on", opts: [wait_for_ack: true]}
+  @tag cmd_map: %{cmd: "on", opts: @wait_for_ack}
   test "can get Pulse Width status", ctx do
-    should_be_non_empty_map(ctx.execute_rc)
+    Process.sleep(100)
+    should_be_ok_tuple(ctx.execute_rc)
 
     status = PulseWidth.status(ctx.name)
     should_be_non_empty_map(status)
@@ -214,6 +226,7 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-epsilon"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Pulse Width Delete Test"
@@ -244,6 +257,7 @@ defmodule PulseWidthTest do
   end
 
   @tag device: "pwm/simulated-epsilon"
+  @tag skip: false
   @tag make_alias: true
   @tag pio: :any
   @tag name: "Names Test"
@@ -255,12 +269,6 @@ defmodule PulseWidthTest do
 
     pattern_names = PulseWidth.names_begin_with("")
     should_be_non_empty_list(pattern_names)
-  end
-
-  test "can PulseWidth BroomOld report metrics" do
-    rc = PulseWidth.DB.Command.report_metrics(interval: "PT30S")
-
-    should_be_ok_tuple_with_val(rc, "PT30S")
   end
 
   defp debug(ctx, msg) when is_map_key(ctx, :debug) do

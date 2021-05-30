@@ -22,7 +22,7 @@ config :logger,
     [application: :helen, level_lower_than: :info]
   ]
 
-apps = ["betty", "broom", "rita", "garden", "helen", "ui", "ruth_sim"]
+apps = ["betty", "broom", "sally", "garden", "helen", "ui", "ruth_sim"]
 
 for app <- apps do
   import_config "#{app}/config.exs"

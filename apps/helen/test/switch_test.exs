@@ -203,6 +203,7 @@ defmodule SwitchTest do
   @tag ttl_ms: 5000
   @tag cmd_map: %{cmd: "on", opts: [wait_for_ack: true]}
   test "can get Switch status", ctx do
+    IO.puts(inspect(ctx.execute_rc, pretty: true))
     should_be_non_empty_map(ctx.execute_rc)
 
     status = Switch.status(ctx.name)

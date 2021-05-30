@@ -1,4 +1,6 @@
 defmodule PulseWidth.Status do
+  require Logger
+
   use Timex
 
   alias PulseWidth.DB.{Alias, Command}
@@ -11,7 +13,7 @@ defmodule PulseWidth.Status do
   # (3 of 5) last cmd was an orphan, populate cmd with unknown (ignore remote cmd)
   # NOTE: this does imply that once there is an orphan the cmd will always be unknown until
   #       there is a successful cmd
-  def check_cmd(%{cmd_last: %{orphan: true}} = m) do
+  def check_cmd(%{cmd_last: %{orphaned: true}} = m) do
     put_cmd_unknown(m)
   end
 
@@ -89,6 +91,10 @@ defmodule PulseWidth.Status do
     #   ttl_ms: ttl_ms
     # } = load_device(a) |> load_last_cmd()
 
+    a = Alias.load_device(a) |> Alias.load_cmd_last()
+
+    Logger.debug(["\n", inspect(a, pretty: true)])
+
     %{
       name: a.name,
       seen_at: a.device.last_seen_at,
@@ -97,12 +103,15 @@ defmodule PulseWidth.Status do
     }
     |> Command.status(a.cmds)
     |> ttl_check()
+    |> check_cmd()
   end
 
   defp status(x, _opts), do: %{not_found: true, invalid: inspect(x, pretty: true)}
 
   defp ttl_check(%{ttl_ms: ttl_ms, seen_at: seen_at} = m) do
     # diff = DateTime.utc_now() |> DateTime.diff(seen_at, :millisecond)
+
+    Logger.debug(["\n", inspect(m, pretty: true)])
 
     ttl_dt = Timex.now() |> Timex.shift(milliseconds: ttl_ms * -1)
 

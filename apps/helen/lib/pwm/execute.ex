@@ -10,8 +10,52 @@ defmodule PulseWidth.Execute do
 
   require Logger
 
-  alias PulseWidth.DB.Alias
+  alias Alfred.{ExecCmd, ExecResult}
+  alias PulseWidth.DB.{Alias, Command, Device}
   alias PulseWidth.Status
+
+  use Broom,
+    schema: Command,
+    metrics_interval: "PT1M",
+    track_timeout: "PT13S",
+    purge_interval: "PT1H",
+    purge_older_than: "PT1D",
+    restart: :permanent,
+    shutdown: 1000
+
+  # NOTE:
+  # original msg is augmented with ack results and returned for downstream processing
+  def ack_if_needed(%{cmdack: true, refid: refid, device: {:ok, %Device{}} = dev_rc} = msg) do
+    alias PulseWidth.Command.Fact
+
+    # prepare the msg map for the results
+    msg_out = Map.drop(msg, [:cmdack, :refid]) |> Map.merge(%{cmd_rc: nil, broom_rc: nil, metric_rc: nil})
+
+    case Command.ack_now(refid, msg.msg_recv_dt) do
+      {:ok, %Command{}} = cmd_rc ->
+        %{
+          msg_out
+          | cmd_rc: cmd_rc,
+            broom_rc: Broom.release(cmd_rc),
+            metric_rc: Fact.write_metric(cmd_rc, dev_rc, msg.msg_recv_dt)
+        }
+
+      {:error, e} ->
+        %{msg_out | cmd_rc: {:failed, "unable to find refid: #{inspect(e)}"}}
+
+      # allow receipt of refid ack messages while passively processing the rpt topic
+      # (e.g. testing by attaching to production reporting topic)
+      nil ->
+        %{msg_out | cmd_rc: {:ok, "unknown refid: #{refid}"}}
+    end
+  end
+
+  def ack_if_needed(msg), do: put_in(msg, [:cmd_rc], {:ok, "ignored, not a cmdack"})
+
+  @spec execute(ExecCmd.t()) :: ExecResult.t()
+  def execute(%ExecCmd{force: true} = ec) do
+    Alias.find(ec.name) |> exec_cmd()
+  end
 
   @doc """
     Execute a command spec
@@ -37,21 +81,60 @@ defmodule PulseWidth.Execute do
       ```
   """
   @doc since: "0.9.9"
-  # (1 of 2) primary entry point
-  def execute(status, name, cmd_map, opts) when is_map(status) do
+  # NOTE: refactor of all execute code into this module
+  def execute(cmd_map) when is_map(cmd_map) do
+    case cmd_map do
+      %{name: _} -> execute(Map.delete(cmd_map, :opts), cmd_map[:opts] || [])
+      _x -> {:invalid, "cmd map must include name"}
+    end
+  end
+
+  # NOTE: refactor of all execute code into this module
+  def execute(cmd_map, opts) when is_map(cmd_map) and is_list(opts) do
+    Repo.transaction(fn ->
+      cmd_map.name
+      |> Alias.find()
+      |> Status.make_status(opts)
+      |> execute(cmd_map, opts)
+    end)
+    |> elem(1)
+  end
+
+  ##
+  ##
+  ## INCOMPLETE!!!
+  ##
+  ##
+
+  # NOTE: OLD
+  def execute(status, cmd_map, opts) when is_map(status) do
     # default to lazy if not specified
     opts = if opts[:lazy] == false, do: opts, else: opts ++ [lazy: true]
 
     case validate_cmd_map(cmd_map) do
-      :valid -> exec_cmd_map(name, status, cmd_map, opts)
+      :valid -> exec_cmd_map(status, cmd_map, opts)
       {:invalid, _} = rc -> rc
     end
   end
 
-  # (11 of 11) execute the cmd!
-  # opts can contain notify_when_released: true to enter a receive loop waiting for ack
-  def execute(:execute, %Alias{} = a, cmd, opts) do
-    Alias.record_cmd(a, cmd, opts) |> assemble_execute_rc()
+  def track_stats(action, keys) do
+    case {action, keys} do
+      {:get, _} -> Broom.counts()
+      {:reset, x} when is_list(x) -> Broom.counts_reset(x)
+    end
+  end
+
+  @impl true
+  def track_timeout(%Broom.TrackerEntry{schema_id: id}) do
+    Repo.transaction(fn ->
+      cmd_schema = Repo.get(Command, id)
+
+      case cmd_schema do
+        %Command{acked: true} = c -> c
+        %Command{acked: false} = c -> Command.orphan_now(c)
+      end
+    end)
+    |> elem(1)
   end
 
   defp assemble_execute_rc(x) do
@@ -61,6 +144,11 @@ defmodule PulseWidth.Execute do
     failed = fn msg, rc -> {:failed, [invalid: fail_msg.(msg, rc)] |> base.()} end
     pending = fn c, rc -> {:pending, [cmd: c.cmd, refid: c.refid, pub_rc: rc] |> base.()} end
 
+    out = fn x ->
+      Logger.debug(["\n", inspect(x, pretty: true), "\n"])
+      x
+    end
+
     case x do
       # cmd inserted, alias updated. this was an immediate ack.
       %{cmd_rc: {:ok, _}, alias_rc: {:ok, a}} -> {:ok, a.cmd |> current.()}
@@ -68,9 +156,14 @@ defmodule PulseWidth.Execute do
       %{cmd_rc: {:ok, new_cmd}, pub_rc: {:ok, _} = pub_rc} -> new_cmd |> pending.(pub_rc)
       x -> "execute failed" |> failed.(x)
     end
+    |> out.()
   end
 
-  defp exec_cmd_map(name, status, cmd_map, opts) when is_binary(name) do
+  defp exec_cmd(%Alias{}) do
+  end
+
+  # (1 of 2) determine if a cmd must be sent
+  defp exec_cmd_map(status, cmd_map, opts) when is_map(status) do
     # default to lazy if not specified
     opts = Keyword.put_new(opts, :lazy, true)
 
@@ -81,16 +174,55 @@ defmodule PulseWidth.Execute do
     # 1. tuple when conditions do not support execute (e.g. invalid, ttl_expired, pending)
     # 2. single atom for actual comparison result
     case Status.compare(status, cmd_map, opts) do
-      rc when rc == :not_equal or force -> exec_cmd_map(:now, name, cmd_map, opts)
+      rc when rc == :not_equal or force -> exec_cmd_map(:now, cmd_map, opts)
       rc when rc == :equal -> {:ok, status}
       rc when is_tuple(rc) -> rc
     end
   end
 
   # (2 of 2)
+  defp exec_cmd_map(:now, cmd_map, opts) do
+    alias PulseWidth.Payload
 
-  defp exec_cmd_map(:now, name, cmd, opts) do
-    Alias.record_cmd(name, cmd, opts) |> assemble_execute_rc()
+    Logger.debug(["\n", inspect(cmd_map, pretty: true), "\n", inspect(opts, pretty: true)])
+
+    # NOTE: Alias.find/1 returns an Alias or nil
+    found_alias = Alias.find(cmd_map.name)
+    cmd_rc = Command.add(found_alias, cmd_map, opts)
+    broom_rc = Broom.track(cmd_rc, opts)
+
+    # NOTE: handle_ack_immediate_if_needed/2 returns a tuple
+    alias_rc = handle_ack_immediate_if_needed(found_alias, cmd_rc)
+
+    Repo.checkout(fn ->
+      Repo.transaction(fn ->
+        %{
+          name: found_alias.name,
+          alias_rc: alias_rc,
+          cmd_rc: cmd_rc,
+          broom_rc: broom_rc,
+          pub_rc: Payload.send_cmd(found_alias, cmd_map, make_pub_opts(cmd_rc, opts))
+        }
+        |> assemble_execute_rc()
+      end)
+    end)
+    |> elem(1)
+  end
+
+  defp handle_ack_immediate_if_needed(%Alias{} = a, cmd_rc) do
+    # reflect the acked cmd in the Alias (returns an :ok tuple)
+    # otherwise normalize the found alias into an :ok tuple
+    case cmd_rc do
+      {:ok, %Command{acked: true, cmd: acked_cmd}} -> Alias.update_cmd(a, acked_cmd)
+      _ -> {:ok, a}
+    end
+  end
+
+  def make_pub_opts(cmd_rc, opts) do
+    case cmd_rc do
+      {:ok, %Command{} = c} -> [refid: c.refid] ++ [opts]
+      _ -> opts
+    end
   end
 
   defp validate_cmd_map(%{name: _} = cmd_map) do

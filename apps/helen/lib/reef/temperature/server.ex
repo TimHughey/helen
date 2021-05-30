@@ -599,7 +599,7 @@ defmodule Reef.Temp.Server do
   def register_for_device_notifications(%{devices_required: devices} = state) do
     check_registration = fn
       {:ok, _} -> nil
-      {:failed, msg} -> Logger.warn("failed to register: #{msg}")
+      {:failed, msg} -> Logger.debug("failed to register: #{msg}")
     end
 
     # unfold required devices and register for notification

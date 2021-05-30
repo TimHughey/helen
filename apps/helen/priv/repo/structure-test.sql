@@ -64,10 +64,10 @@ CREATE TABLE public.pwm_cmd (
     id bigint NOT NULL,
     refid uuid,
     acked boolean DEFAULT false NOT NULL,
-    orphan boolean DEFAULT false NOT NULL,
+    orphaned boolean DEFAULT false NOT NULL,
     rt_latency_us integer DEFAULT 0 NOT NULL,
     sent_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    ack_at timestamp without time zone,
+    acked_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     cmd character varying(32),
@@ -763,7 +763,7 @@ CREATE INDEX pwm_cmd_inserted_at_index ON public.pwm_cmd USING brin (inserted_at
 -- Name: pwm_cmd_orphan_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX pwm_cmd_orphan_index ON public.pwm_cmd USING btree (orphan);
+CREATE INDEX pwm_cmd_orphan_index ON public.pwm_cmd USING btree (orphaned);
 
 
 --
@@ -1092,3 +1092,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20210507003858);
 INSERT INTO public."schema_migrations" (version) VALUES (20210507025645);
 INSERT INTO public."schema_migrations" (version) VALUES (20210510013226);
 INSERT INTO public."schema_migrations" (version) VALUES (20210513233348);
+INSERT INTO public."schema_migrations" (version) VALUES (20210521022739);
