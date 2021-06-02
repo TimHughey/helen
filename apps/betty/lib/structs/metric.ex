@@ -33,5 +33,5 @@ defmodule Betty.Metric do
   end
 
   # remove Elixir. from module names
-  defp mod_to_string(mod), do: Module.split(mod) |> IO.iodata_to_binary()
+  defp mod_to_string(mod), do: Module.split(mod) |> Enum.join(".")
 end
