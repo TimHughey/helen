@@ -1,4 +1,6 @@
 defmodule Alfred do
+  require Logger
+
   @moduledoc """
   Alfred - Master of devices
   """
@@ -35,6 +37,11 @@ defmodule Alfred do
   end
 
   defdelegate is_name_known?(name), to: NamesAgent, as: :exists?
+
+  def just_saw([%_{__meta__: _} | _] = seen_list) do
+    Logger.debug(inspect(seen_list, pretty: true))
+    NamesAgent.just_saw(seen_list)
+  end
 
   # (1 of 2) process seen names from the inbound msg pipeline
   def just_saw(in_msg) do

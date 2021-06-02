@@ -6,8 +6,8 @@ defmodule Sally.Mqtt.Handler do
   require Logger
   use Tortoise.Handler
 
-  alias Sally.InboundMsg
-  alias Sally.Mqtt.Client
+  # alias Sally.InboundMsg
+  # alias Sally.Mqtt.Client
   alias Sally.MsgIn
 
   def init(args) do
@@ -21,7 +21,7 @@ defmodule Sally.Mqtt.Handler do
     the status.
   """
   def connection(:up, %{args: args} = s) do
-    Client.connected()
+    # Client.connected()
 
     get_in(args, [:next_actions, :connected])
     |> List.wrap()
@@ -29,39 +29,31 @@ defmodule Sally.Mqtt.Handler do
   end
 
   def connection(:down, s) do
-    Client.disconnected()
+    # Client.disconnected()
 
     reply_ok(s)
   end
 
   def connection(:terminated, s) do
-    Client.terminated()
+    # Client.terminated()
 
     reply_ok(s)
   end
 
-  def handle_message([env, "r", src_host, type], payload, s) do
-    %MsgIn{
-      payload: payload,
-      env: env,
-      host: src_host,
-      type: type,
-      at: DateTime.utc_now()
-    }
-    |> MsgIn.preprocess()
-    |> InboundMsg.handoff_msg()
+  def handle_message(topic_filters, payload, s) do
+    MsgIn.create(topic_filters, payload) |> MsgIn.handoff()
 
     reply_ok(s)
   end
 
-  def handle_message(topic, _payload, s) do
-    Logger.warn("unhandled topic: #{Enum.join(topic, "/")}")
-
-    reply_ok(s)
-  end
+  # def handle_message(topic, _payload, s) do
+  #   Logger.warn("unhandled topic: #{Enum.join(topic, "/")}")
+  #
+  #   reply_ok(s)
+  # end
 
   def subscription(:up, topic_filter, s) do
-    Logger.debug("subscribed to reporting topic: #{inspect(topic_filter)}")
+    Logger.debug("subscribed to: #{topic_filter}")
 
     reply_ok(s)
   end
@@ -70,7 +62,7 @@ defmodule Sally.Mqtt.Handler do
     # tortoise doesn't care about what you return from terminate/2,
     # that is in alignment with other behaviours that implement a
     # terminate-callback
-    Logger.warn(["Tortoise terminate: ", inspect(reason)])
+    Logger.info(["Tortoise terminate: ", inspect(reason)])
     :ok
   end
 

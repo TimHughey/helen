@@ -2,8 +2,9 @@ defmodule Sally.PulseWidth.Payload do
   require Logger
 
   alias Alfred.ExecCmd
-  alias Sally.Mqtt
-  alias Sally.MsgOut
+
+  use Sally.MsgOut.Client
+
   alias Sally.PulseWidth.DB.{Alias, Command}
 
   # reference for random command
@@ -25,46 +26,19 @@ defmodule Sally.PulseWidth.Payload do
   # end
 
   def send_cmd(%ExecCmd{inserted_cmd: %Command{alias: %Alias{device: device}}} = ec) do
-    %MsgOut{host: device.host, device: device.ident, data: assemble_specific_cmd_data(ec)}
-    |> MsgOut.apply_opts(ec.pub_opts)
-    |> Mqtt.publish()
+    [device.host, "pwm", device.ident, ec.inserted_cmd.refid]
+    |> publish(assemble_specific_cmd_data(ec), ec.pub_opts)
   end
 
   defp assemble_specific_cmd_data(%ExecCmd{} = ec) do
-    ack = ec.cmd_opts[:ack] || :host
+    add_ack_if_needed = fn x -> if ec.cmd_opts[:ack] == :host, do: put_in(x, [:ack], true), else: x end
 
-    %{cmd: ec.cmd, pio: ec.inserted_cmd.alias.pio, refid: ec.inserted_cmd.refid, ack: ack == :host}
-    |> include_cmd_params_if_needed(ec.cmd_params)
+    include_cmd_params_if_needed = fn x ->
+      if map_size(ec.cmd_params) > 0, do: put_in(x, [:params], ec.cmd_params), else: x
+    end
+
+    %{ec.inserted_cmd.alias.pio => ec.cmd}
+    |> add_ack_if_needed.()
+    |> include_cmd_params_if_needed.()
   end
-
-  defp include_cmd_params_if_needed(data, cmd_params) when map_size(cmd_params) > 0 do
-    # cmd_params = Enum.into(cmd_params, []) |> List.wrap()
-
-    put_in(data, [:exec], cmd_params)
-  end
-
-  defp include_cmd_params_if_needed(data, _cmd_params), do: data
-
-  #
-  # def send_cmd(%Schema{} = a, cmd, opts) do
-  #   create_outbound_cmd(a, cmd, opts) |> Mqtt.publish(opts)
-  # end
-
-  # defp create_outbound_cmd(%Schema{device: d} = a, cmd_map, opts) when is_list(opts) do
-  #   # default to the host ack'ing rhe command
-  #   ack = opts[:ack] || :host
-  #
-  #   %{
-  #     payload: "pwm state",
-  #     mtime: System.os_time(:second),
-  #     host: d.host,
-  #     device: d.device,
-  #     pio: a.pio,
-  #     refid: opts[:refid],
-  #     ack: ack == :host,
-  #     exec: prune_cmd_map(cmd_map) |> List.wrap()
-  #   }
-  # end
-  #
-  # defp prune_cmd_map(cmd_map), do: Map.drop(cmd_map, [:name])
 end

@@ -1,7 +1,9 @@
 defmodule RuthSim.Mqtt do
   require Logger
 
-  @default_server MqttClient
+  alias RuthSim.SimMsgIn
+
+  @default_server __MODULE__.Client
 
   def add_roundtrip_ref(ctx, opts \\ [wait_for_roundtrip: true]) do
     if opts[:wait_for_roundtrip] == true do
@@ -32,6 +34,17 @@ defmodule RuthSim.Mqtt do
     %{pack_rc: Msgpax.pack(msg), pub_opts: opts, host: host, cmdack: true}
     |> validate_pack()
     |> call()
+  end
+
+  # NEW!
+  def publish(%SimMsgIn{} = smi) do
+    mtime = smi.mtime || System.os_time(:second)
+
+    data = smi.data |> Map.put_new(:mtime, mtime)
+
+    topic = "test/r/#{smi.host}/#{smi.ident}"
+
+    Tortoise.publish("ruth_sim", topic, Msgpax.pack!(data), qos: 1)
   end
 
   def validate_pack(%{pack_rc: {:ok, x}} = server_msg) do

@@ -76,6 +76,7 @@ defmodule Sally.MixProject do
       {:broom, in_umbrella: true},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:should, in_umbrella: true, only: :test, runtime: false},
+      {:ruth_sim, in_umbrella: true, only: :test},
       {:excoveralls, "~> 0.10", only: :test}
     ]
   end

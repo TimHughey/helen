@@ -1,5 +1,7 @@
-defmodule MqttClient do
+defmodule RuthSim.Mqtt.Client do
   @moduledoc false
+
+  alias __MODULE__
 
   defstruct client_id: nil, last_ref: nil, rpt_topic: nil, qos1: %{}
 
@@ -14,7 +16,7 @@ defmodule MqttClient do
   def init(opts) do
     rpt_topic = [opts[:prefix], "r"] |> Enum.join("/")
 
-    %MqttClient{client_id: opts[:client_id], rpt_topic: rpt_topic}
+    %Client{client_id: opts[:client_id], rpt_topic: rpt_topic}
     |> reply_ok()
   end
 
@@ -48,7 +50,7 @@ defmodule MqttClient do
   def handle_info({{Tortoise, _client_id}, ref, rc}, s) when rc == :ok do
     case get_in(s.qos1, [ref]) do
       %{send_reply: false} -> nil
-      %{reply_to: reply_to} -> send(reply_to, {{MqttClient, :msg_published}, ref, rc})
+      %{reply_to: reply_to} -> send(reply_to, {{Client, :msg_published}, ref, rc})
       _ -> nil
     end
 
@@ -70,14 +72,14 @@ defmodule MqttClient do
     noreply(s)
   end
 
-  defp add_ref_to_qos1(%MqttClient{} = s, nil = _from), do: s
+  defp add_ref_to_qos1(%Client{} = s, nil = _from), do: s
 
-  defp add_ref_to_qos1(%MqttClient{last_ref: ref} = s, {pid, _} = _from) do
+  defp add_ref_to_qos1(%Client{last_ref: ref} = s, {pid, _} = _from) do
     %{s | qos1: put_in(s.qos1, [ref], %{reply_to: pid, send_reply: false})}
   end
 
-  defp noreply(%MqttClient{} = s), do: {:noreply, s}
-  defp reply(%MqttClient{} = s, msg), do: {:reply, msg, s}
-  defp reply(msg, %MqttClient{} = s), do: {:reply, msg, s}
-  defp reply_ok(%MqttClient{} = s), do: {:ok, s}
+  defp noreply(%Client{} = s), do: {:noreply, s}
+  defp reply(%Client{} = s, msg), do: {:reply, msg, s}
+  defp reply(msg, %Client{} = s), do: {:reply, msg, s}
+  defp reply_ok(%Client{} = s), do: {:ok, s}
 end

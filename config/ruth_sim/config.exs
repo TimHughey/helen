@@ -17,7 +17,7 @@ config :logger,
 config :ruth_sim, :topic, prefix: "test"
 config :ruth_sim, :default_tz, "America/New_York"
 
-config :ruth_sim, MqttHandler,
+config :ruth_sim, RuthSim.Mqtt.Handler,
   next_actions: [
     connected: [{:subscribe, "test/#", qos: 1}]
   ]

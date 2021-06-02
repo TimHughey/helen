@@ -2,8 +2,8 @@ defmodule SallyPwmExecuteTest do
   use ExUnit.Case
   use Should
 
-  @device_ident_default "pwm/sally-execute"
-  @device_host_default "pwm.sally-execute"
+  @device_ident_default "execute"
+  @device_host_default "sally.test-execute"
   @defaults [device_opts: [host: @device_host_default, ident: @device_ident_default]]
 
   @moduletag pwm_execute: true, defaults: @defaults

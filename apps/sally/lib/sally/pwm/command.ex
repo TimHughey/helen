@@ -23,9 +23,13 @@ defmodule Sally.PulseWidth.DB.Command do
     belongs_to(:alias, Alias)
   end
 
-  def ack_now(%Schema{} = cmd_to_ack, disposition) when disposition in [:ack, :orphan] do
-    # ensure we have an acked_at
-    acked_at = cmd_to_ack.acked_at || DateTime.utc_now()
+  # (1 of 2) ack via a schema id
+  def ack_now(id, %DateTime{} = at) when is_integer(id), do: Repo.get(Schema, id) |> ack_now(:ack, at)
+
+  # (2 of 3) ack via a schema
+  def ack_now(%Schema{} = cmd_to_ack, disposition, at) when disposition in [:ack, :orphan] do
+    # determine acked at here for updating the schema and calculating the rt_latency
+    acked_at = cmd_to_ack.acked_at || at
 
     %{
       acked: true,

@@ -1,4 +1,4 @@
-defmodule MqttHandler do
+defmodule RuthSim.Mqtt.Handler do
   require Logger
   use Tortoise.Handler
 
@@ -37,6 +37,15 @@ defmodule MqttHandler do
     |> Msgpax.unpack()
     |> atomize_keys()
     |> InboundMsg.process(dev_type)
+
+    reply_ok(s)
+  end
+
+  # TODO: new!
+  def handle_message([_env, host, category, ident, misc], packed, s) do
+    # data = Msgpax.unpack!(packed) |> atomize_keys()
+    data = Msgpax.unpack!(packed)
+    Logger.debug("\n#{host} #{category}/#{ident} #{misc}\n#{inspect(data, pretty: true)}")
 
     reply_ok(s)
   end
@@ -82,7 +91,10 @@ defmodule MqttHandler do
   # don't attempt to atomize structs
   defp atomize_keys(m) when is_map(m) do
     m
-    |> Enum.map(fn {k, v} -> {String.to_atom(k), atomize_keys(v)} end)
+    |> Enum.map(fn
+      {k, v} when is_binary(k) -> {String.to_atom(k), atomize_keys(v)}
+      x -> x
+    end)
     |> Enum.into(%{})
   end
 

@@ -2,8 +2,8 @@ defmodule SallyPwmStatusTest do
   use ExUnit.Case
   use Should
 
-  @device_ident_default "pwm/sally-status"
-  @device_host_default "pwm.sally-status"
+  @device_ident_default "status"
+  @device_host_default "sally.test-status"
   @defaults [device_opts: [host: @device_host_default, ident: @device_ident_default]]
 
   @moduletag pwm_status: true, defaults: @defaults
@@ -134,7 +134,7 @@ defmodule SallyPwmStatusTest do
     new_cmd = Command.add(ts.dev_alias, cmd, cmd_opts)
 
     if cmd_disposition do
-      Command.ack_now(new_cmd, cmd_disposition) |> put_added_cmd.()
+      Command.ack_now(new_cmd, cmd_disposition, DateTime.utc_now()) |> put_added_cmd.()
     else
       new_cmd |> put_added_cmd.()
     end

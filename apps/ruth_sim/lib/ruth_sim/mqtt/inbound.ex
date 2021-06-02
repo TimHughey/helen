@@ -2,6 +2,8 @@ defmodule RuthSim.InboundMsg.Server do
   require Logger
   use GenServer
 
+  alias RuthSim.Mqtt.Client
+
   defstruct init_args: %{}
 
   # must use RuthSim.Server after defstruct
@@ -32,7 +34,7 @@ defmodule RuthSim.InboundMsg.Server do
 
   @impl true
   # received after a MQTT message of QoS1 has been delivered
-  def handle_info({{MqttClient, :msg_published}, _ref, _rc}, %State{} = s), do: noreply(s)
+  def handle_info({{Client, :msg_published}, _ref, _rc}, %State{} = s), do: noreply(s)
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)

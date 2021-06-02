@@ -69,7 +69,27 @@ defmodule Alfred.NamesAgent do
       %KnownName{
         name: schema.name,
         callback_mod: callback_mod.(schema),
-        # if :pio exists this is a mutable device
+        mutable: mutable?.(schema),
+        seen_at: schema.updated_at,
+        ttl_ms: schema.ttl_ms
+      }
+    end
+  end
+
+  defp make_known_names([%_{__meta__: _} | _] = seen_list) do
+    # when the struct has cmds it is mutable.  conversely, when it has datapoints it is not
+    mutable? = fn
+      %_{cmds: _} -> true
+      %_{datapoints: _} -> false
+    end
+
+    # the callback module is the first level of the struct
+    callback_mod = fn %{__struct__: x} -> Module.split(x) |> Enum.take(1) |> Module.concat() end
+
+    for schema <- seen_list do
+      %KnownName{
+        name: schema.name,
+        callback_mod: callback_mod.(schema),
         mutable: mutable?.(schema),
         seen_at: schema.updated_at,
         ttl_ms: schema.ttl_ms

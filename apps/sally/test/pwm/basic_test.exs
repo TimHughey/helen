@@ -8,8 +8,8 @@ defmodule SallyPwmBasicTest do
   use ExUnit.Case
   use Should
 
-  @device_ident_default "pwm/sally-basic"
-  @device_host_default "pwm.sally-basic"
+  @device_ident_default "basic"
+  @device_host_default "sally.test-basic"
   @defaults [device_opts: [host: @device_host_default, ident: @device_ident_default]]
 
   @moduletag pwm_basic: true, defaults: @defaults

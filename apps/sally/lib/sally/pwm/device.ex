@@ -20,7 +20,7 @@ defmodule Sally.PulseWidth.DB.Device do
     field(:latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
 
-    has_many(:aliases, Alias, references: :id, foreign_key: :device_id)
+    has_many(:aliases, Alias, references: :id, foreign_key: :device_id, preload_order: [asc: :pio])
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -95,15 +95,28 @@ defmodule Sally.PulseWidth.DB.Device do
     end
   end
 
+  def load_aliases(schema_or_id), do: Repo.preload(schema_or_id, [:aliases])
+
   def pios(%Schema{pios: pios}), do: pios
 
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
+
+  def update_last_seen_at(id, %DateTime{} = at) when is_integer(id) do
+    alias Ecto.Changeset
+
+    Repo.get!(Schema, id)
+    |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
+    |> Changeset.validate_required([:last_seen_at])
+    |> Repo.update!(returning: true)
+  end
 
   def upsert(p) when is_map(p) do
     # assemble the opts for upsert
     # check for conflicts on :ident
     # if there is a conflict only replace specified columns
     opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
+
+    p = Enum.reject(p, fn {_k, v} -> is_nil(v) end) |> Enum.into(%{})
 
     changeset(%Schema{}, p) |> Repo.insert!(opts)
   end
