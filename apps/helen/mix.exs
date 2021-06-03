@@ -56,10 +56,10 @@ defmodule Helen.Mixfile do
     [
       extras: ["CHANGELOG.md"],
       groups_for_modules: [
-        Devices: [PulseWidth, Remote, Sensor, Switch],
+        Devices: [Remote, Sensor, Switch],
         Servers: [Reef]
       ],
-      nest_modules_by_prefix: [Helen, Mqtt, PulseWidth, Reef, Sensor, Switch, Remote]
+      nest_modules_by_prefix: [Helen, Mqtt, Reef, Sensor, Switch, Remote]
     ]
   end
 

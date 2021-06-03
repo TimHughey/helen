@@ -5,7 +5,7 @@ defmodule Helen.Workers do
   A worker is either:
     a. a Reef worker (e.g. FirstMate)
     b. a GenDevice (e.g. Reef.MixTank.Air)
-    c. a simple device (e.g. Switch, PulseWidth)
+    c. a simple device (e.g. Switch)
   """
 
   require Logger

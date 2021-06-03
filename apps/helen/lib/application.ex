@@ -16,7 +16,7 @@ defmodule Helen.Application do
   @doc since: "0.0.3"
   @impl true
   def start(:normal, args) do
-    Logger.info(["application starting, working directory: ", "#{inspect(File.cwd(), pretty: true)}"])
+    Logger.debug(["application starting, working directory: ", "#{inspect(File.cwd(), pretty: true)}"])
 
     # only start the Repo db passwd is configured
 
@@ -55,7 +55,8 @@ defmodule Helen.Application do
     if only_repo?() do
       [Repo]
     else
-      [Repo, Fact.Supervisor, Mqtt.Supervisor, PulseWidth.Execute, Switch.Supervisor, Reef.Supervisor]
+      #   [Repo, Fact.Supervisor, Mqtt.Supervisor, Switch.Supervisor, Reef.Supervisor]
+      [Repo]
     end
   end
 

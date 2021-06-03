@@ -236,7 +236,7 @@ defmodule Mqtt.Inbound do
 
   defp msg_pwm(%{async: async} = msg) do
     process = fn ->
-      PulseWidth.handle_message(msg) |> msg_post_process()
+      nil
     end
 
     if async do

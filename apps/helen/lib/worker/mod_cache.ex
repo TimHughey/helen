@@ -56,16 +56,9 @@ defmodule Helen.Workers.ModCache do
   # no match, pass through the accumulator
   defp search(acc, :reef_workers), do: acc
 
-  #
-  # Search Simple Devices (e.g. Switch, PulseWidth)
-  #
-
-  #
-  # Search Simple Devices (e.g. Switch, PulseWidth)
-  #
   # nothing found yet, search all simple devices
   defp search(%{find: {_ident, name}, module: nil} = acc, :simple_devices) do
-    for x <- [PulseWidth, Switch], reduce: acc do
+    for x <- [Switch], reduce: acc do
       %{module: nil} = acc ->
         if x.exists?(name) do
           put_in(acc, [:module], x) |> put_in([:type], :simple_device)
