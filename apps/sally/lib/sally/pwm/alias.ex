@@ -85,8 +85,6 @@ defmodule Sally.PulseWidth.DB.Alias do
     end
   end
 
-  def device_name(%Schema{} = a), do: load_device(a).device.device
-
   def exists?(name_or_id) do
     case find(name_or_id) do
       %Schema{} -> true
@@ -103,8 +101,8 @@ defmodule Sally.PulseWidth.DB.Alias do
   end
 
   # (2 of 2) validate param and build opts for find/2
-  def find(id_or_device) do
-    case id_or_device do
+  def find(id_or_schema) do
+    case id_or_schema do
       x when is_binary(x) -> find(name: x)
       x when is_integer(x) -> find(id: x)
       x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
