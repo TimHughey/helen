@@ -63,7 +63,7 @@ defmodule AlfredNamesTest do
 
     res = NamesAgent.get(expire)
     fail = pretty("#{expire} should have expired", res)
-    assert is_nil(res), fail
+    assert res.pruned, fail
 
     res = NamesAgent.get(not_expire)
     fail = pretty("#{not_expire} should have not expired", res)
