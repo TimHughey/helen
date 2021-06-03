@@ -124,12 +124,18 @@ defmodule Sally.PulseWidth.DB.Alias do
     Repo.all(q)
   end
 
-  def update_cmd(alias_id, cmd) do
-    schema = Repo.get!(Schema, alias_id)
+  def update_cmd(alias_id, cmd) when is_integer(alias_id) do
+    Repo.get!(Schema, alias_id) |> update_cmd(cmd)
+  end
 
-    %{cmd: cmd}
-    |> changeset(schema)
-    |> Repo.update!()
+  def update_cmd(%Schema{} = dev_alias, cmd) do
+    alias Ecto.Changeset
+
+    dev_alias
+    |> Changeset.cast(%{cmd: cmd}, [:cmd])
+    |> Changeset.validate_required([:cmd])
+    |> Changeset.validate_length(:cmd, max: 32)
+    |> Repo.update!(returning: true, force: true)
   end
 
   defp load_command_ids(schema_or_nil) do

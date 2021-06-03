@@ -25,7 +25,6 @@ defmodule Sally.PulseWidth.DB.Device do
     timestamps(type: :utc_datetime_usec)
   end
 
-  # (2 of 2) params are a map
   def changeset(%Schema{} = d, p) when is_map(p) do
     alias Ecto.Changeset
 
@@ -54,17 +53,6 @@ defmodule Sally.PulseWidth.DB.Device do
     MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
   end
 
-  def idents_begin_with(pattern) when is_binary(pattern) do
-    like_string = IO.iodata_to_binary([pattern, "%"])
-
-    Query.from(x in Schema,
-      where: like(x.ident, ^like_string),
-      order_by: x.ident,
-      select: x.ident
-    )
-    |> Repo.all()
-  end
-
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
     case Repo.get_by(Schema, opts) do
@@ -84,6 +72,21 @@ defmodule Sally.PulseWidth.DB.Device do
 
   def find_alias(%Schema{aliases: aliases}, pio) when is_integer(pio) and pio >= 0 do
     Enum.find(aliases, nil, fn dev_alias -> Alias.for_pio?(dev_alias, pio) end)
+  end
+
+  def get_aliases(%Schema{id: id}) do
+    Repo.all(Alias, device_id: id)
+  end
+
+  def idents_begin_with(pattern) when is_binary(pattern) do
+    like_string = IO.iodata_to_binary([pattern, "%"])
+
+    Query.from(x in Schema,
+      where: like(x.ident, ^like_string),
+      order_by: x.ident,
+      select: x.ident
+    )
+    |> Repo.all()
   end
 
   def pio_aliased?(%Schema{id: id, pios: pios}, pio) when pio < pios do
@@ -115,8 +118,6 @@ defmodule Sally.PulseWidth.DB.Device do
     # check for conflicts on :ident
     # if there is a conflict only replace specified columns
     opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
-
-    p = Enum.reject(p, fn {_k, v} -> is_nil(v) end) |> Enum.into(%{})
 
     changeset(%Schema{}, p) |> Repo.insert!(opts)
   end

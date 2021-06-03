@@ -11,7 +11,7 @@ defmodule SallyPwmMsgHandlerTest do
   @device_ident_default "msg-handler-default"
   @device_host_default "sally.test-msg-handler-default"
   @defaults [
-    device_opts: [host: @device_host_default, ident: @device_ident_default, pios: 12],
+    device_opts: [host: @device_host_default, ident: @device_ident_default, pios: 4],
     category: "pwm"
   ]
 
@@ -58,7 +58,7 @@ defmodule SallyPwmMsgHandlerTest do
     inflight = MsgHandler.handle_message(cmdack_msg_in)
     should_be_struct(inflight, MsgInFlight)
     should_be_schema(inflight.ident, DB.Device)
-    should_be_ok_tuple(inflight.just_saw)
+    should_be_non_empty_list(inflight.just_saw)
     should_be_ok_tuple(inflight.metric_rc)
     should_be_struct(inflight.release, Broom.TrackerEntry)
 
@@ -67,6 +67,41 @@ defmodule SallyPwmMsgHandlerTest do
     after
       10_000 -> nil
     end
+  end
+
+  # @tag skip: true
+  # @tag dump_ctx: true
+  test "can PulseWidth.MsgHandler.handle_message/1 report message", ctx do
+    validate_ident(ctx)
+    device = ctx.inflight.ident
+
+    _dev_aliases = for x <- 0..3, do: DB.Alias.create(device, name: "Report #{x}", pio: x)
+
+    pios = @defaults[:device_opts][:pios]
+    read_micros = :rand.uniform(10) + 19
+
+    report_data = %{
+      :mtime => System.os_time(:millisecond),
+      0 => "on",
+      1 => "off",
+      2 => "custom1",
+      3 => "custom2",
+      pios: pios,
+      us: read_micros
+    }
+
+    %{msg_in: report_msg_in} = %{ctx | data: report_data} |> setup_msg_in()
+
+    inflight = MsgHandler.handle_message(report_msg_in)
+    should_be_struct(inflight, MsgInFlight)
+    should_be_schema(inflight.ident, DB.Device)
+    should_be_non_empty_list(inflight.applied_data)
+    should_be_schema(inflight.applied_data |> hd(), DB.Alias)
+    should_be_non_empty_list(inflight.just_saw)
+    should_be_non_empty_list(inflight.metrics)
+    should_be_empty_list(inflight.faults)
+
+    inspect(inflight.just_saw, pretty: true) |> IO.puts()
   end
 
   defp setup_additional_data(ctx) do
@@ -153,7 +188,7 @@ defmodule SallyPwmMsgHandlerTest do
     assert x.ident == msg_in.ident, fail
     assert x.pios == msg_in.data.pios, fail
     assert x.latency_us == msg_in.data.latency_us, fail
-    assert x.aliases |> is_list(), fail
+    refute Ecto.assoc_loaded?(x.aliases), fail
     assert DateTime.compare(x.inserted_at, x.last_seen_at) != :eq, fail
     assert DateTime.compare(x.last_seen_at, x.updated_at) == :lt, fail
   end

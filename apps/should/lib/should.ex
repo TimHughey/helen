@@ -13,11 +13,19 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_empty_list(res) do
+    quote location: :keep, bind_quoted: [res: res] do
+      fail = pretty("should be empty list", res)
+      assert is_list(res), fail
+      assert [] == res, fail
+    end
+  end
+
   defmacro should_be_non_empty_list(res) do
     quote location: :keep, bind_quoted: [res: res] do
       fail = pretty("should be non-empty list", res)
       assert is_list(res), fail
-      refute [] == res
+      refute [] == res, fail
     end
   end
 
