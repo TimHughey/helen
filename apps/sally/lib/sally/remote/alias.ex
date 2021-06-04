@@ -25,7 +25,6 @@ defmodule Sally.Remote.DB.Alias do
 
     belongs_to(:host, Host)
     has_many(:cmds, Command, foreign_key: :alias_id, preload_order: [desc: :sent_at])
-    has_many(:datapoints, Datapoint, foreign_key: :alias_id, preload_order: [desc: :reading_at])
 
     timestamps(type: :utc_datetime_usec)
   end
