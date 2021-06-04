@@ -159,7 +159,7 @@ defmodule Sally.PulseWidth.DB.Alias do
   #      alpha numeric, slash (/), dash (-), underscore (_), colon (:) and
   #      spaces
   #  -ends with an alpha char
-  defp name_regex, do: ~r'^[\\~\w]+[\w\\ \\/\\:\\.\\_\\-]{1,}[\w]$'
+  defp name_regex, do: ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i
 
   defp upsert(params, %Schema{} = device) when is_map(params) do
     insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
