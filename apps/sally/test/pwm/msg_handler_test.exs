@@ -87,7 +87,7 @@ defmodule SallyPwmMsgHandlerTest do
       2 => "custom1",
       3 => "custom2",
       pios: pios,
-      us: read_micros
+      read_us: read_micros
     }
 
     %{msg_in: report_msg_in} = %{ctx | data: report_data} |> setup_msg_in()
@@ -114,10 +114,9 @@ defmodule SallyPwmMsgHandlerTest do
     put_in_ctx = fn x -> put_in(ctx, [:data], x) end
 
     pios = ctx[:pios] || @defaults[:device_opts][:pios]
-    latency_us = :rand.uniform(1000) + 500
     mtime = System.os_time(:millisecond)
 
-    %{mtime: mtime, pios: pios, latency_us: latency_us} |> put_in_ctx.()
+    %{mtime: mtime, pios: pios} |> put_in_ctx.()
   end
 
   defp setup_create_dev_alias(ctx) do
@@ -187,7 +186,6 @@ defmodule SallyPwmMsgHandlerTest do
     assert x.host == msg_in.host, fail
     assert x.ident == msg_in.ident, fail
     assert x.pios == msg_in.data.pios, fail
-    assert x.latency_us == msg_in.data.latency_us, fail
     refute Ecto.assoc_loaded?(x.aliases), fail
     assert DateTime.compare(x.inserted_at, x.last_seen_at) != :eq, fail
     assert DateTime.compare(x.last_seen_at, x.updated_at) == :lt, fail

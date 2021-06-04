@@ -144,7 +144,7 @@ defmodule SallyPwmStatusTest do
 
   defp setup_wrapped(ctx) do
     alias Sally.PulseWidth.TestSupport, as: TS
-    alias SallyRepo, as: Repo
+    alias Sally.Repo
 
     txn_res =
       Repo.transaction(fn ->

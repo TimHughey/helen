@@ -6,7 +6,7 @@ defmodule Sally.PulseWidth.MsgHandler do
   alias Broom.TrackerEntry
   alias Sally.PulseWidth.DB
   alias Sally.PulseWidth.Execute
-  alias SallyRepo, as: Repo
+  alias Sally.Repo
 
   @impl true
   def handle_message(%MsgIn{valid?: true} = mi) do
@@ -75,7 +75,7 @@ defmodule Sally.PulseWidth.MsgHandler do
       %Betty.Metric{
         measurement: "mutables",
         tags: %{module: __MODULE__, name: dev_alias.name, cmd: dev_alias.cmd},
-        fields: %{read_us: original_data[:us] || 0},
+        fields: %{read_us: original_data[:read_us] || 0},
         # each measurement must be at a unique timestamp
         timestamp: DateTime.to_unix(sent_at, :nanosecond) + dev_alias.pio
       }
@@ -89,7 +89,6 @@ defmodule Sally.PulseWidth.MsgHandler do
       ident: mi.ident,
       host: mi.host,
       pios: mi.data[:pios],
-      latency_us: mi.data[:latency_us],
       last_seen_at: mi.recv_at
     }
     |> DB.Device.upsert()

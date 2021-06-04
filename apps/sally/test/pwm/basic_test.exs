@@ -26,8 +26,8 @@ defmodule SallyPwmBasicTest do
   @tag alias_opts: [name: "Basic Device and Alias", pio: 0, description: "db basic", ttl_ms: 50]
   test "can PulseWidth create a Device and Alias", ctx do
     txn_res =
-      SallyRepo.transaction(fn ->
-        SallyRepo.checkout(fn ->
+      Sally.Repo.transaction(fn ->
+        Sally.Repo.checkout(fn ->
           ctx = TS.ensure_device(ctx)
           should_be_schema(ctx.ts.device, Device)
 

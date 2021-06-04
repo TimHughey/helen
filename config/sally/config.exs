@@ -1,6 +1,6 @@
 import Config
 
-config :sally, ecto_repos: [SallyRepo]
+config :sally, ecto_repos: [Sally.Repo]
 
 config :sally,
   mqtt_connection: [

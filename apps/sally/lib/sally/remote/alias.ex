@@ -1,6 +1,6 @@
-defmodule Sally.PulseWidth.DB.Alias do
+defmodule Sally.Remote.DB.Alias do
   @moduledoc """
-  Database implementation of Sally.PulseWidth Aliases
+  Database implementation of Sally.Remote Aliases
   """
   require Logger
 
@@ -8,23 +8,24 @@ defmodule Sally.PulseWidth.DB.Alias do
   require Ecto.Query
   alias Ecto.Query
 
-  alias Sally.PulseWidth.DB.Alias, as: Schema
-  alias Sally.PulseWidth.DB.{Command, Device}
+  alias Sally.Remote.DB.Alias, as: Schema
+  alias Sally.Remote.DB.{Command, Datapoint, Host}
   alias Sally.Repo
 
-  @pio_min 0
+  @profile_default "generic"
   @ttl_default 2000
   @ttl_min 50
 
-  schema "pwm_alias" do
+  schema "remote_alias" do
     field(:name, :string)
-    field(:cmd, :string, default: "unknown")
     field(:description, :string, default: "<none>")
-    field(:pio, :integer)
+    field(:cmd, :string, default: "<created>")
+    field(:profile, :string, default: @profile_default)
     field(:ttl_ms, :integer, default: @ttl_default)
 
-    belongs_to(:device, Device)
-    has_many(:cmds, Command, references: :id, foreign_key: :alias_id, preload_order: [desc: :sent_at])
+    belongs_to(:host, Host)
+    has_many(:cmds, Command, foreign_key: :alias_id, preload_order: [desc: :sent_at])
+    has_many(:datapoints, Datapoint, foreign_key: :alias_id, preload_order: [desc: :reading_at])
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -35,11 +36,13 @@ defmodule Sally.PulseWidth.DB.Alias do
     a
     |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required(columns(:required))
+    |> Changeset.validate_length(:name, min: 3, max: 32)
     |> Changeset.validate_format(:name, name_regex())
-    |> Changeset.validate_length(:name, max: 128)
+    |> Changeset.validate_length(:profile, min: 1, max: 32)
+    |> Changeset.validate_format(:profile, profile_regex())
+    |> validate_profile_exists()
+    |> Changeset.validate_length(:cmd, min: 2, max: 32)
     |> Changeset.validate_length(:description, max: 50)
-    |> Changeset.validate_length(:cmd, max: 32)
-    |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
     |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
     |> Changeset.unique_constraint(:name, [:name])
   end
@@ -52,7 +55,7 @@ defmodule Sally.PulseWidth.DB.Alias do
   end
 
   def columns(:cast), do: columns(:all)
-  def columns(:required), do: columns_all(only: [:device_id, :name, :pio])
+  def columns(:required), do: columns_all(only: [:host_id, :name, :profile])
   def columns(:replace), do: columns_all(drop: [:name, :inserted_at])
 
   def columns_all(opts) when is_list(opts) do
@@ -62,12 +65,12 @@ defmodule Sally.PulseWidth.DB.Alias do
     MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
   end
 
-  def create(%Device{} = device, opts) do
-    dev_alias = Ecto.build_assoc(device, :aliases)
+  def create(%Host{} = host, opts) do
+    dev_alias = Ecto.build_assoc(host, :aliases)
 
     %{
       name: opts[:name],
-      pio: opts[:pio],
+      profile: opts[:profile] || @profile_default,
       description: opts[:description] || "<none>",
       ttl_ms: opts[:ttl_ms] || @ttl_default
     }
@@ -95,7 +98,7 @@ defmodule Sally.PulseWidth.DB.Alias do
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
     case Repo.get_by(Schema, opts) do
-      %Schema{} = x -> load_device(x) |> load_cmd_last()
+      %Schema{} = x -> load_host(x) |> load_cmd_last()
       x when is_nil(x) -> nil
     end
   end
@@ -108,8 +111,6 @@ defmodule Sally.PulseWidth.DB.Alias do
       x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
     end
   end
-
-  def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
   def names do
     Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
@@ -141,10 +142,10 @@ defmodule Sally.PulseWidth.DB.Alias do
     Repo.preload(schema_or_nil, [cmds: q], force: true)
   end
 
-  def load_device(schema_or_tuple) do
+  def load_host(schema_or_tuple) do
     case schema_or_tuple do
-      {:ok, %Schema{} = a} -> {:ok, Repo.preload(a, [:device])}
-      %Schema{} = a -> Repo.preload(a, [:device])
+      {:ok, %Schema{} = a} -> {:ok, Repo.preload(a, [:host])}
+      %Schema{} = a -> Repo.preload(a, [:host])
       x -> x
     end
   end
@@ -159,13 +160,20 @@ defmodule Sally.PulseWidth.DB.Alias do
   #      alpha numeric, slash (/), dash (-), underscore (_), colon (:) and
   #      spaces
   #  -ends with an alpha char
-  defp name_regex, do: ~r'^[\\~\w]+[\w\\ \\/\\:\\.\\_\\-]{1,}[\w]$'
+  defp name_regex, do: ~r'^[a-zA-Z]+[\w.:-]+$'
 
-  defp upsert(params, %Schema{} = device) when is_map(params) do
+  defp profile_regex, do: ~r'^[a-zA-Z]+[\w-]+$'
+
+  defp upsert(params, %Schema{} = schema) when is_map(params) do
     insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
 
     params
-    |> changeset(device)
+    |> changeset(schema)
     |> Repo.insert(insert_opts)
+  end
+
+  defp validate_profile_exists(%Ecto.Changeset{} = cs) do
+    # TODO implement profile validation
+    cs
   end
 end

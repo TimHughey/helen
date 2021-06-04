@@ -8,7 +8,7 @@ defmodule Sally.PulseWidth.Execute do
   alias Sally.PulseWidth.DB.{Alias, Command}
   alias Sally.PulseWidth.Payload
   alias Sally.PulseWidth.Status
-  alias SallyRepo, as: Repo
+  alias Sally.Repo
 
   use Broom,
     schema: Command,

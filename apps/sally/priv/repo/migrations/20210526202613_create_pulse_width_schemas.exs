@@ -14,7 +14,6 @@ defmodule Sally.Repo.Migrations.Initial do
       add(:app_sha, :string, size: 64)
       add(:reset_reason, :string, size: 64)
       add(:build_at, :utc_datetime_usec)
-
       add(:last_start_at, :utc_datetime_usec, null: false)
       add(:last_seen_at, :utc_datetime_usec, null: false)
 
@@ -35,6 +34,7 @@ defmodule Sally.Repo.Migrations.Initial do
     end
 
     create(index(:remote_alias, [:name], name: "remote_alias_name_index", unique: true))
+    create(index(:remote_alias, [:host_id], name: "remote_alias_host_id_index"))
 
     create table(:remote_cmd) do
       add(:cmd, :string, size: 32, null: false)

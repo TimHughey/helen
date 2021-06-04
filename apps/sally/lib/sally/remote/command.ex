@@ -1,4 +1,4 @@
-defmodule Sally.PulseWidth.DB.Command do
+defmodule Sally.Remote.DB.Command do
   @moduledoc false
 
   require Logger
@@ -7,18 +7,18 @@ defmodule Sally.PulseWidth.DB.Command do
   require Ecto.Query
   alias Ecto.Query
 
-  alias Sally.PulseWidth.DB.Alias
-  alias Sally.PulseWidth.DB.Command, as: Schema
+  alias Sally.Remote.DB.Alias
+  alias Sally.Remote.DB.Command, as: Schema
   alias Sally.Repo
 
-  schema "pwm_cmd" do
+  schema "remote_cmd" do
     field(:refid, :string)
     field(:cmd, :string, default: "unknown")
     field(:acked, :boolean, default: false)
     field(:orphaned, :boolean, default: false)
-    field(:rt_latency_us, :integer, default: 0)
     field(:sent_at, :utc_datetime_usec)
     field(:acked_at, :utc_datetime_usec)
+    field(:rt_latency_us, :integer, default: 0)
 
     belongs_to(:alias, Alias)
   end

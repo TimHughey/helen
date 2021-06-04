@@ -12,7 +12,7 @@ defmodule Sally.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {SallyRepo, []},
+      {Sally.Repo, []},
       {Tortoise.Connection, @mqtt_connection},
       #  {Sally.Mqtt.Client, make_client_opts()},
       {Sally.PulseWidth.Supervisor, []}

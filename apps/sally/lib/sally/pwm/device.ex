@@ -11,19 +11,21 @@ defmodule Sally.PulseWidth.DB.Device do
 
   alias Sally.PulseWidth.DB.Alias, as: Alias
   alias Sally.PulseWidth.DB.Device, as: Schema
-  alias SallyRepo, as: Repo
+  alias Sally.Repo
 
   schema "pwm_device" do
     field(:ident, :string)
     field(:host, :string)
     field(:pios, :integer)
-    field(:latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
 
     has_many(:aliases, Alias, references: :id, foreign_key: :device_id, preload_order: [asc: :pio])
 
     timestamps(type: :utc_datetime_usec)
   end
+
+  @ident_name_max_length 128
+  @pios_min 1
 
   def changeset(%Schema{} = d, p) when is_map(p) do
     alias Ecto.Changeset
@@ -32,8 +34,10 @@ defmodule Sally.PulseWidth.DB.Device do
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
     |> Changeset.validate_format(:ident, name_regex())
+    |> Changeset.validate_length(:ident, max: @ident_name_max_length)
     |> Changeset.validate_format(:host, name_regex())
-    |> Changeset.validate_number(:latency_us, greater_than_or_equal_to: 0)
+    |> Changeset.validate_length(:host, max: @ident_name_max_length)
+    |> Changeset.validate_number(:pios, greater_than_or_equal_to: @pios_min)
   end
 
   def columns(:all) do

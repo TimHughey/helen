@@ -35,7 +35,6 @@ defmodule Sally.PulseWidth.TestSupport do
       ident: opts[:ident],
       host: opts[:host],
       pios: opts[:pios] || 16,
-      latency_us: :rand.uniform(1000) + 1000,
       last_seen_at: DateTime.utc_now()
     }
 

@@ -5,7 +5,7 @@ defmodule Sally.PulseWidth.Status do
   alias __MODULE__
   alias Alfred.MutableStatus
   alias Sally.PulseWidth.DB.{Alias, Command}
-  alias SallyRepo, as: Repo
+  alias Sally.Repo
 
   @type ttl_ms() :: 50..600_000
   @type opts() :: [ttl_ms: ttl_ms(), need_dev_alias: boolean()]
