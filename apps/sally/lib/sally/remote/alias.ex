@@ -172,7 +172,21 @@ defmodule Sally.Remote.DB.Alias do
   end
 
   defp validate_profile_exists(%Ecto.Changeset{} = cs) do
-    # TODO implement profile validation
-    cs
+    alias Ecto.Changeset
+
+    profile_dir = [System.get_env("RUTH_TOML", "/tmp"), "profiles"] |> Path.join()
+
+    case Changeset.get_change(cs, :profile) do
+      x when is_binary(x) ->
+        profile_file = [profile_dir, x] |> Path.join()
+
+        case Toml.decode_file(profile_file, filename: profile_file) do
+          {:ok, _} -> cs
+          {:error, reason} -> Changeset.add_error(cs, :profile, reason)
+        end
+
+      _ ->
+        cs
+    end
   end
 end

@@ -71,6 +71,7 @@ defmodule Sally.MixProject do
       {:msgpax, "~> 2.0"},
       {:postgrex, ">= 0.0.0", only: :test},
       {:tortoise, "~> 0.9"},
+      {:toml, "~> 0.6.1"},
       {:alfred, in_umbrella: true},
       {:betty, in_umbrella: true},
       {:broom, in_umbrella: true},
