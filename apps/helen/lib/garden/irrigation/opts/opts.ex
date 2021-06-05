@@ -6,11 +6,10 @@ defmodule Garden.Irrigation.Opts do
       jobs: [
         flower_boxes: [
           device: "irrigation flower boxes",
-          schedule: [am: "PT45S", noon: "PT30S", pm: "PT30S"]
+          schedule: [am: "PT2M", noon: "PT1M", pm: "PT1M"]
         ],
-        garden: [device: "irrigation garden", schedule: [am: "PT30M"]]
+        garden: [device: "irrigation garden", schedule: [am: "PT10M", noon: "PT5M", pm: "PT10M"]]
       ],
-      jobs: [],
       power: [device: "irrigation 12v power", power_up_delay: "PT5S"],
       device_group: "irrigation",
       timezone: "America/New_York",

@@ -226,7 +226,7 @@ defmodule Garden.Irrigation.Server do
       case time_key do
         :am -> Agnus.sunrise()
         :noon -> Agnus.noon()
-        :pm -> Agnus.sunset() |> Timex.shift(hours: -3)
+        :pm -> Agnus.sunset() |> Timex.shift(hours: -1)
       end
 
     %Cron{
