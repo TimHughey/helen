@@ -1,4 +1,4 @@
-defmodule Sally.Remote.DB.Command do
+defmodule Sally.Command do
   @moduledoc false
 
   require Logger
@@ -7,20 +7,19 @@ defmodule Sally.Remote.DB.Command do
   require Ecto.Query
   alias Ecto.Query
 
-  alias Sally.Remote.DB.Alias
-  alias Sally.Remote.DB.Command, as: Schema
-  alias Sally.Repo
+  alias __MODULE__, as: Schema
+  alias Sally.{DevAlias, Repo}
 
-  schema "remote_cmd" do
+  schema "command" do
     field(:refid, :string)
     field(:cmd, :string, default: "unknown")
     field(:acked, :boolean, default: false)
     field(:orphaned, :boolean, default: false)
+    field(:rt_latency_us, :integer, default: 0)
     field(:sent_at, :utc_datetime_usec)
     field(:acked_at, :utc_datetime_usec)
-    field(:rt_latency_us, :integer, default: 0)
 
-    belongs_to(:alias, Alias)
+    belongs_to(:dev_alias, DevAlias)
   end
 
   # (1 of 2) ack via a schema id
@@ -41,22 +40,25 @@ defmodule Sally.Remote.DB.Command do
     |> Repo.update!(returning: true)
   end
 
-  def add(%Alias{} = da, cmd, opts) do
+  def add(%DevAlias{} = da, cmd, opts) do
     new_cmd = Ecto.build_assoc(da, :cmds)
 
     [refid | _] = Ecto.UUID.generate() |> String.split("-")
 
+    # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
+    utc_now = DateTime.utc_now()
+
     # handle special case of ack immediate
     ack_immediate? = opts[:ack] == :immediate
-    acked_at = if ack_immediate?, do: DateTime.utc_now(), else: nil
+    acked_at = if ack_immediate?, do: utc_now, else: nil
 
     # base changes for all new cmds
-    %{refid: refid, cmd: cmd, acked: ack_immediate?, acked_at: acked_at, sent_at: DateTime.utc_now()}
+    %{refid: refid, cmd: cmd, acked: ack_immediate?, acked_at: acked_at, sent_at: utc_now}
     |> changeset(new_cmd)
     |> Repo.insert!(returning: true)
   end
 
-  def purge(%Alias{cmds: cmds}, :all) do
+  def purge(%DevAlias{cmds: cmds}, :all) do
     all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
     batches = Enum.chunk_every(all_ids, 10)
 
@@ -75,9 +77,10 @@ defmodule Sally.Remote.DB.Command do
 
     c
     |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required([:refid, :cmd, :sent_at, :alias_id])
+    |> Changeset.validate_required([:refid, :cmd, :sent_at, :dev_alias_id])
     # the cmd should be a minimum of two characters (e.g. "on")
     |> Changeset.validate_length(:cmd, min: 2, max: 32)
+    |> Changeset.validate_length(:refid, is: 8)
     |> Changeset.unique_constraint(:refid)
   end
 

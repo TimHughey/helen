@@ -12,7 +12,9 @@ defmodule Sally.MsgIn do
             host: nil,
             category: nil,
             ident: nil,
-            misc: nil,
+            # TODO: remove misc in favor of adjunct
+            #  misc: nil,
+            adjunct: nil,
             sent_at: nil,
             recv_at: nil,
             data: nil,
@@ -34,7 +36,8 @@ defmodule Sally.MsgIn do
           host: String.t(),
           category: Types.msg_type(),
           ident: Types.device_or_remote_identifier(),
-          misc: nil | String.t(),
+          # misc: nil | String.t(),
+          adjunct: nil | String.t(),
           sent_at: %DateTime{},
           recv_at: %DateTime{},
           data: map(),
@@ -48,7 +51,11 @@ defmodule Sally.MsgIn do
         }
 
   def create(topic_filters, payload) when is_list(topic_filters) and is_bitstring(payload) do
-    filters = Enum.zip([:env, :report, :host, :category, :ident, :misc], topic_filters)
+    {topic_filters, payload} |> create()
+  end
+
+  def create({topic_filters, payload}) when is_list(topic_filters) and is_bitstring(payload) do
+    filters = Enum.zip([:env, :report, :host, :category, :ident, :adjunct], topic_filters)
 
     %MsgIn{
       payload: payload,
@@ -57,7 +64,7 @@ defmodule Sally.MsgIn do
       host: filters[:host],
       category: filters[:category],
       ident: filters[:ident],
-      misc: filters[:misc],
+      adjunct: filters[:adjunct],
       recv_at: DateTime.utc_now()
     }
     |> MsgIn.preprocess()

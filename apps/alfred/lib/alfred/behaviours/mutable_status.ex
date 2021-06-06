@@ -22,19 +22,17 @@ defmodule Alfred.MutableStatus do
           error: status_error()
         }
 
-  def good(%_{} = x) do
+  def good(%_{cmds: [%_{cmd: cmd}]} = x) do
     %Status{
       name: x.name,
-      cmd: x.cmd,
+      cmd: cmd,
       status_at: x.device.last_seen_at
     }
   end
 
   def not_found(name), do: %Status{name: name, status_at: DateTime.utc_now(), found?: false}
 
-  def pending(%_{} = x) do
-    [%_{} = cmd_schema] = x.cmds
-
+  def pending(%_{cmds: [%_{} = cmd_schema]} = x) do
     %Status{
       name: x.name,
       cmd: cmd_schema.cmd,

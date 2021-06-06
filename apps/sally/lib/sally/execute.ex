@@ -1,14 +1,11 @@
-defmodule Sally.PulseWidth.Execute do
+defmodule Sally.Execute do
   require Logger
 
   alias Alfred.ExecCmd
   alias Alfred.ExecResult
   alias Alfred.MutableStatus, as: MutStatus
   alias Broom.TrackerEntry
-  alias Sally.PulseWidth.DB.{Alias, Command}
-  alias Sally.PulseWidth.Payload
-  alias Sally.PulseWidth.Status
-  alias Sally.Repo
+  alias Sally.{Command, Payload, Repo, Status}
 
   use Broom,
     schema: Command,
@@ -21,16 +18,10 @@ defmodule Sally.PulseWidth.Execute do
 
   def ack_now(refid, at) do
     Repo.transaction(fn ->
-      Repo.checkout(fn ->
-        case Broom.get_refid_tracker_entry(refid) do
-          %TrackerEntry{} = te ->
-            Alias.update_cmd(te.alias_id, te.cmd)
-            Command.ack_now(te.schema_id, at) |> Broom.release()
-
-          _ ->
-            nil
-        end
-      end)
+      case Broom.get_refid_tracker_entry(refid) do
+        %TrackerEntry{} = te -> Command.ack_now(te.schema_id, at) |> Broom.release()
+        _ -> nil
+      end
     end)
   end
 
@@ -58,16 +49,11 @@ defmodule Sally.PulseWidth.Execute do
   @impl true
   def track_timeout(%Broom.TrackerEntry{} = te) do
     Repo.transaction(fn ->
-      Repo.checkout(fn ->
-        # the command was already acked when it was tracked so reflect it in the Alias
-        if te.acked, do: Alias.update_cmd(te.alias_id, te.cmd)
-
-        case Repo.get!(Command, te.schema_id) do
-          %Command{acked: false} = c -> Command.ack_now(c, :orphan, DateTime.utc_now())
-          %Command{acked: true} = c -> c
-        end
-        |> Repo.preload(alias: [:device])
-      end)
+      case Repo.get!(Command, te.schema_id) do
+        %Command{acked: false} = c -> Command.ack_now(c, :orphan, DateTime.utc_now())
+        %Command{acked: true} = c -> c
+      end
+      |> Repo.preload(dev_alias: [device: [:host]])
     end)
     |> elem(1)
   end
@@ -84,7 +70,7 @@ defmodule Sally.PulseWidth.Execute do
              {:add_cmd, true} <- {:add_cmd, force or ec.cmd != status.cmd} do
           # actual command to dev alias is required
           # NOTE! preload the dev_alias and device for downstream
-          x = Command.add(dev_alias, ec.cmd, ec.cmd_opts) |> Repo.preload(alias: [:device])
+          x = Command.add(dev_alias, ec.cmd, ec.cmd_opts) |> Repo.preload(dev_alias: [device: [:host]])
           %ExecCmd{ec | inserted_cmd: x, cmd_opts: cmd_opts_rest}
         else
           %MutStatus{} = x -> x

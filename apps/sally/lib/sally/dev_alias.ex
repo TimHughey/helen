@@ -1,4 +1,4 @@
-defmodule Sally.PulseWidth.DB.Alias do
+defmodule Sally.DevAlias do
   @moduledoc """
   Database implementation of Sally.PulseWidth Aliases
   """
@@ -6,25 +6,23 @@ defmodule Sally.PulseWidth.DB.Alias do
 
   use Ecto.Schema
   require Ecto.Query
-  alias Ecto.Query
 
-  alias Sally.PulseWidth.DB.Alias, as: Schema
-  alias Sally.PulseWidth.DB.{Command, Device}
-  alias Sally.Repo
+  alias __MODULE__, as: Schema
+  alias Sally.{Command, Datapoint, Device, Repo}
 
   @pio_min 0
   @ttl_default 2000
   @ttl_min 50
 
-  schema "pwm_alias" do
+  schema "dev_alias" do
     field(:name, :string)
-    field(:cmd, :string, default: "unknown")
-    field(:description, :string, default: "<none>")
     field(:pio, :integer)
+    field(:description, :string, default: "<none>")
     field(:ttl_ms, :integer, default: @ttl_default)
 
     belongs_to(:device, Device)
-    has_many(:cmds, Command, references: :id, foreign_key: :alias_id, preload_order: [desc: :sent_at])
+    has_many(:cmds, Command, foreign_key: :dev_alias_id, preload_order: [desc: :sent_at])
+    has_many(:datapoints, Datapoint, foreign_key: :dev_alias_id, preload_order: [desc: :reading_at])
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -35,11 +33,10 @@ defmodule Sally.PulseWidth.DB.Alias do
     a
     |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required(columns(:required))
-    |> Changeset.validate_format(:name, name_regex())
+    |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:name, max: 128)
-    |> Changeset.validate_length(:description, max: 50)
-    |> Changeset.validate_length(:cmd, max: 32)
     |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
+    |> Changeset.validate_length(:description, max: 128)
     |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
     |> Changeset.unique_constraint(:name, [:name])
   end
@@ -71,7 +68,8 @@ defmodule Sally.PulseWidth.DB.Alias do
       description: opts[:description] || "<none>",
       ttl_ms: opts[:ttl_ms] || @ttl_default
     }
-    |> upsert(dev_alias)
+    |> changeset(dev_alias)
+    |> Repo.insert!(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
   end
 
   def delete(name_or_id) do
@@ -111,33 +109,8 @@ defmodule Sally.PulseWidth.DB.Alias do
 
   def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
-  def names do
-    Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
-  end
-
-  def names_begin_with(pattern) when is_binary(pattern) do
-    like_string = [pattern, "%"] |> IO.iodata_to_binary()
-    q = Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
-
-    Repo.all(q)
-  end
-
-  def update_cmd(alias_id, cmd) when is_integer(alias_id) do
-    Repo.get!(Schema, alias_id) |> update_cmd(cmd)
-  end
-
-  def update_cmd(%Schema{} = dev_alias, cmd) do
-    alias Ecto.Changeset
-
-    dev_alias
-    |> Changeset.cast(%{cmd: cmd}, [:cmd])
-    |> Changeset.validate_required([:cmd])
-    |> Changeset.validate_length(:cmd, max: 32)
-    |> Repo.update!(returning: true, force: true)
-  end
-
   defp load_command_ids(schema_or_nil) do
-    q = Query.from(c in Command, select: [:id])
+    q = Ecto.Query.from(c in Command, select: [:id])
     Repo.preload(schema_or_nil, [cmds: q], force: true)
   end
 
@@ -150,22 +123,17 @@ defmodule Sally.PulseWidth.DB.Alias do
   end
 
   def load_cmd_last(%Schema{} = x) do
-    Repo.preload(x, cmds: Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
+    Repo.preload(x, cmds: Ecto.Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
   end
 
-  # validate name:
-  #  -starts with a ~ or alpha char
-  #  -contains a mix of:
-  #      alpha numeric, slash (/), dash (-), underscore (_), colon (:) and
-  #      spaces
-  #  -ends with an alpha char
-  defp name_regex, do: ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i
+  def names do
+    Ecto.Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+  end
 
-  defp upsert(params, %Schema{} = device) when is_map(params) do
-    insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
+  def names_begin_with(pattern) when is_binary(pattern) do
+    like_string = "#{pattern}%"
 
-    params
-    |> changeset(device)
-    |> Repo.insert(insert_opts)
+    Ecto.Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
+    |> Repo.all()
   end
 end

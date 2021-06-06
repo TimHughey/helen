@@ -14,8 +14,9 @@ defmodule Sally.Application do
     children = [
       {Sally.Repo, []},
       {Tortoise.Connection, @mqtt_connection},
-      #  {Sally.Mqtt.Client, make_client_opts()},
-      {Sally.PulseWidth.Supervisor, []}
+      {Sally.Payload, []},
+      {Sally.Execute, []},
+      {Sally.Host.Handler, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -23,8 +24,4 @@ defmodule Sally.Application do
     opts = [strategy: :one_for_one, name: Sally.Supervisor]
     Supervisor.start_link(children, opts)
   end
-
-  # defp make_client_opts do
-  #   [client_id: @client_id] ++ @client_opts
-  # end
 end

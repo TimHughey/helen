@@ -7,6 +7,7 @@
 
 ## Broom
 
+- [ ] adjust reference implementation to match Sally
 - [x] rename BroomTester.Commands to BroomTester.Execute to create reference implementation
 - [ ] write typespecs for all structs and callbacks
 - [x] implement Broom behaviour
