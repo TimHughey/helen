@@ -7,7 +7,7 @@ defmodule Broom.DB.Command do
   use Ecto.Schema
 
   alias __MODULE__, as: Schema
-  alias Broom.DB.Alias
+  alias Broom.DB.DevAlias
   alias BroomRepo, as: Repo
 
   schema "broom_cmd" do
@@ -19,7 +19,7 @@ defmodule Broom.DB.Command do
     field(:sent_at, :utc_datetime_usec)
     field(:acked_at, :utc_datetime_usec)
 
-    belongs_to(:alias, Alias)
+    belongs_to(:dev_alias, DevAlias)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -38,8 +38,8 @@ defmodule Broom.DB.Command do
     |> Repo.update!(returning: true)
   end
 
-  def add(%Alias{} = a, %{cmd: cmd}, opts) do
-    # associate the new command with the Alias
+  def add(%DevAlias{} = a, %{cmd: cmd}, opts) do
+    # associate the new command with the DevAlias
     new_cmd = Ecto.build_assoc(a, :cmds)
     ack_immediate? = opts[:ack] == :immediate
 
@@ -61,7 +61,7 @@ defmodule Broom.DB.Command do
 
     cmd_schema
     |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required([:cmd, :sent_at, :alias_id])
+    |> Changeset.validate_required([:cmd, :sent_at, :dev_alias_id])
     # the cmd should be a minimum of two characters (e.g. "on")
     |> Changeset.validate_length(:cmd, min: 2, max: 32)
     |> Changeset.unique_constraint(:refid)

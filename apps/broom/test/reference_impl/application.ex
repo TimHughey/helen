@@ -8,7 +8,7 @@ defmodule Broom.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      BroomRepo,
+      {Broom.Repo, []},
       {Broom.Execute, [metrics_interval: "PT1M"]}
     ]
 

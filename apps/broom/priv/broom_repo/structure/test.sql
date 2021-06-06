@@ -21,65 +21,27 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: broom_alias; Type: TABLE; Schema: public; Owner: -
+-- Name: command; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.broom_alias (
+CREATE TABLE public.command (
     id bigint NOT NULL,
-    name character varying(128) NOT NULL,
-    device_id bigint,
-    description character varying(50) DEFAULT '<none>'::character varying,
-    cmd character varying(32) DEFAULT 'unknown'::character varying NOT NULL,
-    pio integer NOT NULL,
-    ttl_ms integer DEFAULT 60000 NOT NULL,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
-);
-
-
---
--- Name: broom_alias_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.broom_alias_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: broom_alias_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.broom_alias_id_seq OWNED BY public.broom_alias.id;
-
-
---
--- Name: broom_cmd; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.broom_cmd (
-    id bigint NOT NULL,
-    cmd character varying(32) DEFAULT 'unknown'::character varying NOT NULL,
-    alias_id bigint,
+    dev_alias_id bigint,
+    cmd character varying(32) NOT NULL,
     refid character varying(8) NOT NULL,
     acked boolean DEFAULT false NOT NULL,
     orphaned boolean DEFAULT false NOT NULL,
     sent_at timestamp without time zone NOT NULL,
     acked_at timestamp without time zone,
-    rt_latency_us integer DEFAULT 0,
-    inserted_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    rt_latency_us integer DEFAULT 0
 );
 
 
 --
--- Name: broom_cmd_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: command_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.broom_cmd_id_seq
+CREATE SEQUENCE public.command_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -88,22 +50,90 @@ CREATE SEQUENCE public.broom_cmd_id_seq
 
 
 --
--- Name: broom_cmd_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: command_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.broom_cmd_id_seq OWNED BY public.broom_cmd.id;
+ALTER SEQUENCE public.command_id_seq OWNED BY public.command.id;
 
 
 --
--- Name: broom_device; Type: TABLE; Schema: public; Owner: -
+-- Name: datapoint; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.broom_device (
+CREATE TABLE public.datapoint (
     id bigint NOT NULL,
+    dev_alias_id bigint,
+    temp_c double precision,
+    relhum double precision,
+    reading_at timestamp without time zone
+);
+
+
+--
+-- Name: datapoint_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.datapoint_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: datapoint_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.datapoint_id_seq OWNED BY public.datapoint.id;
+
+
+--
+-- Name: dev_alias; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dev_alias (
+    id bigint NOT NULL,
+    device_id bigint,
+    name character varying(128) NOT NULL,
+    pio integer NOT NULL,
+    description character varying(128),
+    ttl_ms integer NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: dev_alias_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.dev_alias_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: dev_alias_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.dev_alias_id_seq OWNED BY public.dev_alias.id;
+
+
+--
+-- Name: device; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.device (
+    id bigint NOT NULL,
+    host_id bigint,
     ident character varying(128) NOT NULL,
-    host character varying(128) NOT NULL,
+    family character varying(24) NOT NULL,
+    mutable boolean NOT NULL,
     pios integer NOT NULL,
-    latency_us integer DEFAULT 0,
     last_seen_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -111,10 +141,10 @@ CREATE TABLE public.broom_device (
 
 
 --
--- Name: broom_device_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: device_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.broom_device_id_seq
+CREATE SEQUENCE public.device_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -123,10 +153,51 @@ CREATE SEQUENCE public.broom_device_id_seq
 
 
 --
--- Name: broom_device_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: device_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.broom_device_id_seq OWNED BY public.broom_device.id;
+ALTER SEQUENCE public.device_id_seq OWNED BY public.device.id;
+
+
+--
+-- Name: host; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host (
+    id bigint NOT NULL,
+    ident character varying(32) NOT NULL,
+    name character varying(128) NOT NULL,
+    profile character varying(128) NOT NULL,
+    authorized boolean NOT NULL,
+    firmware_vsn character varying(64),
+    idf_vsn character varying(64),
+    app_sha character varying(64),
+    reset_reason character varying(64),
+    build_at timestamp without time zone,
+    last_start_at timestamp without time zone NOT NULL,
+    last_seen_at timestamp without time zone NOT NULL,
+    inserted_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: host_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.host_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: host_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.host_id_seq OWNED BY public.host.id;
 
 
 --
@@ -140,48 +211,78 @@ CREATE TABLE public.schema_migrations (
 
 
 --
--- Name: broom_alias id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: command id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.broom_alias ALTER COLUMN id SET DEFAULT nextval('public.broom_alias_id_seq'::regclass);
-
-
---
--- Name: broom_cmd id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.broom_cmd ALTER COLUMN id SET DEFAULT nextval('public.broom_cmd_id_seq'::regclass);
+ALTER TABLE ONLY public.command ALTER COLUMN id SET DEFAULT nextval('public.command_id_seq'::regclass);
 
 
 --
--- Name: broom_device id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: datapoint id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.broom_device ALTER COLUMN id SET DEFAULT nextval('public.broom_device_id_seq'::regclass);
-
-
---
--- Name: broom_alias broom_alias_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.broom_alias
-    ADD CONSTRAINT broom_alias_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.datapoint ALTER COLUMN id SET DEFAULT nextval('public.datapoint_id_seq'::regclass);
 
 
 --
--- Name: broom_cmd broom_cmd_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: dev_alias id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.broom_cmd
-    ADD CONSTRAINT broom_cmd_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.dev_alias ALTER COLUMN id SET DEFAULT nextval('public.dev_alias_id_seq'::regclass);
 
 
 --
--- Name: broom_device broom_device_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: device id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.broom_device
-    ADD CONSTRAINT broom_device_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.device ALTER COLUMN id SET DEFAULT nextval('public.device_id_seq'::regclass);
+
+
+--
+-- Name: host id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host ALTER COLUMN id SET DEFAULT nextval('public.host_id_seq'::regclass);
+
+
+--
+-- Name: command command_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.command
+    ADD CONSTRAINT command_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: datapoint datapoint_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.datapoint
+    ADD CONSTRAINT datapoint_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dev_alias dev_alias_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dev_alias
+    ADD CONSTRAINT dev_alias_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: device device_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.device
+    ADD CONSTRAINT device_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: host host_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host
+    ADD CONSTRAINT host_pkey PRIMARY KEY (id);
 
 
 --
@@ -193,44 +294,88 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: broom_alias_name_index; Type: INDEX; Schema: public; Owner: -
+-- Name: command_refid_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX broom_alias_name_index ON public.broom_alias USING btree (name);
-
-
---
--- Name: broom_cmd_refid_index; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX broom_cmd_refid_index ON public.broom_cmd USING btree (refid);
+CREATE UNIQUE INDEX command_refid_index ON public.command USING btree (refid);
 
 
 --
--- Name: broom_device_ident_index; Type: INDEX; Schema: public; Owner: -
+-- Name: command_sent_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX broom_device_ident_index ON public.broom_device USING btree (ident);
-
-
---
--- Name: broom_alias broom_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.broom_alias
-    ADD CONSTRAINT broom_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.broom_device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+CREATE INDEX command_sent_at_index ON public.command USING brin (sent_at);
 
 
 --
--- Name: broom_cmd broom_cmd_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: datapoint_reading_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.broom_cmd
-    ADD CONSTRAINT broom_cmd_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES public.broom_alias(id) ON UPDATE CASCADE ON DELETE CASCADE;
+CREATE INDEX datapoint_reading_at_index ON public.datapoint USING brin (reading_at);
+
+
+--
+-- Name: dev_alias_name_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX dev_alias_name_index ON public.dev_alias USING btree (name);
+
+
+--
+-- Name: device_ident_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX device_ident_index ON public.device USING btree (ident);
+
+
+--
+-- Name: host_ident_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX host_ident_index ON public.host USING btree (ident);
+
+
+--
+-- Name: host_name_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX host_name_index ON public.host USING btree (name);
+
+
+--
+-- Name: command command_dev_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.command
+    ADD CONSTRAINT command_dev_alias_id_fkey FOREIGN KEY (dev_alias_id) REFERENCES public.dev_alias(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: datapoint datapoint_dev_alias_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.datapoint
+    ADD CONSTRAINT datapoint_dev_alias_id_fkey FOREIGN KEY (dev_alias_id) REFERENCES public.dev_alias(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: dev_alias dev_alias_device_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dev_alias
+    ADD CONSTRAINT dev_alias_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.device(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: device device_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.device
+    ADD CONSTRAINT device_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.host(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO public."schema_migrations" (version) VALUES (20210521142631);
+INSERT INTO public."schema_migrations" (version) VALUES (20210606203826);

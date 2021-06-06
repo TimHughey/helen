@@ -4,7 +4,7 @@ defmodule Broom.DB.Device do
   use Ecto.Schema
 
   alias __MODULE__, as: Schema
-  alias Broom.DB.Alias
+  alias Broom.DB.DevAlias
 
   schema "broom_device" do
     field(:ident, :string)
@@ -13,7 +13,7 @@ defmodule Broom.DB.Device do
     field(:latency_us, :integer, default: 0)
     field(:last_seen_at, :utc_datetime_usec)
 
-    has_many(:aliases, Alias, foreign_key: :device_id)
+    has_many(:aliases, DevAlias, foreign_key: :device_id)
 
     timestamps(type: :utc_datetime_usec)
   end

@@ -1,4 +1,4 @@
-defmodule Broom.DB.Alias do
+defmodule Broom.DB.DevAlias do
   @moduledoc false
   use Ecto.Schema
 
@@ -21,12 +21,7 @@ defmodule Broom.DB.Alias do
     field(:ttl_ms, :integer, default: @ttl_default)
 
     belongs_to(:device, Device)
-
-    has_many(:cmds, Command,
-      references: :id,
-      foreign_key: :alias_id,
-      preload_order: [desc: :inserted_at]
-    )
+    has_many(:cmds, Command, foreign_key: :dev_alias_id, preload_order: [desc: :inserted_at])
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -43,8 +38,8 @@ defmodule Broom.DB.Alias do
     |> upsert(dev_alias)
   end
 
-  def update_cmd(alias_id, cmd) do
-    schema = Repo.get!(Schema, alias_id)
+  def update_cmd(dev_alias_id, cmd) do
+    schema = Repo.get!(Schema, dev_alias_id)
 
     %{cmd: cmd}
     |> changeset(schema)
