@@ -4,7 +4,7 @@ defmodule Garden.Lighting.Opts do
   def default_opts do
     [
       syntax_vsn: "2020-0818",
-      timeout: "PT3M",
+      timeout: "PT30S",
       timezone: "America/New_York",
       cmd_definitions: [
         random_fade_bright: %{
