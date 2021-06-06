@@ -13,7 +13,7 @@ defmodule Garden.Irrigation.Opts do
       power: [device: "irrigation 12v power", power_up_delay: "PT5S"],
       device_group: "irrigation",
       timezone: "America/New_York",
-      timeout: "PT3M"
+      timeout: "PT1M"
     ]
   end
 end
