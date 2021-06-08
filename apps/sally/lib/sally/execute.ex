@@ -31,8 +31,7 @@ defmodule Sally.Execute do
     # 1. Broom.track/2 must be invoked outside the cmd insert to ensure the command is available
     #    when immediate ack is requested
     #
-    # 2. insert_cmd_if_needed/1 *MUST* preload the dev alias and device for downstream
-
+    # 2. insert_cmd_if_needed/1 *MUST* preload the dev alias, device and host for downstream
     with %ExecCmd{valid?: true} = ec <- ExecCmd.validate(ec),
          {:ok, %ExecCmd{inserted_cmd: %Command{}} = ec} <- insert_cmd_if_needed(ec),
          {:ok, %TrackerEntry{} = te} <- Broom.track(ec.inserted_cmd, ec.cmd_opts) do
@@ -45,6 +44,8 @@ defmodule Sally.Execute do
       {:error, _} = rc -> ExecResult.error(ec.name, rc)
     end
   end
+
+  def get_tracker_entry(refid), do: Broom.get_refid_tracker_entry(refid)
 
   @impl true
   def track_timeout(%Broom.TrackerEntry{} = te) do
@@ -60,23 +61,21 @@ defmodule Sally.Execute do
 
   defp insert_cmd_if_needed(%ExecCmd{} = ec) do
     Repo.transaction(fn ->
-      Repo.checkout(fn ->
-        {status_opts, cmd_opts_rest} = Keyword.split(ec.cmd_opts, [:ttl_ms])
-        status_opts = [need_dev_alias: true] ++ status_opts
-        force = cmd_opts_rest[:force] || false
+      {status_opts, cmd_opts_rest} = Keyword.split(ec.cmd_opts, [:ttl_ms])
+      status_opts = [need_dev_alias: true] ++ status_opts
+      force = cmd_opts_rest[:force] || false
 
-        with {dev_alias, status} <- Status.get(ec.name, status_opts),
-             %MutStatus{found?: true, ttl_expired?: false} <- status,
-             {:add_cmd, true} <- {:add_cmd, force or ec.cmd != status.cmd} do
-          # actual command to dev alias is required
-          # NOTE! preload the dev_alias and device for downstream
-          x = Command.add(dev_alias, ec.cmd, ec.cmd_opts) |> Repo.preload(dev_alias: [device: [:host]])
-          %ExecCmd{ec | inserted_cmd: x, cmd_opts: cmd_opts_rest}
-        else
-          %MutStatus{} = x -> x
-          {:add_cmd, false} -> :no_change
-        end
-      end)
+      with {dev_alias, status} <- Status.get(ec.name, status_opts),
+           %MutStatus{found?: true, ttl_expired?: false} <- status,
+           {:add_cmd, true} <- {:add_cmd, force or ec.cmd != status.cmd} do
+        # actual command to dev alias is required
+        # NOTE! preload the dev_alias and device for downstream
+        x = Command.add(dev_alias, ec.cmd, ec.cmd_opts) |> Repo.preload(dev_alias: [device: [:host]])
+        %ExecCmd{ec | inserted_cmd: x, cmd_opts: cmd_opts_rest}
+      else
+        %MutStatus{} = x -> x
+        {:add_cmd, false} -> :no_change
+      end
     end)
   end
 end

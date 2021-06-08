@@ -1,51 +1,72 @@
 defmodule Sally.Host.Handler do
   require Logger
 
-  use Sally.MsgIn.Handler, restart: :permanent, shutdown: 1000
+  use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
-  alias Broom.TrackerEntry
-  alias Sally.{Device, Host}
+  alias Sally.Host
+  alias Sally.Host.Message, as: Msg
+  alias Sally.Host.Reply
 
   @impl true
-  def handle_message(%MsgIn{valid?: true} = mi) do
-    Logger.debug("\n#{inspect(mi, pretty: true)}")
-
-    case mi do
-      %MsgIn{adjunct: "cmdack"} -> cmdack(mi)
-      %MsgIn{category: "core", adjunct: "boot"} -> boot(mi)
-      %MsgIn{category: x} when x in ["core", "ds", "i2c", "pwm"] -> reading(mi)
-      %MsgIn{category: "boot"} -> boot(mi)
+  def finalize(%Msg{} = msg) do
+    log = fn x ->
+      Logger.debug("\n#{inspect(x, pretty: true)}")
+      x
     end
-    |> Sally.Repo.transaction()
-    |> post_process()
+
+    %Msg{msg | final_at: DateTime.utc_now()} |> log.()
   end
 
-  defp boot(%MsgIn{} = mi) do
-    mi |> start_multi_and_update_host()
-  end
+  @impl true
+  def process(%Msg{} = msg) do
+    Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
 
-  defp cmdack(%MsgIn{} = mi) do
-    mi |> start_multi_and_update_host()
-  end
-
-  defp post_process({:ok, results}) do
-    results
-  end
-
-  defp post_process(error), do: error
-
-  defp reading(%MsgIn{} = mi) do
-    start_multi_and_update_host(mi)
-    |> Ecto.Multi.insert(:device, fn %{host: h} -> Device.changeset(mi, h) end, Device.insert_opts())
-  end
-
-  defp start_multi_and_update_host(%MsgIn{} = mi) do
     Ecto.Multi.new()
-    |> Ecto.Multi.run(:msg_in, fn _repo, _changes -> {:ok, mi} end)
-    |> Ecto.Multi.insert(:host, Host.changeset(mi), Host.insert_opts())
+    |> Ecto.Multi.insert(:host, Host.changeset(msg), Host.insert_opts())
+    |> Sally.Repo.transaction()
+    |> check_result(msg)
+    |> post_process()
+    |> finalize()
   end
 
-  # defp cmdack(%MsgIn{} = mi) do
+  @impl true
+  def post_process(%Msg{valid?: false} = msg), do: msg
+
+  @impl true
+  def post_process(%Msg{category: "boot"} = msg) do
+    %Reply{
+      ident: msg.ident,
+      name: msg.host.name,
+      data: Host.boot_payload_data(msg.host),
+      filter: "profile"
+    }
+    |> Reply.send()
+    |> Msg.add_reply(msg)
+  end
+
+  @impl true
+  def post_process(%Msg{category: "log"} = msg) do
+    msg
+  end
+
+  @impl true
+  def post_process(%Msg{category: "ota"} = msg) do
+    msg
+  end
+
+  @impl true
+  def post_process(%Msg{category: "run"} = msg) do
+    msg
+  end
+
+  defp check_result(txn_result, %Msg{} = msg) do
+    case txn_result do
+      {:ok, results} -> %Msg{msg | host: results.host}
+      {:error, e} -> Msg.invalid(msg, e)
+    end
+  end
+
+  # defp cmdack(%Msg{} = mi) do
   #   ## cmd acks are straight forward and require only the refid and the message recv at
   #   case Execute.ack_now(mi.data.refid, mi.recv_at) do
   #     {:ok, %TrackerEntry{} = te} ->
@@ -64,11 +85,11 @@ defmodule Sally.Host.Handler do
   #
   #       metric_rc = Betty.write_metric(metric)
   #
-  #       %MsgInFlight{ident: ident, release: te, metric_rc: metric_rc} |> MsgInFlight.just_saw([dev_alias])
+  #       %MsgFlight{ident: ident, release: te, metric_rc: metric_rc} |> MsgFlight.just_saw([dev_alias])
   #
   #     error ->
   #       # TODO properly fill out this error
-  #       %MsgInFlight{faults: [cmdack: error]}
+  #       %MsgFlight{faults: [cmdack: error]}
   #   end
   # end
   #
@@ -78,14 +99,14 @@ defmodule Sally.Host.Handler do
   #   end
   # end
   #
-  # defp report(%MsgIn{} = mi) do
+  # defp report(%Msg{} = mi) do
   #   device = update_device(mi)
   #   dev_aliases = DB.Device.get_aliases(device)
   #   applied_data = apply_reported_data(dev_aliases, mi.data)
   #   metrics = write_applied_data_metrics(applied_data, mi.data, mi.sent_at)
   #
-  #   %MsgInFlight{ident: device, applied_data: applied_data, metrics: metrics}
-  #   |> MsgInFlight.just_saw(applied_data)
+  #   %MsgFlight{ident: device, applied_data: applied_data, metrics: metrics}
+  #   |> MsgFlight.just_saw(applied_data)
   # end
   #
   # defp write_applied_data_metrics(applied_data, original_data, sent_at) do
@@ -102,7 +123,7 @@ defmodule Sally.Host.Handler do
   #   end
   # end
   #
-  # defp update_device(%MsgIn{} = mi) do
+  # defp update_device(%Msg{} = mi) do
   #   %{
   #     ident: mi.ident,
   #     host: mi.host,

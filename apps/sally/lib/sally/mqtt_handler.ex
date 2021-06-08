@@ -6,10 +6,6 @@ defmodule Sally.Mqtt.Handler do
   require Logger
   use Tortoise.Handler
 
-  # alias Sally.InboundMsg
-  # alias Sally.Mqtt.Client
-  alias Sally.MsgIn
-
   def init(args) do
     %{seen: %{hosts: MapSet.new()}, args: args} |> reply_ok()
   end
@@ -40,11 +36,34 @@ defmodule Sally.Mqtt.Handler do
     reply_ok(s)
   end
 
-  def handle_message(topic_filters, payload, s) do
-    MsgIn.create(topic_filters, payload) |> MsgIn.handoff()
+  # @known_envs ["dev", "test", "prod"]
+  # defp check_metadata(%Msg{env: env} = m) when env not in @known_envs do
+  #   invalid(m, "unknown env filter")
+  # end
+
+  def handle_message(_topic, payload, s) when not is_bitstring(payload) do
+    # TODO: log payload error
 
     reply_ok(s)
   end
+
+  def handle_message([env, "r", "host", category, ident, name], payload, s) do
+    alias Sally.Host.Message
+
+    store_last = fn x -> put_in(s, [:last], x) end
+
+    {[env, category, ident, name], payload}
+    |> Message.accept()
+    |> Message.handoff()
+    |> store_last.()
+    |> reply_ok()
+  end
+
+  # def handle_message(topic_filters, payload, s) do
+  #   Logger.info(inspect(topic_filters))
+  #
+  #   reply_ok(s)
+  # end
 
   # def handle_message(topic, _payload, s) do
   #   Logger.warn("unhandled topic: #{Enum.join(topic, "/")}")

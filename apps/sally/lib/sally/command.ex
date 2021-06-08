@@ -22,6 +22,27 @@ defmodule Sally.Command do
     belongs_to(:dev_alias, DevAlias)
   end
 
+  def changeset(changes, %Schema{} = c) when is_map(changes) do
+    alias Ecto.Changeset
+
+    c
+    |> Changeset.cast(changes, columns(:cast))
+    |> Changeset.validate_required([:refid, :cmd, :sent_at, :dev_alias_id])
+    # the cmd should be a minimum of two characters (e.g. "on")
+    |> Changeset.validate_length(:cmd, min: 2, max: 32)
+    |> Changeset.validate_length(:refid, is: 8)
+    |> Changeset.unique_constraint(:refid)
+  end
+
+  # helpers for changeset columns
+  def columns(:all) do
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
+
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
+  end
+
+  def columns(:cast), do: columns(:all)
+
   # (1 of 2) ack via a schema id
   def ack_now(id, %DateTime{} = at) when is_integer(id), do: Repo.get(Schema, id) |> ack_now(:ack, at)
 
@@ -71,25 +92,4 @@ defmodule Sally.Command do
         {:ok, acc + deleted}
     end
   end
-
-  defp changeset(changes, %Schema{} = c) when is_map(changes) do
-    alias Ecto.Changeset
-
-    c
-    |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required([:refid, :cmd, :sent_at, :dev_alias_id])
-    # the cmd should be a minimum of two characters (e.g. "on")
-    |> Changeset.validate_length(:cmd, min: 2, max: 32)
-    |> Changeset.validate_length(:refid, is: 8)
-    |> Changeset.unique_constraint(:refid)
-  end
-
-  # helpers for changeset columns
-  defp columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
-
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  defp columns(:cast), do: columns(:all)
 end

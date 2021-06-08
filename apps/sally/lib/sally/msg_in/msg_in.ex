@@ -1,8 +1,9 @@
 defmodule Sally.MsgIn do
   require Logger
 
-  @msg_old_ms Application.compile_env!(:sally, [Sally.MsgIn, :msg_old_ms])
-  @routing Application.compile_env!(:sally, [Sally.MsgIn, :routing])
+  @msg_old_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_old_ms])
+  # @routing Application.compile_env!(:sally, [Sally.MsgIn, :routing])
+  # @route_to Application.compile_env!(:sally, [Sally.MsgIn, :route_to])
 
   alias __MODULE__
 
@@ -12,9 +13,8 @@ defmodule Sally.MsgIn do
             host: nil,
             category: nil,
             ident: nil,
-            # TODO: remove misc in favor of adjunct
-            #  misc: nil,
             adjunct: nil,
+            refid: nil,
             sent_at: nil,
             recv_at: nil,
             data: nil,
@@ -24,7 +24,8 @@ defmodule Sally.MsgIn do
             invalid_reason: nil,
             faults: [],
             final_at: nil,
-            routed: nil
+            routed: nil,
+            multi: nil
 
   @type payload :: :unpacked | String.t()
   @type log :: [] | [msg: boolean()]
@@ -38,6 +39,7 @@ defmodule Sally.MsgIn do
           ident: Types.device_or_remote_identifier(),
           # misc: nil | String.t(),
           adjunct: nil | String.t(),
+          refid: nil | Types.refid(),
           sent_at: %DateTime{},
           recv_at: %DateTime{},
           data: map(),
@@ -47,15 +49,20 @@ defmodule Sally.MsgIn do
           invalid_reason: Msgpax.UnpackError.t(),
           faults: [],
           final_at: DateTime.t(),
-          routed: nil | :ok
+          routed: nil | :ok,
+          multi: nil | Ecto.Multi.t()
         }
+
+  def add_fault(%MsgIn{} = mi, fault) do
+    %MsgIn{mi | faults: [fault] ++ mi.faults}
+  end
 
   def create(topic_filters, payload) when is_list(topic_filters) and is_bitstring(payload) do
     {topic_filters, payload} |> create()
   end
 
   def create({topic_filters, payload}) when is_list(topic_filters) and is_bitstring(payload) do
-    filters = Enum.zip([:env, :report, :host, :category, :ident, :adjunct], topic_filters)
+    filters = Enum.zip([:env, :report, :host, :category, :ident, :adjunct, :refid], topic_filters)
 
     %MsgIn{
       payload: payload,
@@ -65,6 +72,7 @@ defmodule Sally.MsgIn do
       category: filters[:category],
       ident: filters[:ident],
       adjunct: filters[:adjunct],
+      refid: filters[:refid],
       recv_at: DateTime.utc_now()
     }
     |> MsgIn.preprocess()
@@ -122,6 +130,7 @@ defmodule Sally.MsgIn do
       not is_binary(mi.host) -> invalid(mi, "host filter missing")
       not is_binary(mi.category) -> invalid(mi, "category filter missing")
       not is_binary(mi.ident) -> invalid(mi, "ident filter missing")
+      mi.adjunct == "cmdack" and is_nil(mi.refid) -> invalid(mi, "cmdack missing refid")
       true -> %MsgIn{mi | valid?: true}
     end
   end
@@ -149,7 +158,8 @@ defmodule Sally.MsgIn do
   end
 
   defp route_msg(%MsgIn{} = mi) do
-    msg_server = @routing[String.to_atom(mi.category)]
+    # msg_server = @route_to
+    msg_server = Foobar
     pid = GenServer.whereis(msg_server)
 
     cond do
@@ -158,4 +168,15 @@ defmodule Sally.MsgIn do
       true -> %MsgIn{mi | routed: GenServer.cast(msg_server, mi)}
     end
   end
+
+  # defp route_msg(%MsgIn{} = mi) do
+  #   msg_server = @routing[String.to_atom(mi.category)]
+  #   pid = GenServer.whereis(msg_server)
+  #
+  #   cond do
+  #     is_nil(msg_server) -> invalid(mi, "undefined routing: #{mi.category}")
+  #     not is_pid(pid) -> invalid(mi, "no server: #{inspect(msg_server)}")
+  #     true -> %MsgIn{mi | routed: GenServer.cast(msg_server, mi)}
+  #   end
+  # end
 end

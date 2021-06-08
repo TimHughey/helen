@@ -13,7 +13,7 @@ defmodule Sally.Host do
     field(:ident, :string)
     field(:name, :string)
     field(:profile, :string, default: "generic")
-    field(:authorized, :boolean, default: true)
+    field(:authorized, :boolean, default: false)
     field(:firmware_vsn, :string)
     field(:idf_vsn, :string)
     field(:app_sha, :string)
@@ -32,7 +32,7 @@ defmodule Sally.Host do
   end
 
   def changeset(p) when is_map(p) do
-    # allow changeset to consume MsgIn without creating a direct dependency while also allowing
+    # allow changeset to consume Messages without creating a direct dependency while also allowing
     # host instead of ident
     %{
       ident: p[:host] || p[:ident],
@@ -74,7 +74,7 @@ defmodule Sally.Host do
 
   def columns(:cast), do: columns(:all)
   def columns(:required), do: columns_all(only: [:ident, :name, :last_seen_at, :last_start_at])
-  def columns(:replace), do: columns_all(drop: [:ident, :authorized, :inserted_at])
+  def columns(:replace), do: columns_all(drop: [:ident, :inserted_at])
 
   def columns_all(opts) when is_list(opts) do
     case opts do

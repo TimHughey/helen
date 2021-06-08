@@ -39,7 +39,7 @@ defmodule Broom.Tracker do
   def init(%TrackOpts{} = track_opts), do: %Tracker{} |> apply_opts(track_opts) |> schedule_prune()
 
   def get_refid_entry(refid, %Tracker{} = t) do
-    get_in(t.refs, [refid])
+    get_in(t.refs, [refid]) || %Entry{}
   end
 
   def put_entry(%Entry{refid: refid} = te, %Tracker{} = t) do

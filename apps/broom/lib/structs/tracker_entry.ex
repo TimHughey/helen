@@ -21,7 +21,7 @@ defmodule Broom.TrackerEntry do
             released_at: nil,
             module: nil,
             schema: nil,
-            schema_id: nil
+            schema_id: 0
 
   @type t :: %__MODULE__{
           cmd: String.t(),
@@ -39,7 +39,7 @@ defmodule Broom.TrackerEntry do
           released_at: Types.datetime_or_nil(),
           module: Types.module_or_nil(),
           schema: TYpes.schema_or_nil(),
-          schema_id: Types.db_primary_id()
+          schema_id: Types.db_primary_id() | 0
         }
 
   # NOTE: invoked after track_timeout AND when entry is released via a db_result

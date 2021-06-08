@@ -9,17 +9,21 @@ config :sally,
     keep_alive: 36
   ]
 
+config :sally, Sally.Host.Reply, publish: [prefix: "#{config_env()}", qos: 1]
 config :sally, Sally.MsgOut, publish: [prefix: "#{config_env()}", qos: 1]
 #  runtime_metrics: [all: false]
 
-config :sally, Sally.MsgIn,
-  msg_old_ms: 5_000,
-  routing: [
-    {:pwm, Sally.PulseWidth.MsgHandler},
-    {:switch, Sally.Switch},
-    {:sensor, Sally.Sensor},
-    {:rhost, Sally.Remote}
-  ]
+config :sally, Sally.Message.Handler, msg_old_ms: 5_000
+# route_to: Sally.MsgIn.Processor
+
+# config :sally, Sally.MsgIn,
+#   msg_old_ms: 5_000,
+#   routing: [
+#     {:pwm, Sally.PulseWidth.MsgHandler},
+#     {:switch, Sally.Switch},
+#     {:sensor, Sally.Sensor},
+#     {:rhost, Sally.Remote}
+#   ]
 
 if config_env() in [:dev, :test] do
   import_config "test-secret.exs"

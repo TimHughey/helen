@@ -1,5 +1,5 @@
 defmodule Sally.MsgOut.Client do
-  alias Sally.Message.Types, as: Types
+  alias Sally.Types
 
   @callback child_spec(Types.child_spec_opts()) :: Supervisor.child_spec()
   @callback publish(Types.pub_topic_filters(), Types.pub_data(), Types.pub_opts()) :: Types.pub_rc()

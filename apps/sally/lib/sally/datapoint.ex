@@ -29,11 +29,6 @@ defmodule Sally.Datapoint do
     changeset(new_dp, cs) |> Repo.insert(returning: true)
   end
 
-  # (1 of 2) insure changes are a map
-  # def changeset(%Schema{} = c, changes) when is_list(changes) do
-  #   changeset(c, Enum.into(changes, %{}))
-  # end
-
   def changeset(%Schema{} = c, changes) when is_map(changes) do
     alias Ecto.Changeset
 
@@ -43,6 +38,14 @@ defmodule Sally.Datapoint do
     |> Changeset.validate_number(:temp_c, greater_than: -30.0, less_than: 55.0)
     |> Changeset.validate_number(:relhum, greater_than: 0.0, less_than_or_equal_to: 100.0)
   end
+
+  def columns(:all) do
+    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
+
+    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
+  end
+
+  def columns(:cast), do: columns(:all)
 
   def purge(%DevAlias{datapoints: datapoints}, :all) do
     all_ids = Enum.map(datapoints, fn %Schema{id: id} -> id end)
@@ -57,13 +60,4 @@ defmodule Sally.Datapoint do
         {:ok, acc + deleted}
     end
   end
-
-  # helpers for changeset columns
-  defp columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
-
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  defp columns(:cast), do: columns(:all)
 end
