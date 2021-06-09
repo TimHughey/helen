@@ -1,5 +1,5 @@
 defmodule SallyDevAliasTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
   @host_ident_default "sally.hostdevalias0"

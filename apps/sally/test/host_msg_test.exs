@@ -1,7 +1,7 @@
 defmodule SallyHostMsgTest do
   @moduledoc false
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
   alias Sally.Host.Message, as: Msg
@@ -39,7 +39,7 @@ defmodule SallyHostMsgTest do
   end
 
   defp accept(ctx) do
-    {["test", ctx.category, ctx.host_ident, ctx.host_name], Msgpax.pack!(ctx.data, iodata: false)}
+    {["test", ctx.host_ident, ctx.category], Msgpax.pack!(ctx.data, iodata: false)}
     |> Msg.accept()
   end
 

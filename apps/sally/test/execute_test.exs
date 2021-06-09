@@ -1,5 +1,5 @@
 defmodule SallyPwmExecuteTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
   @host_ident_default "sally.hostexecute0"

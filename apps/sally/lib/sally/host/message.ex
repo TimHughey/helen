@@ -11,7 +11,6 @@ defmodule Sally.Host.Message do
   defstruct env: nil,
             category: nil,
             ident: nil,
-            name: nil,
             payload: nil,
             data: nil,
             sent_at: nil,
@@ -31,7 +30,6 @@ defmodule Sally.Host.Message do
           env: Types.msg_env(),
           category: category(),
           ident: String.t(),
-          name: String.t(),
           payload: Types.payload(),
           data: map() | nil,
           sent_at: DateTime.t() | nil,
@@ -48,8 +46,8 @@ defmodule Sally.Host.Message do
     %Msg{msg | reply: reply}
   end
 
-  def accept({[env, category, ident, name], payload}) do
-    %Msg{env: env, category: category, ident: ident, name: name, payload: payload} |> preprocess()
+  def accept({[env, ident, category], payload}) do
+    %Msg{env: env, category: category, ident: ident, payload: payload} |> preprocess()
   end
 
   def handoff(%Msg{} = m) do

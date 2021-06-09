@@ -5,7 +5,7 @@ defmodule SallyHostTest do
   ## Test of basic Device and Alias creation via TestSupport
   ##
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
   @host_ident_default "sally.host000"

@@ -79,7 +79,7 @@ defmodule Sally.Host.Reply do
   end
 
   defp make_topic_filter(%Reply{} = msg) do
-    filter = [@prefix, msg.ident, "core", msg.name, msg.filter] |> Enum.join("/")
+    filter = [@prefix, msg.ident, "host", msg.name, msg.filter] |> Enum.join("/")
     %Reply{msg | filter: filter}
   end
 

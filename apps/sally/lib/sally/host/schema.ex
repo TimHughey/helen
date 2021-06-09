@@ -36,7 +36,7 @@ defmodule Sally.Host do
     # host instead of ident
     %{
       ident: p[:host] || p[:ident],
-      name: p[:name] || p[:ident],
+      name: p[:name] || p[:ident] || p[:host],
       last_start_at: p[:last_start_at] || p[:sent_at],
       last_seen_at: p[:last_seen_at] || p[:sent_at]
     }

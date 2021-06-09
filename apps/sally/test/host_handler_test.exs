@@ -1,7 +1,7 @@
 defmodule SallyHostHandlerTest do
   @moduledoc false
 
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
   @moduletag host_handler: true, sally_host: true
@@ -35,8 +35,6 @@ defmodule SallyHostHandlerTest do
     tested = [:ident] ++ tested
     refute x.invalid_reason, fail
     tested = [:invalid_reason] ++ tested
-    assert x.name == ctx.host_name, fail
-    tested = [:name] ++ tested
     assert x.payload == :unpacked, fail
     tested = [:payload] ++ tested
     assert DateTime.compare(x.recv_at, x.sent_at) == :gt, fail
@@ -56,7 +54,11 @@ defmodule SallyHostHandlerTest do
   # and is intended for consumption by Host.Message.accept/1
   defp setup_filter(ctx) do
     put = fn x -> put_in(ctx, [:filter], x) end
-    ["test", ctx[:category], ctx[:host_ident], ctx[:host_name]] |> put.()
+
+    case ctx.category do
+      "boot" -> ["test", ctx[:host_ident], ctx.category] |> put.()
+      _ -> ["test"] |> put.()
+    end
   end
 
   # NOTE! must use iodata: false since this packed data won't be sent. rather, we're simulating the
