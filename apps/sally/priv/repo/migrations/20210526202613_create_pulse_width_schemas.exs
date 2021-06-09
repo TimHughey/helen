@@ -67,14 +67,14 @@ defmodule Sally.Repo.Migrations.Initial do
 
   defp create_host do
     create table(:host) do
-      add(:ident, :string, size: 32, null: false)
-      add(:name, :string, size: 128, null: false)
-      add(:profile, :string, size: 128, null: false)
+      add(:ident, :string, size: 24, null: false)
+      add(:name, :string, size: 32, null: false)
+      add(:profile, :string, size: 32, null: false)
       add(:authorized, :boolean, null: false)
-      add(:firmware_vsn, :string, size: 64)
-      add(:idf_vsn, :string, size: 64)
-      add(:app_sha, :string, size: 64)
-      add(:reset_reason, :string, size: 64)
+      add(:firmware_vsn, :string, size: 32)
+      add(:idf_vsn, :string, size: 12)
+      add(:app_sha, :string, size: 12)
+      add(:reset_reason, :string, size: 24)
       add(:build_at, :utc_datetime_usec)
       add(:last_start_at, :utc_datetime_usec, null: false)
       add(:last_seen_at, :utc_datetime_usec, null: false)

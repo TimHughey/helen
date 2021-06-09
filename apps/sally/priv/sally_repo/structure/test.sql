@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 13.2
--- Dumped by pg_dump version 13.2
+-- Dumped by pg_dump version 13.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -165,14 +165,14 @@ ALTER SEQUENCE public.device_id_seq OWNED BY public.device.id;
 
 CREATE TABLE public.host (
     id bigint NOT NULL,
-    ident character varying(32) NOT NULL,
-    name character varying(128) NOT NULL,
-    profile character varying(128) NOT NULL,
+    ident character varying(24) NOT NULL,
+    name character varying(32) NOT NULL,
+    profile character varying(32) NOT NULL,
     authorized boolean NOT NULL,
-    firmware_vsn character varying(64),
-    idf_vsn character varying(64),
-    app_sha character varying(64),
-    reset_reason character varying(64),
+    firmware_vsn character varying(32),
+    idf_vsn character varying(12),
+    app_sha character varying(12),
+    reset_reason character varying(24),
     build_at timestamp without time zone,
     last_start_at timestamp without time zone NOT NULL,
     last_seen_at timestamp without time zone NOT NULL,
