@@ -7,6 +7,7 @@ defmodule Sally.Mqtt.Handler do
   use Tortoise.Handler
 
   def init(args) do
+    Logger.debug("#{inspect(args, pretty: true)}")
     %{seen: %{hosts: MapSet.new()}, args: args} |> reply_ok()
   end
 
@@ -18,6 +19,8 @@ defmodule Sally.Mqtt.Handler do
   """
   def connection(:up, %{args: args} = s) do
     # Client.connected()
+
+    Logger.debug("#{inspect(args, pretty: true)}")
 
     get_in(args, [:next_actions, :connected])
     |> List.wrap()
@@ -59,11 +62,13 @@ defmodule Sally.Mqtt.Handler do
     |> reply_ok()
   end
 
-  # def handle_message(topic_filters, payload, s) do
-  #   Logger.info(inspect(topic_filters))
-  #
-  #   reply_ok(s)
-  # end
+  def handle_message(topic_filters, payload, s) do
+    unpacked = Msgpax.unpack(payload)
+    Logger.info("unhandled message: #{Enum.join(topic_filters, "/")}\n#{inspect(unpacked, pretty: true)}")
+    Logger.info(inspect(topic_filters))
+
+    reply_ok(s)
+  end
 
   # def handle_message(topic, _payload, s) do
   #   Logger.warn("unhandled topic: #{Enum.join(topic, "/")}")

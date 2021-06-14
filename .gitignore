@@ -53,4 +53,4 @@ ttb_last_config
 
 .DS_Store
 
-agnus.json
+priv/agnus.json

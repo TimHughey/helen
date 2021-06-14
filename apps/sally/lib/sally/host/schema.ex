@@ -34,6 +34,9 @@ defmodule Sally.Host do
   def changeset(p) when is_map(p) do
     # allow changeset to consume Messages without creating a direct dependency while also allowing
     # host instead of ident
+
+    Logger.info(inspect(p, pretty: true))
+
     %{
       ident: p[:host] || p[:ident],
       name: p[:name] || p[:ident] || p[:host],
@@ -73,7 +76,7 @@ defmodule Sally.Host do
 
   def columns(:cast), do: columns(:all)
   def columns(:required), do: columns_all(only: [:ident, :name, :last_seen_at, :last_start_at])
-  def columns(:replace), do: columns_all(drop: [:ident, :inserted_at])
+  def columns(:replace), do: columns_all(drop: [:ident, :name, :inserted_at])
 
   def columns_all(opts) when is_list(opts) do
     case opts do

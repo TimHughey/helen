@@ -13,4 +13,8 @@
 ## Sally -> Ruth
 
 - common: `/<env>/<host_ident>`
-- host boot: `<host_name>/core/profile`
+
+### Host Directives
+
+- host common: `<common>/host`
+- boot: `<host common>/profile/<host_name>`

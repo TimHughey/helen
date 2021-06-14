@@ -38,7 +38,7 @@ defmodule Sally.Host.Handler do
       ident: msg.ident,
       name: msg.host.name,
       data: Host.boot_payload_data(msg.host),
-      filter: "profile"
+      filters: ["profile", msg.host.name]
     }
     |> Reply.send()
     |> Msg.add_reply(msg)

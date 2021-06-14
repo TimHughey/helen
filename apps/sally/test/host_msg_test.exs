@@ -35,7 +35,7 @@ defmodule SallyHostMsgTest do
 
     fail = pretty("Msg did not match", x)
     refute x.valid?, fail
-    assert x.invalid_reason == "data is old"
+    assert x.invalid_reason == "data is #{ctx.mtime * -1} old"
   end
 
   defp accept(ctx) do

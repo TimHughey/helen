@@ -27,8 +27,9 @@ defmodule Sally.Host.Reply do
   defstruct client_id: @client_id,
             ident: nil,
             name: nil,
+            mtime: :populate_when_sent,
             data: %{},
-            filter: nil,
+            filters: [],
             opts: [],
             packed_length: 0,
             pub_ref: nil,
@@ -38,7 +39,10 @@ defmodule Sally.Host.Reply do
   ## Public API
   ##
   def send(%Reply{} = msg) do
-    {:send, msg |> make_topic_filter() |> set_qos()} |> Reply.call()
+    Logger.debug("\n#{inspect(msg, pretty: true)}")
+
+    {:send, msg |> add_mtime() |> set_qos()}
+    |> Reply.call()
   end
 
   @impl true
@@ -52,9 +56,10 @@ defmodule Sally.Host.Reply do
 
   @impl true
   def handle_call({:send, %Reply{} = msg}, _from, %State{} = s) do
-    packed = Msgpax.pack!(msg.data)
+    Logger.debug("\n#{inspect(msg, pretty: true)}")
+    packed = %{mtime: msg.mtime} |> Map.merge(msg.data) |> Msgpax.pack!()
 
-    Tortoise.publish(msg.client_id, msg.filter, packed, qos: msg.qos)
+    Tortoise.publish(msg.client_id, make_filter(msg), packed, qos: msg.qos)
     |> save_pub_rc(msg)
     |> save_packed_length(IO.iodata_length(packed))
     |> State.save_last_pub(s)
@@ -78,9 +83,10 @@ defmodule Sally.Host.Reply do
     end
   end
 
-  defp make_topic_filter(%Reply{} = msg) do
-    filter = [@prefix, msg.ident, "host", msg.name, msg.filter] |> Enum.join("/")
-    %Reply{msg | filter: filter}
+  defp add_mtime(%Reply{} = msg), do: %Reply{msg | mtime: System.os_time(:millisecond)}
+
+  defp make_filter(%Reply{} = msg) do
+    ([@prefix, msg.ident, "host"] ++ msg.filters) |> Enum.join("/")
   end
 
   defp save_packed_length(%Reply{} = msg, length), do: %Reply{msg | packed_length: length}

@@ -33,7 +33,7 @@ defmodule FatHelen.MixProject do
     [
       helen: [
         version: "0.1.2",
-        applications: [helen: :permanent, ui: :permanent],
+        applications: applications(),
         include_erts: true,
         include_executables_for: [:unix],
         applications: [runtime_tools: :permanent],
@@ -46,6 +46,16 @@ defmodule FatHelen.MixProject do
           &sym_link_to_tar/1
         ]
       ]
+    ]
+  end
+
+  defp applications do
+    [
+      alfred: :permanent,
+      betty: :permanent,
+      broom: :permanent,
+      sally: :permanent,
+      helen: :permanent
     ]
   end
 

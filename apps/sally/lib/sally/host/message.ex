@@ -107,11 +107,13 @@ defmodule Sally.Host.Message do
     sent_at = DateTime.from_unix!(data[:mtime] || 0, :millisecond)
 
     m = %Msg{m | recv_at: recv_at, sent_at: sent_at}
+    ms_diff = DateTime.diff(recv_at, sent_at, :millisecond)
 
     cond do
       DateTime.compare(sent_at, DateTime.from_unix!(0)) == :eq -> invalid(m, "mtime is missing")
-      DateTime.compare(sent_at, recv_at) == :gt -> invalid(m, "data is from the future")
-      DateTime.diff(recv_at, sent_at, :millisecond) >= @msg_old_ms -> invalid(m, "data is old")
+      ms_diff < -100 -> invalid(m, "data is from #{ms_diff} in the future")
+      ms_diff < 0 -> %Msg{m | sent_at: m.recv_at}
+      ms_diff >= @msg_old_ms -> invalid(m, "data is #{ms_diff} old")
       true -> m
     end
   end
@@ -122,7 +124,7 @@ defmodule Sally.Host.Message do
     m
   end
 
-  @route_to Sally.Host.Handler
+  # @route_to Sally.Host.Handler
   defp route_msg(%Msg{} = m) do
     mod_parts = __MODULE__ |> Module.split()
     mod_base = Enum.take(mod_parts, length(mod_parts) - 1)
