@@ -2,7 +2,7 @@ defmodule Sally.Host.Message do
   require Logger
 
   alias __MODULE__, as: Msg
-  alias Sally.Host.Reply
+  alias Sally.Host.Instruct
   alias Sally.Types
 
   @msg_mtime_variance_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_mtime_variance_ms])
@@ -36,12 +36,12 @@ defmodule Sally.Host.Message do
           log: list(),
           routed: :no | :ok,
           host: Ecto.Schema.t() | nil,
-          reply: Reply.t(),
+          reply: Instruct.t(),
           valid?: boolean(),
           invalid_reason: String.t()
         }
 
-  def add_reply(%Reply{} = reply, %Msg{} = msg) do
+  def add_reply(%Instruct{} = reply, %Msg{} = msg) do
     %Msg{msg | reply: reply}
   end
 

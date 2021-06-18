@@ -4,8 +4,8 @@ defmodule Sally.Host.Handler do
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
   alias Sally.Host
+  alias Sally.Host.Instruct
   alias Sally.Host.Message, as: Msg
-  alias Sally.Host.Reply
 
   @impl true
   def finalize(%Msg{} = msg) do
@@ -34,13 +34,13 @@ defmodule Sally.Host.Handler do
 
   @impl true
   def post_process(%Msg{category: "boot"} = msg) do
-    %Reply{
+    %Instruct{
       ident: msg.ident,
       name: msg.host.name,
       data: Host.boot_payload_data(msg.host),
       filters: ["profile", msg.host.name]
     }
-    |> Reply.send()
+    |> Instruct.send()
     |> Msg.add_reply(msg)
   end
 

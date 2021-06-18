@@ -14,9 +14,9 @@ defmodule Sally.Application do
     children = [
       {Sally.Repo, []},
       {Tortoise.Connection, @mqtt_connection},
-      {Sally.Payload, []},
+      # {Sally.Payload, []},
       {Sally.Execute, []},
-      {Sally.Host.Reply, []},
+      {Sally.Host.Instruct, []},
       {Sally.Host.Handler, []}
     ]
 

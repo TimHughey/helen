@@ -52,7 +52,8 @@ defmodule SallyHostTest do
     %{
       ident: opts[:host_ident] || @host_ident_default,
       name: opts[:host_name] || @host_name_default,
-      sent_at: DateTime.utc_now()
+      sent_at: DateTime.utc_now(),
+      data: %{build_date: "Jul 13 1971", build_time: "13:05:00"}
     }
   end
 

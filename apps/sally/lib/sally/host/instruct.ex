@@ -1,4 +1,4 @@
-defmodule Sally.Host.Reply do
+defmodule Sally.Host.Instruct do
   defmodule State do
     require Logger
 
@@ -18,11 +18,11 @@ defmodule Sally.Host.Reply do
   use GenServer, restart: :permanent, shutdown: 1000
 
   alias __MODULE__
-  alias Sally.Host.Reply.State
+  alias Sally.Host.Instruct.State
 
   @client_id Application.compile_env!(:sally, [:mqtt_connection, :client_id])
-  @qos_default Application.compile_env!(:sally, [Reply, :publish, :qos])
-  @prefix Application.compile_env!(:sally, [Reply, :publish, :prefix])
+  @qos_default Application.compile_env!(:sally, [Instruct, :publish, :qos])
+  @prefix Application.compile_env!(:sally, [Instruct, :publish, :prefix])
 
   defstruct client_id: @client_id,
             ident: nil,
@@ -38,11 +38,11 @@ defmodule Sally.Host.Reply do
   ##
   ## Public API
   ##
-  def send(%Reply{} = msg) do
+  def send(%Instruct{} = msg) do
     Logger.debug("\n#{inspect(msg, pretty: true)}")
 
     {:send, msg |> add_mtime() |> set_qos()}
-    |> Reply.call()
+    |> Instruct.call()
   end
 
   @impl true
@@ -51,11 +51,11 @@ defmodule Sally.Host.Reply do
   end
 
   def start_link(_) do
-    GenServer.start_link(Reply, [], name: __MODULE__)
+    GenServer.start_link(Instruct, [], name: __MODULE__)
   end
 
   @impl true
-  def handle_call({:send, %Reply{} = msg}, _from, %State{} = s) do
+  def handle_call({:send, %Instruct{} = msg}, _from, %State{} = s) do
     Logger.debug("\n#{inspect(msg, pretty: true)}")
     packed = %{mtime: msg.mtime} |> Map.merge(msg.data) |> Msgpax.pack!()
 
@@ -77,31 +77,31 @@ defmodule Sally.Host.Reply do
 
   @doc false
   def call(msg) when is_tuple(msg) do
-    case GenServer.whereis(Reply) do
+    case GenServer.whereis(Instruct) do
       x when is_pid(x) -> GenServer.call(x, msg)
       x -> {:no_server, x}
     end
   end
 
-  defp add_mtime(%Reply{} = msg), do: %Reply{msg | mtime: System.os_time(:millisecond)}
+  defp add_mtime(%Instruct{} = msg), do: %Instruct{msg | mtime: System.os_time(:millisecond)}
 
-  defp make_filter(%Reply{} = msg) do
+  defp make_filter(%Instruct{} = msg) do
     ([@prefix, msg.ident, "host"] ++ msg.filters) |> Enum.join("/")
   end
 
-  defp save_packed_length(%Reply{} = msg, length), do: %Reply{msg | packed_length: length}
+  defp save_packed_length(%Instruct{} = msg, length), do: %Instruct{msg | packed_length: length}
 
-  defp save_pub_rc(pub_rc, %Reply{} = msg) do
+  defp save_pub_rc(pub_rc, %Instruct{} = msg) do
     case pub_rc do
-      {:ok, ref} -> %Reply{msg | pub_ref: ref}
+      {:ok, ref} -> %Instruct{msg | pub_ref: ref}
       _ -> msg
     end
   end
 
-  defp set_qos(%Reply{} = msg), do: %Reply{msg | qos: msg.opts[:qos] || msg.qos}
+  defp set_qos(%Instruct{} = msg), do: %Instruct{msg | qos: msg.opts[:qos] || msg.qos}
 
   ##
-  ## GenServer Reply Helpers
+  ## GenServer Instruct Helpers
   ##
 
   # (1 of 2) handle plain %State{}

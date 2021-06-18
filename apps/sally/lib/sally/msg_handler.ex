@@ -115,7 +115,7 @@ defmodule Sally.Message.Handler.Server do
   end
 
   ##
-  ## GenServer Reply Helpers
+  ## GenServer Instruct Helpers
   ##
 
   # (1 of 2) handle plain %State{}

@@ -14,7 +14,7 @@ defmodule SallyHostMsgTest do
   @tag host_ident: "host.hostmsgtest"
   @tag host_name: "host-message-test"
   @tag mtime: :now
-  @tag payload: %{}
+  @tag payload: %{build_date: "Jul 13 1971", build_time: "13:05:00"}
   test "can Sally.Host.Message.accept/1 handle a boot message", ctx do
     x = ctx.accepted_message
 
@@ -35,7 +35,7 @@ defmodule SallyHostMsgTest do
 
     fail = pretty("Msg did not match", x)
     refute x.valid?, fail
-    assert x.invalid_reason == "data is #{ctx.mtime * -1} old"
+    assert x.invalid_reason =~ "old"
   end
 
   defp accept(ctx) do

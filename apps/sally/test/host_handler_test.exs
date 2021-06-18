@@ -39,7 +39,7 @@ defmodule SallyHostHandlerTest do
     tested = [:payload] ++ tested
     assert DateTime.compare(x.recv_at, x.sent_at) == :gt, fail
     tested = [:recv_at] ++ tested
-    should_be_struct(x.reply, Host.Reply)
+    should_be_struct(x.reply, Host.Instruct)
     tested = [:reply] ++ tested
     assert x.routed == :no, fail
     tested = [:routed] ++ tested
