@@ -41,12 +41,17 @@ defmodule RuthSim.Mqtt.Handler do
     reply_ok(s)
   end
 
-  # TODO: new!
   def handle_message([_env, host, category, ident, misc], packed, s) do
     # data = Msgpax.unpack!(packed) |> atomize_keys()
     data = Msgpax.unpack!(packed)
     Logger.debug("\n#{host} #{category}/#{ident} #{misc}\n#{inspect(data, pretty: true)}")
 
+    reply_ok(s)
+  end
+
+  def handle_message(filter, packed, s) do
+    data = Msgpax.unpack!(packed)
+    Logger.debug("unknown message\n#{Enum.join(filter, "/")}\n#{inspect(data, pretty: true)}")
     reply_ok(s)
   end
 

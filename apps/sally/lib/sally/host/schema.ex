@@ -35,11 +35,12 @@ defmodule Sally.Host do
     # allow changeset to consume Messages without creating a direct dependency while also allowing
     # host instead of ident
 
-    Logger.info(inspect(p, pretty: true))
+    Logger.debug("raw: #{inspect(p, pretty: true)}")
 
     %{
       ident: p[:host] || p[:ident],
       name: p[:name] || p[:ident] || p[:host],
+      build_at: make_build_datetime(p),
       last_start_at: p[:last_start_at] || p[:sent_at],
       last_seen_at: p[:last_seen_at] || p[:sent_at]
     }
@@ -51,6 +52,8 @@ defmodule Sally.Host do
 
   def changeset(%Schema{} = host, p) when is_map(p) do
     alias Ecto.Changeset
+
+    Logger.debug("final: #{inspect(p, pretty: true)}")
 
     host
     |> Changeset.cast(p, columns(:cast))
@@ -114,6 +117,35 @@ defmodule Sally.Host do
     file = [System.get_env("RUTH_TOML", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
 
     Toml.decode_file!(file)
+  end
+
+  defp make_build_datetime(%{data: %{build_date: build_date, build_time: build_time}}) do
+    [month_bin, day, year] = String.split(build_date, " ")
+
+    date = Date.new!(String.to_integer(year), month_binary_to_integer(month_bin), String.to_integer(day))
+    time = Time.from_iso8601!("#{build_time}.049152Z")
+
+    DateTime.new!(date, time, "America/New_York")
+  end
+
+  defp make_build_datetime(_), do: nil
+
+  defp month_binary_to_integer(month_bin) do
+    %{
+      "Jan" => 1,
+      "Feb" => 2,
+      "Mar" => 3,
+      "Apr" => 4,
+      "May" => 5,
+      "Jun" => 6,
+      "Jul" => 7,
+      "Aug" => 8,
+      "Sep" => 9,
+      "Oct" => 10,
+      "Nov" => 11,
+      "Dec" => 12
+    }
+    |> Map.get(month_bin)
   end
 
   defp validate_profile_exists(%Ecto.Changeset{} = cs) do

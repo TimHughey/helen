@@ -28,7 +28,7 @@ defmodule SallyHostMsgTest do
   @tag category: "run"
   @tag host_ident: "host.hostmsgtest"
   @tag host_name: "host-message-test"
-  @tag mtime: -5_000
+  @tag mtime: -100_000
   @tag payload: %{}
   test "can Sally.Host.Message.accept/1 handle an old message", ctx do
     x = ctx.accepted_message

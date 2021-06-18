@@ -56,6 +56,21 @@ defmodule Sally.Host.Handler do
 
   @impl true
   def post_process(%Msg{category: "run"} = msg) do
+    Logger.debug(inspect(msg.data, pretty: true))
+
+    %Betty.Metric{
+      measurement: "host",
+      tags: %{ident: msg.host.ident, name: msg.host.name},
+      fields: %{
+        ap_primary_channel: msg.data[:ap]["pri_chan"] || 0,
+        ap_rssi: msg.data[:ap]["rssi"] || 0,
+        heap_min: msg.data.heap["min"],
+        heap_max_alloc: msg.data.heap["max_alloc"],
+        heap_free: msg.data.heap["free"]
+      }
+    }
+    |> Betty.write_metric()
+
     msg
   end
 

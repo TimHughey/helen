@@ -5,8 +5,7 @@ defmodule Sally.Host.Message do
   alias Sally.Host.Reply
   alias Sally.Types
 
-  # TODO: revisit configuration of :msg_old_ms
-  @msg_old_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_old_ms])
+  @msg_mtime_variance_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_mtime_variance_ms])
 
   defstruct env: nil,
             category: nil,
@@ -111,9 +110,9 @@ defmodule Sally.Host.Message do
 
     cond do
       DateTime.compare(sent_at, DateTime.from_unix!(0)) == :eq -> invalid(m, "mtime is missing")
-      ms_diff < -100 -> invalid(m, "data is from #{ms_diff} in the future")
+      ms_diff < @msg_mtime_variance_ms * -1 -> invalid(m, "data is from the future #{ms_diff * -1}ms")
       ms_diff < 0 -> %Msg{m | sent_at: m.recv_at}
-      ms_diff >= @msg_old_ms -> invalid(m, "data is #{ms_diff} old")
+      ms_diff >= @msg_mtime_variance_ms -> invalid(m, "data is #{ms_diff} old")
       true -> m
     end
   end

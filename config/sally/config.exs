@@ -13,7 +13,7 @@ config :sally, Sally.Host.Reply, publish: [prefix: "#{config_env()}", qos: 1]
 config :sally, Sally.MsgOut, publish: [prefix: "#{config_env()}", qos: 1]
 #  runtime_metrics: [all: false]
 
-config :sally, Sally.Message.Handler, msg_old_ms: 5_000
+config :sally, Sally.Message.Handler, msg_mtime_variance_ms: 100_000
 # route_to: Sally.MsgIn.Processor
 
 # config :sally, Sally.MsgIn,
