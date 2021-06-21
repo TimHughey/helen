@@ -10,6 +10,7 @@ defmodule Sally.Host.Message do
   defstruct env: nil,
             category: nil,
             ident: nil,
+            filter_extra: [],
             payload: nil,
             data: nil,
             sent_at: nil,
@@ -29,6 +30,7 @@ defmodule Sally.Host.Message do
           env: Types.msg_env(),
           category: category(),
           ident: String.t(),
+          filter_extra: list(),
           payload: Types.payload(),
           data: map() | nil,
           sent_at: DateTime.t() | nil,
@@ -45,8 +47,8 @@ defmodule Sally.Host.Message do
     %Msg{msg | reply: reply}
   end
 
-  def accept({[env, ident, category], payload}) do
-    %Msg{env: env, category: category, ident: ident, payload: payload} |> preprocess()
+  def accept({[env, ident, category, extras], payload}) do
+    %Msg{env: env, category: category, ident: ident, filter_extra: extras, payload: payload} |> preprocess()
   end
 
   def handoff(%Msg{} = m) do
@@ -93,7 +95,7 @@ defmodule Sally.Host.Message do
     end
   end
 
-  @known_categories ["boot", "run", "ota", "log"]
+  @known_categories ["startup", "boot", "run", "ota", "log"]
   defp check_metadata(%Msg{} = m) do
     case m.category do
       cat when cat in @known_categories -> %Msg{m | valid?: true}

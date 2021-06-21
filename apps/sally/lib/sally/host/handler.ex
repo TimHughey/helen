@@ -33,15 +33,48 @@ defmodule Sally.Host.Handler do
   def post_process(%Msg{valid?: false} = msg), do: msg
 
   @impl true
-  def post_process(%Msg{category: "boot"} = msg) do
+  def post_process(%Msg{category: "startup"} = msg) do
+    profile = Host.boot_payload_data(msg.host)
+    profile_name = profile["meta"]["name"]
+    profile_desc = profile["meta"]["description"]
+
+    Logger.info("#{msg.host.name} startup, sending profile: #{profile_name} '#{profile_desc}'")
+
     %Instruct{
       ident: msg.ident,
       name: msg.host.name,
-      data: Host.boot_payload_data(msg.host),
+      # the description could be long, don't send it
+      data: %{profile | "meta" => Map.delete(profile["meta"], :description)},
       filters: ["profile", msg.host.name]
     }
     |> Instruct.send()
     |> Msg.add_reply(msg)
+  end
+
+  @impl true
+  def post_process(%Msg{category: "boot"} = msg) do
+    Logger.debug(inspect(msg.data, pretty: true))
+    boot_profile = List.first(msg.filter_extra, "unknown")
+    Logger.info("host startup complete: #{msg.host.name} (profile: #{boot_profile})")
+
+    stack_size = msg.data[:stack]["size"] || 1
+    stack_hw = msg.data[:stack]["highwater"] || 1
+    stack_used = (100.0 - stack_hw / stack_size * 100.0) |> Float.round(2)
+
+    %Betty.Metric{
+      measurement: "host",
+      tags: %{ident: msg.host.ident, name: msg.host.name},
+      fields: %{
+        boot_elapsed_ms: msg.data[:elapsed_ms] || 0,
+        tasks: msg.data[:tasks] || 0,
+        stack_size: stack_size,
+        stack_high_water: stack_used,
+        stack_used: stack_used
+      }
+    }
+    |> Betty.write_metric()
+
+    msg
   end
 
   @impl true
