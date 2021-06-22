@@ -85,7 +85,7 @@ defmodule Sally.Host do
 
   def columns(:cast), do: columns(:all)
   def columns(:required), do: columns_all(only: [:ident, :name, :last_seen_at, :last_start_at])
-  def columns(:replace), do: columns_all(drop: [:ident, :name, :profile, :inserted_at])
+  def columns(:replace), do: columns_all(drop: [:ident, :name, :profile, :authorized, :inserted_at])
 
   def columns_all(opts) when is_list(opts) do
     case opts do

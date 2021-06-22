@@ -123,7 +123,7 @@ defmodule Sally.Dispatch do
   defp check_metadata(%Msg{} = m) do
     case {m.subsystem, m.category} do
       {"host", cat} when cat in @known_host_categories -> %Msg{m | valid?: true}
-      {"pwm", _cat} -> %Msg{m | valid?: true}
+      {"pwm", _cat} -> %Msg{m | valid?: true} |> load_host()
       x -> invalid(m, "unknown subsystem/category: #{inspect(x)}")
     end
   end
