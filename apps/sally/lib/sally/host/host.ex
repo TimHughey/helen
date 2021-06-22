@@ -27,6 +27,12 @@ defmodule Sally.Host do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def boot_payload_data(%Schema{} = h) do
+    file = [System.get_env("RUTH_TOML", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
+
+    Toml.decode_file!(file)
+  end
+
   def changeset(p) when is_struct(p) do
     Map.from_struct(p) |> changeset()
   end
@@ -79,7 +85,7 @@ defmodule Sally.Host do
 
   def columns(:cast), do: columns(:all)
   def columns(:required), do: columns_all(only: [:ident, :name, :last_seen_at, :last_start_at])
-  def columns(:replace), do: columns_all(drop: [:ident, :name, :inserted_at])
+  def columns(:replace), do: columns_all(drop: [:ident, :name, :profile, :inserted_at])
 
   def columns_all(opts) when is_list(opts) do
     case opts do
@@ -93,6 +99,8 @@ defmodule Sally.Host do
         keep
     end
   end
+
+  def find_by_ident(ident), do: Repo.get_by(Schema, ident: ident)
 
   def get_devices(%Schema{id: id}) do
     Repo.all(Sally.Device, host_id: id)
@@ -111,12 +119,6 @@ defmodule Sally.Host do
 
   def insert_opts do
     [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
-  end
-
-  def boot_payload_data(%Schema{} = h) do
-    file = [System.get_env("RUTH_TOML", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
-
-    Toml.decode_file!(file)
   end
 
   defp make_build_datetime(%{data: %{build_date: build_date, build_time: build_time}}) do

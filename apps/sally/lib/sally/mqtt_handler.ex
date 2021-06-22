@@ -50,12 +50,12 @@ defmodule Sally.Mqtt.Handler do
     reply_ok(s)
   end
 
-  def handle_message([env, "r", host_ident, "host", category | extra], payload, s) do
+  def handle_message([env, "r", host_ident, subsystem, category | extra], payload, s) do
     alias Sally.Host.Message
 
     store_last = fn x -> put_in(s, [:last], x) end
 
-    {[env, host_ident, category, extra], payload}
+    {[env, host_ident, subsystem, category, extra], payload}
     |> Message.accept()
     |> Message.handoff()
     |> store_last.()

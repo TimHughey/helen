@@ -2,12 +2,14 @@ defmodule Sally.Host.Message do
   require Logger
 
   alias __MODULE__, as: Msg
+  alias Sally.Host
   alias Sally.Host.Instruct
   alias Sally.Types
 
   @msg_mtime_variance_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_mtime_variance_ms])
 
   defstruct env: nil,
+            subsystem: nil,
             category: nil,
             ident: nil,
             filter_extra: [],
@@ -18,16 +20,19 @@ defmodule Sally.Host.Message do
             log: [],
             routed: :no,
             host: nil,
-            reply: nil,
             final_at: nil,
             valid?: false,
             invalid_reason: "metadata not checked"
+
+  # "host", "pwm"
+  @type subsystem() :: String.t()
 
   # "boot", "run", "ota", "log"
   @type category() :: String.t()
 
   @type t :: %__MODULE__{
           env: Types.msg_env(),
+          subsystem: subsystem(),
           category: category(),
           ident: String.t(),
           filter_extra: list(),
@@ -38,17 +43,20 @@ defmodule Sally.Host.Message do
           log: list(),
           routed: :no | :ok,
           host: Ecto.Schema.t() | nil,
-          reply: Instruct.t(),
           valid?: boolean(),
           invalid_reason: String.t()
         }
 
-  def add_reply(%Instruct{} = reply, %Msg{} = msg) do
-    %Msg{msg | reply: reply}
-  end
-
-  def accept({[env, ident, category, extras], payload}) do
-    %Msg{env: env, category: category, ident: ident, filter_extra: extras, payload: payload} |> preprocess()
+  def accept({[env, ident, subsystem, category, extras], payload}) do
+    %Msg{
+      env: env,
+      subsystem: subsystem,
+      category: category,
+      ident: ident,
+      filter_extra: extras,
+      payload: payload
+    }
+    |> preprocess()
   end
 
   def handoff(%Msg{} = m) do
@@ -60,6 +68,23 @@ defmodule Sally.Host.Message do
   end
 
   def invalid(%Msg{} = m, reason), do: %Msg{m | valid?: false, invalid_reason: reason}
+
+  def load_host(%Msg{} = m) do
+    if m.valid? do
+      case Host.find_by_ident(m.ident) do
+        %Host{authorized: true} = host ->
+          %Msg{m | host: host}
+
+        %Host{authorized: false} = host ->
+          %Msg{m | host: host, valid?: false, invalid_reason: "host not authorized"}
+
+        nil ->
+          %Msg{m | valid?: false, invalid_reason: "unknown host"}
+      end
+    else
+      m
+    end
+  end
 
   def preprocess(%Msg{} = m) do
     with %Msg{valid?: true} = m <- check_metadata(m),
@@ -95,11 +120,12 @@ defmodule Sally.Host.Message do
     end
   end
 
-  @known_categories ["startup", "boot", "run", "ota", "log"]
+  @known_host_categories ["startup", "boot", "run", "ota", "log", "pwm"]
   defp check_metadata(%Msg{} = m) do
-    case m.category do
-      cat when cat in @known_categories -> %Msg{m | valid?: true}
-      _ -> invalid(m, "unknown category: #{m.category}")
+    case {m.subsystem, m.category} do
+      {"host", cat} when cat in @known_host_categories -> %Msg{m | valid?: true}
+      {"pwm", _cat} -> %Msg{m | valid?: true}
+      x -> invalid(m, "unknown subsystem/category: #{inspect(x)}")
     end
   end
 
@@ -125,15 +151,21 @@ defmodule Sally.Host.Message do
     m
   end
 
-  # @route_to Sally.Host.Handler
+  @routing [
+    host: Sally.Host.Handler,
+    pwm: Sally.PulseWidth.Handler
+  ]
   defp route_msg(%Msg{} = m) do
-    mod_parts = __MODULE__ |> Module.split()
-    mod_base = Enum.take(mod_parts, length(mod_parts) - 1)
-    msg_handler_module = (mod_base ++ [Handler]) |> Module.concat()
+    # mod_parts = __MODULE__ |> Module.split()
+    # mod_base = Enum.take(mod_parts, length(mod_parts) - 1)
+    # msg_handler_module = (mod_base ++ [Handler]) |> Module.concat()
+
+    msg_handler_module = get_in(@routing, [String.to_atom(m.subsystem)])
+
     pid = GenServer.whereis(msg_handler_module)
 
     cond do
-      is_nil(msg_handler_module) -> invalid(m, "undefined routing: #{m.category}")
+      is_nil(msg_handler_module) -> invalid(m, "undefined routing: #{m.subsystem}")
       not is_pid(pid) -> invalid(m, "no server: #{inspect(msg_handler_module)}")
       true -> %Msg{m | routed: GenServer.cast(msg_handler_module, m)}
     end

@@ -19,7 +19,7 @@ defmodule SallyHostHandlerTest do
     x = {ctx.filter, ctx.packed} |> Host.Message.accept() |> Host.Handler.process()
 
     # initially set tested to keys we don't need to test
-    tested = [:env, :log]
+    tested = [:env, :subsystem, :filter_extra, :log]
     fail = pretty("finalized Message did not match", x)
     assert x.valid? == true, fail
     tested = [:valid?] ++ tested
@@ -39,8 +39,6 @@ defmodule SallyHostHandlerTest do
     tested = [:payload] ++ tested
     assert DateTime.compare(x.recv_at, x.sent_at) == :gt, fail
     tested = [:recv_at] ++ tested
-    should_be_struct(x.reply, Host.Instruct)
-    tested = [:reply] ++ tested
     assert x.routed == :no, fail
     tested = [:routed] ++ tested
 
@@ -56,7 +54,7 @@ defmodule SallyHostHandlerTest do
     put = fn x -> put_in(ctx, [:filter], x) end
 
     case ctx.category do
-      "boot" -> ["test", ctx[:host_ident], ctx.category] |> put.()
+      "boot" -> ["test", ctx[:host_ident], "host", ctx.category, []] |> put.()
       _ -> ["test"] |> put.()
     end
   end

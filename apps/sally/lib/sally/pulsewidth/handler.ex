@@ -1,11 +1,11 @@
-defmodule Sally.Host.Handler do
+defmodule Sally.PulseWidth.Handler do
   require Logger
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
-  alias Sally.Host
   alias Sally.Host.Instruct
   alias Sally.Host.Message, as: Msg
+  alias Sally.PulseWidth
 
   @impl true
   def finalize(%Msg{} = msg) do
@@ -19,101 +19,98 @@ defmodule Sally.Host.Handler do
 
   @impl true
   def process(%Msg{} = msg) do
-    Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
+    Logger.info("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
 
-    Ecto.Multi.new()
-    |> Ecto.Multi.insert(:host, Host.changeset(msg), Host.insert_opts())
-    |> Sally.Repo.transaction()
-    |> check_result(msg)
-    |> post_process()
-    |> finalize()
+    # {:ok, %{}}
+    # |> check_result(msg)
+    # |> post_process()
+    # |> finalize()
   end
 
   @impl true
   def post_process(%Msg{valid?: false} = msg), do: msg
 
-  @impl true
-  def post_process(%Msg{category: "startup"} = msg) do
-    profile = Host.boot_payload_data(msg.host)
-    profile_name = profile["meta"]["name"]
-    profile_desc = profile["meta"]["description"]
+  # @impl true
+  # def post_process(%Msg{category: "startup"} = msg) do
+  #   profile = PulseWidth.boot_payload_data(msg.host)
+  #   profile_name = profile["meta"]["name"]
+  #   profile_desc = profile["meta"]["description"]
+  #
+  #   Logger.info("#{msg.host.name} startup, sending profile: #{profile_name} '#{profile_desc}'")
+  #
+  #   %Instruct{
+  #     ident: msg.ident,
+  #     name: msg.host.name,
+  #     # the description could be long, don't send it
+  #     data: %{profile | "meta" => Map.delete(profile["meta"], :description)},
+  #     filters: ["profile", msg.host.name]
+  #   }
+  #   |> Instruct.send()
+  #   |> Msg.add_reply(msg)
+  # end
+  #
+  # @impl true
+  # def post_process(%Msg{category: "boot"} = msg) do
+  #   Logger.debug(inspect(msg.data, pretty: true))
+  #   boot_profile = List.first(msg.filter_extra, "unknown")
+  #   Logger.info("host startup complete: #{msg.host.name} (profile: #{boot_profile})")
+  #
+  #   stack_size = msg.data[:stack]["size"] || 1
+  #   stack_hw = msg.data[:stack]["highwater"] || 1
+  #   stack_used = (100.0 - stack_hw / stack_size * 100.0) |> Float.round(2)
+  #
+  #   %Betty.Metric{
+  #     measurement: "host",
+  #     tags: %{ident: msg.host.ident, name: msg.host.name},
+  #     fields: %{
+  #       boot_elapsed_ms: msg.data[:elapsed_ms] || 0,
+  #       tasks: msg.data[:tasks] || 0,
+  #       stack_size: stack_size,
+  #       stack_high_water: stack_used,
+  #       stack_used: stack_used
+  #     }
+  #   }
+  #   |> Betty.write_metric()
+  #
+  #   msg
+  # end
+  #
+  # @impl true
+  # def post_process(%Msg{category: "log"} = msg) do
+  #   msg
+  # end
+  #
+  # @impl true
+  # def post_process(%Msg{category: "ota"} = msg) do
+  #   msg
+  # end
+  #
+  # @impl true
+  # def post_process(%Msg{category: "run"} = msg) do
+  #   Logger.debug(inspect(msg.data, pretty: true))
+  #
+  #   %Betty.Metric{
+  #     measurement: "host",
+  #     tags: %{ident: msg.host.ident, name: msg.host.name},
+  #     fields: %{
+  #       ap_primary_channel: msg.data[:ap]["pri_chan"] || 0,
+  #       ap_rssi: msg.data[:ap]["rssi"] || 0,
+  #       heap_min: msg.data.heap["min"],
+  #       heap_max_alloc: msg.data.heap["max_alloc"],
+  #       heap_free: msg.data.heap["free"]
+  #     }
+  #   }
+  #   |> Betty.write_metric()
+  #
+  #   msg
+  # end
 
-    Logger.info("#{msg.host.name} startup, sending profile: #{profile_name} '#{profile_desc}'")
-
-    %Instruct{
-      ident: msg.ident,
-      name: msg.host.name,
-      # the description could be long, don't send it
-      data: %{profile | "meta" => Map.delete(profile["meta"], :description)},
-      filters: ["profile", msg.host.name]
-    }
-    |> Instruct.send()
-
-    msg
-  end
-
-  @impl true
-  def post_process(%Msg{category: "boot"} = msg) do
-    Logger.debug(inspect(msg.data, pretty: true))
-    boot_profile = List.first(msg.filter_extra, "unknown")
-    Logger.info("host startup complete: #{msg.host.name} (profile: #{boot_profile})")
-
-    stack_size = msg.data[:stack]["size"] || 1
-    stack_hw = msg.data[:stack]["highwater"] || 1
-    stack_used = (100.0 - stack_hw / stack_size * 100.0) |> Float.round(2)
-
-    %Betty.Metric{
-      measurement: "host",
-      tags: %{ident: msg.host.ident, name: msg.host.name},
-      fields: %{
-        boot_elapsed_ms: msg.data[:elapsed_ms] || 0,
-        tasks: msg.data[:tasks] || 0,
-        stack_size: stack_size,
-        stack_high_water: stack_used,
-        stack_used: stack_used
-      }
-    }
-    |> Betty.write_metric()
-
-    msg
-  end
-
-  @impl true
-  def post_process(%Msg{category: "log"} = msg) do
-    msg
-  end
-
-  @impl true
-  def post_process(%Msg{category: "ota"} = msg) do
-    msg
-  end
-
-  @impl true
-  def post_process(%Msg{category: "run"} = msg) do
-    Logger.debug(inspect(msg.data, pretty: true))
-
-    %Betty.Metric{
-      measurement: "host",
-      tags: %{ident: msg.host.ident, name: msg.host.name},
-      fields: %{
-        ap_primary_channel: msg.data[:ap]["pri_chan"] || 0,
-        ap_rssi: msg.data[:ap]["rssi"] || 0,
-        heap_min: msg.data.heap["min"],
-        heap_max_alloc: msg.data.heap["max_alloc"],
-        heap_free: msg.data.heap["free"]
-      }
-    }
-    |> Betty.write_metric()
-
-    msg
-  end
-
-  defp check_result(txn_result, %Msg{} = msg) do
-    case txn_result do
-      {:ok, results} -> %Msg{msg | host: results.host}
-      {:error, e} -> Msg.invalid(msg, e)
-    end
-  end
+  # defp check_result(txn_result, %Msg{} = msg) do
+  #   case txn_result do
+  #     {:ok, results} -> %Msg{msg | host: results.host}
+  #     {:error, e} -> Msg.invalid(msg, e)
+  #   end
+  # end
 
   # defp cmdack(%Msg{} = mi) do
   #   ## cmd acks are straight forward and require only the refid and the message recv at

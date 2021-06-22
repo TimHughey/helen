@@ -38,11 +38,6 @@ defmodule SallyHostMsgTest do
     assert x.invalid_reason =~ "old"
   end
 
-  defp accept(ctx) do
-    {["test", ctx.host_ident, ctx.category], Msgpax.pack!(ctx.data, iodata: false)}
-    |> Msg.accept()
-  end
-
   @tag category: "ota"
   @tag host_ident: "host.hostmsgtest"
   @tag host_name: "host-message-test"
@@ -66,7 +61,12 @@ defmodule SallyHostMsgTest do
 
     fail = pretty("Msg did not match", x)
     refute x.valid?, fail
-    assert x.invalid_reason == "unknown category: bad"
+    assert x.invalid_reason =~ "unknown subsystem/category"
+  end
+
+  defp accept(ctx) do
+    {["test", ctx.host_ident, "host", ctx.category, []], Msgpax.pack!(ctx.data, iodata: false)}
+    |> Msg.accept()
   end
 
   defp make_mtime(ctx) do
