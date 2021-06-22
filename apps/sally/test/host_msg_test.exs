@@ -4,7 +4,7 @@ defmodule SallyHostMsgTest do
   use ExUnit.Case, async: true
   use Should
 
-  alias Sally.Host.Message, as: Msg
+  alias Sally.Dispatch, as: Msg
 
   @moduletag :host_message
 
@@ -15,7 +15,7 @@ defmodule SallyHostMsgTest do
   @tag host_name: "host-message-test"
   @tag mtime: :now
   @tag payload: %{build_date: "Jul 13 1971", build_time: "13:05:00"}
-  test "can Sally.Host.Message.accept/1 handle a boot message", ctx do
+  test "can Sally.Dispatch.accept/1 handle a boot message", ctx do
     x = ctx.accepted_message
 
     fail = pretty("Msg did not match", x)
@@ -30,7 +30,7 @@ defmodule SallyHostMsgTest do
   @tag host_name: "host-message-test"
   @tag mtime: -100_000
   @tag payload: %{}
-  test "can Sally.Host.Message.accept/1 handle an old message", ctx do
+  test "can Sally.Dispatch.accept/1 handle an old message", ctx do
     x = ctx.accepted_message
 
     fail = pretty("Msg did not match", x)
@@ -43,7 +43,7 @@ defmodule SallyHostMsgTest do
   @tag host_name: "host-message-test"
   @tag mtime: :none
   @tag payload: %{}
-  test "can Sally.Host.Message.accept/1 handle a message missing the mtime key", ctx do
+  test "can Sally.Dispatch.accept/1 handle a message missing the mtime key", ctx do
     x = ctx.accepted_message
 
     fail = pretty("Msg did not match", x)
@@ -56,7 +56,7 @@ defmodule SallyHostMsgTest do
   @tag host_name: "host-message-test"
   @tag mtime: :now
   @tag payload: %{}
-  test "can Sally.Host.Message.accept/1 handle a message with invalid category", ctx do
+  test "can Sally.Dispatch.accept/1 handle a message with invalid category", ctx do
     x = ctx.accepted_message
 
     fail = pretty("Msg did not match", x)

@@ -3,8 +3,8 @@ defmodule Sally.PulseWidth.Handler do
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
+  alias Sally.Dispatch, as: Msg
   alias Sally.Host.Instruct
-  alias Sally.Host.Message, as: Msg
   alias Sally.PulseWidth
 
   @impl true

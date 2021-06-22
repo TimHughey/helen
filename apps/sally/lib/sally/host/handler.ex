@@ -3,9 +3,9 @@ defmodule Sally.Host.Handler do
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
+  alias Sally.Dispatch, as: Msg
   alias Sally.Host
   alias Sally.Host.Instruct
-  alias Sally.Host.Message, as: Msg
 
   @impl true
   def finalize(%Msg{} = msg) do

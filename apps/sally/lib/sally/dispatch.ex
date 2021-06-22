@@ -1,9 +1,8 @@
-defmodule Sally.Host.Message do
+defmodule Sally.Dispatch do
   require Logger
 
   alias __MODULE__, as: Msg
   alias Sally.Host
-  alias Sally.Host.Instruct
   alias Sally.Types
 
   @msg_mtime_variance_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_mtime_variance_ms])

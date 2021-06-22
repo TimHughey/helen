@@ -16,7 +16,7 @@ defmodule SallyHostHandlerTest do
   @tag host_name: "sally.hostprocessor000"
   test "can Host Handler can process a boot message", ctx do
     # simulare the steps taken by Sally.Mqtt.Handler.handle_message/3 and Host.Handler.process/1
-    x = {ctx.filter, ctx.packed} |> Host.Message.accept() |> Host.Handler.process()
+    x = {ctx.filter, ctx.packed} |> Sally.Dispatch.accept() |> Host.Handler.process()
 
     # initially set tested to keys we don't need to test
     tested = [:env, :subsystem, :filter_extra, :log]
@@ -49,7 +49,7 @@ defmodule SallyHostHandlerTest do
   end
 
   # NOTE: the filter created is the reduced filter created by Mqtt.Handler.handle_message/3
-  # and is intended for consumption by Host.Message.accept/1
+  # and is intended for consumption by Sally.Dispatch.accept/1
   defp setup_filter(ctx) do
     put = fn x -> put_in(ctx, [:filter], x) end
 
