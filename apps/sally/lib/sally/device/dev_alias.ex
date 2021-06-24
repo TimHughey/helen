@@ -11,7 +11,7 @@ defmodule Sally.DevAlias do
   alias Sally.{Command, Datapoint, Device, Repo}
 
   @pio_min 0
-  @ttl_default 2000
+  @ttl_default 15_000
   @ttl_min 50
 
   schema "dev_alias" do
@@ -108,6 +108,10 @@ defmodule Sally.DevAlias do
   end
 
   def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
+
+  def just_saw(repo, %Schema{} = da, seen_at) do
+    changeset(%{updated_at: seen_at}, da) |> repo.update!(returning: true)
+  end
 
   defp load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])

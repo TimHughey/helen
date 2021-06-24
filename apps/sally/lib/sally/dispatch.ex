@@ -19,6 +19,7 @@ defmodule Sally.Dispatch do
             log: [],
             routed: :no,
             host: nil,
+            results: nil,
             final_at: nil,
             valid?: false,
             invalid_reason: "metadata not checked"
@@ -42,6 +43,8 @@ defmodule Sally.Dispatch do
           log: list(),
           routed: :no | :ok,
           host: Ecto.Schema.t() | nil,
+          results: struct() | nil,
+          final_at: DateTime.t() | nil,
           valid?: boolean(),
           invalid_reason: String.t()
         }

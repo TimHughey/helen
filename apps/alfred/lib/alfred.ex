@@ -38,12 +38,15 @@ defmodule Alfred do
 
   defdelegate is_name_known?(name), to: NamesAgent, as: :exists?
 
+  # NOTE
+  # this is the go forward implementation
   def just_saw([%_{__meta__: _} | _] = seen_list) do
     Logger.debug(inspect(seen_list, pretty: true))
     NamesAgent.just_saw(seen_list)
   end
 
   # (1 of 2) process seen names from the inbound msg pipeline
+  @deprecated "Use just_saw/1 instead"
   def just_saw(in_msg) do
     put_rc = fn x -> put_in(in_msg, [:alfred_rc], x) end
 

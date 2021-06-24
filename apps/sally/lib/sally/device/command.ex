@@ -92,4 +92,16 @@ defmodule Sally.Command do
         {:ok, acc + deleted}
     end
   end
+
+  def reported_cmd_changeset(%DevAlias{} = da, cmd, reported_at) do
+    reported_cmd = Ecto.build_assoc(da, :cmds)
+
+    [refid | _] = Ecto.UUID.generate() |> String.split("-")
+
+    # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
+    utc_now = DateTime.utc_now()
+
+    %{refid: refid, cmd: cmd, acked: true, orphan: false, acked_at: utc_now, sent_at: reported_at}
+    |> changeset(reported_cmd)
+  end
 end
