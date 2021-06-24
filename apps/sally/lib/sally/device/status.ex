@@ -75,7 +75,10 @@ defmodule Sally.Status do
     ttl_start_at = DateTime.utc_now() |> DateTime.add(ttl_ms * -1, :millisecond)
 
     # if either the device hasn't been seen or the DevAlias hasn't been updated then the ttl is expired
-    DateTime.compare(ttl_start_at, dev_alias.device.last_seen_at) == :gt or
-      DateTime.compare(ttl_start_at, dev_alias.updated_at) == :gt
+    # DateTime.compare(ttl_start_at, dev_alias.device.last_seen_at) == :gt or
+    #   DateTime.compare(ttl_start_at, dev_alias.updated_at) == :gt
+
+    # TODO validate only checking the device is accurate
+    DateTime.compare(ttl_start_at, dev_alias.device.last_seen_at) == :gt
   end
 end

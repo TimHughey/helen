@@ -7,7 +7,7 @@ defmodule Alfred.ExecCmd do
             cmd_params: %{},
             cmd_opts: [ack: :host, force: false, notify_when_released: false],
             pub_opts: [],
-            pub_ref: nil,
+            instruct: nil,
             valid?: false,
             invalid_reason: nil
 
@@ -30,7 +30,7 @@ defmodule Alfred.ExecCmd do
           cmd_params: cmd_params(),
           cmd_opts: cmd_opts(),
           pub_opts: pub_opts(),
-          pub_ref: nil | reference(),
+          instruct: nil | struct(),
           valid?: boolean(),
           invalid_reason: nil | String.t()
         }

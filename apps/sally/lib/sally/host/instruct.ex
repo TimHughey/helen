@@ -27,6 +27,7 @@ defmodule Sally.Host.Instruct do
   defstruct client_id: @client_id,
             ident: nil,
             name: nil,
+            subsystem: nil,
             mtime: :populate_when_sent,
             data: %{},
             filters: [],
@@ -86,7 +87,7 @@ defmodule Sally.Host.Instruct do
   defp add_mtime(%Instruct{} = msg), do: %Instruct{msg | mtime: System.os_time(:millisecond)}
 
   defp make_filter(%Instruct{} = msg) do
-    ([@prefix, msg.ident, "host"] ++ msg.filters) |> Enum.join("/")
+    ([@prefix, msg.ident, msg.subsystem] ++ msg.filters) |> Enum.join("/")
   end
 
   defp save_packed_length(%Instruct{} = msg, length), do: %Instruct{msg | packed_length: length}

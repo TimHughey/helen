@@ -31,10 +31,10 @@ defmodule Sally.Device do
     device = Ecto.build_assoc(host, :devices)
 
     %{
-      ident: p[:ident],
-      family: p[:category] || p[:family],
+      ident: List.first(p.filter_extra, p[:ident]),
+      family: p[:subsystem] || p.data[:family],
       mutable: p.data[:mut] || p.data[:mutable],
-      pios: p.data[:pios],
+      pios: p.data[:pins] |> length(),
       last_seen_at: p[:sent_at]
     }
     |> Map.merge(merge_data)
@@ -63,31 +63,37 @@ defmodule Sally.Device do
 
   def columns(:cast), do: columns(:all)
   def columns(:required), do: columns_all(drop: [:inserted_at, :updated_at])
-  def columns(:replace), do: columns_all(drop: [:ident, :inserted_at])
+  def columns(:replace), do: columns_all(only: [:last_seen_at, :updated_at])
 
   def columns_all(opts) when is_list(opts) do
-    keep_set = MapSet.new(opts[:only] || columns(:all))
-    drop_set = MapSet.new(opts[:drop] || columns(:all))
+    case opts do
+      [drop: x] ->
+        keep_set = columns(:all) |> MapSet.new()
+        drop_set = x |> MapSet.new()
 
-    MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
+        MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
+
+      [only: keep] ->
+        keep
+    end
   end
 
-  # # (1 of 2) find with proper opts
-  # def find(opts) when is_list(opts) and opts != [] do
-  #   case Repo.get_by(Schema, opts) do
-  #     %Schema{} = x -> preload(x)
-  #     x when is_nil(x) -> nil
-  #   end
-  # end
-  #
+  # (1 of 2) find with proper opts
+  def find(opts) when is_list(opts) and opts != [] do
+    case Repo.get_by(Schema, opts) do
+      %Schema{} = x -> preload(x)
+      x when is_nil(x) -> nil
+    end
+  end
+
   # # (2 of 2) validate param and build opts for find/2
-  # def find(id_or_ident) do
-  #   case id_or_ident do
-  #     x when is_binary(x) -> find(ident: x)
-  #     x when is_integer(x) -> find(id: x)
-  #     x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
-  #   end
-  # end
+  def find(id_or_ident) do
+    case id_or_ident do
+      x when is_binary(x) -> find(ident: x)
+      x when is_integer(x) -> find(id: x)
+      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
+    end
+  end
 
   # def find_alias(%Schema{aliases: aliases}, pio) when is_integer(pio) and pio >= 0 do
   #   Enum.find(aliases, nil, fn dev_alias -> DevAlias.for_pio?(dev_alias, pio) end)
@@ -110,6 +116,10 @@ defmodule Sally.Device do
 
   def insert_opts do
     [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
+  end
+
+  def load_aliases(device) do
+    Repo.preload(device, [:aliases])
   end
 
   def pio_aliased?(%Schema{pios: pios} = device, pio) when pio < pios do

@@ -24,9 +24,6 @@ defmodule Sally.Payload do
   alias Sally.Host
 
   def send_cmd(%Alfred.ExecCmd{inserted_cmd: %Sally.Command{dev_alias: dev_alias}} = ec) do
-    # [dev_alias.device.host.ident, dev_alias.device.family, dev_alias.device.ident, ec.inserted_cmd.refid]
-    # |> publish(assemble_specific_cmd_data(ec), ec.pub_opts)
-
     host_id = dev_alias.device.host.ident
     hostname = dev_alias.device.host.name
     family = dev_alias.device.family
@@ -37,20 +34,21 @@ defmodule Sally.Payload do
     %Host.Instruct{
       ident: host_id,
       name: hostname,
+      subsystem: family,
       data: data,
-      filters: [host_id, family, device, refid]
+      filters: [device, refid]
     }
     |> Host.Instruct.send()
   end
 
   defp assemble_specific_cmd_data(%Alfred.ExecCmd{} = ec) do
-    add_ack_if_needed = fn x -> if ec.cmd_opts[:ack] == :host, do: put_in(x, [:ack], true), else: x end
+    add_ack_if_needed = fn x -> if ec.cmd_opts[:ack] != :immediate, do: put_in(x, [:ack], true), else: x end
 
     include_cmd_params_if_needed = fn x ->
       if map_size(ec.cmd_params) > 0, do: put_in(x, [:params], ec.cmd_params), else: x
     end
 
-    %{ec.inserted_cmd.dev_alias.pio => ec.cmd}
+    %{pin: ec.inserted_cmd.dev_alias.pio, cmd: ec.cmd}
     |> add_ack_if_needed.()
     |> include_cmd_params_if_needed.()
   end

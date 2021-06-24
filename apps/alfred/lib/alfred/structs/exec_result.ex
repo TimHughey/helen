@@ -10,7 +10,7 @@ defmodule Alfred.ExecResult do
             refid: nil,
             track_timeout_ms: nil,
             will_notify_when_released: false,
-            pub_ref: nil
+            instruct: nil
 
   @type(exec_rc :: :ok | :not_found | :tty_expired, {:invalid, String.t()} | {:error, any()})
 
@@ -21,7 +21,7 @@ defmodule Alfred.ExecResult do
           refid: nil | String.t(),
           track_timeout_ms: nil | pos_integer(),
           will_notify_when_released: boolean(),
-          pub_ref: nil | reference()
+          instruct: nil | struct()
         }
 
   def error(name, rc), do: %ExecResult{name: name, rc: rc}
@@ -37,7 +37,7 @@ defmodule Alfred.ExecResult do
   def not_found(%MutableStatus{name: name}), do: %ExecResult{name: name, cmd: "unknown", rc: :not_found}
   def no_change(%ExecCmd{name: name, cmd: cmd}), do: %ExecResult{name: name, cmd: cmd, rc: :ok}
 
-  def ok(%ExecCmd{name: name, pub_ref: pub_ref}, %_{} = te) do
+  def ok(%ExecCmd{name: name, instruct: instruct}, %_{} = te) do
     %ExecResult{
       name: name,
       rc: :ok,
@@ -45,7 +45,7 @@ defmodule Alfred.ExecResult do
       refid: te.refid,
       track_timeout_ms: te.track_timeout_ms,
       will_notify_when_released: te.notify_pid && true,
-      pub_ref: pub_ref
+      instruct: instruct
     }
   end
 

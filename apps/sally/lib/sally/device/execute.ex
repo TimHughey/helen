@@ -36,7 +36,7 @@ defmodule Sally.Execute do
          {:ok, %ExecCmd{inserted_cmd: %Command{}} = ec} <- insert_cmd_if_needed(ec),
          {:ok, %TrackerEntry{} = te} <- Broom.track(ec.inserted_cmd, ec.cmd_opts) do
       # everything is in order, send the command to the remote host
-      %ExecCmd{ec | pub_ref: Payload.send_cmd(ec)} |> ExecResult.ok(te)
+      %ExecCmd{ec | instruct: Payload.send_cmd(ec)} |> ExecResult.ok(te)
     else
       %ExecCmd{valid?: false} = x -> ExecResult.invalid(x)
       {:ok, :no_change} -> ExecResult.no_change(ec)

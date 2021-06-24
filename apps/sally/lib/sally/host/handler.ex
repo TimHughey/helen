@@ -43,6 +43,7 @@ defmodule Sally.Host.Handler do
     %Instruct{
       ident: msg.ident,
       name: msg.host.name,
+      subsystem: "host",
       # the description could be long, don't send it
       data: %{profile | "meta" => Map.delete(profile["meta"], :description)},
       filters: ["profile", msg.host.name]

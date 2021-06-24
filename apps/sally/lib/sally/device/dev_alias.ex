@@ -65,8 +65,8 @@ defmodule Sally.DevAlias do
     %{
       name: opts[:name],
       pio: opts[:pio],
-      description: opts[:description] || "<none>",
-      ttl_ms: opts[:ttl_ms] || @ttl_default
+      description: opts[:description] || dev_alias.description,
+      ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
     }
     |> changeset(dev_alias)
     |> Repo.insert!(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
@@ -120,6 +120,18 @@ defmodule Sally.DevAlias do
       %Schema{} = a -> Repo.preload(a, [:device])
       x -> x
     end
+  end
+
+  def load_aliases_with_last_cmd(repo, multi_changes) do
+    cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
+
+    {:ok,
+     Ecto.Query.from(a in Schema,
+       where: a.device_id == ^multi_changes.device.id,
+       order_by: [asc: a.pio],
+       preload: [cmds: ^cmd_q]
+     )
+     |> repo.all()}
   end
 
   def load_cmd_last(%Schema{} = x) do
