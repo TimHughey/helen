@@ -31,7 +31,8 @@ defmodule Alfred.MixProject do
     [
       {:easy_time, in_umbrella: true},
       {:ecto_sql, "~> 3.0"},
-      {:excoveralls, "~> 0.10", only: :test}
+      {:excoveralls, "~> 0.10", only: :test},
+      {:should, in_umbrella: true, only: :test}
     ]
   end
 

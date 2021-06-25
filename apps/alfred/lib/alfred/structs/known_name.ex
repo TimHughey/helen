@@ -1,17 +1,36 @@
 defmodule Alfred.KnownName do
+  alias __MODULE__
+
   defstruct name: "new name",
             callback_mod: Alfred.Fake,
-            mutable: false,
-            seen_at: DateTime.utc_now(),
+            mutable?: false,
+            seen_at: DateTime.from_unix!(0, :microsecond),
             ttl_ms: 30_000,
-            pruned: false
+            missing?: false
 
   @type t :: %__MODULE__{
           name: String.t(),
           callback_mod: module(),
-          mutable: boolean(),
+          mutable?: boolean(),
           seen_at: DateTime.t(),
           ttl_ms: pos_integer(),
-          pruned: boolean()
+          missing?: boolean()
         }
+
+  def detect_missing(%KnownName{} = kn) do
+    utc_now = DateTime.utc_now()
+    ttl_dt = DateTime.add(utc_now, kn.ttl_ms * -1, :millisecond)
+
+    if DateTime.compare(utc_now, ttl_dt) != :gt, do: %KnownName{kn | missing?: true}, else: kn
+  end
+
+  def new(name, mutable?, ttl_ms, callback_mod) do
+    %KnownName{
+      name: name,
+      callback_mod: callback_mod,
+      mutable?: mutable?,
+      seen_at: DateTime.utc_now(),
+      ttl_ms: ttl_ms
+    }
+  end
 end

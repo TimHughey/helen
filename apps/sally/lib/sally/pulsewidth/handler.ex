@@ -32,7 +32,6 @@ defmodule Sally.PulseWidth.Handler do
     |> Ecto.Multi.run(:aligned, Handler, :align_status, [msg])
     |> Ecto.Multi.run(:just_saw, Handler, :just_saw, [msg])
     |> Sally.Repo.transaction()
-    |> tap(fn {:ok, results} -> Logger.debug("just saw: #{inspect(results.just_saw)}") end)
     |> check_result(msg)
     |> post_process()
     |> finalize()
@@ -53,27 +52,42 @@ defmodule Sally.PulseWidth.Handler do
         dev_alias = DevAlias.just_saw(Repo, dev_alias, msg.sent_at)
         # ident = DB.Device.update_last_seen_at(dev_alias.device_id, msg.sent_at)
 
-        metric = %Betty.Metric{
-          measurement: "command",
-          tags: %{module: __MODULE__, name: dev_alias.name, cmd: te.cmd},
-          fields: %{
-            cmd_roundtrip_us: DateTime.diff(te.acked_at, te.sent_at, :microsecond),
-            cmd_total_us: DateTime.diff(te.released_at, te.sent_at, :microsecond),
-            release_us: DateTime.diff(te.released_at, msg.recv_at, :microsecond)
-          }
-        }
-
-        Betty.write_metric(metric)
-
-        msg |> finalize()
+        {:ok,
+         %{
+           betty_rc:
+             %Betty.Metric{
+               measurement: "command",
+               tags: %{module: __MODULE__, name: dev_alias.name, cmd: te.cmd},
+               fields: %{
+                 cmd_roundtrip_us: DateTime.diff(te.acked_at, te.sent_at, :microsecond),
+                 cmd_total_us: DateTime.diff(te.released_at, te.sent_at, :microsecond),
+                 release_us: DateTime.diff(te.released_at, msg.recv_at, :microsecond)
+               }
+             }
+             |> Betty.write_metric(),
+           just_saw: [dev_alias]
+         }}
 
       error ->
-        Dispatch.invalid(msg, error) |> finalize()
+        {:error, error}
     end
+    |> check_result(msg)
+    |> finalize()
   end
 
   @impl true
   def post_process(%Dispatch{valid?: true} = msg) do
+    # alias Alfred.JustSaw
+    #
+    # just_saw_list = for
+    #
+    #
+    #
+    #
+    # case Alfred.just_saw(msg.results.just_saw) do
+    #   {:ok, alfred_res} -> %Dispatch{msg | results: put_in(msg.results, [:alfred], alfred_res)}
+    #   error -> Dispatch.invalid(msg, error)
+    # end
     msg
   end
 
@@ -109,16 +123,20 @@ defmodule Sally.PulseWidth.Handler do
   end
 
   def just_saw(repo, changes, %Dispatch{} = msg) do
+    alias Alfred.JustSaw
+
     for %DevAlias{} = dev_alias <- changes.aliases, reduce: {:ok, []} do
       {:ok, acc} ->
         DevAlias.just_saw(repo, dev_alias, msg.sent_at)
-        {:ok, [dev_alias.name] ++ acc}
+        JustSaw.new(Sally, changes.device.mutable) |> JustSaw.add_device(dev_alias) |> Alfred.just_saw_cast()
+
+        {:ok, [dev_alias] ++ acc}
     end
   end
 
   defp check_result(txn_result, %Dispatch{} = msg) do
     case txn_result do
-      {:ok, _results} -> %Dispatch{msg | valid?: true}
+      {:ok, results} -> %Dispatch{msg | valid?: true, results: results}
       {:error, e} -> Dispatch.invalid(msg, e)
     end
   end

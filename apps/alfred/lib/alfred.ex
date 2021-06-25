@@ -5,98 +5,53 @@ defmodule Alfred do
   Alfred - Master of devices
   """
 
-  alias Alfred.{KnownName, NamesAgent, Notify}
+  alias Alfred.{ExecCmd, KnownName, MutableStatus, Names, Notify}
 
   # is a name available (aka unknown)
   def available(name) do
-    case is_name_known?(name) do
+    case Names.exists?(name) do
       false -> {:alfred, :available, name}
-      true -> {:alfred, :taken, NamesAgent.get(name)}
+      true -> {:alfred, :taken, Names.lookup(name)}
     end
   end
 
-  defdelegate delete(name), to: NamesAgent
+  defdelegate delete(name), to: Names
 
-  # (1 of 2) accept a single arg, ensure it contains name and extract opts if needed
-  def execute(cmd_map) when is_map(cmd_map) do
-    case cmd_map do
-      %{name: name, opts: opts} = x -> execute(name, Map.delete(x, :opts), opts)
-      %{name: name} = x -> execute(name, x, [])
-      _x -> {:invalid, "execute map must include name"}
+  def execute(%ExecCmd{} = ec) do
+    case Names.lookup(ec.name) do
+      %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.execute(ec)
+      %KnownName{mutable?: false} -> {:failed, "immutable: #{ec.name}"}
+      nil -> {:failed, "unknown: #{ec.name}"}
     end
   end
 
-  # (2 of 2) name, cmd_map and opts specified as unique arguments
-  # NOTE: opts can contain notify_when_released: true to enter a receive loop waiting for ack
-  def execute(name, cmd_map, opts) when is_binary(name) and is_map(cmd_map) and is_list(opts) do
-    case NamesAgent.get(name) do
-      %KnownName{callback_mod: cb_mod, mutable: true} -> cb_mod.execute(name, cmd_map, opts)
-      %KnownName{mutable: false} -> {:failed, "#{in_quotes(name)} is immutable"}
-      nil -> {:failed, "unknown: #{in_quotes(name)}"}
-    end
-  end
+  defdelegate is_name_known?(name), to: Names, as: :exists?
+  defdelegate just_saw(js), to: Names
+  defdelegate just_saw_cast(js), to: Names
 
-  defdelegate is_name_known?(name), to: NamesAgent, as: :exists?
-
-  # NOTE
-  # this is the go forward implementation
-  def just_saw([%_{__meta__: _} | _] = seen_list) do
-    Logger.debug(inspect(seen_list, pretty: true))
-    NamesAgent.just_saw(seen_list)
-  end
-
-  # (1 of 2) process seen names from the inbound msg pipeline
-  @deprecated "Use just_saw/1 instead"
-  def just_saw(in_msg) do
-    put_rc = fn x -> put_in(in_msg, [:alfred_rc], x) end
-
-    in_msg
-    |> get_seen_names_from_in_msg()
-    |> make_seen_list()
-    |> NamesAgent.just_saw()
-    |> put_rc.()
-    |> log_and_passthrough("just_saw:")
-  end
-
-  defdelegate known(), to: NamesAgent
   defdelegate notify_register(name, opts), to: Notify, as: :register
 
   def off(name, opts \\ []) when is_binary(name) do
-    %{cmd: "off", name: name, opts: opts} |> execute()
+    %ExecCmd{name: name, cmd: "off", cmd_opts: opts} |> execute()
   end
 
   def on(name, opts \\ []) when is_binary(name) do
-    %{cmd: "on", name: name, opts: opts} |> execute()
+    %ExecCmd{name: name, cmd: "on", cmd_opts: opts} |> execute()
   end
 
   def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    case NamesAgent.get(name) do
+    case Names.lookup(name) do
       %KnownName{callback_mod: cb_mod} -> cb_mod.status(name, opts)
-      nil -> {:failed, "unknown: #{in_quotes(name)}"}
+      nil -> {:failed, "unknown: #{name}"}
     end
   end
 
-  defp get_seen_names_from_in_msg(in_msg) do
-    case in_msg do
-      %{states_rc: {:ok, x}} -> x
-      %{datapoints_rc: {:ok, x}} -> x
-      _x -> {:failed, "unable to determine seen list"}
+  def toggle(name, opts \\ []) when is_binary(name) and is_list(opts) do
+    case status(name, opts) do
+      %MutableStatus{pending?: true} -> {:failed, "pending command"}
+      %MutableStatus{cmd: "on"} -> off(name, opts)
+      %MutableStatus{cmd: "off"} -> on(name, opts)
+      %MutableStatus{cmd: cmd} -> {:failed, "can not toggle: #{cmd}"}
     end
   end
-
-  defp log_and_passthrough(what, msg) do
-    require Logger
-    [msg, "\n", inspect(what, pretty: true), "\n"] |> Logger.debug()
-
-    what
-  end
-
-  defp make_seen_list(results) do
-    case results do
-      [%_{} | _] = schemas -> for %{schema: x, success: true} <- schemas, do: x
-      previous_rc -> previous_rc
-    end
-  end
-
-  defp in_quotes(name), do: "\"#{name}\""
 end

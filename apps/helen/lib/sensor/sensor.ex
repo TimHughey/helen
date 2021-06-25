@@ -130,7 +130,9 @@ defmodule Sensor do
   def handle_message(msg_in) do
     Logger.debug(["\n", inspect(msg_in, pretty: true), "\n"])
 
-    msg_in |> put_in([:msg_handler], __MODULE__) |> Msg.handle() |> Alfred.just_saw()
+    msg_in |> put_in([:msg_handler], __MODULE__) |> Msg.handle()
+
+    #  msg_in |> put_in([:msg_handler], __MODULE__) |> Msg.handle() |> Alfred.just_saw()
   end
 
   # @doc """

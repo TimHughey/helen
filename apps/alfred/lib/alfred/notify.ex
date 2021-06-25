@@ -3,9 +3,7 @@ defmodule Alfred.Notify do
   Alfred Notify Public API
   """
 
-  alias Alfred.NamesAgent
-
-  @server Alfred.NotifyServer
+  @server Alfred.Notify.Server
 
   def alive? do
     if GenServer.whereis(@server), do: true, else: false
@@ -17,16 +15,12 @@ defmodule Alfred.Notify do
     {:seen_list, seen_list} |> cast()
   end
 
+  @register_default_opts [interval_ms: 60_000, link: true]
   def register(name, opts \\ []) do
-    opts = Keyword.put_new(opts, :link, true)
-    make_opts = fn ms -> [interval_ms: ms, link: opts[:link]] end
-
-    interval = opts[:interval] || opts[:notify_interval] || "PT1M"
-
-    case {NamesAgent.exists?(name), EasyTime.iso8601_duration_to_ms(interval)} do
-      {true, x} when is_integer(x) -> {:register, name, make_opts.(x)} |> call()
-      {false, _} -> {:failed, "unknown name: #{name}"}
-      {_, {:failed, msg}} -> {:failed, "invalid interval: #{inspect(interval)}, #{msg}"}
+    if Alfred.is_name_known?(name) do
+      {:register, name, Keyword.merge(@register_default_opts, opts)} |> call()
+    else
+      {:failed, "unknown name: #{name}"}
     end
   end
 

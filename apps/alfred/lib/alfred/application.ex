@@ -5,14 +5,14 @@ defmodule Alfred.Application do
 
   use Application
 
-  alias Alfred.{ControlServer, NamesAgent, NotifyServer}
+  alias Alfred.{Control, Names, Notify}
 
   @impl true
   def start(_type, _args) do
     children = [
-      {NamesAgent, []},
-      {NotifyServer, []},
-      {ControlServer, []}
+      {Names.Server, []},
+      {Notify.Server, []},
+      {Control.Server, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

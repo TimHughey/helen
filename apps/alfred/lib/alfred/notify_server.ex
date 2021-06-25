@@ -1,11 +1,26 @@
-defmodule Alfred.NotifyServer do
+defmodule Alfred.NotifyTo do
+  defstruct name: "none",
+            pid: nil,
+            ref: nil,
+            last_notify: DateTime.from_unix!(0),
+            interval_ms: 60_000
+end
+
+defmodule Alfred.Notify.Server do
+  defmodule State do
+    defstruct registrations: %{}
+  end
+
+  # defmodule Registration do
+  #   defstruct name: "<default>", pid: nil
+  # end
+
   use GenServer, shutdown: 2000
 
   require Logger
 
   alias Alfred.{KnownName, NotifyTo}
-  alias Alfred.NotifyServer, as: Mod
-  alias Alfred.NotifyServerState, as: State
+  alias Alfred.Notify.Server, as: Mod
 
   @impl true
   def init(_args) do

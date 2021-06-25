@@ -1,9 +1,12 @@
-defmodule Alfred.ControlServer do
+defmodule Alfred.Control.Server do
+  defmodule State do
+    defstruct timeout: %{last: nil, ms: 1000}, token: nil
+  end
+
   require Logger
   use GenServer, shutdown: 2000
 
   alias __MODULE__, as: Mod
-  alias Alfred.ControlServerState, as: State
 
   def init(_args) do
     %State{} |> reply_ok()
