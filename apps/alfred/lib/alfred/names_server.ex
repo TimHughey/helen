@@ -71,11 +71,15 @@ defmodule Alfred.Names.Server do
   end
 
   defp just_saw(%JustSaw{} = js, %State{} = s) do
+    alias Alfred.Notify
     alias JustSaw.DevAlias
 
     for %DevAlias{} = dev_alias <- js.seen_list, reduce: {s, []} do
       {%State{} = s, acc} ->
         kn = KnownName.new(dev_alias.name, js.mutable?, dev_alias.ttl_ms, js.callback_mod)
+
+        Notify.just_saw(kn)
+
         state = State.add_or_update(s, kn)
         acc = [dev_alias.name] ++ acc
 

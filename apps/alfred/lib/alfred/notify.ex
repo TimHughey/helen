@@ -3,32 +3,33 @@ defmodule Alfred.Notify do
   Alfred Notify Public API
   """
 
+  alias Alfred.KnownName
+
   @server Alfred.Notify.Server
 
   def alive? do
     if GenServer.whereis(@server), do: true, else: false
   end
 
-  def names_registered, do: {:names_registered} |> call()
+  def just_saw(%KnownName{} = kn), do: {:just_saw, kn} |> cast()
 
-  def notify(seen_list) when is_list(seen_list) do
-    {:seen_list, seen_list} |> cast()
-  end
+  @register_default_opts [interval_ms: :use_ttl, link: true]
+  def register(name, opts) do
+    alias Alfred.{KnownName, Names}
 
-  @register_default_opts [interval_ms: 60_000, link: true]
-  def register(name, opts \\ []) do
-    if Alfred.is_name_known?(name) do
-      {:register, name, Keyword.merge(@register_default_opts, opts)} |> call()
-    else
-      {:failed, "unknown name: #{name}"}
+    opts = Keyword.merge(@register_default_opts, opts)
+
+    case Names.lookup(name) do
+      %KnownName{missing?: false} = kn -> {:register, kn, opts} |> call()
+      _ -> {:failed, "unknown name: #{name}"}
     end
   end
 
-  defp call(msg) do
-    if alive?(), do: GenServer.call(@server, msg), else: {:no_server, @server}
-  end
+  def registrations, do: {:registrations} |> call()
+  def unregister(ref) when is_reference(ref), do: {:unregister, ref} |> call()
 
-  defp cast(msg) do
-    if alive?(), do: GenServer.cast(@server, msg), else: {:no_server, @server}
-  end
+  # def unregister(ref) do
+
+  defp call(msg), do: (alive?() && GenServer.call(@server, msg)) || {:no_server, @server}
+  defp cast(msg), do: (alive?() && GenServer.cast(@server, msg)) || {:no_server, @server}
 end

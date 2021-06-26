@@ -1,12 +1,12 @@
 defmodule Alfred.KnownName do
   alias __MODULE__
 
-  defstruct name: "new name",
+  defstruct name: "unknown",
             callback_mod: Alfred.Fake,
             mutable?: false,
             seen_at: DateTime.from_unix!(0, :microsecond),
             ttl_ms: 30_000,
-            missing?: false
+            missing?: true
 
   @type t :: %__MODULE__{
           name: String.t(),
@@ -30,7 +30,8 @@ defmodule Alfred.KnownName do
       callback_mod: callback_mod,
       mutable?: mutable?,
       seen_at: DateTime.utc_now(),
-      ttl_ms: ttl_ms
+      ttl_ms: ttl_ms,
+      missing?: false
     }
   end
 end

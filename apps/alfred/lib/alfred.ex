@@ -8,20 +8,14 @@ defmodule Alfred do
   alias Alfred.{ExecCmd, KnownName, MutableStatus, Names, Notify}
 
   # is a name available (aka unknown)
-  def available(name) do
-    case Names.exists?(name) do
-      false -> {:alfred, :available, name}
-      true -> {:alfred, :taken, Names.lookup(name)}
-    end
-  end
-
+  defdelegate available(name), to: Names, as: :exists?
   defdelegate delete(name), to: Names
 
   def execute(%ExecCmd{} = ec) do
     case Names.lookup(ec.name) do
       %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.execute(ec)
       %KnownName{mutable?: false} -> {:failed, "immutable: #{ec.name}"}
-      nil -> {:failed, "unknown: #{ec.name}"}
+      %KnownName{name: "unknown"} -> {:failed, "unknown: #{ec.name}"}
     end
   end
 
@@ -29,7 +23,8 @@ defmodule Alfred do
   defdelegate just_saw(js), to: Names
   defdelegate just_saw_cast(js), to: Names
 
-  defdelegate notify_register(name, opts), to: Notify, as: :register
+  defdelegate notify_register(name, opts \\ []), to: Notify, as: :register
+  defdelegate notify_unregister(notify_to), to: Notify, as: :unregister
 
   def off(name, opts \\ []) when is_binary(name) do
     %ExecCmd{name: name, cmd: "off", cmd_opts: opts} |> execute()
@@ -42,7 +37,7 @@ defmodule Alfred do
   def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case Names.lookup(name) do
       %KnownName{callback_mod: cb_mod} -> cb_mod.status(name, opts)
-      nil -> {:failed, "unknown: #{name}"}
+      %KnownName{name: "unknown"} -> {:failed, "unknown: #{name}"}
     end
   end
 
