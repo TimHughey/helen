@@ -29,8 +29,6 @@ defmodule Alfred.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:easy_time, in_umbrella: true},
-      {:ecto_sql, "~> 3.0"},
       {:excoveralls, "~> 0.10", only: :test},
       {:should, in_umbrella: true, only: :test}
     ]
