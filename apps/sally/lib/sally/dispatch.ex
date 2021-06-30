@@ -122,11 +122,12 @@ defmodule Sally.Dispatch do
     end
   end
 
-  @known_host_categories ["startup", "boot", "run", "ota", "log", "pwm"]
+  @host_categories ["startup", "boot", "run", "ota", "log"]
+  @subsystems ["pwm", "ds"]
   defp check_metadata(%Msg{} = m) do
     case {m.subsystem, m.category} do
-      {"host", cat} when cat in @known_host_categories -> %Msg{m | valid?: true}
-      {"pwm", _cat} -> %Msg{m | valid?: true} |> load_host()
+      {"host", cat} when cat in @host_categories -> %Msg{m | valid?: true}
+      {subsystem, _cat} when subsystem in @subsystems -> %Msg{m | valid?: true} |> load_host()
       x -> invalid(m, "unknown subsystem/category: #{inspect(x)}")
     end
   end
@@ -153,10 +154,7 @@ defmodule Sally.Dispatch do
     m
   end
 
-  @routing [
-    host: Sally.Host.Handler,
-    pwm: Sally.PulseWidth.Handler
-  ]
+  @routing [host: Sally.Host.Handler, pwm: Sally.PulseWidth.Handler, ds: Sally.DalSemi.Handler]
   defp route_msg(%Msg{} = m) do
     # mod_parts = __MODULE__ |> Module.split()
     # mod_base = Enum.take(mod_parts, length(mod_parts) - 1)
