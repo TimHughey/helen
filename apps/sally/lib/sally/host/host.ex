@@ -122,7 +122,7 @@ defmodule Sally.Host do
   end
 
   defp make_build_datetime(%{data: %{build_date: build_date, build_time: build_time}}) do
-    [month_bin, day, year] = String.split(build_date, " ")
+    [month_bin, day, year] = String.split(build_date, " ", trim: true)
 
     date = Date.new!(String.to_integer(year), month_binary_to_integer(month_bin), String.to_integer(day))
     time = Time.from_iso8601!("#{build_time}.049152Z")
