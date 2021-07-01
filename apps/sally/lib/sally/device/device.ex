@@ -41,6 +41,10 @@ defmodule Sally.Device do
     |> changeset(device)
   end
 
+  def changeset(changes, %Host{} = host) when is_map(changes) do
+    Ecto.build_assoc(host, :devices) |> changeset(changes)
+  end
+
   def changeset(p, %Schema{} = device) when is_map(p), do: changeset(device, p)
 
   def changeset(%Schema{} = device, p) when is_map(p) do
@@ -49,7 +53,8 @@ defmodule Sally.Device do
     device
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
-    |> Changeset.validate_format(:ident, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
+    # |> Changeset.validate_format(:ident, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
+    |> Changeset.validate_format(:ident, ~r/^[a-z~]{1,}\/[[:alnum:]][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:ident, max: 128)
     |> Changeset.validate_format(:family, ~r/^[pwm]|[ds]|[i2c]$/)
     |> Changeset.validate_number(:pios, greater_than_or_equal_to: 1)
@@ -120,6 +125,11 @@ defmodule Sally.Device do
 
   def load_aliases(device) do
     Repo.preload(device, [:aliases])
+  end
+
+  def newest do
+    Ecto.Query.from(x in Schema, order_by: [desc: x.inserted_at], limit: 1)
+    |> Repo.one()
   end
 
   def pio_aliased?(%Schema{pios: pios} = device, pio) when pio < pios do

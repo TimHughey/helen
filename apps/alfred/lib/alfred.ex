@@ -5,10 +5,11 @@ defmodule Alfred do
   Alfred - Master of devices
   """
 
-  alias Alfred.{ExecCmd, KnownName, MutableStatus, Names, Notify}
+  alias Alfred.{ExecCmd, ImmutableStatus, KnownName, MutableStatus, Names, Notify}
 
   # is a name available (aka unknown)
-  defdelegate available(name), to: Names, as: :exists?
+  def available(name), do: not Names.exists?(name)
+
   defdelegate delete(name), to: Names
 
   def execute(%ExecCmd{} = ec) do
@@ -34,19 +35,23 @@ defmodule Alfred do
     %ExecCmd{name: name, cmd: "on", cmd_opts: opts} |> execute()
   end
 
-  def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
+  def status(name, opts \\ [])
+
+  def status(name, opts) when is_binary(name) and is_list(opts) do
     case Names.lookup(name) do
-      %KnownName{callback_mod: cb_mod} -> cb_mod.status(name, opts)
+      %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.status(:mutable, name, opts)
+      %KnownName{callback_mod: cb_mod, mutable?: false} -> cb_mod.status(:immutable, name, opts)
       %KnownName{name: "unknown"} -> {:failed, "unknown: #{name}"}
     end
   end
 
-  def toggle(name, opts \\ []) when is_binary(name) and is_list(opts) do
+  def toggle(name, opts) when is_binary(name) and is_list(opts) do
     case status(name, opts) do
       %MutableStatus{pending?: true} -> {:failed, "pending command"}
       %MutableStatus{cmd: "on"} -> off(name, opts)
       %MutableStatus{cmd: "off"} -> on(name, opts)
       %MutableStatus{cmd: cmd} -> {:failed, "can not toggle: #{cmd}"}
+      %ImmutableStatus{} -> {:failed, "can not toggle immutable"}
     end
   end
 end

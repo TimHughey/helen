@@ -10,16 +10,19 @@ defmodule Sally do
   def execute(%ExecCmd{} = ec), do: Sally.Execute.cmd(ec)
 
   @doc """
-    Create an alias to a device and pio
+  Create an alias to a device and pio
 
-    ```elixir
+  ## Examples:
+      iex> opts = [ttl_ms: 15_000, description: "new dev alias"]
+      iex> Sally.make_alias(alias_name, device_ident, pio, opts)
 
-    Sally.make_alias(alias_name, device_ident, pio, [ttl_ms: 15_000, description: "new dev alias"])
+  ## Args
+  1. `name` alias to device and pio to create
+  2. `device_ident` device identifier to be aliased
+  3. `pio` device pio to be aliased
 
-    ```
-
-    **NOTE**
-    Device alias names must be unique across *all* device types.
+  ## NOTES
+  * Device alias names must be unique across *all* device types.
 
   """
   @doc since: "0.5.2"
@@ -35,6 +38,14 @@ defmodule Sally do
     end
   end
 
+  defdelegate newest_device, to: Device, as: :newest
+
   # required as callback from Alfred
-  def status(name, opts \\ []), do: Sally.Status.get(name, opts)
+
+  def status(type, name, opts \\ [])
+  # (1 of 2) handle mutable devices
+  def status(:mutable, name, opts), do: Sally.Status.get(name, opts)
+
+  # (2 of 2) handle immutable devices
+  def status(:immutable, name, opts), do: Sally.Immutable.status(name, opts)
 end

@@ -138,6 +138,12 @@ defmodule Sally.DevAlias do
      |> repo.all()}
   end
 
+  def load_aliases(repo, multi_changes) do
+    q = Ecto.Query.from(a in Schema, where: a.device_id == ^multi_changes.device.id, order_by: [asc: a.pio])
+
+    {:ok, q |> repo.all()}
+  end
+
   def load_cmd_last(%Schema{} = x) do
     Repo.preload(x, cmds: Ecto.Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
   end
