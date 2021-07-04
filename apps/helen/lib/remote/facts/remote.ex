@@ -19,7 +19,7 @@ defmodule Remote.Fact do
           type: "boot"
         } = _msg
       ) do
-    import Fact.Influx, only: [write: 2]
+    write = fn map, opts -> {map, opts} end
 
     # assemble the metric fields
     fields =
@@ -43,7 +43,7 @@ defmodule Remote.Fact do
          }
        ]
      }
-     |> write(precision: :nanosecond, async: true)}
+     |> write.(precision: :nanosecond, async: true)}
   end
 
   # handle remote task stack highwater metrics
@@ -62,7 +62,7 @@ defmodule Remote.Fact do
           doc_stats: doc_stats
         } = _msg
       ) do
-    import Fact.Influx, only: [write: 2]
+    write = fn map, opts -> {map, opts} end
 
     # map the document stats key/values to human friendly values
     base_fields =
@@ -93,7 +93,7 @@ defmodule Remote.Fact do
          }
        ]
      }
-     |> write(precision: :nanosecond, async: true)}
+     |> write.(precision: :nanosecond, async: true)}
   end
 
   # if this wasn't a boot message then it's :ok, nothing to write
