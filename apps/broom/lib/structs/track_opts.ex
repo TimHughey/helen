@@ -1,7 +1,7 @@
 defmodule Broom.TrackOpts do
   alias __MODULE__
 
-  defstruct track_timeout: "PT13S", prune_interval: "PT1M", prune_older_than: "PT24H"
+  defstruct track_timeout: "PT3.3S", prune_interval: "PT1M", prune_older_than: "PT24H"
 
   @type iso8601_duration :: String.t()
   @type t :: %__MODULE__{
