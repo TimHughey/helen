@@ -1,7 +1,6 @@
 defmodule Reef.Temp.Server do
   @moduledoc """
-  Controls the temperature of an environment using the readings of a
-  Sensor to control a Switch
+  Controls the temperature of an environment
   """
 
   defmacro __using__(use_opts) do
@@ -166,7 +165,7 @@ defmodule Reef.Temp.Server do
   end
 
   def handle_call(_module, {:server_mode, mode}, _from, %{opts: opts} = state) do
-    import Switch, only: [off: 1]
+    off = fn dev_name -> dev_name end
 
     case mode do
       # when switching to :standby ensure the switch is off
@@ -176,7 +175,7 @@ defmodule Reef.Temp.Server do
         state
         |> put_in([:server_mode], mode)
         |> put_in([:server_standby_reason], :api)
-        |> put_in([:devices, dev_name, :control], off(dev_name))
+        |> put_in([:devices, dev_name, :control], off.(dev_name))
         |> reply({:ok, mode})
 
       # no action when switching to :active, the server will take control
@@ -243,9 +242,7 @@ defmodule Reef.Temp.Server do
   def handle_info(_module, {Alfred, _ref, {:notify, dev_name} = obj}, %{opts: _opts} = state) do
     # function to retrieve the value of the device
     value_fn = fn
-      # Switch.status(dev_name)
       :switch -> nil
-      # Sensor.fahrenheit(dev_name, sensor_opts(opts))
       :sensor -> nil
     end
 
@@ -295,11 +292,11 @@ defmodule Reef.Temp.Server do
   # end
 
   def terminate(_module, _reason, %{opts: opts}) do
-    import Switch, only: [off: 2]
+    off = fn dev_name, opts -> {dev_name, opts} end
 
     switch_name = opts[:switch][:name]
 
-    off(switch_name, ack: false)
+    off.(switch_name, ack: false)
   end
 
   def last_timeout(module) do
@@ -515,7 +512,9 @@ defmodule Reef.Temp.Server do
         } = state
       ) do
     import Helen.Time.Helper, only: [utc_now: 0]
-    import Switch, only: [on: 1, off: 1]
+
+    off = fn dev_name -> dev_name end
+    on = fn dev_name -> dev_name end
 
     # grab opts into local variables
     sensor_name = opts[:sensor][:name]
@@ -540,61 +539,41 @@ defmodule Reef.Temp.Server do
         state
         |> put_in([:status], :temp_low)
         |> put_in([:status_at], utc_now())
-        |> put_in([:devices, switch_name, :control], on(switch_name))
+        |> put_in([:devices, switch_name, :control], on.(switch_name))
 
       # equal to or high than set point, stop heating
       curr_temp >= high_temp ->
         state
         |> put_in([:status], :temp_high)
         |> put_in([:status_at], utc_now())
-        |> put_in([:devices, switch_name, :control], off(switch_name))
+        |> put_in([:devices, switch_name, :control], off.(switch_name))
 
       # for minimize risk of overheating, default to heater off
       true ->
         state
         |> put_in([:status], :no_match)
         |> put_in([:status_at], utc_now())
-        |> put_in([:devices, switch_name, :control], off(switch_name))
+        |> put_in([:devices, switch_name, :control], off.(switch_name))
     end
   end
 
   # unhappy path, one or both devices are missing
   def control_temperature(%{server_mode: :active, ample_msgs: true, devices_seen: false} = state) do
     import Helen.Time.Helper, only: [utc_now: 0]
-    import Switch, only: [off: 1]
+
+    off = fn dev_name -> dev_name end
 
     switch_name = get_in(state, [:opts, :switch, :name])
 
     state
     |> put_in([:status], :fault_missing_device)
     |> put_in([:status_at], utc_now())
-    |> put_in([:devices, switch_name, :control], off(switch_name))
+    |> put_in([:devices, switch_name, :control], off.(switch_name))
   end
 
   ##
   ## Device Map Helpers
   ##
-
-  # def check_pending_cmds_if_needed(state) do
-  #   import Switch, only: [acked?: 1]
-  #
-  #   for {dev_name, %{control: {:pending, pending_info}}} <- state[:devices],
-  #       reduce: state do
-  #     state ->
-  #       refid = pending_info[:refid]
-  #
-  #       if acked?(refid) do
-  #         sw_rc_now = Switch.position(dev_name)
-  #         expected = pending_info[:position]
-  #
-  #         state
-  #         |> put_in([:devices, dev_name, :control], sw_rc_now)
-  #         |> dev_verify_switch_position(dev_name, expected, sw_rc_now)
-  #       else
-  #         state
-  #       end
-  #   end
-  # end
 
   def register_for_device_notifications(%{devices_required: devices} = state) do
     check_registration = fn
@@ -669,7 +648,7 @@ defmodule Reef.Temp.Server do
   end
 
   def handle_server_startup_mode(%{server_mode: mode} = state) do
-    import Switch, only: [off: 1]
+    off = fn dev_name -> dev_name end
 
     case mode do
       :standby ->
@@ -678,7 +657,7 @@ defmodule Reef.Temp.Server do
 
         state
         |> put_in([:standby_reason], :startup_args)
-        |> put_in([:devices, dev_name, :control], off(dev_name))
+        |> put_in([:devices, dev_name, :control], off.(dev_name))
 
       :active ->
         state

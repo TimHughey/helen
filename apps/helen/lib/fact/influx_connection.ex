@@ -4,36 +4,6 @@ defmodule Fact.Influx do
   require Logger
   use Instream.Connection, otp_app: :helen
 
-  @doc """
-    Primary entry point for writing timeseries metrics for Sensors or Remotes
-
-    The message map received by MQTT is forwarded to the Sensor, Remote or
-    Switch module for processing.  Those modules then forward the mesasage
-    to this function.  If this function finds that the previous module
-    successfully processed the message it will write the necesssary
-    metrics to the timeseries database.
-
-    NOTE:  This function must return the passed message map (with additional
-           keys, if necessary)
-
-  """
-  @doc since: "0.0.16"
-  # def handle_message(%{sensor_datapoint: datapoint, msg_recv_dt: _} = msg) do
-  #   alias Sensor.DB.DataPoint, as: Schema
-  #   alias Sensor.Fact
-  #
-  #   # begin by confirming the datapoint was saved
-  #   with {:ok, %Schema{} = dp} <- datapoint,
-  #        # add the write_rc key so downstream modules can pattern match
-  #        msg <- Map.put(msg, :write_rc, nil),
-  #        write_rc <- Fact.write_specific_metric(dp, msg) do
-  #     Map.put(msg, :write_rc, write_rc)
-  #   else
-  #     error ->
-  #       Map.put(msg, :write_rc, {:processed, {:sensor_datapoint_error, error}})
-  #   end
-  # end
-
   def handle_message(%{remote_host: remote_host, msg_recv_dt: _} = msg) do
     alias Remote.DB.Remote, as: Schema
     alias Remote.Fact

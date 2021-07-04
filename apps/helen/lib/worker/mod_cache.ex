@@ -58,7 +58,7 @@ defmodule Helen.Workers.ModCache do
 
   # nothing found yet, search all simple devices
   defp search(%{find: {_ident, name}, module: nil} = acc, :simple_devices) do
-    for x <- [Switch], reduce: acc do
+    for x <- [], reduce: acc do
       %{module: nil} = acc ->
         if x.exists?(name) do
           put_in(acc, [:module], x) |> put_in([:type], :simple_device)

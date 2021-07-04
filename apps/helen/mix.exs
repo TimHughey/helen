@@ -23,7 +23,6 @@ defmodule Helen.Mixfile do
       compilers: [:gettext] ++ Mix.compilers(),
       aliases: aliases(),
       package: package(),
-      docs: docs(),
       description: "Helen",
       escript: escript_config(),
       deploy_paths: deploy_paths(),
@@ -51,17 +50,6 @@ defmodule Helen.Mixfile do
   end
 
   def deploy_paths, do: [dev: "/tmp/helen/dev", test: "/tmp/helen/test", prod: "/usr/local/helen"]
-
-  def docs do
-    [
-      extras: ["CHANGELOG.md"],
-      groups_for_modules: [
-        Devices: [Remote, Sensor, Switch],
-        Servers: [Reef]
-      ],
-      nest_modules_by_prefix: [Helen, Reef, Sensor, Switch, Remote]
-    ]
-  end
 
   def stage_paths, do: [prod: "/tmp"]
 

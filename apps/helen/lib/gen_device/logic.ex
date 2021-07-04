@@ -157,7 +157,7 @@ defmodule GenDevice.Logic do
     status = inflight_status(state)
 
     dev_name = device_name(state)
-    func = fn cmd -> apply(Switch, cmd, [dev_name]) end
+    func = fn cmd -> {:apply, cmd, [dev_name]} end
 
     cond do
       status == :running ->
@@ -434,7 +434,7 @@ defmodule GenDevice.Logic do
   end
 
   def value(state, opts) do
-    status = device_name(state) |> Switch.status()
+    status = device_name(state)
 
     cond do
       opts[:simple] -> get_in(status, [:cmd])
