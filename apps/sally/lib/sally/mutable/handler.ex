@@ -1,4 +1,4 @@
-defmodule Sally.PulseWidth.Handler do
+defmodule Sally.Mutable.Handler do
   require Logger
   require Ecto.Query
 
@@ -77,22 +77,28 @@ defmodule Sally.PulseWidth.Handler do
 
   @impl true
   def post_process(%Dispatch{valid?: true} = msg) do
-    # alias Alfred.JustSaw
-    #
-    # just_saw_list = for
-    #
-    #
-    #
-    #
-    # case Alfred.just_saw(msg.results.just_saw) do
-    #   {:ok, alfred_res} -> %Dispatch{msg | results: put_in(msg.results, [:alfred], alfred_res)}
-    #   error -> Dispatch.invalid(msg, error)
-    # end
     msg
   end
 
   @impl true
   def post_process(%Dispatch{valid?: false} = msg), do: msg
+
+  def add_datapoint(_repo, %{aliases: []} = _changes, %Dispatch{}) do
+    # Logger.info("\n#{inspect(changes, pretty: true)}")
+
+    {:ok, []}
+  end
+
+  def add_datapoint(repo, changes, %Dispatch{category: "celsius"} = msg) do
+    alias Sally.Datapoint
+
+    dev_alias = List.first(changes.aliases)
+    datapoint = Ecto.build_assoc(dev_alias, :datapoints)
+
+    changes = %{temp_c: msg.data[:val], reading_at: msg.sent_at}
+
+    {:ok, Datapoint.changeset(datapoint, changes) |> repo.insert!(returning: true)}
+  end
 
   def align_status(repo, changes, %Dispatch{} = msg) do
     pins = msg.data.pins

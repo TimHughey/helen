@@ -26,18 +26,21 @@ defmodule Sally.Device do
 
   def changeset(struct, %Host{} = host) when is_struct(struct) do
     p = Map.from_struct(struct)
-    merge_data = Map.drop(p.data, [:mut, :mutable, :pios])
+    # merge_data = Map.drop(p.data, [:mut, :mutable, :pios])
 
+    ident = List.first(p.filter_extra)
+    mutable? = p.subsystem == "mut"
     device = Ecto.build_assoc(host, :devices)
 
     %{
-      ident: List.first(p.filter_extra, p[:ident]),
-      family: p[:subsystem] || p.data[:family],
-      mutable: p.data[:mut] || p.data[:mutable],
-      pios: p.data[:pins] |> length(),
+      ident: ident,
+      family: determine_family(ident),
+      # mutable: p.data[:mut] || p.data[:mutable],
+      mutable: mutable?,
+      pios: (mutable? && length(p.data[:pins])) || 1,
       last_seen_at: p[:sent_at]
     }
-    |> Map.merge(merge_data)
+    # |> Map.merge(merge_data)
     |> changeset(device)
   end
 
@@ -54,7 +57,7 @@ defmodule Sally.Device do
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
     # |> Changeset.validate_format(:ident, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
-    |> Changeset.validate_format(:ident, ~r/^[a-z~]{1,}\/[[:alnum:]][\w .:-]+[[:alnum:]]$/i)
+    |> Changeset.validate_format(:ident, ~r/^[a-z~]{1,}[[:alnum:]][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:ident, max: 128)
     |> Changeset.validate_format(:family, ~r/^[pwm]|[ds]|[i2c]$/)
     |> Changeset.validate_number(:pios, greater_than_or_equal_to: 1)
@@ -147,4 +150,13 @@ defmodule Sally.Device do
   def pios(%Schema{pios: pios}), do: pios
 
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
+
+  defp determine_family(ident) do
+    case ident do
+      <<"ds"::utf8, _rest::binary>> -> "ds"
+      <<"pwm"::utf8, _rest::binary>> -> "pwm"
+      <<"i2c"::utf8, _rest::binary>> -> "i2c"
+      _ -> "unsupported"
+    end
+  end
 end

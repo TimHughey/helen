@@ -14,7 +14,8 @@ defmodule Sally.Application do
       {Tortoise.Connection, @mqtt_connection},
       {Sally.Execute, []},
       {Sally.Immutable.Handler, []},
-      {Sally.PulseWidth.Handler, []},
+      {Sally.Mutable.Handler, []},
+      # {Sally.PulseWidth.Handler, []},
       {Sally.Host.Instruct, []},
       {Sally.Host.Handler, []}
     ]

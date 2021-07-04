@@ -123,7 +123,7 @@ defmodule Sally.Dispatch do
   end
 
   @host_categories ["startup", "boot", "run", "ota", "log"]
-  @subsystems ["pwm", "immut"]
+  @subsystems ["immut", "mut"]
   defp check_metadata(%Msg{} = m) do
     case {m.subsystem, m.category} do
       {"host", cat} when cat in @host_categories -> %Msg{m | valid?: true}
@@ -154,7 +154,11 @@ defmodule Sally.Dispatch do
     m
   end
 
-  @routing [host: Sally.Host.Handler, pwm: Sally.PulseWidth.Handler, immut: Sally.Immutable.Handler]
+  @routing [
+    host: Sally.Host.Handler,
+    immut: Sally.Immutable.Handler,
+    mut: Sally.Mutable.Handler
+  ]
   defp route_msg(%Msg{} = m) do
     msg_handler_module = get_in(@routing, [String.to_atom(m.subsystem)])
 

@@ -10,7 +10,7 @@ defmodule Sally.Execute do
   use Broom,
     schema: Command,
     metrics_interval: "PT1M",
-    track_timeout: "PT13S",
+    track_timeout: "PT3.3S",
     purge_interval: "PT1H",
     purge_older_than: "PT1D",
     restart: :permanent,

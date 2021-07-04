@@ -76,22 +76,22 @@ defmodule Sally.Immutable.Handler do
   end
 
   @impl true
-  def process(%Dispatch{category: "celsius", filter_extra: [family, dev, _status]} = msg) do
+  def process(%Dispatch{category: "celsius", filter_extra: [_ident, _status]} = msg) do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
     Logger.debug("#{inspect(msg.filter_extra)} ==> #{inspect(msg.data, pretty: true)}")
 
-    dev_changes = %{
-      ident: Enum.join([family, dev], "/"),
-      family: family,
-      mutable: false,
-      pios: 1,
-      last_seen_at: msg.sent_at
-    }
+    # dev_changes = %{
+    #   ident: ident,
+    #   family: ident |> String.split(":") |> List.first(),
+    #   mutable: false,
+    #   pios: 1,
+    #   last_seen_at: msg.sent_at
+    # }
 
     # dp_changes = %{temp_c: msg.data.temp_c, reading_at: msg.sent_at}
 
     Ecto.Multi.new()
-    |> Ecto.Multi.insert(:device, Device.changeset(dev_changes, msg.host), Device.insert_opts())
+    |> Ecto.Multi.insert(:device, Device.changeset(msg, msg.host), Device.insert_opts())
     |> Ecto.Multi.run(:aliases, DevAlias, :load_aliases, [])
     |> Ecto.Multi.run(:datapoint, Handler, :add_datapoint, [msg])
     |> Ecto.Multi.run(:just_saw, Handler, :just_saw, [msg])
