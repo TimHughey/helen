@@ -59,7 +59,7 @@ defmodule Helen.Mixfile do
         Devices: [Remote, Sensor, Switch],
         Servers: [Reef]
       ],
-      nest_modules_by_prefix: [Helen, Mqtt, Reef, Sensor, Switch, Remote]
+      nest_modules_by_prefix: [Helen, Reef, Sensor, Switch, Remote]
     ]
   end
 

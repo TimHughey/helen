@@ -324,13 +324,7 @@ defmodule Remote do
     |> List.flatten()
   end
 
-  defp send_cmds(
-         %Schema{name: name, host: host},
-         cmd,
-         %{} = payload
-       )
-       when is_binary(cmd) do
-    import Mqtt.Client, only: [publish_to_host: 2]
+  defp send_cmds(%Schema{name: name, host: host}, cmd, %{} = payload) when is_binary(cmd) do
     import Helen.Time.Helper, only: [unix_now: 0]
 
     # all commands must include the basic information
@@ -341,22 +335,20 @@ defmodule Remote do
     # for example, restart commands only require the basic command info
     # where, on the other hand, ota updates must supply additional information
     cmd_map = Map.merge(base_cmd, payload)
-    {rc, ref} = publish_to_host(cmd_map, cmd)
+    {rc, ref} = {nil, nil}
 
     # return [cmd: [{name, rc, ref}]]
     [{String.to_atom(cmd), {name, rc, ref}}]
   end
 
   defp send_profile_if_needed(%{type: type, remote_host: remote_host} = msg) do
-    import Mqtt.Client, only: [publish_to_host: 2]
-
     with {:ok, %Schema{name: _name, profile: pname} = rem} <- remote_host,
          "boot" <- type,
          # find the profile assigned to this remote
          {:pfile, %Profile{} = profile} <- {:pfile, profile_find(pname)},
          # create the payload using the remote and profile
          cmd <- Profile.create_profile_payload(rem, profile) do
-      {rc, ref} = publish_to_host(cmd, "profile")
+      {rc, ref} = {nil, nil}
 
       Map.put(msg, :remote_profile_send, {rc, ref})
     else

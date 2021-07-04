@@ -21,9 +21,7 @@ defmodule Switch.Payload do
   #   create_outbound_cmd(switch_dev, cmd, [])
   # end
 
-  def send_cmd(%Schema{} = a, cmd, opts) do
-    create_outbound_cmd(a, cmd, opts) |> Mqtt.publish(opts)
-  end
+  def send_cmd(%Schema{} = _a, _cmd, _opts), do: nil
 
   defp create_outbound_cmd(%Schema{device: d} = a, cmd_map, opts) when is_list(opts) do
     # default to the host ack'ing rhe command
