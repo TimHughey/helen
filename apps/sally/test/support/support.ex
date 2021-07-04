@@ -18,19 +18,37 @@ defmodule Sally.Test.Support do
   end
 
   def add_host(opts) do
-    %{
-      host: opts[:host] || opts[:ident],
+    alias Sally.Host.ChangeControl
+
+    raw = %{
+      ident: opts[:host] || opts[:ident],
       name: opts[:name],
       profile: opts[:profile] || "generic",
       last_start_at: opts[:last_start_at] || DateTime.utc_now(),
       last_seen_at: opts[:last_seen_at] || DateTime.utc_now()
     }
-    |> Sally.Host.changeset()
-    |> Sally.Repo.insert!(
-      on_conflict: {:replace, Sally.Host.columns(:replace)},
-      returning: true,
-      conflict_target: [:ident]
-    )
+
+    cc = %ChangeControl{
+      raw_changes: raw,
+      required: Map.keys(raw),
+      replace: raw |> Map.drop([:ident, :name, :inserted_at]) |> Map.keys()
+    }
+
+    Sally.Host.changeset(cc) |> Sally.Repo.insert!(Sally.Host.insert_opts(cc.replace))
+
+    # %{
+    #   host: opts[:host] || opts[:ident],
+    #   name: opts[:name],
+    #   profile: opts[:profile] || "generic",
+    #   last_start_at: opts[:last_start_at] || DateTime.utc_now(),
+    #   last_seen_at: opts[:last_seen_at] || DateTime.utc_now()
+    # }
+    # |> Sally.Host.changeset()
+    # |> Sally.Repo.insert!(
+    #   on_conflict: {:replace, Sally.Host.columns(:replace)},
+    #   returning: true,
+    #   conflict_target: [:ident]
+    # )
   end
 
   def add_command(%Sally.DevAlias{} = dev_alias, cmd) do

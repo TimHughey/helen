@@ -19,7 +19,7 @@ defmodule SallyHostHandlerTest do
     x = {ctx.filter, ctx.packed} |> Sally.Dispatch.accept() |> Host.Handler.process()
 
     # initially set tested to keys we don't need to test
-    tested = [:env, :subsystem, :filter_extra, :log]
+    tested = [:env, :subsystem, :filter_extra, :log, :results]
     fail = pretty("finalized Message did not match", x)
     assert x.valid? == true, fail
     tested = [:valid?] ++ tested

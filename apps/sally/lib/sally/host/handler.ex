@@ -3,42 +3,59 @@ defmodule Sally.Host.Handler do
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
-  alias Sally.Dispatch, as: Msg
+  alias Sally.Dispatch
   alias Sally.Host
+  alias Sally.Host.ChangeControl
   alias Sally.Host.Instruct
 
   @impl true
-  def finalize(%Msg{} = msg) do
+  def finalize(%Dispatch{} = msg) do
     log = fn x ->
       Logger.debug("\n#{inspect(x, pretty: true)}")
       x
     end
 
-    %Msg{msg | final_at: DateTime.utc_now()} |> log.()
+    %Dispatch{msg | final_at: DateTime.utc_now()} |> log.()
   end
 
   @impl true
-  def process(%Msg{} = msg) do
+  def process(%Dispatch{category: cat} = msg) when cat in ["startup", "boot", "run"] do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
 
+    cc = assemble_change_control(msg)
+
+    Logger.debug("\n#{inspect(cc, pretty: true)}")
+
     Ecto.Multi.new()
-    |> Ecto.Multi.insert(:host, Host.changeset(msg), Host.insert_opts())
+    |> Ecto.Multi.insert(:host, Host.changeset(cc), Host.insert_opts(cc.replace))
     |> Sally.Repo.transaction()
     |> check_result(msg)
     |> post_process()
     |> finalize()
   end
 
-  @impl true
-  def post_process(%Msg{valid?: false} = msg), do: msg
+  # @impl true
+  # def process(%Dispatch{} = msg) do
+  #   Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
+  #
+  #   Ecto.Multi.new()
+  #   |> Ecto.Multi.insert(:host, Host.changeset(msg), Host.insert_opts())
+  #   |> Sally.Repo.transaction()
+  #   |> check_result(msg)
+  #   |> post_process()
+  #   |> finalize()
+  # end
 
   @impl true
-  def post_process(%Msg{category: "startup"} = msg) do
+  def post_process(%Dispatch{valid?: false} = msg), do: msg
+
+  @impl true
+  def post_process(%Dispatch{category: "startup"} = msg) do
     profile = Host.boot_payload_data(msg.host)
-    profile_name = profile["meta"]["name"]
-    profile_desc = profile["meta"]["description"]
+    pname = profile["meta"]["name"]
+    pdesc = profile["meta"]["description"]
 
-    Logger.info("#{msg.host.name} startup, sending profile: #{profile_name} '#{profile_desc}'")
+    Logger.info("host=#{msg.host.name} startup; sending profile=#{pname} description='#{pdesc}'")
 
     %Instruct{
       ident: msg.ident,
@@ -54,10 +71,10 @@ defmodule Sally.Host.Handler do
   end
 
   @impl true
-  def post_process(%Msg{category: "boot"} = msg) do
+  def post_process(%Dispatch{category: "boot"} = msg) do
     Logger.debug(inspect(msg.data, pretty: true))
     boot_profile = List.first(msg.filter_extra, "unknown")
-    Logger.info("host startup complete: #{msg.host.name} (profile: #{boot_profile})")
+    Logger.info("host=#{msg.host.name} using_profile=#{boot_profile} startup complete")
 
     stack_size = msg.data[:stack]["size"] || 1
     stack_hw = msg.data[:stack]["highwater"] || 1
@@ -79,18 +96,18 @@ defmodule Sally.Host.Handler do
     msg
   end
 
-  @impl true
-  def post_process(%Msg{category: "log"} = msg) do
-    msg
-  end
+  # @impl true
+  # def post_process(%Dispatch{category: "log"} = msg) do
+  #   msg
+  # end
+  #
+  # @impl true
+  # def post_process(%Dispatch{category: "ota"} = msg) do
+  #   msg
+  # end
 
   @impl true
-  def post_process(%Msg{category: "ota"} = msg) do
-    msg
-  end
-
-  @impl true
-  def post_process(%Msg{category: "run"} = msg) do
+  def post_process(%Dispatch{category: "run"} = msg) do
     Logger.debug(inspect(msg.data, pretty: true))
 
     %Betty.Metric{
@@ -109,77 +126,62 @@ defmodule Sally.Host.Handler do
     msg
   end
 
-  defp check_result(txn_result, %Msg{} = msg) do
+  # Dispatches for different categories define specific changes to the Host record
+  # (1 of 2) startup messages
+  defp assemble_change_control(%Dispatch{category: "startup"} = msg) do
+    raw_changes = %{
+      ident: msg.ident,
+      name: msg.ident,
+      firmware_vsn: msg.data[:firmware_vsn],
+      idf_vsn: msg.data[:idf_vsn],
+      app_sha: msg.data[:app_sha],
+      build_at: make_build_datetime(msg.data),
+      last_start_at: msg.sent_at,
+      last_seen_at: msg.sent_at,
+      reset_reason: msg.data[:reset_reason]
+    }
+
+    %ChangeControl{
+      raw_changes: raw_changes,
+      required: Map.keys(raw_changes),
+      # never replace the ident, it is the conflict field
+      replace: raw_changes |> Map.drop([:ident, :name, :inserted_at]) |> Map.keys()
+    }
+    |> tap(fn x -> Logger.info("\n#{inspect(x, pretty: true)}") end)
+  end
+
+  # (2 of 2) boot and run time metrics
+  defp assemble_change_control(%Dispatch{category: cat} = msg) when cat in ["boot", "run"] do
+    raw_changes = %{
+      ident: msg.ident,
+      name: msg.ident,
+      last_start_at: msg.sent_at,
+      last_seen_at: msg.sent_at
+    }
+
+    %ChangeControl{
+      raw_changes: raw_changes,
+      required: Map.keys(raw_changes),
+      # never replace the ident, it is the conflict field
+      replace: [:last_seen_at]
+    }
+  end
+
+  defp check_result(txn_result, %Dispatch{} = msg) do
     case txn_result do
-      {:ok, results} -> %Msg{msg | host: results.host}
-      {:error, e} -> Msg.invalid(msg, e)
+      {:ok, results} -> %Dispatch{msg | host: results.host}
+      {:error, e} -> Dispatch.invalid(msg, e)
     end
   end
 
-  # defp cmdack(%Msg{} = mi) do
-  #   ## cmd acks are straight forward and require only the refid and the message recv at
-  #   case Execute.ack_now(mi.data.refid, mi.recv_at) do
-  #     {:ok, %TrackerEntry{} = te} ->
-  #       dev_alias = Repo.get!(DB.Alias, te.alias_id)
-  #       ident = DB.Device.update_last_seen_at(dev_alias.device_id, mi.recv_at)
-  #
-  #       metric = %Betty.Metric{
-  #         measurement: "command",
-  #         tags: %{module: __MODULE__, name: dev_alias.name, cmd: te.cmd},
-  #         fields: %{
-  #           cmd_roundtrip_us: DateTime.diff(te.acked_at, te.sent_at, :microsecond),
-  #           cmd_total_us: DateTime.diff(te.released_at, te.sent_at, :microsecond),
-  #           release_us: DateTime.diff(te.released_at, mi.recv_at, :microsecond)
-  #         }
-  #       }
-  #
-  #       metric_rc = Betty.write_metric(metric)
-  #
-  #       %MsgFlight{ident: ident, release: te, metric_rc: metric_rc} |> MsgFlight.just_saw([dev_alias])
-  #
-  #     error ->
-  #       # TODO properly fill out this error
-  #       %MsgFlight{faults: [cmdack: error]}
-  #   end
-  # end
-  #
-  # defp apply_reported_data(dev_aliases, data) do
-  #   for %DB.Alias{pio: pio} = da <- dev_aliases, {^pio, cmd} <- data do
-  #     DB.Alias.update_cmd(da, cmd)
-  #   end
-  # end
-  #
-  # defp report(%Msg{} = mi) do
-  #   device = update_device(mi)
-  #   dev_aliases = DB.Device.get_aliases(device)
-  #   applied_data = apply_reported_data(dev_aliases, mi.data)
-  #   metrics = write_applied_data_metrics(applied_data, mi.data, mi.sent_at)
-  #
-  #   %MsgFlight{ident: device, applied_data: applied_data, metrics: metrics}
-  #   |> MsgFlight.just_saw(applied_data)
-  # end
-  #
-  # defp write_applied_data_metrics(applied_data, original_data, sent_at) do
-  #   for %DB.Alias{} = dev_alias <- applied_data do
-  #     %Betty.Metric{
-  #       measurement: "mutables",
-  #       tags: %{module: __MODULE__, name: dev_alias.name, cmd: dev_alias.cmd},
-  #       fields: %{read_us: original_data[:read_us] || 0},
-  #       # each measurement must be at a unique timestamp
-  #       timestamp: DateTime.to_unix(sent_at, :nanosecond) + dev_alias.pio
-  #     }
-  #     |> Betty.write_metric()
-  #     |> elem(1)
-  #   end
-  # end
-  #
-  # defp update_device(%Msg{} = mi) do
-  #   %{
-  #     ident: mi.ident,
-  #     host: mi.host,
-  #     pios: mi.data[:pios],
-  #     last_seen_at: mi.recv_at
-  #   }
-  #   |> DB.Device.upsert()
-  # end
+  @months ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Dec"]
+  defp make_build_datetime(%{build_date: build_date, build_time: build_time}) do
+    [month_bin, day, year] = String.split(build_date, " ", trim: true)
+    month = Enum.find_index(@months, fn x -> x == month_bin end) + 1
+
+    date = Date.new!(String.to_integer(year), month, String.to_integer(day))
+    time = Time.from_iso8601!("#{build_time}.049152Z")
+
+    DateTime.new!(date, time, "America/New_York")
+  end
 end

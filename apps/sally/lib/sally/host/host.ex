@@ -1,3 +1,15 @@
+defmodule Sally.Host.ChangeControl do
+  defstruct raw_changes: %{}, required: [], replace: []
+
+  @type raw_change_map() :: %{atom() => String.t() | DateTime.t()}
+
+  @type t :: %__MODULE__{
+          raw_changes: raw_change_map(),
+          required: nonempty_list(),
+          replace: nonempty_list()
+        }
+end
+
 defmodule Sally.Host do
   require Logger
 
@@ -7,6 +19,7 @@ defmodule Sally.Host do
   alias Ecto.Query
 
   alias Sally.Host, as: Schema
+  alias Sally.Host.ChangeControl
   alias Sally.Repo
 
   schema "host" do
@@ -33,37 +46,12 @@ defmodule Sally.Host do
     Toml.decode_file!(file)
   end
 
-  def changeset(p) when is_struct(p) do
-    Map.from_struct(p) |> changeset()
-  end
-
-  def changeset(p) when is_map(p) do
-    # allow changeset to consume Messages without creating a direct dependency while also allowing
-    # host instead of ident
-
-    Logger.debug("raw: #{inspect(p, pretty: true)}")
-
-    %{
-      ident: p[:host] || p[:ident],
-      name: p[:name] || p[:ident] || p[:host],
-      build_at: make_build_datetime(p),
-      last_start_at: p[:last_start_at] || p[:sent_at],
-      last_seen_at: p[:last_seen_at] || p[:sent_at]
-    }
-    |> Map.merge(p[:data] || %{})
-    |> changeset(%Schema{})
-  end
-
-  def changeset(p, %Schema{} = host) when is_map(p), do: changeset(host, p)
-
-  def changeset(%Schema{} = host, p) when is_map(p) do
+  def changeset(%ChangeControl{} = cc) do
     alias Ecto.Changeset
 
-    Logger.debug("final: #{inspect(p, pretty: true)}")
-
-    host
-    |> Changeset.cast(p, columns(:cast))
-    |> Changeset.validate_required(columns(:required))
+    %Schema{}
+    |> Changeset.cast(cc.raw_changes, cc.required)
+    |> Changeset.validate_required(cc.required)
     |> Changeset.validate_format(:ident, ~r/^[a-z]+[.][[:alnum:]]{3,}$/i)
     |> Changeset.validate_length(:ident, max: 24)
     |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
@@ -76,6 +64,50 @@ defmodule Sally.Host do
     |> Changeset.validate_length(:app_sha, max: 12)
     |> Changeset.validate_length(:reset_reason, max: 24)
   end
+
+  # def changeset(p) when is_struct(p) do
+  #   Map.from_struct(p) |> changeset()
+  # end
+
+  # def changeset(p) when is_map(p) do
+  #   # allow changeset to consume Messages without creating a direct dependency while also allowing
+  #   # host instead of ident
+  #
+  #   Logger.debug("raw: #{inspect(p, pretty: true)}")
+  #
+  #   %{
+  #     ident: p[:host] || p[:ident],
+  #     name: p[:name] || p[:ident] || p[:host],
+  #     build_at: make_build_datetime(p),
+  #     last_start_at: p[:last_start_at] || p[:sent_at],
+  #     last_seen_at: p[:last_seen_at] || p[:sent_at]
+  #   }
+  #   |> Map.merge(p[:data] || %{})
+  #   |> changeset(%Schema{})
+  # end
+  #
+  # def changeset(p, %Schema{} = host) when is_map(p), do: changeset(host, p)
+  #
+  # def changeset(%Schema{} = host, p) when is_map(p) do
+  #   alias Ecto.Changeset
+  #
+  #   Logger.debug("final: #{inspect(p, pretty: true)}")
+  #
+  #   host
+  #   |> Changeset.cast(p, columns(:cast))
+  #   |> Changeset.validate_required(columns(:required))
+  #   |> Changeset.validate_format(:ident, ~r/^[a-z]+[.][[:alnum:]]{3,}$/i)
+  #   |> Changeset.validate_length(:ident, max: 24)
+  #   |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
+  #   |> Changeset.validate_length(:name, max: 32)
+  #   |> Changeset.validate_format(:profile, ~r/^[a-z]+[\w.-]+$/i)
+  #   |> Changeset.validate_length(:profile, max: 32)
+  #   |> validate_profile_exists()
+  #   |> Changeset.validate_length(:firmware_vsn, max: 32)
+  #   |> Changeset.validate_length(:idf_vsn, max: 12)
+  #   |> Changeset.validate_length(:app_sha, max: 12)
+  #   |> Changeset.validate_length(:reset_reason, max: 24)
+  # end
 
   def columns(:all) do
     these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
@@ -117,37 +149,8 @@ defmodule Sally.Host do
     |> Repo.all()
   end
 
-  def insert_opts do
-    [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
-  end
-
-  defp make_build_datetime(%{data: %{build_date: build_date, build_time: build_time}}) do
-    [month_bin, day, year] = String.split(build_date, " ", trim: true)
-
-    date = Date.new!(String.to_integer(year), month_binary_to_integer(month_bin), String.to_integer(day))
-    time = Time.from_iso8601!("#{build_time}.049152Z")
-
-    DateTime.new!(date, time, "America/New_York")
-  end
-
-  defp make_build_datetime(_), do: nil
-
-  defp month_binary_to_integer(month_bin) do
-    %{
-      "Jan" => 1,
-      "Feb" => 2,
-      "Mar" => 3,
-      "Apr" => 4,
-      "May" => 5,
-      "Jun" => 6,
-      "Jul" => 7,
-      "Aug" => 8,
-      "Sep" => 9,
-      "Oct" => 10,
-      "Nov" => 11,
-      "Dec" => 12
-    }
-    |> Map.get(month_bin)
+  def insert_opts(replace_columns \\ columns(:replace)) do
+    [on_conflict: {:replace, replace_columns}, returning: true, conflict_target: [:ident]]
   end
 
   defp validate_profile_exists(%Ecto.Changeset{} = cs) do
