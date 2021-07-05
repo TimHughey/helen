@@ -6,6 +6,17 @@ defmodule Sally do
   alias Alfred.ExecCmd
   alias Sally.{DevAlias, Device}
 
+  def delete_alias(name_or_id) do
+    case DevAlias.delete(name_or_id) do
+      {:ok, results} ->
+        kn = Alfred.delete(results[:name])
+        {:ok, results ++ [alfred: kn]}
+
+      error ->
+        error
+    end
+  end
+
   # required as callback from Alfred
   def execute(%ExecCmd{} = ec), do: Sally.Execute.cmd(ec)
 

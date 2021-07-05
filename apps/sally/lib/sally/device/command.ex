@@ -79,9 +79,9 @@ defmodule Sally.Command do
     |> Repo.insert!(returning: true)
   end
 
-  def purge(%DevAlias{cmds: cmds}, :all) do
+  def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
     all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
-    batches = Enum.chunk_every(all_ids, 10)
+    batches = Enum.chunk_every(all_ids, batch_size)
 
     for batch <- batches, reduce: {:ok, 0} do
       {:ok, acc} ->

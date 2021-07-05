@@ -1,4 +1,6 @@
 defmodule Sally.Host.ChangeControl do
+  alias __MODULE__
+
   defstruct raw_changes: %{}, required: [], replace: []
 
   @type raw_change_map() :: %{atom() => String.t() | DateTime.t()}
@@ -40,18 +42,31 @@ defmodule Sally.Host do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def authorize(name, val \\ true) when is_boolean(val) do
+    case Repo.get_by(Schema, name: name) do
+      %Schema{} = h -> changeset(h, %{authorized: val}, [:authorized]) |> Repo.update!()
+      nil -> nil
+    end
+  end
+
   def boot_payload_data(%Schema{} = h) do
     file = [System.get_env("RUTH_TOML", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
 
     Toml.decode_file!(file)
   end
 
+  # (1 of 2) accept a ChangeControl
   def changeset(%ChangeControl{} = cc) do
+    changeset(%Schema{}, cc.raw_changes, cc.required)
+  end
+
+  # (2 of 2) traditional implementation accepting a Schema, changes and what's required
+  def changeset(%Schema{} = schema, changes, required) do
     alias Ecto.Changeset
 
-    %Schema{}
-    |> Changeset.cast(cc.raw_changes, cc.required)
-    |> Changeset.validate_required(cc.required)
+    schema
+    |> Changeset.cast(changes, required)
+    |> Changeset.validate_required(required)
     |> Changeset.validate_format(:ident, ~r/^[a-z]+[.][[:alnum:]]{3,}$/i)
     |> Changeset.validate_length(:ident, max: 24)
     |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
@@ -64,50 +79,6 @@ defmodule Sally.Host do
     |> Changeset.validate_length(:app_sha, max: 12)
     |> Changeset.validate_length(:reset_reason, max: 24)
   end
-
-  # def changeset(p) when is_struct(p) do
-  #   Map.from_struct(p) |> changeset()
-  # end
-
-  # def changeset(p) when is_map(p) do
-  #   # allow changeset to consume Messages without creating a direct dependency while also allowing
-  #   # host instead of ident
-  #
-  #   Logger.debug("raw: #{inspect(p, pretty: true)}")
-  #
-  #   %{
-  #     ident: p[:host] || p[:ident],
-  #     name: p[:name] || p[:ident] || p[:host],
-  #     build_at: make_build_datetime(p),
-  #     last_start_at: p[:last_start_at] || p[:sent_at],
-  #     last_seen_at: p[:last_seen_at] || p[:sent_at]
-  #   }
-  #   |> Map.merge(p[:data] || %{})
-  #   |> changeset(%Schema{})
-  # end
-  #
-  # def changeset(p, %Schema{} = host) when is_map(p), do: changeset(host, p)
-  #
-  # def changeset(%Schema{} = host, p) when is_map(p) do
-  #   alias Ecto.Changeset
-  #
-  #   Logger.debug("final: #{inspect(p, pretty: true)}")
-  #
-  #   host
-  #   |> Changeset.cast(p, columns(:cast))
-  #   |> Changeset.validate_required(columns(:required))
-  #   |> Changeset.validate_format(:ident, ~r/^[a-z]+[.][[:alnum:]]{3,}$/i)
-  #   |> Changeset.validate_length(:ident, max: 24)
-  #   |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
-  #   |> Changeset.validate_length(:name, max: 32)
-  #   |> Changeset.validate_format(:profile, ~r/^[a-z]+[\w.-]+$/i)
-  #   |> Changeset.validate_length(:profile, max: 32)
-  #   |> validate_profile_exists()
-  #   |> Changeset.validate_length(:firmware_vsn, max: 32)
-  #   |> Changeset.validate_length(:idf_vsn, max: 12)
-  #   |> Changeset.validate_length(:app_sha, max: 12)
-  #   |> Changeset.validate_length(:reset_reason, max: 24)
-  # end
 
   def columns(:all) do
     these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
@@ -131,6 +102,8 @@ defmodule Sally.Host do
         keep
     end
   end
+
+  def deauthorize(name), do: authorize(name, false)
 
   def find_by_ident(ident), do: Repo.get_by(Schema, ident: ident)
 

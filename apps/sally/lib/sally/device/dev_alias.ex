@@ -73,10 +73,11 @@ defmodule Sally.DevAlias do
   end
 
   def delete(name_or_id) do
-    with %Schema{} = a <- find(name_or_id) |> load_command_ids(),
-         {:ok, count} <- Command.purge(a, :all),
+    with %Schema{} = a <- find(name_or_id) |> load_command_ids() |> load_datapoint_ids(),
+         {:ok, cmd_count} <- Command.purge(a, :all),
+         {:ok, dp_count} <- Datapoint.purge(a, :all),
          {:ok, %Schema{name: n}} <- Repo.delete(a) do
-      {:ok, [name: n, commands: count]}
+      {:ok, [name: n, commands: cmd_count, datapoints: dp_count]}
     else
       nil -> {:unknown, name_or_id}
       error -> error
@@ -116,6 +117,11 @@ defmodule Sally.DevAlias do
   defp load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])
     Repo.preload(schema_or_nil, [cmds: q], force: true)
+  end
+
+  defp load_datapoint_ids(schema_or_nil) do
+    q = Ecto.Query.from(dp in Datapoint, select: [:id])
+    Repo.preload(schema_or_nil, [datapoints: q], force: true)
   end
 
   def load_device(schema_or_tuple) do

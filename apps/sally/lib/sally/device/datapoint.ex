@@ -47,9 +47,9 @@ defmodule Sally.Datapoint do
 
   def columns(:cast), do: columns(:all)
 
-  def purge(%DevAlias{datapoints: datapoints}, :all) do
+  def purge(%DevAlias{datapoints: datapoints}, :all, batch_size \\ 10) do
     all_ids = Enum.map(datapoints, fn %Schema{id: id} -> id end)
-    batches = Enum.chunk_every(all_ids, 10)
+    batches = Enum.chunk_every(all_ids, batch_size)
 
     for batch <- batches, reduce: {:ok, 0} do
       {:ok, acc} ->
