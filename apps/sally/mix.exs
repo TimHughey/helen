@@ -9,7 +9,7 @@ defmodule Sally.MixProject do
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
-      elixir: "~> 1.11",
+      elixir: "~> 1.12",
       start_permanent: Mix.env() in [:prod, :test],
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -77,7 +77,6 @@ defmodule Sally.MixProject do
       {:broom, in_umbrella: true},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:should, in_umbrella: true, only: :test, runtime: false},
-      {:ruth_sim, in_umbrella: true, only: :test},
       {:excoveralls, "~> 0.10", only: :test}
     ]
   end
