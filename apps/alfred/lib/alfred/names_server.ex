@@ -50,8 +50,10 @@ defmodule Alfred.Names.Server do
 
   @impl true
   def handle_call({:delete, name}, _from, %State{} = s) do
-    State.delete_name(s, name)
-    |> reply()
+    case State.lookup(name, s) do
+      %KnownName{} = kn -> State.delete_name(s, name) |> reply(kn)
+      nil -> s |> reply(nil)
+    end
   end
 
   @impl true
