@@ -79,8 +79,7 @@ defmodule Helen.Mixfile do
       {:broom, in_umbrella: true},
       {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.10", only: :test},
-      {:ruth_sim, in_umbrella: true, only: [:dev, :test]}
+      {:excoveralls, "~> 0.10", only: :test}
     ]
   end
 
