@@ -13,7 +13,11 @@ defmodule Alfred.Notify do
 
   def just_saw(%KnownName{} = kn), do: {:just_saw, kn} |> cast()
 
-  @register_default_opts [interval_ms: :use_ttl, link: true]
+  @register_default_opts [frequency: [interval_ms: 0], link: true]
+  @type notify_frequency_opts() :: nil | [interval_ms: pos_integer()] | :all | :use_ttl
+  @type register_opts() :: [pid: pid(), frequency: notify_frequency_opts]
+  @spec register(String.t(), register_opts()) :: {:ok, NotifyTo.t()} | {:error, term()}
+
   def register(name, opts) do
     alias Alfred.{KnownName, Names}
 
@@ -27,8 +31,6 @@ defmodule Alfred.Notify do
 
   def registrations, do: {:registrations} |> call()
   def unregister(ref) when is_reference(ref), do: {:unregister, ref} |> call()
-
-  # def unregister(ref) do
 
   defp call(msg), do: (alive?() && GenServer.call(@server, msg)) || {:no_server, @server}
   defp cast(msg), do: (alive?() && GenServer.cast(@server, msg)) || {:no_server, @server}

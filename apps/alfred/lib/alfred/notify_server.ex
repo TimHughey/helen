@@ -13,8 +13,22 @@ defmodule Alfred.NotifyTo do
           interval_ms: pos_integer()
         }
 
-  def new(name, opts) do
-    %__MODULE__{name: name, pid: opts[:pid], ref: make_ref(), interval_ms: opts[:interval_ms]}
+  def new(%Alfred.KnownName{} = kn, opts) do
+    %__MODULE__{
+      name: kn.name,
+      pid: opts[:pid],
+      ref: make_ref(),
+      interval_ms: make_notify_interval(opts, kn.ttl_ms)
+    }
+  end
+
+  def make_notify_interval(opts, ttl_ms) do
+    case opts[:frequency] do
+      :all -> 0
+      :use_ttl -> ttl_ms
+      [interval_ms: x] when is_integer(x) -> x
+      _x -> ttl_ms
+    end
   end
 end
 
@@ -50,12 +64,13 @@ defmodule Alfred.Notify.Server do
           }
 
     def register(%KnownName{} = kn, opts, %State{registrations: regs} = s) do
-      nt = NotifyTo.new(kn.name, opts)
+      nt = NotifyTo.new(kn, opts)
 
-      # only link if requested
+      # only link if requested but always monitor
       if opts[:link], do: Process.link(nt.pid)
+      monitor_ref = Process.monitor(nt.pid)
 
-      key = make_registration_key(nt)
+      key = make_registration_key(nt, monitor_ref)
 
       s = %State{s | registrations: put_in(regs, [key], nt)}
 
@@ -72,7 +87,7 @@ defmodule Alfred.Notify.Server do
       end
     end
 
-    def make_registration_key(%NotifyTo{} = nt), do: {nt.name, nt.pid, Process.monitor(nt.pid)}
+    def make_registration_key(%NotifyTo{} = nt, monitor_ref), do: {nt.name, nt.pid, monitor_ref}
     def new, do: %State{started_at: DateTime.utc_now()}
   end
 
@@ -99,8 +114,7 @@ defmodule Alfred.Notify.Server do
 
   @impl true
   def handle_call({:register, %KnownName{} = kn, opts}, {pid, _ref}, %State{} = s) do
-    interval_ms = if opts[:interval_ms] == :use_ttl, do: kn.ttl_ms, else: opts[:interval_ms]
-    opts = [interval_ms: interval_ms, pid: pid] ++ Keyword.delete_first(opts, :interval_ms)
+    opts = Keyword.put_new(opts, :pid, pid)
     State.register(kn, opts, s) |> reply()
   end
 
