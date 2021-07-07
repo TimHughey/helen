@@ -2,7 +2,6 @@ defmodule Sally.Mutable do
   require Logger
   require Ecto.Query
 
-  alias __MODULE__
   alias Alfred.MutableStatus
   alias Sally.{Command, DevAlias}
   alias Sally.Repo
