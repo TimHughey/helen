@@ -1,4 +1,4 @@
-defmodule Sally.Status do
+defmodule Sally.Mutable do
   require Logger
   require Ecto.Query
 
@@ -10,8 +10,8 @@ defmodule Sally.Status do
   @type ttl_ms() :: 50..600_000
   @type opts() :: [ttl_ms: ttl_ms(), need_dev_alias: boolean()]
 
-  @spec get(Sring.t(), Status.opts()) :: MutableStatus.t()
-  def get(name, opts) when is_binary(name) and is_list(opts) do
+  @spec status(Sring.t(), Status.opts()) :: MutableStatus.t()
+  def status(name, opts) when is_binary(name) and is_list(opts) do
     alias Ecto.Query
 
     last_cmd_query = Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
@@ -27,31 +27,17 @@ defmodule Sally.Status do
       good?(dev_alias) -> MutableStatus.good(dev_alias)
       :unmatched -> MutableStatus.unknown_state(dev_alias)
     end
-    |> make_get_response(dev_alias, opts)
+    |> make_response(dev_alias, opts)
   end
 
-  # NOTE: as of 2021-06-05 the DevAiias does not keep it's own view of the current cmd
-  #       so the ONLY view of the current command is from the last Command
-  #
-  #       when there is not a last Command there isn't a current command for the status
-  #       to ensure there is a proper status an acked command is inserted to represent
-  #       the current cmd while processing messages from the remote host.
+  # when there is not a last Command there isn't a current command for the status.
+  # to ensure there is a proper status an acked command is inserted to represent
+  # the current cmd while processing messages from the remote host.
 
   defp good?(%DevAlias{cmds: []}), do: false
   defp good?(%DevAlias{cmds: [%Command{acked: true}]}), do: true
 
-  # NOTE: implementation prior to 2021-06-05
-  # # NOTE! good?/1 assumes: (1) ttl checked, (2) pending checked, (3) orphan checked. in other words,
-  # #       it should be the last of the checks
-  # # (1 of 2) no cmds to look at
-  # defp good?(%DevAlias{cmds: []}), do: true
-  #
-  # # (2 of 2) alias has been updated since the cmd was acked
-  # defp good?(%DevAlias{cmds: [%Command{acked: true, acked_at: acked_at}], updated_at: updated_at}) do
-  #   DateTime.compare(acked_at, updated_at) == :lt
-  # end
-
-  defp make_get_response(res, dev_alias, opts) do
+  defp make_response(res, dev_alias, opts) do
     if opts[:need_dev_alias], do: {dev_alias, res}, else: res
   end
 

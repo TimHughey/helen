@@ -55,7 +55,7 @@ defmodule Sally do
 
   def status(type, name, opts \\ [])
   # (1 of 2) handle mutable devices
-  def status(:mutable, name, opts), do: Sally.Status.get(name, opts)
+  def status(:mutable, name, opts), do: Sally.Mutable.status(name, opts)
 
   # (2 of 2) handle immutable devices
   def status(:immutable, name, opts), do: Sally.Immutable.status(name, opts)

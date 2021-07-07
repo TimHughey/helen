@@ -12,11 +12,15 @@ defmodule Alfred.ImmutableStatus do
   @type t :: %__MODULE__{
           name: String.t(),
           found?: boolean(),
-          datapoints: %{temp_c: float(), relhum: float() | nil} | %{},
+          datapoints: %{temp_c: float(), temp_f: float(), relhum: float() | nil} | %{},
           status_at: DateTime.t(),
           ttl_expired?: boolean(),
           error: status_error()
         }
+
+  def add_datapoint(%Status{} = status, key, val) do
+    %Status{status | datapoints: status.datapoints |> put_in([key], val)}
+  end
 
   def good(%_{datapoints: [values_map]} = x) do
     %Status{

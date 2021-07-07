@@ -7,10 +7,8 @@ defmodule Sally.Mutable.Handler do
   alias __MODULE__
 
   alias Alfred.MutableStatus, as: MutStatus
-  alias Sally.{Command, DevAlias, Device, Execute, Status}
+  alias Sally.{Command, DevAlias, Device, Execute, Immutable}
   alias Sally.Dispatch
-  # alias Sally.Host.Instruct
-  # alias Sally.PulseWidth
 
   @impl true
   def finalize(%Dispatch{} = msg) do
@@ -101,13 +99,15 @@ defmodule Sally.Mutable.Handler do
   end
 
   def align_status(repo, changes, %Dispatch{} = msg) do
+    alias Sally.Immutable
+
     pins = msg.data.pins
     reported_at = msg.sent_at
 
     for dev_alias <- changes.aliases, reduce: {:ok, []} do
       {:ok, acc} ->
         cmd = pin_status(pins, dev_alias.pio)
-        status = Status.get(dev_alias.name, [])
+        status = Immutable.status(dev_alias.name, [])
         Logger.debug(inspect(status, pretty: true))
 
         case status do

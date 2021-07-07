@@ -32,8 +32,19 @@ defmodule Sally.Immutable do
     cond do
       is_nil(dev_alias) -> ImmutableStatus.not_found(name)
       ttl_expired?(dev_alias, opts) -> ImmutableStatus.ttl_expired(dev_alias)
-      good?(dev_alias) -> ImmutableStatus.good(dev_alias)
+      good?(dev_alias) -> ImmutableStatus.good(dev_alias) |> add_tempf()
       :unmatched -> ImmutableStatus.unknown_status(dev_alias)
+    end
+  end
+
+  defp add_tempf(%ImmutableStatus{datapoints: %{temp_c: temp_c}} = status) do
+    case temp_c do
+      x when is_number(x) ->
+        temp_f = (x * 9 / 5 + 32) |> Float.round(3)
+        ImmutableStatus.add_datapoint(status, :temp_f, temp_f)
+
+      _ ->
+        status
     end
   end
 
