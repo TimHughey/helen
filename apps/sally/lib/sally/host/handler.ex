@@ -147,7 +147,6 @@ defmodule Sally.Host.Handler do
       # never replace the ident, it is the conflict field
       replace: raw_changes |> Map.drop([:ident, :name, :inserted_at]) |> Map.keys()
     }
-    |> tap(fn x -> Logger.info("\n#{inspect(x, pretty: true)}") end)
   end
 
   # (2 of 2) boot and run time metrics
