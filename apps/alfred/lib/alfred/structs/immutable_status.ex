@@ -22,6 +22,24 @@ defmodule Alfred.ImmutableStatus do
     %Status{status | datapoints: status.datapoints |> put_in([key], val)}
   end
 
+  def diff(key, %Status{datapoints: dp1, ttl_expired?: false, error: :none}, %Status{
+        datapoints: dp2,
+        ttl_expired?: false,
+        error: :none
+      })
+      when is_atom(key) and is_map_key(dp1, key) and is_map_key(dp2, key) do
+    v1 = dp1[key]
+    v2 = dp2[key]
+
+    if is_number(v1) and is_number(v2) do
+      v1 - v2
+    else
+      :error
+    end
+  end
+
+  def diff(_key, _status1, _status2), do: :error
+
   def good(%_{datapoints: [values_map]} = x) do
     %Status{
       name: x.name,
