@@ -5,7 +5,7 @@ defmodule Sally.Execute do
   alias Alfred.ExecResult
   alias Alfred.MutableStatus, as: MutStatus
   alias Broom.TrackerEntry
-  alias Sally.{Command, Payload, Repo, Status}
+  alias Sally.{Command, Payload, Repo}
 
   use Broom,
     schema: Command,
@@ -65,7 +65,7 @@ defmodule Sally.Execute do
       status_opts = [need_dev_alias: true] ++ status_opts
       force = cmd_opts_rest[:force] || false
 
-      with {dev_alias, status} <- Status.get(ec.name, status_opts),
+      with {dev_alias, status} <- Sally.status(:mutable, ec.name, status_opts),
            %MutStatus{found?: true, ttl_expired?: false} <- status,
            {:add_cmd, true} <- {:add_cmd, force or ec.cmd != status.cmd} do
         # actual command to dev alias is required
