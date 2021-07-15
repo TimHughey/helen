@@ -1,21 +1,10 @@
 # Sally
 
-**TODO: Add description**
+Sally provides support for [Ruth]([https://github.com/TimHughey/ruth):
 
-## Installation
+- Host
+- Immutable and Mutable Devices
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `sally` to your list of dependencies in `mix.exs`:
+##### Environmnet Variables Required
 
-```elixir
-def deps do
-  [
-    {:sally, "~> 0.1.0"}
-  ]
-end
-```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/sally](https://hexdocs.pm/sally).
-
+- `RUTH_TOML` path to directory containing `profiles` and `binders`
