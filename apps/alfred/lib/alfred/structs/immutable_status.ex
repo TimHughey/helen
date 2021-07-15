@@ -2,6 +2,7 @@ defmodule Alfred.ImmutableStatus do
   alias __MODULE__, as: Status
 
   defstruct name: nil,
+            good?: false,
             found?: true,
             datapoints: nil,
             status_at: nil,
@@ -11,6 +12,7 @@ defmodule Alfred.ImmutableStatus do
   @type status_error() :: :none | :unresponsive | :unknown_value
   @type t :: %__MODULE__{
           name: String.t(),
+          good?: boolean(),
           found?: boolean(),
           datapoints: %{temp_c: float(), temp_f: float(), relhum: float() | nil} | %{},
           status_at: DateTime.t(),
@@ -22,11 +24,7 @@ defmodule Alfred.ImmutableStatus do
     %Status{status | datapoints: status.datapoints |> put_in([key], val)}
   end
 
-  def diff(key, %Status{datapoints: dp1, ttl_expired?: false, error: :none}, %Status{
-        datapoints: dp2,
-        ttl_expired?: false,
-        error: :none
-      })
+  def diff(key, %Status{datapoints: dp1, good?: true}, %Status{datapoints: dp2, good?: true})
       when is_atom(key) and is_map_key(dp1, key) and is_map_key(dp2, key) do
     v1 = dp1[key]
     v2 = dp2[key]
@@ -39,6 +37,14 @@ defmodule Alfred.ImmutableStatus do
   end
 
   def diff(_key, _status1, _status2), do: :error
+
+  # (1 of 2) this status is good: ttl is ok, it is found and no error
+  def finalize(%Status{error: :none, found?: true, ttl_expired?: false} = x) do
+    %Status{x | good?: true}
+  end
+
+  # (2 of 2) something is wrong with this status
+  def finalize(%Status{} = x), do: x
 
   def good(%_{datapoints: [values_map]} = x) do
     %Status{

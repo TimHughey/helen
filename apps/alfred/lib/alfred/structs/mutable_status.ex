@@ -2,6 +2,7 @@ defmodule Alfred.MutableStatus do
   alias __MODULE__, as: Status
 
   defstruct name: nil,
+            good?: false,
             found?: true,
             cmd: "unknown",
             status_at: nil,
@@ -13,6 +14,7 @@ defmodule Alfred.MutableStatus do
   @type status_error() :: :none | :unresponsive | :unknown_state
   @type t :: %__MODULE__{
           name: String.t(),
+          good?: boolean(),
           found?: boolean(),
           cmd: String.t(),
           status_at: DateTime.t(),
@@ -21,6 +23,14 @@ defmodule Alfred.MutableStatus do
           ttl_expired?: boolean(),
           error: status_error()
         }
+
+  # (1 of 2) this status is good: ttl is ok, it is found and no error
+  def finalize(%Status{error: :none, found?: true, ttl_expired?: false} = x) do
+    %Status{x | good?: true}
+  end
+
+  # (2 of 2) something is wrong with this status
+  def finalize(%Status{} = x), do: x
 
   def good(%_{cmds: [%_{cmd: cmd}]} = x) do
     %Status{
