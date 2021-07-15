@@ -35,6 +35,7 @@ defmodule Sally.Immutable do
       good?(dev_alias) -> ImmutableStatus.good(dev_alias) |> add_tempf()
       :unmatched -> ImmutableStatus.unknown_status(dev_alias)
     end
+    |> ImmutableStatus.finalize()
   end
 
   defp add_tempf(%ImmutableStatus{datapoints: %{temp_c: temp_c}} = status) do

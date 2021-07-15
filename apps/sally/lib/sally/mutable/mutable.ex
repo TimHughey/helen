@@ -26,6 +26,7 @@ defmodule Sally.Mutable do
       good?(dev_alias) -> MutableStatus.good(dev_alias)
       :unmatched -> MutableStatus.unknown_state(dev_alias)
     end
+    |> MutableStatus.finalize()
     |> make_response(dev_alias, opts)
   end
 
