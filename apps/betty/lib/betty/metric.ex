@@ -1,7 +1,14 @@
 defmodule Betty.Metric do
+  alias __MODULE__
+
   defstruct measurement: nil, fields: %{}, tags: %{}, timestamp: nil
 
-  alias Betty.Metric
+  @type t :: %Metric{
+          measurement: String.t(),
+          fields: map(),
+          tags: map(),
+          timestamp: nil | pos_integer()
+        }
 
   def into_map(%Metric{} = mm) do
     %Metric{
@@ -11,6 +18,10 @@ defmodule Betty.Metric do
         timestamp: mm.timestamp || System.os_time(:nanosecond)
     }
     |> Map.from_struct()
+  end
+
+  def new(measurement, fields \\ [], tags \\ []) do
+    %Metric{measurement: measurement, fields: Enum.into(fields, %{}), tags: Enum.into(tags, %{})}
   end
 
   # (1 of 2) convert structs to maps, then map values
@@ -32,6 +43,6 @@ defmodule Betty.Metric do
     end
   end
 
-  # remove Elixir. from module names
+  # remove Elixir from module names
   defp mod_to_string(mod), do: Module.split(mod) |> Enum.join(".")
 end
