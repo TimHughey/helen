@@ -34,7 +34,7 @@ defmodule Betty do
   end
 
   @doc """
-  Wrote a single %Betty.Metric{} to the timeseries database.
+  Write a single %Betty.Metric{} to the timeseries database.
 
   """
   @doc since: "0.2.1"
@@ -44,7 +44,7 @@ defmodule Betty do
     points_map = %{points: [Metric.into_map(mm)]}
     instream_opts = [precision: :nanosecond, async: true]
 
-    # now erite the point to the timeseries database
+    # now write the point to the timeseries database
     {Connection.write(points_map, instream_opts), points_map}
   end
 end
