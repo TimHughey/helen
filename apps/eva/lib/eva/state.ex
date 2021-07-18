@@ -14,10 +14,10 @@ defmodule Eva.State do
           started_at: DateTime.t()
         }
 
-  def load_config(%State{opts: %Opts{toml_file: file}} = s) do
-    toml_rc = Toml.decode_file(file, keys: :atoms)
+  def load_config(%State{opts: %Opts{} = opts} = s) do
+    toml_rc = opts.toml_file |> Toml.decode_file(keys: :atoms)
 
-    %State{s | variant: Variant.Factory.new(toml_rc), opts: Opts.append_cfg(toml_rc, s.opts)}
+    %State{s | variant: Variant.Factory.new(toml_rc, opts), opts: Opts.append_cfg(toml_rc, s.opts)}
   end
 
   def new(%Opts{} = opts) do

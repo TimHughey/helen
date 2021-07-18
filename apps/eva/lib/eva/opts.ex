@@ -16,6 +16,7 @@ defmodule Eva.Opts do
 
   defstruct server: %Server{},
             toml_file: nil,
+            name: nil,
             description: "<none>",
             initial_mode: :ready,
             valid?: true,
@@ -24,6 +25,8 @@ defmodule Eva.Opts do
   @type t :: %Opts{
           server: Server.t(),
           toml_file: Path.t(),
+          name: String.t(),
+          description: String.t(),
           initial_mode: :ready | :standby | :error,
           valid?: boolean(),
           invalid_reason: nil | any()
@@ -34,7 +37,8 @@ defmodule Eva.Opts do
       {:ok, cfg} ->
         desc = cfg[:description] || opts.description
         mode = String.to_atom(cfg[:initial_mode]) || opts.initial_mode
-        %Opts{opts | description: desc, initial_mode: mode}
+        name = cfg[:name] || opts.server.name |> Module.split() |> Enum.join(".")
+        %Opts{opts | name: name, description: desc, initial_mode: mode}
 
       {:error, error} ->
         %Opts{opts | initial_mode: :error, valid?: false, invalid_reason: error}

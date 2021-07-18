@@ -3,6 +3,12 @@ defmodule Betty do
 
   alias Betty.{Connection, Metric}
 
+  def app_error(module, tags) when is_atom(module) and is_list(tags) do
+    alias Betty.AppError
+
+    AppError.new(module, tags) |> AppError.write()
+  end
+
   @doc """
   Retrieves measurements for the environment configured database
 
@@ -13,6 +19,18 @@ defmodule Betty do
       vals when is_list(vals) -> List.flatten(vals)
       error -> error
     end
+  end
+
+  @doc """
+  Create and write a single metric to the environment configured database
+
+  """
+  @doc since: "0.2.2"
+  def metric(measurement, fields, tags) do
+    alias Betty.Metric
+
+    Metric.new(measurement, fields, tags)
+    |> Metric.write()
   end
 
   @doc """

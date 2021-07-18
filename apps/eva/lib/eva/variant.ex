@@ -21,42 +21,54 @@ defprotocol Eva.Variant do
   @spec mode(struct(), server_mode()) :: struct()
   def mode(variant, mode)
 
+  @spec new(struct(), Eva.Opts.t(), extra_opts :: list()) :: struct()
+  def new(variant, eva_opts, extra_opts)
+
   @spec valid?(struct()) :: boolean()
   def valid?(variant)
 end
 
-defmodule Eva.Variant.Factory do
-  alias Eva.{Follow, Variant}
-
-  def new(toml_rc) do
-    case toml_rc do
-      {:ok, %{variant: "in range"} = x} -> Variant.InRange.new(x)
-      {:ok, %{variant: "follow"} = x} -> Follow.new(x)
-      {:error, error} -> Variant.Invalid.new(error)
-    end
-  end
-end
-
-defmodule Eva.Variant.Invalid do
+defmodule Eva.Invalid do
   alias __MODULE__
 
-  defstruct valid?: false, invalid_reason: nil
+  defstruct name: "invalid", mod: nil, valid?: false, invalid_reason: nil
 
-  @type t :: %__MODULE__{
+  @type t :: %Invalid{
+          name: String.t(),
+          mod: module(),
           valid?: boolean(),
           invalid_reason: any()
         }
+end
 
-  def new(invalid_reason), do: %__MODULE__{valid?: false, invalid_reason: invalid_reason}
+defimpl Eva.Variant, for: Eva.Invalid do
+  alias Alfred.NotifyMemo, as: Memo
+  alias Broom.TrackerEntry
+  alias Eva.{Invalid, Opts}
 
-  defimpl Eva.Variant do
-    def control(%Invalid{} = x, %Alfred.NotifyMemo{}, _mode), do: x
-    def current_mode(%Invalid{}), do: :invalid
-    def find_devices(%Invalid{} = x), do: x
-    def found_all_devs?(%Invalid{}), do: false
-    def handle_notify(%Invalid{} = x, %Alfred.NotifyMemo{}, _mode), do: x
-    def handle_release(%Invalid{} = x, %Broom.TrackerEntry{}), do: x
-    def mode(%Invalid{} = x, _mode), do: x
-    def valid?(%Invalid{}), do: false
+  def control(%Invalid{} = x, %Memo{}, _mode), do: x
+  def current_mode(%Invalid{}), do: :invalid
+  def find_devices(%Invalid{} = x), do: x
+  def found_all_devs?(%Invalid{}), do: false
+  def handle_notify(%Invalid{} = x, %Memo{}, _mode), do: x
+  def handle_release(%Invalid{} = x, %TrackerEntry{}), do: x
+  def mode(%Invalid{} = x, _mode), do: x
+
+  def new(%Invalid{} = x, %Opts{} = opts, extra_opts) do
+    %Invalid{x | mod: opts.server.name, valid?: false, invalid_reason: extra_opts[:reason]}
+  end
+
+  def valid?(%Invalid{}), do: false
+end
+
+defmodule Eva.Variant.Factory do
+  alias Eva.{Follow, Invalid, Opts, Setpoint, Variant}
+
+  def new(toml_rc, %Opts{} = opts) do
+    case toml_rc do
+      {:ok, %{variant: "setpoint"} = x} -> %Setpoint{} |> Setpoint.new(opts, cfg: x)
+      {:ok, %{variant: "follow"} = x} -> %Follow{} |> Variant.new(opts, cfg: x)
+      {:error, error} -> %Invalid{} |> Variant.new(opts, reason: error)
+    end
   end
 end

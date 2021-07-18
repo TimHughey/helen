@@ -1,5 +1,5 @@
 defmodule BettyTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   test "can Betty retrieve the connection configuration", _ctx do
     cfg = Application.get_env(:betty, Betty.Connection)
@@ -35,6 +35,13 @@ defmodule BettyTest do
     mm = %Betty.Metric{measurement: "betty", fields: %{val: true, mod: __MODULE__}, tags: %{test: true}}
 
     metric_rc = Betty.write_metric(mm)
+
+    fail = "metric rc should be a ok tuple with a map: #{inspect(metric_rc)}"
+    assert {:ok, %{}} = metric_rc, fail
+  end
+
+  test "can Betty write an %AppError{} to the database", _ctx do
+    metric_rc = Betty.app_error(__MODULE__, env: :test, success: false, temp_f: 78.7, val: 42)
 
     fail = "metric rc should be a ok tuple with a map: #{inspect(metric_rc)}"
     assert {:ok, %{}} = metric_rc, fail

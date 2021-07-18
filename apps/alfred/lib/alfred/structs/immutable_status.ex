@@ -24,18 +24,38 @@ defmodule Alfred.ImmutableStatus do
     %Status{status | datapoints: status.datapoints |> put_in([key], val)}
   end
 
+  # (1 of 3) diff of two ImmutableStatus structs
+  @doc """
+  Calculate the difference of a specified key of an ImmutableStatus and numberic value or
+  another ImmutableStatus.
+
+  """
+  @doc since: "0.0.1"
   def diff(key, %Status{datapoints: dp1, good?: true}, %Status{datapoints: dp2, good?: true})
       when is_atom(key) and is_map_key(dp1, key) and is_map_key(dp2, key) do
-    v1 = dp1[key]
-    v2 = dp2[key]
+    val1 = dp1[key]
+    val2 = dp2[key]
 
-    if is_number(v1) and is_number(v2) do
-      v1 - v2
+    if is_number(val1) and is_number(val2) do
+      val1 - val2
     else
       :error
     end
   end
 
+  # (2 of 3) diff of a numeric value and the specified key of an ImmutableStatus
+  def diff(key, val1, %Status{datapoints: dp, good?: true})
+      when is_atom(key) and is_map_key(dp, key) and is_number(val1) do
+    val2 = dp[key]
+
+    if is_number(val2) do
+      val1 - val2
+    else
+      :error
+    end
+  end
+
+  # (3 of 3) key doesn't exist, can't compare passed arguments or bad status
   def diff(_key, _status1, _status2), do: :error
 
   # (1 of 2) this status is good: ttl is ok, it is found and no error
