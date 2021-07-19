@@ -136,7 +136,7 @@ defmodule Eva.Follow do
   def control(%Follow{mode: vmode} = vf, %Memo{}, _mode) when vmode in [:init, :standby], do: vf
 
   # (x of x) an issue exists
-  def control(%Follow{} = vf, %Memo{}, mode) do
+  def control(%Follow{} = vf, %Memo{} = memo, mode) do
     tags = [variant: vf.name, mode: mode]
     Betty.app_error(vf.mod, tags ++ [control: true])
 
@@ -151,6 +151,8 @@ defmodule Eva.Follow do
     if vf.follower.ttl_expired? do
       Betty.app_error(vf.mod, tags ++ [follower: vf.follower.name, ttl_expired: true])
     end
+
+    Logger.info("\n#{inspect(memo, pretty: true)}\n#{inspect(memo, pretty: true)}")
 
     vf
   end
