@@ -81,7 +81,7 @@ defmodule Sally.Immutable.Handler do
     for %DevAlias{} = dev_alias <- changes.aliases, reduce: {:ok, []} do
       {:ok, acc} ->
         DevAlias.just_saw(repo, dev_alias, msg.sent_at)
-        JustSaw.new(Sally, changes.device.mutable) |> JustSaw.add_device(dev_alias) |> Alfred.just_saw_cast()
+        JustSaw.new(Sally, changes.device.mutable, dev_alias) |> Alfred.just_saw_cast()
 
         {:ok, [dev_alias] ++ acc}
     end

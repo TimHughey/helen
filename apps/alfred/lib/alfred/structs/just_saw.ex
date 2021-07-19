@@ -1,7 +1,7 @@
 defmodule Alfred.JustSaw do
   alias __MODULE__
 
-  defmodule DevAlias do
+  defmodule Alias do
     defstruct name: nil, ttl_ms: nil
 
     @type t :: %__MODULE__{
@@ -17,12 +17,16 @@ defmodule Alfred.JustSaw do
   @type t :: %__MODULE__{
           mutable?: boolean(),
           callback_mod: module(),
-          seen_list: [DevAlias.t(), ...]
+          seen_list: [Alias.t(), ...]
         }
 
-  def add_device(%JustSaw{} = js, %{name: name, ttl_ms: ttl_ms}) do
-    %JustSaw{js | seen_list: [%DevAlias{name: name, ttl_ms: ttl_ms}] ++ js.seen_list}
+  def add_alias(%JustSaw{} = js, %{name: name, ttl_ms: ttl_ms}) do
+    %JustSaw{js | seen_list: [%Alias{name: name, ttl_ms: ttl_ms}] ++ js.seen_list}
   end
 
   def new(callback_mod, mutable?), do: %JustSaw{mutable?: mutable?, callback_mod: callback_mod}
+
+  def new(callback_mod, mutable?, %{name: name, ttl_ms: ttl_ms}) do
+    %JustSaw{mutable?: mutable?, callback_mod: callback_mod, seen_list: [%Alias{name: name, ttl_ms: ttl_ms}]}
+  end
 end
