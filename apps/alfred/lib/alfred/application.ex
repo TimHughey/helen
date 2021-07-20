@@ -5,18 +5,15 @@ defmodule Alfred.Application do
 
   use Application
 
-  alias Alfred.{Control, Names, Notify}
+  alias Alfred.{Names, Notify}
 
   @impl true
   def start(_type, _args) do
     children = [
       {Names.Server, []},
-      {Notify.Server, []},
-      {Control.Server, []}
+      {Notify.Server, []}
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Alfred.Supervisor]
     Supervisor.start_link(children, opts)
   end

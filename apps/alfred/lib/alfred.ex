@@ -24,6 +24,15 @@ defmodule Alfred do
   defdelegate just_saw(js), to: Names
   defdelegate just_saw_cast(js), to: Names
 
+  def known_names(what \\ :names) do
+    for %KnownName{} = kn <- Names.all_known() do
+      case what do
+        :names -> kn.name
+        :details -> kn
+      end
+    end
+  end
+
   defdelegate notify_register(name, opts \\ []), to: Notify, as: :register
   defdelegate notify_unregister(notify_to), to: Notify, as: :unregister
 
