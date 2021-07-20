@@ -80,7 +80,7 @@ defmodule Alfred.ImmutableStatus do
     %Status{name: x.name, status_at: x.device.last_seen_at, ttl_expired?: true}
   end
 
-  def tty_expired?(%Status{ttl_expired?: expired}), do: expired
+  def ttl_expired?(%Status{ttl_expired?: expired}), do: expired
 
   def unknown_status(%_{} = x) do
     %Status{

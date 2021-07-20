@@ -5,6 +5,7 @@ defmodule Alfred.MutableStatus do
             good?: false,
             found?: true,
             cmd: "unknown",
+            cmd_extra: %{},
             status_at: nil,
             pending?: false,
             pending_refid: nil,
@@ -17,6 +18,7 @@ defmodule Alfred.MutableStatus do
           good?: boolean(),
           found?: boolean(),
           cmd: String.t(),
+          cmd_extra: map(),
           status_at: DateTime.t(),
           pending?: boolean(),
           pending_refid: String.t(),
@@ -56,7 +58,7 @@ defmodule Alfred.MutableStatus do
     %Status{name: x.name, status_at: x.device.last_seen_at, ttl_expired?: true}
   end
 
-  def tty_expired?(%Status{ttl_expired?: expired}), do: expired
+  def ttl_expired?(%Status{ttl_expired?: expired}), do: expired
 
   def unknown_state(%_{} = x) do
     %Status{

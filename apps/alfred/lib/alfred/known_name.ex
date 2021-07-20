@@ -24,6 +24,9 @@ defmodule Alfred.KnownName do
     if DateTime.compare(utc_now, ttl_dt) != :gt, do: %KnownName{kn | missing?: true}, else: kn
   end
 
+  def missing(%KnownName{} = kn), do: %KnownName{kn | missing?: true}
+  def missing?(%KnownName{} = kn), do: kn.missing?
+
   def new(name, mutable?, ttl_ms, callback_mod) do
     %KnownName{
       name: name,
