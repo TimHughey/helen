@@ -26,7 +26,6 @@ defmodule Sally.Device do
 
   def changeset(struct, %Host{} = host) when is_struct(struct) do
     p = Map.from_struct(struct)
-    # merge_data = Map.drop(p.data, [:mut, :mutable, :pios])
 
     ident = List.first(p.filter_extra)
     mutable? = p.subsystem == "mut"
@@ -35,12 +34,10 @@ defmodule Sally.Device do
     %{
       ident: ident,
       family: determine_family(ident),
-      # mutable: p.data[:mut] || p.data[:mutable],
       mutable: mutable?,
       pios: (mutable? && length(p.data[:pins])) || 1,
       last_seen_at: p[:sent_at]
     }
-    # |> Map.merge(merge_data)
     |> changeset(device)
   end
 
@@ -56,7 +53,6 @@ defmodule Sally.Device do
     device
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
-    # |> Changeset.validate_format(:ident, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_format(:ident, ~r/^[a-z~]{1,}[[:alnum:]][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:ident, max: 128)
     |> Changeset.validate_format(:family, ~r/^[pwm]|[ds]|[i2c]$/)
