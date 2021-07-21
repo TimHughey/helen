@@ -20,7 +20,7 @@ defmodule Sally.Mutable.Handler do
   end
 
   @impl true
-  def process(%Dispatch{category: "status"} = msg) do
+  def process(%Dispatch{category: "status", filter_extra: [_ident, "ok"]} = msg) do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
     Logger.debug("\n#{inspect(msg.data, pretty: true)}")
 
@@ -32,6 +32,18 @@ defmodule Sally.Mutable.Handler do
     |> Sally.Repo.transaction()
     |> check_result(msg)
     |> post_process()
+    |> finalize()
+  end
+
+  # the ident encountered an error
+  @impl true
+  def process(%Dispatch{category: "status", filter_extra: [ident, "error"]} = msg) do
+    Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
+    Logger.debug("\n#{inspect(msg.data, pretty: true)}")
+
+    Betty.app_error(__MODULE__, ident: ident, mutable: true, hostname: msg.host.name)
+
+    msg
     |> finalize()
   end
 
@@ -48,7 +60,6 @@ defmodule Sally.Mutable.Handler do
       {:ok, %TrackerEntry{} = te} ->
         dev_alias = Repo.get!(DevAlias, te.dev_alias_id)
         dev_alias = DevAlias.just_saw(Repo, dev_alias, msg.sent_at)
-        # ident = DB.Device.update_last_seen_at(dev_alias.device_id, msg.sent_at)
 
         {:ok,
          %{

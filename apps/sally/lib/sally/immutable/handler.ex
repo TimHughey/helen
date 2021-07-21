@@ -19,23 +19,7 @@ defmodule Sally.Immutable.Handler do
   end
 
   @impl true
-  def process(%Dispatch{category: "status"} = msg) do
-    Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
-    Logger.debug("\n#{inspect(msg.data, pretty: true)}")
-
-    Ecto.Multi.new()
-    |> Ecto.Multi.insert(:device, Device.changeset(msg, msg.host), Device.insert_opts())
-    |> Ecto.Multi.run(:aliases, DevAlias, :load_aliases_with_last_cmd, [])
-    |> Ecto.Multi.run(:aligned, Handler, :align_status, [msg])
-    |> Ecto.Multi.run(:just_saw, Handler, :just_saw, [msg])
-    |> Sally.Repo.transaction()
-    |> check_result(msg)
-    |> post_process()
-    |> finalize()
-  end
-
-  @impl true
-  def process(%Dispatch{category: "celsius", filter_extra: [_ident, _status]} = msg) do
+  def process(%Dispatch{category: "celsius", filter_extra: [_ident, "ok"]} = msg) do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
     Logger.debug("#{inspect(msg.filter_extra)} ==> #{inspect(msg.data, pretty: true)}")
 
@@ -50,6 +34,18 @@ defmodule Sally.Immutable.Handler do
     |> finalize()
   end
 
+  # ident encountered an error
+  @impl true
+  def process(%Dispatch{category: "celsius", filter_extra: [ident, "error"]} = msg) do
+    Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
+    Logger.debug("#{inspect(msg.filter_extra)} ==> #{inspect(msg.data, pretty: true)}")
+
+    Betty.app_error(__MODULE__, ident: ident, immutable: true, hostname: msg.host.name)
+
+    msg
+    |> finalize()
+  end
+
   @impl true
   def post_process(%Dispatch{valid?: true} = msg) do
     msg
@@ -58,12 +54,12 @@ defmodule Sally.Immutable.Handler do
   @impl true
   def post_process(%Dispatch{valid?: false} = msg), do: msg
 
+  # (1 of 2) when no aliases add no datapoints
   def add_datapoint(_repo, %{aliases: []} = _changes, %Dispatch{}) do
-    # Logger.info("\n#{inspect(changes, pretty: true)}")
-
     {:ok, []}
   end
 
+  # (2 of 2) ident has an alias, add the datapoint
   def add_datapoint(repo, changes, %Dispatch{category: "celsius"} = msg) do
     alias Sally.Datapoint
 
