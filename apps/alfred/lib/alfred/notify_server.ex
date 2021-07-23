@@ -174,7 +174,7 @@ defmodule Alfred.Notify.Server do
 
   @impl true
   def handle_info({:missing, %NotifyTo{} = nt}, %State{} = s) do
-    Logger.info("MISSING\n#{inspect(nt, pretty: true)}")
+    Logger.debug("MISSING\n#{inspect(nt, pretty: true)}")
 
     Betty.app_error(__MODULE__, name: nt.name, missing: true)
 

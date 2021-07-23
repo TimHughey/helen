@@ -50,7 +50,7 @@ defmodule Sally.Host do
   end
 
   def boot_payload_data(%Schema{} = h) do
-    file = [System.get_env("RUTH_TOML", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
+    file = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
 
     Toml.decode_file!(file)
   end
@@ -129,7 +129,7 @@ defmodule Sally.Host do
   defp validate_profile_exists(%Ecto.Changeset{} = cs) do
     alias Ecto.Changeset
 
-    profile_dir = [System.get_env("RUTH_TOML", "/tmp"), "profiles"] |> Path.join()
+    profile_dir = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles"] |> Path.join()
 
     case Changeset.fetch_field(cs, :profile) do
       {_src, profile} ->

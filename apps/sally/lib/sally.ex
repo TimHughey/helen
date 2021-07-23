@@ -52,8 +52,9 @@ defmodule Sally do
   defdelegate newest_device, to: Device, as: :newest
 
   # required as callback from Alfred
-
+  # function head
   def status(type, name, opts \\ [])
+
   # (1 of 2) handle mutable devices
   def status(:mutable, name, opts), do: Sally.Mutable.status(name, opts)
 

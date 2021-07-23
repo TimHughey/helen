@@ -26,6 +26,18 @@ defmodule Alfred.ExecResult do
 
   def error(name, rc), do: %ExecResult{name: name, rc: rc}
 
+  def from_cmd(%ExecCmd{} = ec, opts) do
+    %ExecResult{
+      name: ec.name,
+      rc: opts[:rc] || :ok,
+      cmd: ec.cmd,
+      refid: opts[:refid],
+      track_timeout_ms: opts[:track_timeout_ms],
+      will_notify_when_released: if(is_boolean(opts[:will_notify]), do: opts[:will_notify], else: false),
+      instruct: opts[:instruct]
+    }
+  end
+
   def from_status(%MutableStatus{} = status) do
     case status do
       %MutableStatus{ttl_expired?: true} -> ttl_expired(status)

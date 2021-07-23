@@ -7,4 +7,4 @@ Sally provides support for [Ruth]([https://github.com/TimHughey/ruth):
 
 ##### Environmnet Variables Required
 
-- `RUTH_TOML` path to directory containing `profiles` and `binders`
+- `RUTH_CONFIG_PATH` path to directory containing `profiles` and `binders`
