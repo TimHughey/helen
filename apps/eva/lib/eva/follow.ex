@@ -58,13 +58,14 @@ defmodule Eva.Follow do
   require Logger
 
   alias __MODULE__
+  alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.ImmutableStatus, as: ImmStatus
   alias Alfred.MutableStatus, as: MutStatus
   alias Alfred.NotifyMemo, as: Memo
-  alias Alfred.NotifyTo
   alias Broom.TrackerEntry
   alias Eva.Equipment
   alias Eva.Follow.{Follower, Leader}
+  alias Eva.Names
   alias Eva.Opts
 
   defstruct name: nil,
@@ -78,7 +79,6 @@ defmodule Eva.Follow do
             valid?: true
 
   @type mode() :: :init | :raising | :idle | :lowering | :standby
-  @type value_key() :: atom()
   @type t :: %Follow{
           name: String.t(),
           mod: module(),
@@ -137,43 +137,31 @@ defmodule Eva.Follow do
 
   # (x of x) an issue exists
   def control(%Follow{} = vf, %Memo{} = memo, mode) do
+    alias Alfred.ImmutableStatus, as: ImmStatus
+    alias Alfred.MutableStatus, as: MutStatus
+
     tags = [variant: vf.name, mode: mode]
     Betty.app_error(vf.mod, tags ++ [control: true])
 
-    if vf.equipment.ttl_expired? do
+    Logger.debug("\n#{inspect(memo, pretty: true)}\n#{inspect(memo, pretty: true)}")
+
+    if vf.equipment.status |> MutStatus.ttl_expired?() do
       Betty.app_error(vf.mod, tags ++ [equipment: vf.equipment.name, ttl_expired: true])
     end
 
-    if vf.leader.ttl_expired? do
+    if vf.leader.status |> ImmStatus.ttl_expired?() do
       Betty.app_error(vf.mod, tags ++ [leader: vf.leader.name, ttl_expired: true])
     end
 
-    if vf.follower.ttl_expired? do
+    if vf.follower.status |> ImmStatus.ttl_expired?() do
       Betty.app_error(vf.mod, tags ++ [follower: vf.follower.name, ttl_expired: true])
     end
-
-    Logger.info("\n#{inspect(memo, pretty: true)}\n#{inspect(memo, pretty: true)}")
 
     vf
   end
 
-  def find_devices(%Follow{} = vf) do
-    # get a copy of the names to find
-    to_find = vf.names.needed
-
-    # clear the needed names.  needed names not found will be accumulated
-    vf = %Follow{vf | names: %{vf.names | needed: []}}
-
-    for name <- to_find, reduce: vf do
-      %Follow{} = vf ->
-        # we want all notifications and to restart when Alfred restarts
-        reg_rc = Alfred.notify_register(name, frequency: :all, link: true)
-
-        case reg_rc do
-          {:ok, %NotifyTo{} = nt} -> vf |> add_found_name(name) |> add_notify_name(nt)
-          _ -> add_needed_name(vf, name)
-        end
-    end
+  def execute(%Follow{} = vf, %ExecCmd{cmd: cmd} = ec, _from) when cmd in ["on", "off"] do
+    {vf, ExecResult.from_cmd(ec, rc: :unsupported)}
   end
 
   def handle_notify(%Follow{} = vf, %Memo{} = _momo, :starting), do: vf
@@ -199,49 +187,33 @@ defmodule Eva.Follow do
     te |> Equipment.handle_release(vf.equipment) |> update(vf)
   end
 
-  def mode(%Follow{} = vf, mode) do
-    %Follow{vf | mode: mode} |> adjust_mode_as_needed()
+  def mode(%Follow{mode: prev_mode} = vf, mode) do
+    vf = %Follow{vf | mode: mode}
+    fake_memo = %Memo{name: vf.equipment.name}
+
+    case {vf, mode} do
+      {vf, mode} when mode == prev_mode -> vf
+      {vf, :resume} -> vf |> control(fake_memo, :ready)
+      {vf, :standby} -> vf |> control(fake_memo, :standby)
+      {vf, _mode} -> vf
+    end
   end
 
-  def new(%Follow{} = vf, %Opts{} = opts, extra_opts) do
-    x = extra_opts[:cfg]
+  def new(%Opts{} = opts, extra_opts) do
+    cfg = extra_opts[:cfg]
+
+    leader = Leader.new(cfg)
+    follower = Follower.new(cfg)
+    equipment = Equipment.new(cfg)
 
     %Follow{
-      vf
-      | name: x[:name],
-        mod: opts.server.name,
-        leader: Leader.new(x),
-        follower: Follower.new(x),
-        equipment: Equipment.new(x),
-        names: %{needed: [], found: []},
-        notifies: %{},
-        valid?: true
+      name: cfg[:name],
+      mod: opts.server.name,
+      leader: leader,
+      follower: follower,
+      equipment: equipment,
+      names: Names.new([leader.name, follower.name, equipment.name])
     }
-    |> make_needed_names()
-  end
-
-  defp add_found_name(vf, name) do
-    %Follow{vf | names: %{vf.names | found: [name] ++ vf.names.found}}
-  end
-
-  defp add_needed_name(vf, name) do
-    %Follow{vf | names: %{vf.names | needed: [name] ++ vf.names.needed}}
-  end
-
-  defp add_notify_name(vf, %NotifyTo{} = nt) do
-    %Follow{vf | notifies: put_in(vf.notifies, [nt.ref], nt.name)}
-  end
-
-  # (1 of 2) handle standby mode; ensure equipment is off
-  defp adjust_mode_as_needed(%Follow{mode: :standby} = vf),
-    do: vf.equipment |> Equipment.off() |> update(vf)
-
-  # (2 of 2) no action necessary
-  defp adjust_mode_as_needed(vf), do: vf
-
-  defp make_needed_names(vf) do
-    needed = [vf.leader.name, vf.follower.name, vf.equipment.name]
-    %Follow{vf | names: %{vf.names | needed: needed}}
   end
 
   # (1 of 3) update equipment
@@ -251,17 +223,15 @@ defmodule Eva.Follow do
 end
 
 defimpl Eva.Variant, for: Eva.Follow do
+  alias Alfred.ExecCmd
   alias Alfred.NotifyMemo, as: Memo
   alias Broom.TrackerEntry
-  alias Eva.{Follow, Opts}
+  alias Eva.Follow
 
   def control(%Follow{} = vf, %Memo{} = memo, mode), do: Follow.control(vf, memo, mode)
-  def current_mode(%Follow{} = vf), do: vf.mode
-  def find_devices(%Follow{} = vf), do: Follow.find_devices(vf)
-  def found_all_devs?(%Follow{} = v), do: v.names.needed == []
+  def execute(%Follow{} = vf, %ExecCmd{} = ec, from), do: Follow.execute(vf, ec, from)
+  def handle_instruct(variant, _instruct), do: variant
   def handle_notify(%Follow{} = vf, %Memo{} = memo, mode), do: Follow.handle_notify(vf, memo, mode)
   def handle_release(%Follow{} = vf, %TrackerEntry{} = te), do: Follow.handle_release(vf, te)
   def mode(%Follow{} = vf, mode), do: Follow.mode(vf, mode)
-  def new(%Follow{} = vf, %Opts{} = opts, extra_opts), do: Follow.new(vf, opts, extra_opts)
-  def valid?(%Follow{} = v), do: v.valid?
 end

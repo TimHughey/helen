@@ -4,6 +4,7 @@ defmodule Eva do
   @type eva_child_spec_opts() :: map() | keyword()
   @callback child_spec(eva_child_spec_opts()) :: Supervisor.child_spec()
   @callback kill() :: pid()
+  # @callback status() :: %Alfred.MutableStatus{}
 
   defmacro __using__(use_opts) do
     # here we inject code into the using module so it can be started in a supervision tree
@@ -18,10 +19,12 @@ defmodule Eva do
 
       def current_mode, do: Eva.current_mode(unquote(__CALLER__.module))
       def equipment, do: Eva.equipment(unquote(__CALLER__.module))
+      def execute(%Alfred.ExecCmd{} = ec), do: Eva.execute(unquote(__CALLER__.module), ec)
       def kill, do: Eva.kill(unquote(__CALLER__.module))
       def resume, do: Eva.resume(unquote(__CALLER__.module))
       def standby, do: Eva.standby(unquote(__CALLER__.module))
       def state, do: Eva.state(unquote(__CALLER__.module))
+      def status(:mutable, name, opts), do: Eva.status(unquote(__CALLER__.module), name, opts)
     end
   end
 
@@ -37,6 +40,12 @@ defmodule Eva do
 
   def equipment(mod) do
     GenServer.call(mod, :equipment)
+  rescue
+    _ -> :no_server
+  end
+
+  def execute(mod, ec) do
+    GenServer.call(mod, ec)
   rescue
     _ -> :no_server
   end
@@ -80,5 +89,12 @@ defmodule Eva do
     GenServer.whereis(mod) |> :sys.get_state()
   rescue
     _ -> :no_server
+  end
+
+  def status(mod, name, opts) do
+    GenServer.call(mod, {:status, name, opts})
+  rescue
+    _ ->
+      :no_server
   end
 end

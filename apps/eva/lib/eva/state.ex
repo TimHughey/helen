@@ -2,17 +2,25 @@ defmodule Eva.State do
   require Logger
 
   alias __MODULE__
-  alias Eva.{Follow, Opts}
-  alias Eva.Variant
+  alias Eva.{Equipment, Follow, InRange, Opts, TimedCmd, Variant}
 
-  defstruct opts: nil, variant: nil, mode: :starting, started_at: nil
+  defstruct opts: nil, variant: nil, mode: :starting, started_at: nil, seen_at: nil
 
+  @type server_mode() :: :starting | :finding_names | :ready | :standby
   @type t :: %__MODULE__{
           opts: %Opts{},
-          variant: Variant.InRange.t() | Follow.t() | Variant.Invalid.t(),
-          mode: :starting | :ready | :standby,
-          started_at: DateTime.t()
+          variant: InRange.t() | Follow.t() | TimedCmd.t(),
+          mode: server_mode(),
+          started_at: DateTime.t(),
+          seen_at: DateTime.t()
         }
+
+  def just_saw(%State{} = s) do
+    Alfred.JustSaw.new(s.opts.server.name, :mutable, %{name: s.variant.name, ttl_ms: 60_000})
+    |> Alfred.just_saw_cast()
+
+    %State{s | seen_at: DateTime.utc_now()}
+  end
 
   def load_config(%State{opts: %Opts{} = opts} = s) do
     toml_rc = opts.toml_file |> Toml.decode_file(keys: :atoms)
@@ -32,8 +40,15 @@ defmodule Eva.State do
   end
 
   def mode(%State{} = s, mode) do
-    %State{s | mode: mode}
+    case mode do
+      :resume -> %State{s | mode: :ready}
+      x -> %State{s | mode: x}
+    end
   end
 
-  def update_variant(v, %State{} = s), do: %State{s | variant: v}
+  def update(%{equipment: %Equipment{}} = v, %State{} = s), do: %State{s | variant: v}
+
+  def update_variant(v, %State{} = s) do
+    %State{s | variant: v}
+  end
 end

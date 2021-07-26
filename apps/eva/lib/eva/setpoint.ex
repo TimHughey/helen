@@ -30,13 +30,13 @@ defmodule Eva.Setpoint do
   require Logger
 
   alias __MODULE__
+  alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.ImmutableStatus, as: ImmStatus
   alias Alfred.MutableStatus, as: MutStatus
   alias Alfred.NotifyMemo, as: Memo
   alias Alfred.NotifyTo
   alias Broom.TrackerEntry
-  alias Eva.Equipment
-  alias Eva.Opts
+  alias Eva.{Equipment, Names, Opts}
   alias Eva.Setpoint.Leader
 
   defstruct name: nil,
@@ -60,7 +60,7 @@ defmodule Eva.Setpoint do
           leader: Leader.t(),
           equipment: Equipment.t(),
           names: %{needed: list(), found: list()},
-          notifies: %{required(reference()) => Alfred.NotifyTo.t()},
+          notifies: %{required(reference()) => NotifyTo.t()},
           mode: mode(),
           valid?: boolean()
         }
@@ -73,7 +73,7 @@ defmodule Eva.Setpoint do
           leader: %Leader{status: %ImmStatus{good?: true} = leader, datapoint: datapoint},
           equipment:
             %Equipment{impact: :raises, name: equip_name, status: %MutStatus{good?: true}} = equipment
-        } = vf,
+        } = v,
         %Memo{name: memo_name},
         :ready
       )
@@ -82,152 +82,119 @@ defmodule Eva.Setpoint do
 
     cond do
       diff <= low_pt ->
-        equipment |> Equipment.on() |> update(vf) |> Setpoint.mode(:raising)
+        equipment |> Equipment.on() |> update(v) |> Setpoint.mode(:raising)
 
       diff >= high_pt ->
-        equipment |> Equipment.off() |> update(vf) |> Setpoint.mode(:idle)
+        equipment |> Equipment.off() |> update(v) |> Setpoint.mode(:idle)
 
       diff > low_pt and diff < high_pt ->
-        equipment |> Equipment.off() |> update(vf) |> Setpoint.mode(:idle)
+        equipment |> Equipment.off() |> update(v) |> Setpoint.mode(:idle)
     end
   end
 
   # (2 of x) server is in standby mode; ensure equipment is off
   def control(
-        %Setpoint{equipment: %Equipment{name: equip_name}} = vf,
+        %Setpoint{equipment: %Equipment{name: equip_name}} = v,
         %Memo{name: memo_name},
         :standby
       )
       when memo_name == equip_name do
-    vf.equipment |> Equipment.off() |> update(vf) |> mode(:standby)
+    v.equipment |> Equipment.off() |> update(v) |> mode(:standby)
   end
 
   # (3 of x) quietly ignore requests to control equipment when notify is for sensors
-  def control(%Setpoint{equipment: %Equipment{name: equip_name}} = vf, %Memo{name: memo_name}, :ready)
+  def control(%Setpoint{equipment: %Equipment{name: equip_name}} = v, %Memo{name: memo_name}, :ready)
       when equip_name != memo_name,
-      do: vf
+      do: v
 
   # (4 of x) quietly ignore requests to control equipment while initializing or in standby
-  def control(%Setpoint{mode: vmode} = vf, %Memo{}, _mode) when vmode in [:init, :standby], do: vf
+  def control(%Setpoint{mode: vmode} = v, %Memo{}, _mode) when vmode in [:init, :standby], do: v
 
   # (x of x) an issue exists
-  def control(%Setpoint{} = vf, %Memo{}, mode) do
-    tags = [variant: vf.name, mode: mode]
-    Betty.app_error(vf.mod, tags ++ [control: true])
+  def control(%Setpoint{} = v, %Memo{}, mode) do
+    tags = [variant: v.name, mode: mode]
+    Betty.app_error(v.mod, tags ++ [control: true])
 
-    if vf.equipment.ttl_expired? do
-      Betty.app_error(vf.mod, tags ++ [equipment: vf.equipment.name, ttl_expired: true])
+    if v.equipment.ttl_expired? do
+      Betty.app_error(v.mod, tags ++ [equipment: v.equipment.name, ttl_expired: true])
     end
 
-    if vf.leader.ttl_expired? do
-      Betty.app_error(vf.mod, tags ++ [leader: vf.leader.name, ttl_expired: true])
+    if v.leader.ttl_expired? do
+      Betty.app_error(v.mod, tags ++ [leader: v.leader.name, ttl_expired: true])
     end
 
-    vf
+    v
   end
 
-  def find_devices(%Setpoint{} = vf) do
-    # get a copy of the names to find
-    to_find = vf.names.needed
-
-    # clear the needed names.  needed names not found will be accumulated
-    vf = %Setpoint{vf | names: %{vf.names | needed: []}}
-
-    for name <- to_find, reduce: vf do
-      %Setpoint{} = vf ->
-        # we want all notifications and to restart when Alfred restarts
-        reg_rc = Alfred.notify_register(name, frequency: :all, link: true)
-
-        case reg_rc do
-          {:ok, %NotifyTo{} = nt} -> vf |> add_found_name(name) |> add_notify_name(nt)
-          _ -> add_needed_name(vf, name)
-        end
-    end
+  def execute(%Setpoint{} = vs, %ExecCmd{} = _ec, _from) do
+    {vs, %ExecResult{}}
   end
 
-  def handle_notify(%Setpoint{} = vf, %Memo{} = _momo, :starting), do: vf
+  def handle_notify(%Setpoint{} = v, %Memo{} = _momo, :starting), do: v
 
-  def handle_notify(%Setpoint{} = vf, %Memo{} = memo, _mode) do
+  def handle_notify(%Setpoint{} = v, %Memo{} = memo, _mode) do
     cond do
-      memo.name == vf.leader.name ->
-        Leader.update_status(vf.leader) |> update(vf)
+      memo.name == v.leader.name ->
+        Leader.update_status(v.leader) |> update(v)
 
-      memo.name == vf.equipment.name ->
-        Equipment.update_status(vf.equipment) |> update(vf)
+      memo.name == v.equipment.name ->
+        Equipment.update_status(v.equipment) |> update(v)
     end
   end
 
-  def handle_release(%Setpoint{} = vf, %TrackerEntry{} = te) do
+  def handle_release(%Setpoint{} = v, %TrackerEntry{} = te) do
     fields = [cmd: te.cmd]
-    tags = [module: vf.mod, equipment: true, device: vf.equipment.name, impact: vf.mode]
+    tags = [module: v.mod, equipment: true, device: v.equipment.name, impact: v.mode]
     Betty.metric("eva", fields, tags)
 
-    te |> Equipment.handle_release(vf.equipment) |> update(vf)
+    te |> Equipment.handle_release(v.equipment) |> update(v)
   end
 
-  def mode(%Setpoint{} = vf, mode) do
-    %Setpoint{vf | mode: mode} |> adjust_mode_as_needed()
+  def mode(%Setpoint{} = v, mode) do
+    %Setpoint{v | mode: mode} |> adjust_mode_as_needed()
   end
 
-  def new(%Setpoint{} = vf, %Opts{} = opts, extra_opts) do
+  def new(%Opts{} = opts, extra_opts) do
     x = extra_opts[:cfg]
 
+    leader = Leader.new(x)
+    equipment = Equipment.new(x)
+
+    default = %Setpoint{}
+
     %Setpoint{
-      vf
-      | name: x[:name],
-        mod: opts.server.name,
-        setpoint: x[:setpoint],
-        range: x[:range] || vf.range,
-        leader: Leader.new(x),
-        equipment: Equipment.new(x),
-        names: %{needed: [], found: []},
-        notifies: %{},
-        valid?: true
+      name: x[:name],
+      mod: opts.server.name,
+      setpoint: x[:setpoint],
+      range: x[:range] || default.range,
+      leader: leader,
+      equipment: equipment,
+      names: Names.new([leader.name, equipment.name])
     }
-    |> make_needed_names()
-  end
-
-  defp add_found_name(vf, name) do
-    %Setpoint{vf | names: %{vf.names | found: [name] ++ vf.names.found}}
-  end
-
-  defp add_needed_name(vf, name) do
-    %Setpoint{vf | names: %{vf.names | needed: [name] ++ vf.names.needed}}
-  end
-
-  defp add_notify_name(vf, %NotifyTo{} = nt) do
-    %Setpoint{vf | notifies: put_in(vf.notifies, [nt.ref], nt.name)}
   end
 
   # (1 of 2) handle standby mode; ensure equipment is off
-  defp adjust_mode_as_needed(%Setpoint{mode: :standby} = vf),
-    do: vf.equipment |> Equipment.off() |> update(vf)
+  defp adjust_mode_as_needed(%Setpoint{mode: :standby} = v),
+    do: v.equipment |> Equipment.off() |> update(v)
 
   # (2 of 2) no action necessary
-  defp adjust_mode_as_needed(vf), do: vf
-
-  defp make_needed_names(vf) do
-    needed = [vf.leader.name, vf.equipment.name]
-    %Setpoint{vf | names: %{vf.names | needed: needed}}
-  end
+  defp adjust_mode_as_needed(v), do: v
 
   # (1 of 3) update equipment
-  defp update(%Equipment{} = x, %Setpoint{} = vf), do: %Setpoint{vf | equipment: x}
-  defp update(%Leader{} = x, %Setpoint{} = vf), do: %Setpoint{vf | leader: x}
+  defp update(%Equipment{} = x, %Setpoint{} = v), do: %Setpoint{v | equipment: x}
+  defp update(%Leader{} = x, %Setpoint{} = v), do: %Setpoint{v | leader: x}
 end
 
 defimpl Eva.Variant, for: Eva.Setpoint do
+  alias Alfred.ExecCmd
   alias Alfred.NotifyMemo, as: Memo
   alias Broom.TrackerEntry
-  alias Eva.{Setpoint, Opts}
+  alias Eva.Setpoint
 
-  def control(%Setpoint{} = vf, %Memo{} = memo, mode), do: Setpoint.control(vf, memo, mode)
-  def current_mode(%Setpoint{} = vf), do: vf.mode
-  def find_devices(%Setpoint{} = vf), do: Setpoint.find_devices(vf)
-  def found_all_devs?(%Setpoint{} = v), do: v.names.needed == []
-  def handle_notify(%Setpoint{} = vf, %Memo{} = memo, mode), do: Setpoint.handle_notify(vf, memo, mode)
-  def handle_release(%Setpoint{} = vf, %TrackerEntry{} = te), do: Setpoint.handle_release(vf, te)
-  def mode(%Setpoint{} = vf, mode), do: Setpoint.mode(vf, mode)
-  def new(%Setpoint{} = vf, %Opts{} = opts, extra_opts), do: Setpoint.new(vf, opts, extra_opts)
-  def valid?(%Setpoint{} = v), do: v.valid?
+  def control(%Setpoint{} = v, %Memo{} = memo, mode), do: Setpoint.control(v, memo, mode)
+  def execute(%Setpoint{} = v, %ExecCmd{} = ec, from), do: Setpoint.execute(v, ec, from)
+  def handle_instruct(variant, _instruct), do: variant
+  def handle_notify(%Setpoint{} = v, %Memo{} = memo, mode), do: Setpoint.handle_notify(v, memo, mode)
+  def handle_release(%Setpoint{} = v, %TrackerEntry{} = te), do: Setpoint.handle_release(v, te)
+  def mode(%Setpoint{} = v, mode), do: Setpoint.mode(v, mode)
 end

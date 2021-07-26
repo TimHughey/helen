@@ -2,9 +2,11 @@ defmodule Eva.Server do
   require Logger
 
   alias __MODULE__
+  alias Alfred.{ExecCmd, ExecResult}
+  alias Alfred.MutableStatus, as: Status
   alias Alfred.NotifyMemo, as: Memo
   alias Broom.TrackerEntry
-  alias Eva.{Opts, State, Variant}
+  alias Eva.{Names, Opts, State, Variant}
 
   use GenServer
 
@@ -12,14 +14,14 @@ defmodule Eva.Server do
   def init(%Opts{} = opts) do
     s = State.new(opts) |> State.load_config()
 
-    if s.variant.valid? do
+    if is_struct(s.variant) and s.variant.valid? do
       # a device can only be found and registered for notifications once known
       # by Alfred (e.g. device was seen and has become a KnownName).  as such, drop into
       # a series of info messages to poll for (aka find) the devices.  this is only necessary
       # after a cold start when Alfred hasn't seen any names yet.
-      {:ok, s, {:continue, :find_devs}}
+      {:ok, s, {:continue, :register_self}}
     else
-      {:stop, s.variant.invalid_reason}
+      {:stop, s.variant}
     end
   end
 
@@ -33,29 +35,78 @@ defmodule Eva.Server do
   def handle_call(:current_mode, _from, %State{} = s), do: s.mode |> reply(s)
 
   @impl true
-  def handle_call(:equipment, _from, %State{} = s), do: Variant.current_mode(s.variant) |> reply(s)
+  def handle_call(:equipment, _from, %State{variant: %_{mode: mode}} = s), do: mode |> reply(s)
 
   @impl true
-  def handle_call(mode, _from, %State{} = s) when mode in [:standby, :resume] do
+  def handle_call({:status, name, _opts}, _from, %State{} = s) do
+    %Status{
+      name: name,
+      good?: true,
+      cmd: Atom.to_string(s.mode),
+      cmd_extra: s.variant,
+      status_at: DateTime.utc_now()
+    }
+    |> reply(s)
+  end
+
+  @impl true
+  def handle_call(mode, _from, %State{mode: server_mode} = s)
+      when mode in [:standby, :resume] and server_mode in [:ready, :standby] do
     # reused startup logic by invoking handle_continue/2
     {:reply, :ok, s, {:continue, mode}}
   end
 
   @impl true
+  def handle_call(%ExecCmd{} = ec, _from, %State{mode: mode} = s) when mode in [:starting, :finding_names] do
+    result = ExecResult.from_cmd(ec, rc: mode)
+
+    {:reply, result, s}
+  end
+
+  @impl true
+  def handle_call(%ExecCmd{cmd: cmd} = ec, _from, %State{} = s) when cmd in ["standby", "resume"] do
+    mode = String.to_atom(cmd)
+    result = ExecResult.from_cmd(ec, [])
+
+    {:reply, result, s, {:continue, mode}}
+  end
+
+  @impl true
+  def handle_call(%ExecCmd{} = ec, from, %State{} = s) do
+    {variant, response} = s.variant |> Variant.execute(ec, from)
+
+    variant
+    |> State.update(s)
+    |> reply(response)
+  end
+
+  @impl true
   # called once at start-up,
-  def handle_continue(:find_devs, %State{} = s), do: handle_info(:find_devs, s)
+  def handle_continue(:find_names, %State{} = s), do: handle_info(:find_names, State.mode(s, :finding_names))
+
+  @impl true
+  def handle_continue(:register_self, %State{} = s) do
+    s
+    |> State.just_saw()
+    |> noreply_continue(:find_names)
+  end
 
   @impl true
   # called once all devices are found and registered for notifications
   def handle_continue(mode, %State{} = s) when mode in [:ready, :resume, :standby] do
+    # NOTE  direct update to variant
     case mode do
-      x when x in [:ready, :resume] ->
-        State.mode(s, :ready)
-
-      :standby ->
-        s.variant |> Variant.mode(:standby) |> State.update_variant(s) |> State.mode(:standby)
+      :ready -> %{s.variant | mode: mode} |> State.update(s) |> State.mode(:ready)
+      x -> %{s.variant | mode: mode} |> State.update(s) |> State.mode(x)
     end
     |> noreply()
+  end
+
+  # ignore notifies while initializing or finding names
+  @impl true
+  def handle_info({Alfred, :notify, %Memo{}}, %State{mode: mode} = s)
+      when mode in [:starting, :finding_names] do
+    noreply(s)
   end
 
   @impl true
@@ -63,7 +114,8 @@ defmodule Eva.Server do
     s.variant
     |> Variant.handle_notify(memo, s.mode)
     |> Variant.control(memo, s.mode)
-    |> State.update_variant(s)
+    |> State.update(s)
+    |> State.just_saw()
     |> noreply()
   end
 
@@ -71,24 +123,31 @@ defmodule Eva.Server do
   def handle_info({Broom, :release, %TrackerEntry{} = te}, %State{} = s) do
     s.variant
     |> Variant.handle_release(te)
-    |> State.update_variant(s)
+    |> State.update(s)
     |> noreply()
   end
 
   @impl true
-  # called repeatedly until all devices are found
-  # it is possble this is only called once if Alfred already knows the devices required
-  def handle_info(:find_devs, %State{} = s) do
-    s = Variant.find_devices(s.variant) |> State.update_variant(s)
+  def handle_info(:find_names, %State{variant: %_{names: names, notifies: _}} = s) do
+    {names, notifies} = Names.find_and_register(names)
 
-    if Variant.found_all_devs?(s.variant) do
+    # NOTE:  direct update to expected variant struct elements
+    s = %{s.variant | names: names, notifies: notifies} |> State.update(s) |> State.mode(:finding_names)
+
+    if Names.all_found?(names) do
       # good, all devices have been located, move to the initial mode
       s |> noreply_continue(s.opts.initial_mode)
     else
+      # all names not found, keep looking after a delay
       server = Opts.server_name(s.opts)
-      Process.send_after(server, :find_devs, 1900)
+      Process.send_after(server, :find_names, 1900)
       noreply(s)
     end
+  end
+
+  @impl true
+  def handle_info({:instruct, instruct}, %State{} = s) do
+    s.variant |> Variant.handle_instruct(instruct) |> State.update(s) |> noreply()
   end
 
   ##
