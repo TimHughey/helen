@@ -12,6 +12,19 @@ defmodule Alfred do
 
   defdelegate delete(name), to: Names
 
+  def execute(name, opts) when is_binary(name) and is_list(opts) do
+    default = %ExecCmd{}
+
+    %ExecCmd{
+      name: name,
+      cmd: opts[:cmd],
+      cmd_params: opts[:params] || default.cmd_params,
+      cmd_opts: opts[:cmd_opts] || default.cmd_opts,
+      pub_opts: opts[:pub_opts] || default.pub_opts
+    }
+    |> execute()
+  end
+
   def execute(%ExecCmd{} = ec) do
     case Names.lookup(ec.name) do
       %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.execute(ec)
