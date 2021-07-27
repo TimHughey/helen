@@ -20,7 +20,7 @@ defmodule Eva.TimedCmd.Instruct do
 
   @type t :: %Instruct{
           name: String.t(),
-          from: GenServer.from(),
+          from: pid(),
           cmd: String.t(),
           nowait: boolean(),
           for_ms: pos_integer(),
@@ -28,15 +28,21 @@ defmodule Eva.TimedCmd.Instruct do
           ref: reference(),
           timer: reference() | nil,
           expired?: boolean(),
-          exec_result: ExecResult.t() | nil | :released,
+          exec_result: ExecResult.t(),
           ledger: Ledger.t()
         }
 
   def completed(%Instruct{ledger: ledger} = instruct) do
+    # once a command is complete, unlink the processes
+    if is_pid(instruct.from), do: Process.unlink(instruct.from)
+
     %Instruct{instruct | ledger: Ledger.completed(ledger)}
   end
 
   def execute(%Instruct{} = x) do
+    # link the processes while executing a command
+    if is_pid(x.from), do: Process.link(x.from)
+
     result = %ExecCmd{name: x.name, cmd: x.cmd, cmd_opts: [notify_when_released: true]} |> Alfred.execute()
 
     Logger.debug("\n#{inspect(result, pretty: true)}")
@@ -81,6 +87,10 @@ defmodule Eva.TimedCmd.Instruct do
     end
   end
 
+  def force(equipment_name, cmd) do
+    %Instruct{name: equipment_name, cmd: cmd, ref: make_ref(), ledger: Ledger.new()}
+  end
+
   def new(equipment_name, %ExecCmd{} = ec, {pid, _tag} = _from) do
     default = %Instruct{}
 
@@ -96,15 +106,11 @@ defmodule Eva.TimedCmd.Instruct do
     }
   end
 
-  def prime(equipment_name) do
-    %Instruct{name: equipment_name, cmd: "off", ref: make_ref(), ledger: Ledger.new()}
-  end
-
   def released(%Instruct{exec_result: %ExecResult{refid: refid}} = instruct, %TrackerEntry{
         refid: tracked_refid
       })
       when refid == tracked_refid do
-    %Instruct{instruct | exec_result: :released, ledger: Ledger.released(instruct.ledger)}
+    %Instruct{instruct | ledger: Ledger.released(instruct.ledger)}
     |> schedule_timer()
     |> tap(fn x -> Logger.debug("\n#{inspect(x, pretty: true)}") end)
   end
@@ -127,10 +133,11 @@ defmodule Eva.TimedCmd do
 
   alias __MODULE__
   alias Alfred.{ExecCmd, ExecResult}
+  alias Alfred.MutableStatus, as: MutStatus
   alias Alfred.NotifyMemo, as: Memo
   alias Alfred.NotifyTo
   alias Broom.TrackerEntry
-  alias Eva.{Equipment, Names, Opts}
+  alias Eva.{Equipment, Ledger, Names, Opts}
   alias Eva.TimedCmd.Instruct
 
   defstruct name: nil,
@@ -154,13 +161,44 @@ defmodule Eva.TimedCmd do
           valid?: boolean()
         }
 
-  def control(%TimedCmd{instruct: nil} = tc, %Memo{}, _mode) do
-    instruct = Instruct.prime(tc.equipment.name) |> Instruct.execute()
+  # the control code path for TimedCmd provides a failsafe to ensure the equipment
+  # matches the desired cmd.
 
-    update(tc, instruct)
+  # NOTE this failsafe check only occurs for each notify from the equipment.
+  # so there can be up to the interval between notifies when the equipment cmd is out of sync with
+  # the expected command.
+
+  # (1 of 3) executed once at startup to initialize the current instruct to the equipment
+  def control(
+        %TimedCmd{instruct: nil, equipment: %Equipment{status: %MutStatus{good?: true, cmd: cmd}}} = tc,
+        %Memo{},
+        _mode
+      ) do
+    Instruct.force(tc.equipment.name, cmd) |> Instruct.execute() |> update(tc)
   end
 
+  # (2 of 3) failsafe: revert the equipment to the expected cmd if a mismatch occurs and the
+  #          current Instruct is marked as complete
+  def control(
+        %TimedCmd{
+          instruct: %Instruct{cmd: icmd, ledger: %Ledger{completed_at: %DateTime{}}},
+          equipment: %Equipment{status: %MutStatus{cmd: ecmd, good?: true}}
+        } = tc,
+        %Memo{},
+        :ready
+      )
+      when icmd != ecmd do
+    Betty.app_error(tc.mod, [mismatch: true] ++ app_error_base_tags(tc))
+
+    Instruct.force(tc.equipment.name, icmd) |> Instruct.execute() |> update(tc)
+  end
+
+  # (3 of 3) report app errors or fall through
   def control(%TimedCmd{} = tc, %Memo{}, _mode) do
+    if tc.equipment.status |> MutStatus.ttl_expired?() do
+      Betty.app_error(tc.mod, [ttl_expired: true] ++ app_error_base_tags(tc))
+    end
+
     tc
   end
 
@@ -225,7 +263,9 @@ defmodule Eva.TimedCmd do
     }
   end
 
-  # defp change_token(%TimedCmd{} = v), do: %TimedCmd{v | token: make_ref()}
+  defp app_error_base_tags(%TimedCmd{} = tc) do
+    [variant: tc.name, mode: tc.mode, control: true, mismatch: true, equipment: tc.equipment.name]
+  end
 
   defp update(%Equipment{} = x, %TimedCmd{} = v), do: %TimedCmd{v | equipment: x}
   defp update(%Instruct{} = x, %TimedCmd{} = v), do: %TimedCmd{v | instruct: x}
