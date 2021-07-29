@@ -7,7 +7,7 @@ defmodule Sally.Mutable.Handler do
   alias __MODULE__
 
   alias Alfred.MutableStatus, as: MutStatus
-  alias Sally.{Command, DevAlias, Device, Execute, Immutable}
+  alias Sally.{Command, DevAlias, Device, Execute}
   alias Sally.Dispatch
 
   @impl true
@@ -93,7 +93,7 @@ defmodule Sally.Mutable.Handler do
   def post_process(%Dispatch{valid?: false} = msg), do: msg
 
   def align_status(repo, changes, %Dispatch{} = msg) do
-    alias Sally.Immutable
+    alias Sally.Mutable
 
     pins = msg.data.pins
     reported_at = msg.sent_at
@@ -101,7 +101,7 @@ defmodule Sally.Mutable.Handler do
     for dev_alias <- changes.aliases, reduce: {:ok, []} do
       {:ok, acc} ->
         cmd = pin_status(pins, dev_alias.pio)
-        status = Immutable.status(dev_alias.name, [])
+        status = Mutable.status(dev_alias.name, [])
         Logger.debug(inspect(status, pretty: true))
 
         case status do
@@ -112,6 +112,11 @@ defmodule Sally.Mutable.Handler do
           # accept the device reported cmd when our view of the cmd is unknown
           # (e.g. no cmd history, ttl is expired)
           %MutStatus{cmd: "unknown"} ->
+            cmd = Command.reported_cmd_changeset(dev_alias, cmd, reported_at) |> repo.insert!(returning: true)
+
+            {:ok, [cmd] ++ acc}
+
+          %MutStatus{cmd: local_cmd} when local_cmd != cmd ->
             cmd = Command.reported_cmd_changeset(dev_alias, cmd, reported_at) |> repo.insert!(returning: true)
 
             {:ok, [cmd] ++ acc}
