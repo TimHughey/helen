@@ -20,6 +20,16 @@ defmodule Sally do
   # required as callback from Alfred
   def execute(%ExecCmd{} = ec), do: Sally.Execute.cmd(ec)
 
+  def host_profile(hostname, profile_name) do
+    alias Sally.{Host, Repo}
+
+    case Host.find_by_name(hostname) do
+      %Host{profile: profile} when profile == profile_name -> :no_change
+      %Host{} = x -> Host.changeset(x, %{profile: profile_name}, [:profile]) |> Repo.update()
+      _ -> :not_found
+    end
+  end
+
   @doc """
   Create an alias to a device and pio
 

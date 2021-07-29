@@ -106,6 +106,7 @@ defmodule Sally.Host do
   def deauthorize(name), do: authorize(name, false)
 
   def find_by_ident(ident), do: Repo.get_by(Schema, ident: ident)
+  def find_by_name(name), do: Repo.get_by(Schema, name: name)
 
   def get_devices(%Schema{id: id}) do
     Repo.all(Sally.Device, host_id: id)
