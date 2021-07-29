@@ -19,7 +19,7 @@ defmodule Sally.Immutable.Handler do
   end
 
   @impl true
-  def process(%Dispatch{category: "celsius", filter_extra: [_ident, "ok"]} = msg) do
+  def process(%Dispatch{category: x, filter_extra: [_ident, "ok"]} = msg) when x in ["celsius", "relhum"] do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
     Logger.debug("#{inspect(msg.filter_extra)} ==> #{inspect(msg.data, pretty: true)}")
 
@@ -36,7 +36,7 @@ defmodule Sally.Immutable.Handler do
 
   # ident encountered an error
   @impl true
-  def process(%Dispatch{category: "celsius", filter_extra: [ident, "error"]} = msg) do
+  def process(%Dispatch{category: x, filter_extra: [ident, "error"]} = msg) when x in ["celsius", "relhum"] do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
     Logger.debug("#{inspect(msg.filter_extra)} ==> #{inspect(msg.data, pretty: true)}")
 
@@ -67,6 +67,18 @@ defmodule Sally.Immutable.Handler do
     datapoint = Ecto.build_assoc(dev_alias, :datapoints)
 
     changes = %{temp_c: msg.data[:val], reading_at: msg.sent_at}
+
+    {:ok, Datapoint.changeset(datapoint, changes) |> repo.insert!(returning: true)}
+  end
+
+  # (3 of 3) ident has an alias, add the relhum datapoint
+  def add_datapoint(repo, changes, %Dispatch{category: "relhum"} = msg) do
+    alias Sally.Datapoint
+
+    dev_alias = List.first(changes.aliases)
+    datapoint = Ecto.build_assoc(dev_alias, :datapoints)
+
+    changes = %{temp_c: msg.data[:temp_c], relhum: msg.data[:relhum], reading_at: msg.sent_at}
 
     {:ok, Datapoint.changeset(datapoint, changes) |> repo.insert!(returning: true)}
   end
