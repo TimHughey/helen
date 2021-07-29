@@ -59,6 +59,8 @@ defmodule Sally do
     end
   end
 
+  def move_device_aliases(src_ident, dest_ident), do: Sally.Device.move_aliases(src_ident, dest_ident)
+
   defdelegate newest_device, to: Device, as: :newest
 
   # required as callback from Alfred

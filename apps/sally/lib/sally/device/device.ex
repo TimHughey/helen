@@ -126,6 +126,20 @@ defmodule Sally.Device do
     Repo.preload(device, [:aliases])
   end
 
+  def move_aliases(src_ident, dest_ident) do
+    with {:src, %Schema{} = src_dev} <- {:src, find(src_ident)},
+         {:dest, %Schema{aliases: []} = dest_dev} <- {:dest, find(dest_ident)} do
+      dest_dev
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.put_assoc(:aliases, src_dev.aliases)
+      |> Repo.update()
+    else
+      %Schema{ident: ident} -> {:existing_aliases, ident}
+      {:src, _} -> {:not_found, src_ident}
+      {:dest, _} -> {:not_found, dest_ident}
+    end
+  end
+
   def newest do
     Ecto.Query.from(x in Schema, order_by: [desc: x.inserted_at], limit: 1)
     |> Repo.one()
