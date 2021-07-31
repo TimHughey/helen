@@ -4,7 +4,8 @@ config :sally, ecto_repos: [Sally.Repo]
 
 config :sally,
   mqtt_connection: [
-    handler: {Sally.Mqtt.Handler, [next_actions: [connected: [{:subscribe, "#{config_env()}/r/#", qos: 0}]]]},
+    handler:
+      {Sally.Mqtt.Handler, [next_actions: [connected: [{:subscribe, "#{config_env()}/r2/#", qos: 0}]]]},
     options: [topic: "#{config_env()}"],
     keep_alive: 36
   ]

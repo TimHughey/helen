@@ -87,7 +87,7 @@ defmodule Sally.Host.Instruct do
   defp add_mtime(%Instruct{} = msg), do: %Instruct{msg | mtime: System.os_time(:millisecond)}
 
   defp make_filter(%Instruct{} = msg) do
-    ([@prefix, msg.ident, msg.subsystem] ++ msg.filters) |> Enum.join("/")
+    ([@prefix, "c2", msg.ident, msg.subsystem] ++ msg.filters) |> Enum.join("/")
   end
 
   defp save_packed_length(%Instruct{} = msg, length), do: %Instruct{msg | packed_length: length}

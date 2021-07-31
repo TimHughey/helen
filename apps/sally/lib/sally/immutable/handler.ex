@@ -6,7 +6,7 @@ defmodule Sally.Immutable.Handler do
 
   alias __MODULE__
 
-  alias Sally.{DevAlias, Device}
+  alias Sally.{Datapoint, DevAlias, Device}
   alias Sally.Dispatch
 
   @impl true
@@ -47,6 +47,23 @@ defmodule Sally.Immutable.Handler do
   end
 
   @impl true
+  def post_process(
+        %Dispatch{valid?: true, results: %{aliases: [dev_alias], datapoint: %Datapoint{} = dp}} = msg
+      ) do
+    measurement = "immutables"
+    tags = [name: dev_alias.name, family: msg.results.device.family]
+    temp_f = (dp.temp_c * 9 / 5 + 32) |> Float.round(3)
+    fields = [temp_c: dp.temp_c, temp_f: temp_f, read_us: msg.data.metrics["read"]]
+
+    case dp do
+      %Datapoint{relhum: nil} -> Betty.metric(measurement, fields, tags)
+      %Datapoint{} -> Betty.metric(measurement, [relhum: dp.relhum] ++ fields, tags)
+    end
+
+    msg
+  end
+
+  @impl true
   def post_process(%Dispatch{valid?: true} = msg) do
     msg
   end
@@ -61,8 +78,6 @@ defmodule Sally.Immutable.Handler do
 
   # (2 of 2) ident has an alias, add the datapoint
   def add_datapoint(repo, changes, %Dispatch{category: "celsius"} = msg) do
-    alias Sally.Datapoint
-
     dev_alias = List.first(changes.aliases)
     datapoint = Ecto.build_assoc(dev_alias, :datapoints)
 
@@ -73,8 +88,6 @@ defmodule Sally.Immutable.Handler do
 
   # (3 of 3) ident has an alias, add the relhum datapoint
   def add_datapoint(repo, changes, %Dispatch{category: "relhum"} = msg) do
-    alias Sally.Datapoint
-
     dev_alias = List.first(changes.aliases)
     datapoint = Ecto.build_assoc(dev_alias, :datapoints)
 

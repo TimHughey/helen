@@ -67,7 +67,7 @@ defmodule Alfred do
     end
   end
 
-  def toggle(name, opts) when is_binary(name) and is_list(opts) do
+  def toggle(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case status(name, opts) do
       %MutableStatus{pending?: true} -> {:failed, "pending command"}
       %MutableStatus{cmd: "on"} -> off(name, opts)

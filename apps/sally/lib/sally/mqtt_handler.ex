@@ -18,8 +18,6 @@ defmodule Sally.Mqtt.Handler do
     the status.
   """
   def connection(:up, %{args: args} = s) do
-    # Client.connected()
-
     Logger.debug("#{inspect(args, pretty: true)}")
 
     get_in(args, [:next_actions, :connected])
@@ -28,21 +26,12 @@ defmodule Sally.Mqtt.Handler do
   end
 
   def connection(:down, s) do
-    # Client.disconnected()
-
     reply_ok(s)
   end
 
   def connection(:terminated, s) do
-    # Client.terminated()
-
     reply_ok(s)
   end
-
-  # @known_envs ["dev", "test", "prod"]
-  # defp check_metadata(%Msg{env: env} = m) when env not in @known_envs do
-  #   invalid(m, "unknown env filter")
-  # end
 
   def handle_message(_topic, payload, s) when not is_bitstring(payload) do
     # TODO: log payload error
@@ -50,7 +39,7 @@ defmodule Sally.Mqtt.Handler do
     reply_ok(s)
   end
 
-  def handle_message([env, "r", host_ident, subsystem, category | extra], payload, s) do
+  def handle_message([env, "r2", host_ident, subsystem, category | extra], payload, s) do
     alias Sally.Dispatch
 
     store_last = fn x -> put_in(s, [:last], x) end
@@ -69,12 +58,6 @@ defmodule Sally.Mqtt.Handler do
 
     reply_ok(s)
   end
-
-  # def handle_message(topic, _payload, s) do
-  #   Logger.warn("unhandled topic: #{Enum.join(topic, "/")}")
-  #
-  #   reply_ok(s)
-  # end
 
   def subscription(:up, topic_filter, s) do
     Logger.debug("subscribed to: #{topic_filter}")

@@ -6,13 +6,6 @@ config :helen, ecto_repos: [Repo]
 
 config :scribe, style: Scribe.Style.GithubMarkdown
 
-# default settings for dev and test, must override in prod
-config :helen,
-  feeds: [
-    prefix: "dev",
-    rpt: {"prod/r/#", 0}
-  ]
-
 config :helen, OTA, [
   {:uri,
    [
