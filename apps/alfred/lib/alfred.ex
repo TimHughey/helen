@@ -40,9 +40,10 @@ defmodule Alfred do
   def known_names(what \\ :names) do
     for %KnownName{} = kn <- Names.all_known() do
       case what do
-        :names -> kn.name
-        :seen_at -> {kn.name, kn.seen_at}
         :details -> kn
+        :names -> kn.name
+        :seen_ago -> {kn.name, DateTime.utc_now() |> DateTime.diff(kn.seen_at, :millisecond)}
+        :seen_at -> {kn.name, kn.seen_at}
       end
     end
   end
