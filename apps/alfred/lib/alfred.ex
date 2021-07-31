@@ -41,6 +41,7 @@ defmodule Alfred do
     for %KnownName{} = kn <- Names.all_known() do
       case what do
         :names -> kn.name
+        :seen_at -> {kn.name, kn.seen_at}
         :details -> kn
       end
     end
