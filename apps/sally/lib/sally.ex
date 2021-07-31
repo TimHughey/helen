@@ -20,6 +20,11 @@ defmodule Sally do
   # required as callback from Alfred
   def execute(%ExecCmd{} = ec), do: Sally.Execute.cmd(ec)
 
+  @default_firmware_file Application.compile_env!(:sally, [Sally.Host.Firmware, :uri, :file])
+  def host_ota(name, firmware_file \\ @default_firmware_file) do
+    Sally.Host.Firmware.ota(name, firmware_file)
+  end
+
   def host_profile(hostname, profile_name) do
     alias Sally.{Host, Repo}
 
@@ -29,6 +34,8 @@ defmodule Sally do
       _ -> :not_found
     end
   end
+
+  def host_restart(name), do: Sally.Host.Restart.now(name)
 
   @doc """
   Create an alias to a device and pio

@@ -44,6 +44,7 @@ defmodule Alfred do
         :names -> kn.name
         :seen_ago -> {kn.name, DateTime.utc_now() |> DateTime.diff(kn.seen_at, :millisecond)}
         :seen_at -> {kn.name, kn.seen_at}
+        _ -> {:opts, [:details, :names, :seen_ago, :seen_at]}
       end
     end
   end

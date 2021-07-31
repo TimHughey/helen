@@ -4,8 +4,6 @@ import Config
 
 config :helen, ecto_repos: [Repo]
 
-config :scribe, style: Scribe.Style.GithubMarkdown
-
 config :helen, OTA, [
   {:uri,
    [

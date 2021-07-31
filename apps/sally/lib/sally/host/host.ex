@@ -1,17 +1,3 @@
-defmodule Sally.Host.ChangeControl do
-  alias __MODULE__
-
-  defstruct raw_changes: %{}, required: [], replace: []
-
-  @type raw_change_map() :: %{atom() => String.t() | DateTime.t()}
-
-  @type t :: %__MODULE__{
-          raw_changes: raw_change_map(),
-          required: nonempty_list(),
-          replace: nonempty_list()
-        }
-end
-
 defmodule Sally.Host do
   require Logger
 
@@ -42,6 +28,8 @@ defmodule Sally.Host do
     timestamps(type: :utc_datetime_usec)
   end
 
+  @env_profile_path Application.compile_env!(:sally, [Sally.Host, :env_vars, :profile_path])
+
   def authorize(name, val \\ true) when is_boolean(val) do
     case Repo.get_by(Schema, name: name) do
       %Schema{} = h -> changeset(h, %{authorized: val}, [:authorized]) |> Repo.update!()
@@ -50,7 +38,7 @@ defmodule Sally.Host do
   end
 
   def boot_payload_data(%Schema{} = h) do
-    file = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
+    file = [System.get_env(@env_profile_path, "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
 
     Toml.decode_file!(file)
   end

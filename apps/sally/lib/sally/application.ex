@@ -15,7 +15,6 @@ defmodule Sally.Application do
       {Sally.Execute, []},
       {Sally.Immutable.Handler, []},
       {Sally.Mutable.Handler, []},
-      # {Sally.PulseWidth.Handler, []},
       {Sally.Host.Instruct, []},
       {Sally.Host.Handler, []}
     ]

@@ -39,6 +39,12 @@ defmodule Sally.Host.Instruct do
   ##
   ## Public API
   ##
+  def send(opts) when is_list(opts) do
+    opts_map = Enum.into(opts, %{})
+
+    Map.merge(%Instruct{}, opts_map) |> send()
+  end
+
   def send(%Instruct{} = msg) do
     Logger.debug("\n#{inspect(msg, pretty: true)}")
 
