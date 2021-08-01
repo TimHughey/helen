@@ -55,7 +55,7 @@ defmodule Sally.Host.Handler do
     pname = profile["meta"]["name"]
     pdesc = profile["meta"]["description"]
 
-    Logger.info("host=#{msg.host.name} startup; sending profile=#{pname} description='#{pdesc}'")
+    Logger.debug("host=#{msg.host.name} startup; sending profile='#{pname}' description='#{pdesc}'")
 
     %Instruct{
       ident: msg.ident,
@@ -74,7 +74,7 @@ defmodule Sally.Host.Handler do
   def post_process(%Dispatch{category: "boot"} = msg) do
     Logger.debug(inspect(msg.data, pretty: true))
     boot_profile = List.first(msg.filter_extra, "unknown")
-    Logger.info("host=#{msg.host.name} using_profile=#{boot_profile} startup complete")
+    Logger.info("host=#{msg.host.name} profile='#{boot_profile}' startup complete")
 
     stack_size = msg.data[:stack]["size"] || 1
     stack_hw = msg.data[:stack]["highwater"] || 1
