@@ -54,7 +54,7 @@ defmodule Eva.TimedCmd.Instruct do
       %ExecResult{rc: :ok, refid: x} when is_binary(x) -> instruct
       # equipment matches desired cmd, start for_ms timer immediately
       %ExecResult{rc: :ok} -> instruct |> schedule_timer()
-      # TODO an error has occurred
+      # allow caller to deal with errors by checking exec_result
       _ -> instruct
     end
   end
@@ -211,12 +211,12 @@ defmodule Eva.TimedCmd do
       name: tc.name,
       rc: if(instruct.exec_result.rc == :ok, do: :accepted, else: :error),
       cmd: ec.cmd,
-      will_notify_when_released: true,
+      will_notify_when_released: if(instruct.exec_result.rc == :ok, do: true, else: false),
       refid: instruct.ref,
       instruct: instruct
     }
 
-    {update(tc, instruct), result}
+    {update(tc, instruct), {instruct.exec_result.rc, result}}
   end
 
   def handle_instruct(%TimedCmd{} = v, %Instruct{} = instruct) do
