@@ -5,7 +5,7 @@ defmodule Alfred do
   Alfred - Master of devices
   """
 
-  alias Alfred.{ExecCmd, ImmutableStatus, KnownName, MutableStatus, Names, Notify}
+  alias Alfred.{ExecCmd, ExecResult, ImmutableStatus, KnownName, MutableStatus, Names, Notify}
 
   # is a name available (aka unknown)
   def available(name), do: not Names.exists?(name)
@@ -27,9 +27,9 @@ defmodule Alfred do
 
   def execute(%ExecCmd{} = ec) do
     case Names.lookup(ec.name) do
+      nil -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :not_found}
       %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.execute(ec)
-      %KnownName{mutable?: false} -> {:failed, "immutable: #{ec.name}"}
-      %KnownName{name: "unknown"} -> {:failed, "unknown: #{ec.name}"}
+      %KnownName{mutable?: false} -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :immutable}
     end
   end
 
