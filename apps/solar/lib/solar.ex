@@ -44,20 +44,20 @@ defmodule Solar do
       {:ok, Time}
       {:error, message}
   """
-  def event(event, location, opts \\ []) do
-    Solar.Events.event(event, location, opts)
+  def event(opts) do
+    Solar.Events.event(opts)
   end
 
-  @doc """
-  Generates the sunrise, sunset times as well as the daylight hours. The following tuple is returned:
-
-      {:ok, sunrise, sunset, daylight}
-
-  This takes the same parameters as `Solar.event` except the event parameter.
-  """
-  def day_info(location, opts \\ []) do
-    {:ok, rise} = Solar.Events.event(:rise, location, opts)
-    {:ok, set} = Solar.Events.event(:set, location, opts)
-    {:ok, rise, set, Solar.Events.daylight(rise, set)}
-  end
+  # @doc """
+  # Generates the sunrise, sunset times as well as the daylight hours. The following tuple is returned:
+  #
+  #     {:ok, sunrise, sunset, daylight}
+  #
+  # This takes the same parameters as `Solar.event` except the event parameter.
+  # """
+  # def day_info(location, opts \\ []) do
+  #   {:ok, rise} = Solar.Events.event(:rise, location, opts)
+  #   {:ok, set} = Solar.Events.event(:set, location, opts)
+  #   {:ok, rise, set, Solar.Events.daylight(rise, set)}
+  # end
 end

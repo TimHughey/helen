@@ -8,6 +8,15 @@ defmodule Zeniths do
   - Official is when the sun is 50 arcminutes below horizon.
   """
 
+  def lookup(zenith) do
+    case zenith do
+      :official -> official()
+      :astro -> astronomical()
+      :civil -> civil()
+      :nautical -> nautical()
+    end
+  end
+
   @doc "Returns the angle for 'astronomical' sunrise and sunset"
   def astronomical, do: 90.0 + 18.0
 
