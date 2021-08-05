@@ -106,7 +106,7 @@ defmodule Solar.Events do
       lat_rad: opts.latitude |> deg_to_rad(),
       long_deg: opts.longitude,
       long_rad: opts.longitude |> deg_to_rad(),
-      loc_date: DateTime.now!(opts.timezone) |> DateTime.to_date(),
+      loc_date: Timex.local(opts.timezone) |> Timex.to_date(),
       timezone: opts.timezone
     }
 
