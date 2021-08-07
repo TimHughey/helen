@@ -11,7 +11,7 @@ defmodule Eva.TimedCmd.Instruct do
             cmd: "off",
             for_ms: 0,
             nowait: false,
-            then_cmd: nil,
+            then_cmd: :none,
             ref: nil,
             timer: nil,
             expired?: false,
@@ -178,19 +178,27 @@ defmodule Eva.TimedCmd do
   end
 
   # (2 of 3) failsafe: revert the equipment to the expected cmd if a mismatch occurs and the
-  #          current Instruct is marked as complete
+  #          current Instruct is released but not complete
   def control(
         %TimedCmd{
-          instruct: %Instruct{cmd: icmd, ledger: %Ledger{completed_at: %DateTime{}}},
-          equipment: %Equipment{status: %MutStatus{cmd: ecmd, good?: true}}
+          instruct: %Instruct{cmd: icmd, ledger: ledger},
+          equipment: %Equipment{name: name, status: %MutStatus{cmd: ecmd, good?: true}}
         } = tc,
         %Memo{},
         :ready
       )
       when icmd != ecmd do
-    Betty.app_error(tc.mod, [mismatch: true] ++ app_error_base_tags(tc))
+    case ledger do
+      # make no attempt to correct the equipment cmd while another cmd is inflight
+      %Ledger{executed_at: %DateTime{}, released_at: :none} ->
+        tc
 
-    Instruct.force(tc.equipment.name, icmd) |> Instruct.execute() |> update(tc)
+      _ ->
+        Betty.app_error(tc.mod, [mismatch: true] ++ app_error_base_tags(tc))
+        %ExecCmd{name: name, cmd: icmd} |> Alfred.execute()
+
+        tc
+    end
   end
 
   # (3 of 3) report app errors or fall through
