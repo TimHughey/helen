@@ -173,6 +173,16 @@ defmodule Eva.Setpoint do
     }
   end
 
+  def status(%Setpoint{} = v, _opts) do
+    %MutStatus{
+      name: v.name,
+      good?: v.equipment.status.good?,
+      cmd: v.equipment.status.cmd,
+      extended: v,
+      status_at: DateTime.utc_now()
+    }
+  end
+
   # (1 of 2) handle standby mode; ensure equipment is off
   defp adjust_mode_as_needed(%Setpoint{mode: :standby} = v),
     do: v.equipment |> Equipment.off() |> update(v)
@@ -196,5 +206,5 @@ defimpl Eva.Variant, for: Eva.Setpoint do
   def handle_instruct(variant, _instruct), do: variant
   def handle_notify(%Setpoint{} = v, %Memo{} = memo, mode), do: Setpoint.handle_notify(v, memo, mode)
   def handle_release(%Setpoint{} = v, %TrackerEntry{} = te), do: Setpoint.handle_release(v, te)
-  def mode(%Setpoint{} = v, mode), do: Setpoint.mode(v, mode)
+  def status(%Setpoint{} = v, opts), do: Setpoint.status(v, opts)
 end

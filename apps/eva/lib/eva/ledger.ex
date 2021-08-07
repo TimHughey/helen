@@ -31,6 +31,7 @@ defmodule Eva.Ledger do
   def completed(%Ledger{} = l), do: %Ledger{l | completed_at: DateTime.utc_now()}
   def executed(%Ledger{} = l), do: %Ledger{l | executed_at: DateTime.utc_now()}
   def expired(%Ledger{} = l), do: %Ledger{l | expired_at: DateTime.utc_now()}
+  def in_progress?(%Ledger{} = l), do: l.completed_at == :none
   def notified(%Ledger{} = l), do: %Ledger{l | notified_at: DateTime.utc_now()}
   def released(%Ledger{} = l), do: %Ledger{l | released_at: DateTime.utc_now()}
 end

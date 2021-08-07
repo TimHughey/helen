@@ -16,16 +16,20 @@ defprotocol Eva.Variant do
 
   @spec handle_release(struct(), Broom.TrackerEntry.t()) :: struct()
   def handle_release(variant, tracker_entry)
+
+  @spec status(struct(), list()) :: Alfred.MutableStatus.t() | struct()
+  def status(variant, opts)
 end
 
 defmodule Eva.Variant.Factory do
-  alias Eva.{Follow, Opts, Setpoint, TimedCmd}
+  alias Eva.{AutoOff, Follow, Opts, Setpoint, TimedCmd}
 
   def new(toml_rc, %Opts{} = opts) do
     case toml_rc do
       {:ok, %{variant: "setpoint"} = x} -> Setpoint.new(opts, cfg: x)
       {:ok, %{variant: "follow"} = x} -> Follow.new(opts, cfg: x)
       {:ok, %{variant: "timed_cmd"} = x} -> TimedCmd.new(opts, cfg: x)
+      {:ok, %{variant: "autooff"} = x} -> AutoOff.new(opts, cfg: x)
       {:error, error} -> {:error, error}
     end
   end

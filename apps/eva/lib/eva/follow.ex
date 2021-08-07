@@ -216,6 +216,16 @@ defmodule Eva.Follow do
     }
   end
 
+  def status(%Follow{} = vf, _opts) do
+    %MutStatus{
+      name: vf.name,
+      good?: vf.equipment.status.good?,
+      cmd: vf.equipment.status.cmd,
+      extended: vf,
+      status_at: DateTime.utc_now()
+    }
+  end
+
   # (1 of 3) update equipment
   defp update(%Equipment{} = x, %Follow{} = vf), do: %Follow{vf | equipment: x}
   defp update(%Follower{} = x, %Follow{} = vf), do: %Follow{vf | follower: x}
@@ -233,5 +243,5 @@ defimpl Eva.Variant, for: Eva.Follow do
   def handle_instruct(variant, _instruct), do: variant
   def handle_notify(%Follow{} = vf, %Memo{} = memo, mode), do: Follow.handle_notify(vf, memo, mode)
   def handle_release(%Follow{} = vf, %TrackerEntry{} = te), do: Follow.handle_release(vf, te)
-  def mode(%Follow{} = vf, mode), do: Follow.mode(vf, mode)
+  def status(%Follow{} = vf, opts), do: Follow.status(vf, opts)
 end

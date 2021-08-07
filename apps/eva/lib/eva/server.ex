@@ -3,7 +3,6 @@ defmodule Eva.Server do
 
   alias __MODULE__
   alias Alfred.{ExecCmd, ExecResult}
-  alias Alfred.MutableStatus, as: Status
   alias Alfred.NotifyMemo, as: Memo
   alias Broom.TrackerEntry
   alias Eva.{Names, Opts, State, Variant}
@@ -38,14 +37,9 @@ defmodule Eva.Server do
   def handle_call(:equipment, _from, %State{variant: %_{mode: mode}} = s), do: mode |> reply(s)
 
   @impl true
-  def handle_call({:status, name, _opts}, _from, %State{} = s) do
-    %Status{
-      name: name,
-      good?: true,
-      cmd: Atom.to_string(s.mode),
-      cmd_extra: s.variant,
-      status_at: DateTime.utc_now()
-    }
+  def handle_call({:status, _name, opts}, _from, %State{} = s) do
+    s.variant
+    |> Variant.status(opts)
     |> reply(s)
   end
 

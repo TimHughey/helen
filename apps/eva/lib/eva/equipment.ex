@@ -5,7 +5,7 @@ defmodule Eva.Equipment do
   alias Alfred.ExecResult
   alias Broom.TrackerEntry
 
-  defstruct name: nil, impact: nil, status: nil, cmd: :none
+  defstruct name: nil, impact: nil, status: %Alfred.MutableStatus{}, cmd: :none
 
   @type t :: %Equipment{
           name: String.t(),

@@ -263,6 +263,16 @@ defmodule Eva.TimedCmd do
     }
   end
 
+  def status(%TimedCmd{} = v, _opts) do
+    %MutStatus{
+      name: v.name,
+      good?: v.equipment.status.good?,
+      cmd: v.equipment.status.cmd,
+      extended: v,
+      status_at: DateTime.utc_now()
+    }
+  end
+
   defp app_error_base_tags(%TimedCmd{} = tc) do
     [variant: tc.name, mode: tc.mode, control: true, mismatch: true, equipment: tc.equipment.name]
   end
@@ -285,5 +295,5 @@ defimpl Eva.Variant, for: Eva.TimedCmd do
   def handle_instruct(%TimedCmd{} = tc, %Instruct{} = x), do: TimedCmd.handle_instruct(tc, x)
   def handle_notify(%TimedCmd{} = tc, %Memo{} = memo, mode), do: TimedCmd.handle_notify(tc, memo, mode)
   def handle_release(%TimedCmd{} = tc, %TrackerEntry{} = te), do: TimedCmd.handle_release(tc, te)
-  def mode(%TimedCmd{} = tc, mode), do: TimedCmd.mode(tc, mode)
+  def status(%TimedCmd{} = tc, opts), do: TimedCmd.status(tc, opts)
 end
