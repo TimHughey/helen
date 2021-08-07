@@ -14,6 +14,8 @@ defmodule Eva.Opts do
   alias __MODULE__
   alias Eva.Opts.Server
 
+  @helen_base "HELEN_BASE"
+
   defstruct server: %Server{},
             toml_file: nil,
             name: nil,
@@ -46,8 +48,10 @@ defmodule Eva.Opts do
   end
 
   def make_opts(mod, start_opts, use_opts) do
-    cfg_path = System.get_env(start_opts[:env_vars][:cfg_path], ".")
-    cfg_file = System.get_env(start_opts[:env_vars][:cfg_file], "not_specified.toml")
+    # cfg_path = System.get_env(start_opts[:env_vars][:cfg_path], ".")
+    cfg_path = [System.get_env(@helen_base), start_opts[:cfg_path]] |> Path.join()
+    #   cfg_file = System.get_env(start_opts[:env_vars][:cfg_file], "not_specified.toml")
+    cfg_file = start_opts[:cfg_file]
     toml_file = [cfg_path, cfg_file] |> Path.join()
 
     {id, rest} = Keyword.pop(use_opts, :id, mod)

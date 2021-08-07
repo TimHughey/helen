@@ -1,0 +1,10 @@
+name = "Auto Off"
+variant = "autooff"
+description = "turns equipment off when all dependents are also off"
+initial_mode = "ready"
+watch = ["relay2", "relay3"]
+settle = "PT10S"  # duration for "on" command to settle before notifying caller of completed
+
+[equipment]
+  name = "relay4"
+  impact = "power"
