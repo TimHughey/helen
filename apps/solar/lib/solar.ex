@@ -44,8 +44,8 @@ defmodule Solar do
       {:ok, Time}
       {:error, message}
   """
-  def event(opts) do
-    Solar.Events.event(opts)
+  def event(opts \\ %Solar.Opts{}) do
+    opts |> Solar.Events.event()
   end
 
   # @doc """

@@ -106,7 +106,7 @@ defmodule Solar.Events do
       lat_rad: opts.latitude |> deg_to_rad(),
       long_deg: opts.longitude,
       long_rad: opts.longitude |> deg_to_rad(),
-      loc_date: Timex.local(opts.timezone) |> Timex.to_date(),
+      loc_date: Timex.now(opts.timezone) |> Timex.to_date(),
       timezone: opts.timezone
     }
 
@@ -150,7 +150,7 @@ defmodule Solar.Events do
     offset = if(type == :rise, do: 6.0, else: 18.0)
 
     dividend = offset - calc.long_deg / 15.0
-    addend = dividend / 24.0
+    addend = (dividend / 24.0) |> trunc()
 
     %Events{calc | long_hour: Timex.day(calc.loc_date) + addend}
   end
@@ -237,24 +237,24 @@ defmodule Solar.Events do
     radians * 180.0 / :math.pi()
   end
 
-  @doc """
-  Calculates the hours of daylight returning as a time with hours, minutes and seconds.
-  """
-  def daylight(rise, set) do
-    hours_to_time(time_to_hours(set) - time_to_hours(rise))
-  end
-
-  defp time_to_hours(time) do
-    time.hour + time.minute / 60.0 + time.second / (60.0 * 60.0)
-  end
-
-  defp hours_to_time(hours) do
-    h = Kernel.trunc(hours)
-    value = (hours - h) * 60
-    m = Kernel.trunc(value)
-    value = (value - m) * 60
-    s = Kernel.trunc(value)
-    {:ok, time} = Time.new(h, m, s)
-    time
-  end
+  # @doc """
+  # Calculates the hours of daylight returning as a time with hours, minutes and seconds.
+  # """
+  # def daylight(rise, set) do
+  #   hours_to_time(time_to_hours(set) - time_to_hours(rise))
+  # end
+  #
+  # defp time_to_hours(time) do
+  #   time.hour + time.minute / 60.0 + time.second / (60.0 * 60.0)
+  # end
+  #
+  # defp hours_to_time(hours) do
+  #   h = Kernel.trunc(hours)
+  #   value = (hours - h) * 60
+  #   m = Kernel.trunc(value)
+  #   value = (value - m) * 60
+  #   s = Kernel.trunc(value)
+  #   {:ok, time} = Time.new(h, m, s)
+  #   time
+  # end
 end
