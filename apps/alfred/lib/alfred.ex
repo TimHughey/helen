@@ -66,7 +66,7 @@ defmodule Alfred do
     case Names.lookup(name) do
       %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.status(:mutable, name, opts)
       %KnownName{callback_mod: cb_mod, mutable?: false} -> cb_mod.status(:immutable, name, opts)
-      %KnownName{name: "unknown"} -> {:failed, "unknown: #{name}"}
+      nil -> {:failed, "unknown: #{name}"}
     end
   end
 
