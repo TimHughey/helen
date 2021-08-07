@@ -1,0 +1,18 @@
+meta = { mtime = 1619876657, env = "prod"}
+wifi = {ssid = "Foobar", passwd = "foobar"}
+ntp = ["ntp1.wisslanding.com", "ntp2.wisslanding.com"]
+
+[mqtt]
+uri = "mqtt://mqtt.live.wisslanding.com:1883",
+user = "mqtt",
+passwd = "mqtt",
+priority = 11,
+rx_buffer = 1024,
+tx_buffer = 1024,
+reconnect_ms = 3000
+
+[ota]
+host = "www.wisslanding.com",
+path = "helen/firmware",
+file = "latest.bin",
+valid_ms = 60000

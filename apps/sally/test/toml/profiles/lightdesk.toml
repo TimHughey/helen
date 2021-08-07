@@ -1,0 +1,19 @@
+# default profile when a host specific profile is not found or
+# the profile specified in the Host record isn't found.
+
+# provides the minimal configuration required for a Host
+# and does not start any Engines or other functionality
+[meta]
+name = "lightdesk"
+# the description is not sent to the Host
+# rather, it is used by Sally to log the profile sent to the host
+description = "only lightdesk"
+version = 1
+
+[host]
+report_ms = 7_000
+
+[lightdesk]
+dmx_port = 48005
+idle_shutdown_ms = 600_000
+idle_check_ms = 1000

@@ -1,0 +1,40 @@
+# default profile when a host specific profile is not found or
+# the profile specified in the Host record isn't found.
+
+# provides the minimal configuration required for a Host
+# and does not start any Engines or other functionality
+[meta]
+name = "dalsemi"
+# the description is not sent to the Host
+# rather, it is used by Sally to log the profile sent to the host
+description = "dalsemi only"
+version = 1
+
+[host]
+report_ms = 7_000
+
+# the following configurations are reasonable for dalsemi, i2c, pwm and dmx
+# the engine is started only when the configuration is present
+
+[dalsemi]
+report = {stack = 4096, pri = 5, send_ms = 7_000, loops_per_discover = 10 }
+command = {stack = 4096, pri = 14}
+#
+# [i2c]
+# use_multiplexer = false
+# core = {stack = 4096, pri = 1, interval_ms = 30_000}
+# report = {stack = 4096, pri = 5, interval_ms = 7_000}
+# command = {stack = 4096, pri = 14}
+#
+# [pwm]
+# command = {stack = 4096, pri = 13}
+# report = {stack = 3072, pri = 1, send_ms = 7_000}
+#
+# [dmx]
+# port = 48005
+# psk = "psk"
+# magic = 51666
+# version = 1
+#
+# [watcher]
+# report_ms = 7_000

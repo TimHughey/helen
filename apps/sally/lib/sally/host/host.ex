@@ -28,7 +28,9 @@ defmodule Sally.Host do
     timestamps(type: :utc_datetime_usec)
   end
 
-  @env_profile_path Application.compile_env!(:sally, [Sally.Host, :env_vars, :profile_path])
+  @helen_base "HELEN_BASE"
+  @profiles_dir Application.compile_env!(:sally, [Sally.Host, :profiles_path])
+  # @env_profile_path Application.compile_env!(:sally, [Sally.Host, :env_vars, :profile_path])
 
   def authorize(name, val \\ true) when is_boolean(val) do
     case Repo.get_by(Schema, name: name) do
@@ -38,7 +40,9 @@ defmodule Sally.Host do
   end
 
   def boot_payload_data(%Schema{} = h) do
-    file = [System.get_env(@env_profile_path, "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
+    # file = [System.get_env(@env_profile_path, "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
+
+    file = [profiles_path(), "#{h.profile}.toml"] |> Path.join()
 
     Toml.decode_file!(file)
   end
@@ -115,15 +119,19 @@ defmodule Sally.Host do
     [on_conflict: {:replace, replace_columns}, returning: true, conflict_target: [:ident]]
   end
 
+  defp profiles_path do
+    [System.get_env(@helen_base), @profiles_dir] |> Path.join()
+  end
+
   defp validate_profile_exists(%Ecto.Changeset{} = cs) do
     alias Ecto.Changeset
 
-    profile_dir = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles"] |> Path.join()
+    #  profile_dir = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles"] |> Path.join()
 
     case Changeset.fetch_field(cs, :profile) do
       {_src, profile} ->
         file = "#{profile}.toml"
-        file_path = [profile_dir, file] |> Path.join()
+        file_path = [profiles_path(), file] |> Path.join()
 
         case Toml.decode_file(file_path, filename: file_path) do
           {:ok, _profile} -> cs
