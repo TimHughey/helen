@@ -21,6 +21,13 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_equal(res, expected) do
+    quote location: :keep, bind_quoted: [res: res, expected: expected] do
+      fail = "#{inspect(res)} should be equal to #{inspect(expected)}"
+      assert res == expected
+    end
+  end
+
   defmacro should_be_non_empty_list(res) do
     quote location: :keep, bind_quoted: [res: res] do
       fail = pretty("should be non-empty list", res)
