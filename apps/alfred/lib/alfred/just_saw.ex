@@ -20,11 +20,11 @@ defmodule Alfred.JustSaw do
           seen_list: [Alias.t(), ...]
         }
 
-  def add_alias(%JustSaw{} = js, %{name: name, ttl_ms: ttl_ms}) do
-    %JustSaw{js | seen_list: [%Alias{name: name, ttl_ms: ttl_ms}] ++ js.seen_list}
-  end
-
-  def new(callback_mod, mutable?), do: %JustSaw{mutable?: mutable?, callback_mod: callback_mod}
+  # def add_alias(%JustSaw{} = js, %{name: name, ttl_ms: ttl_ms}) do
+  #   %JustSaw{js | seen_list: [%Alias{name: name, ttl_ms: ttl_ms}] ++ js.seen_list}
+  # end
+  #
+  # def new(callback_mod, mutable?), do: %JustSaw{mutable?: mutable?, callback_mod: callback_mod}
 
   def new(callback_mod, type, %{name: name, ttl_ms: ttl_ms}) when type in [:mutable, :immutable] do
     %JustSaw{

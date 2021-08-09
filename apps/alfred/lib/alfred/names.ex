@@ -4,19 +4,16 @@ defmodule Alfred.Names do
   """
 
   alias Alfred.JustSaw
+  alias Alfred.KnownName
 
   @server Alfred.Names.Server
-
-  def alive? do
-    if GenServer.whereis(@server), do: true, else: false
-  end
 
   def all_known, do: {:all_known} |> call()
 
   def delete(name), do: {:delete, name} |> call()
 
   def exists?(name) do
-    if lookup(name) |> is_nil(), do: false, else: true
+    if lookup(name) |> KnownName.unknown?(), do: false, else: true
   end
 
   def lookup(name), do: {:lookup, name} |> call()
@@ -25,10 +22,14 @@ defmodule Alfred.Names do
   def just_saw_cast(%JustSaw{} = js), do: {:just_saw, js} |> cast()
 
   defp call(msg) do
-    if alive?(), do: GenServer.call(@server, msg), else: {:no_server, @server}
+    GenServer.call(@server, msg)
+  rescue
+    _ -> {:no_server, @server}
   end
 
   defp cast(msg) do
-    if alive?(), do: GenServer.cast(@server, msg), else: {:no_server, @server}
+    GenServer.cast(@server, msg)
+  rescue
+    _ -> {:no_server, @server}
   end
 end

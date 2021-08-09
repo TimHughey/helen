@@ -26,6 +26,10 @@ defmodule Alfred.MutableStatus do
           error: status_error()
         }
 
+  # testing the below serves zero purpose as a unit test
+  # rather, these are tested as part of integration testing
+  # coveralls-ignore-start
+
   # (1 of 2) this status is good: ttl is ok, it is found and no error
   def finalize(%Status{error: :none, found?: true, ttl_expired?: false} = x) do
     %Status{x | good?: true}
@@ -34,49 +38,29 @@ defmodule Alfred.MutableStatus do
   # (2 of 2) something is wrong with this status
   def finalize(%Status{} = x), do: x
 
-  def good(%_{cmds: [%_{cmd: cmd}]} = x) do
-    %Status{
-      name: x.name,
-      cmd: cmd,
-      status_at: x.device.last_seen_at
-    }
+  def good(%{name: name, device: %{last_seen_at: last_seen_at}, cmds: [%{cmd: cmd}]}) do
+    %Status{name: name, cmd: cmd, status_at: last_seen_at}
   end
 
   def not_found(name), do: %Status{name: name, status_at: DateTime.utc_now(), found?: false}
 
-  def pending(%_{cmds: [%_{} = cmd_schema]} = x) do
-    %Status{
-      name: x.name,
-      cmd: cmd_schema.cmd,
-      status_at: cmd_schema.sent_at,
-      pending?: true,
-      pending_refid: cmd_schema.refid
-    }
+  def pending(%{name: name, cmds: [%{cmd: cmd, sent_at: sent_at, refid: refid}]}) do
+    %Status{name: name, cmd: cmd, status_at: sent_at, pending?: true, pending_refid: refid}
   end
 
-  def ttl_expired(%_{} = x) do
-    %Status{name: x.name, status_at: x.device.last_seen_at, ttl_expired?: true}
+  def ttl_expired(%{name: name, device: %{last_seen_at: last_seen_at}}) do
+    %Status{name: name, status_at: last_seen_at, ttl_expired?: true}
   end
 
   def ttl_expired?(%Status{ttl_expired?: expired}), do: expired
 
-  def unknown_state(%_{} = x) do
-    %Status{
-      name: x.name,
-      cmd: "unknown",
-      status_at: x.updated_at,
-      error: :unknown_state
-    }
+  def unknown_state(%{name: name, updated_at: updated_at}) do
+    %Status{name: name, cmd: "unknown", status_at: updated_at, error: :unknown_state}
   end
 
-  def unresponsive(%_{} = x) do
-    [%_{} = cmd_schema] = x.cmds
-
-    %Status{
-      name: x.name,
-      cmd: "unknown",
-      status_at: cmd_schema.acked_at,
-      error: :unresponsive
-    }
+  def unresponsive(%{name: name, cmds: [%{acked_at: acked_at}]}) do
+    %Status{name: name, cmd: "unknown", status_at: acked_at, error: :unresponsive}
   end
+
+  # coveralls-ignore-stop
 end

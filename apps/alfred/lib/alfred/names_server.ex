@@ -18,7 +18,12 @@ defmodule Alfred.Names.Server do
 
     def delete_name(%State{} = s, name), do: %State{s | known: Map.delete(s.known, name)}
 
-    def lookup(name, %State{} = s), do: get_in(s.known, [name])
+    def lookup(name, %State{} = s) do
+      case get_in(s.known, [name]) do
+        nil -> KnownName.unknown(name)
+        %KnownName{} = kn -> kn |> KnownName.detect_missing()
+      end
+    end
 
     def new, do: %State{}
   end

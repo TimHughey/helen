@@ -26,11 +26,20 @@ defmodule Alfred do
   end
 
   def execute(%ExecCmd{} = ec) do
-    case Names.lookup(ec.name) do
-      nil -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :not_found}
-      %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.execute(ec)
-      %KnownName{mutable?: false} -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :immutable}
+    kn = Names.lookup(ec.name)
+
+    cond do
+      KnownName.unknown?(kn) -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :unknown}
+      KnownName.missing?(kn) -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :missing}
+      KnownName.immutable?(kn) -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :immutable}
+      true -> kn.callback_mod.execute(ec)
     end
+
+    # case Names.lookup(ec.name) do
+    #   nil -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :not_found}
+    #   %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.execute(ec)
+    #   %KnownName{mutable?: false} -> %ExecResult{name: ec.name, cmd: ec.cmd, rc: :immutable}
+    # end
   end
 
   defdelegate is_name_known?(name), to: Names, as: :exists?
@@ -63,20 +72,29 @@ defmodule Alfred do
   def status(name, opts \\ [])
 
   def status(name, opts) when is_binary(name) and is_list(opts) do
-    case Names.lookup(name) do
-      %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.status(:mutable, name, opts)
-      %KnownName{callback_mod: cb_mod, mutable?: false} -> cb_mod.status(:immutable, name, opts)
-      nil -> {:failed, "unknown: #{name}"}
+    kn = Names.lookup(name)
+
+    cond do
+      KnownName.unknown?(kn) -> %ImmutableStatus{name: name, good?: false, error: "unknown"}
+      KnownName.immutable?(kn) -> kn.callback_mod.status(:immutable, name, opts)
+      true -> kn.callback_mod.status(:mutable, name, opts)
     end
+
+    # case Names.lookup(name) do
+    #   %KnownName{callback_mod: cb_mod, mutable?: true} -> cb_mod.status(:mutable, name, opts)
+    #   %KnownName{callback_mod: cb_mod, mutable?: false} -> cb_mod.status(:immutable, name, opts)
+    #   nil -> {:failed, "unknown: #{name}"}
+    # end
   end
 
   def toggle(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case status(name, opts) do
-      %MutableStatus{pending?: true} -> {:failed, "pending command"}
+      %{good?: false} -> %ExecResult{name: name, rc: :bad_status}
+      %MutableStatus{pending?: true} -> %ExecResult{name: name, rc: :pending}
       %MutableStatus{cmd: "on"} -> off(name, opts)
       %MutableStatus{cmd: "off"} -> on(name, opts)
-      %MutableStatus{cmd: cmd} -> {:failed, "can not toggle: #{cmd}"}
-      %ImmutableStatus{} -> {:failed, "can not toggle immutable"}
+      %MutableStatus{cmd: cmd} -> %ExecResult{name: name, cmd: cmd, rc: :not_supported}
+      %ImmutableStatus{} -> %ExecResult{name: name, rc: :immutable}
     end
   end
 end

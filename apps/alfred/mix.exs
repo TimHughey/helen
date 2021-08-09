@@ -30,6 +30,7 @@ defmodule Alfred.MixProject do
   defp deps do
     [
       {:betty, in_umbrella: true},
+      {:tzdata, "~> 1.1"},
       {:excoveralls, "~> 0.10", only: :test},
       {:should, in_umbrella: true, only: :test}
     ]
