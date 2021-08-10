@@ -13,6 +13,12 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_datetime(res) do
+    quote location: :keep, bind_quoted: [res: res] do
+      should_be_struct(res, DateTime)
+    end
+  end
+
   defmacro should_be_empty_list(res) do
     quote location: :keep, bind_quoted: [res: res] do
       fail = pretty("should be empty list", res)
