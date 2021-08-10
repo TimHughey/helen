@@ -6,7 +6,7 @@ defmodule Solar.Opts do
             latitude: 40.21089564609479,
             longitude: -74.0109850020794,
             timezone: "America/New_York",
-            valid?: false,
+            valid?: true,
             invalid_reason: ""
 
   @type event_type() :: :rise | :set
@@ -22,16 +22,37 @@ defmodule Solar.Opts do
           invalid_reason: String.t()
         }
 
-  def new(opts) do
-    default = %Opts{}
+  def new(type, location_opts) when is_binary(type) and is_list(location_opts) do
+    make_type(type) |> make_zenith(type) |> make_location(location_opts)
+  end
 
+  defp make_location(%Opts{} = opts, location_opts) do
     %Opts{
-      type: opts[:type] || default.type,
-      zenith: opts[:zenith] || default.zenith,
-      latitude: opts[:latitude] || default.latitude,
-      longitude: opts[:longitude] || default.longitude,
-      timezone: opts[:timezone] || default.timezone
+      opts
+      | latitude: location_opts[:latitude] || opts.latitude,
+        longitude: location_opts[:longitude] || opts.longitude,
+        timezone: location_opts[:timezone] || opts.timezone
     }
+  end
+
+  defp make_type(type) do
+    cond do
+      type =~ "rise" -> %Opts{type: :rise}
+      type =~ "set" -> %Opts{type: :set}
+      true -> %Opts{invalid_reason: "type must include 'rise' or 'set'", valid?: false}
+    end
+  end
+
+  defp make_zenith(%Opts{} = opts, type) do
+    cond do
+      opts.valid? == false -> opts
+      type =~ "sun" -> %Opts{opts | zenith: :official}
+      type =~ "astro" -> %Opts{opts | zenith: :astro}
+      type =~ "civil" -> %Opts{opts | zenith: :civil}
+      type =~ "nautical" -> %Opts{opts | zenith: :nautical}
+      type =~ "noon" -> %Opts{opts | zenith: :noon}
+      true -> %Opts{invalid_reason: "unknown type: '#{type}'", valid?: false}
+    end
   end
 end
 
@@ -110,7 +131,7 @@ defmodule Solar.Events do
       timezone: opts.timezone
     }
 
-    with {:type, true} <- {:type, opts.type in [:rise, :set]},
+    with %Opts{valid?: true} <- opts,
          # Computes the base longitude hour, lngHour in the algorithm. The longitude
          # of the location of the solar event divided by 15 (deg/hour).
          %Events{} = x <- %Events{calc | base_long_hour: calc.long_deg / 15.0},
@@ -138,7 +159,7 @@ defmodule Solar.Events do
 
       Timex.now(x.timezone) |> Timex.set(hour: hr, minute: min, second: sec, microsecond: 0)
     else
-      {:type, false} -> {:error, "type must be either :rise or :set"}
+      %Opts{valid?: false, invalid_reason: x} -> {:error, x}
       %Events{invalid_reason: x} -> {:error, x}
     end
   end
