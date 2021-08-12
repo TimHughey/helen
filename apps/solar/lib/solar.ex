@@ -24,6 +24,20 @@ defmodule Solar do
   """
   def event(type, opts \\ [])
 
+  def event("beginning of day", opts) when is_list(opts) do
+    case event("sunrise", opts) do
+      %DateTime{} = sunrise -> Timex.beginning_of_day(sunrise)
+      x -> x
+    end
+  end
+
+  def event("end of day", opts) when is_list(opts) do
+    case event("sunset", opts) do
+      %DateTime{} = sunrise -> Timex.end_of_day(sunrise)
+      x -> x
+    end
+  end
+
   def event("noon", opts) when is_list(opts) do
     with %DateTime{} = sunrise <- event("sunrise", opts),
          %DateTime{} = sunset <- event("sunset", opts) do
