@@ -8,6 +8,11 @@ defmodule Eva.RefImpl.AutoOff do
   use Eva, name: AutoOff, id: AutoOff, restart: :permanent, shutdown: 1000
 end
 
+defmodule Eva.RefImpl.RuthLED do
+  alias __MODULE__
+  use Eva, name: RuthLED, id: RuthLED, restart: :permanent, shutdown: 1000
+end
+
 defmodule Eva.RefImpl.ManualTest do
   def setup do
     for num <- 0..7 do

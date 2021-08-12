@@ -9,6 +9,7 @@ defmodule Eva.TimedCmd.Instruct do
   defstruct name: "default",
             from: nil,
             cmd: "off",
+            cmd_params: %{},
             for_ms: 0,
             nowait: false,
             then_cmd: :none,
@@ -22,6 +23,7 @@ defmodule Eva.TimedCmd.Instruct do
           name: String.t(),
           from: pid(),
           cmd: String.t(),
+          cmd_params: map(),
           nowait: boolean(),
           for_ms: pos_integer(),
           then_cmd: String.t() | nil,
@@ -39,11 +41,13 @@ defmodule Eva.TimedCmd.Instruct do
     %Instruct{instruct | ledger: Ledger.completed(ledger)}
   end
 
-  def execute(%Instruct{} = x) do
+  def execute(%Instruct{name: name, cmd: cmd, cmd_params: cmd_params} = x) do
     # link the processes while executing a command
     if is_pid(x.from), do: Process.link(x.from)
 
-    result = %ExecCmd{name: x.name, cmd: x.cmd, cmd_opts: [notify_when_released: true]} |> Alfred.execute()
+    result =
+      %ExecCmd{name: name, cmd: cmd, cmd_params: cmd_params, cmd_opts: [notify_when_released: true]}
+      |> Alfred.execute()
 
     Logger.debug("\n#{inspect(result, pretty: true)}")
 
@@ -94,13 +98,16 @@ defmodule Eva.TimedCmd.Instruct do
   def new(equipment_name, %ExecCmd{} = ec, {pid, _tag} = _from) do
     default = %Instruct{}
 
+    {instruct_opts, cmd_params} = ec.cmd_params |> Enum.into(%{}) |> Map.split([:for_ms, :nowait, :then_cmd])
+
     %Instruct{
       name: equipment_name,
       cmd: ec.cmd,
+      cmd_params: cmd_params,
       from: pid,
-      for_ms: ec.cmd_params[:for_ms] || default.for_ms,
-      nowait: ec.cmd_params[:nowait] || default.nowait,
-      then_cmd: ec.cmd_params[:then_cmd] || default.then_cmd,
+      for_ms: instruct_opts[:for_ms] || default.for_ms,
+      nowait: instruct_opts[:nowait] || default.nowait,
+      then_cmd: instruct_opts[:then_cmd] || default.then_cmd,
       ref: make_ref(),
       ledger: Ledger.new()
     }

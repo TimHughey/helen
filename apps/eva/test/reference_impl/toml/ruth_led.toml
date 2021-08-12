@@ -1,0 +1,7 @@
+name = "Ruth LED"
+variant = "timed_cmd"
+description = "Ruth onboard status LED"
+initial_mode = "ready"
+
+[equipment]
+  name = "led"
