@@ -4,6 +4,12 @@ import Config
 
 config :garden, :suninfo_wait_ms, 1000
 
-config :garden, Lights,
-  cfg_file: "rel/toml/garden/lighting.toml",
-  suninfo_wait_ms: 1000
+if config_env() in [:dev, :test] do
+  config :garden,
+    cfg_path: "apps/garden/test/toml",
+    cfg_file: "config.toml"
+else
+  config :garden,
+    cfg_path: "rel/toml/garden",
+    cfg_file: "config.toml"
+end

@@ -43,9 +43,8 @@ defmodule Garden.MixProject do
     [
       {:toml, "~> 0.6.1"},
       {:timex, "~> 3.0"},
-      {:agnus, "~> 0.1.0"},
-      {:helen, in_umbrella: true},
-      {:credo, "> 0.0.0", only: [:dev, :test], runtime: false},
+      {:solar, in_umbrella: true},
+      {:should, in_umbrella: true},
       {:excoveralls, "~> 0.10", only: :test},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false}
     ]

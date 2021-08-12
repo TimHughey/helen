@@ -1,92 +1,51 @@
-defmodule LightsConfigTest do
+defmodule GardenConfigTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use Should
 
-  import GardenTestHelpers, only: [cfg_toml_file: 1, make_state: 1, pretty: 1]
-
-  @moduletag :config
-
-  def setup_ctx(args) do
-    {rc, s} = make_state(args)
-
-    assert :ok == rc, "state creation failed#{pretty(s)}"
-
-    %{cfg: s.cfg, state: s}
+  setup_all ctx do
+    ctx
   end
 
-  setup ctx do
-    args = get_in(ctx, [:state_args]) || :default
+  describe "Garden Config Parse" do
+    @tag cfg_file: "test/toml/config.toml"
+    test "success: can parse config file", ctx do
+      cfg = Garden.Config.Decode.file_to_map(ctx.cfg_file) |> Garden.Config.new()
 
-    {:ok, setup_ctx(args)}
-  end
+      should_be_struct(cfg, Garden.Config)
 
-  @tag state_args: [cfg_file: cfg_toml_file(:not_found), confirm_state: false]
-  test "can handle non-existant config file", %{state: s} do
-    invalid = get_in(s, [:invalid])
-    fail = "state should contain the list :invalid#{pretty(s)}"
-    assert is_list(invalid), fail
-    refute [] == invalid, fail
+      # cfg |> inspect(pretty: true) |> IO.puts()
+    end
 
-    msg = hd(invalid)
-    fail = "invalid list should contain not found#{pretty(invalid)}"
-    assert msg =~ "not found", fail
-  end
+    @tag cfg_file: "test/toml/config.toml"
+    test "success: can get unique equipment names", ctx do
+      res =
+        Garden.Config.Decode.file_to_map(ctx.cfg_file)
+        |> Garden.Config.new()
+        |> Garden.Config.equipment()
 
-  test "can load config", %{cfg: cfg, state: s} do
-    assert is_map(cfg)
-    assert is_map_key(s, :cfg)
+      should_be_non_empty_list(res)
+      assert length(res) == 6, "there should be six pieces of equipment"
 
-    fstat = get_in(cfg, [:fstat])
-    fail = "state cfg should contain :fstat#{pretty(s)}"
-    refute is_nil(fstat), fail
-    assert %File.Stat{} = fstat, fail
+      # res |> inspect(pretty: true) |> IO.puts()
+    end
 
-    %File.Stat{ctime: ctime, mtime: mtime, size: size} = fstat
+    @tag cfg_file: "test/toml/config.toml"
+    test "success: can calculate equipment commands", ctx do
+      now = Solar.event("astro rise")
 
-    msg = fn x -> "cfg file #{x} should be > 0" end
+      res =
+        Garden.Config.Decode.file_to_map(ctx.cfg_file)
+        |> Garden.Config.new()
+        |> Garden.Config.equipment_cmds(now)
 
-    assert ctime > 0, msg.("ctime")
-    assert mtime > 0, msg.("mtime")
-    assert size > 0, msg.("size")
-  end
+      assert should_be_non_empty_map(res)
 
-  @tag state_args: [cfg_file: cfg_toml_file(:parse_fail), confirm_state: false]
-  test "can detect config parse failure", %{state: s} do
-    invalid = get_in(s, [:invalid])
-    fail = "state should contain :invalid list#{pretty(s)}"
-    assert is_list(invalid), fail
-    refute [] == invalid, fail
+      inspect(res, pretty: true)
+      |> IO.puts()
 
-    msg = hd(invalid)
-    fail = "invalid list should contain parse fail#{pretty(invalid)}"
-    assert msg =~ "parse fail", fail
-  end
-
-  test "can detect config file change and reload", %{state: %{args: args} = s} do
-    cfg_file = "lighting.toml"
-
-    tmp_dir = System.tmp_dir()
-    refute is_nil(tmp_dir) == :ok, "unable to determine a suitable tmp directory"
-
-    new_cfg_file = Path.join(tmp_dir, cfg_file)
-
-    cfg_file_path = cfg_toml_file(:lighting)
-    rc = File.cp(cfg_file_path, new_cfg_file)
-    assert :ok == rc, "unable to cp #{inspect(cfg_file_path)} to #{inspect(new_cfg_file)}"
-
-    {rc, new_fstat} = File.stat(new_cfg_file, time: :posix)
-    assert :ok == rc, "unable to stat #{inspect(new_cfg_file)}"
-
-    args = update_in(args, [:cfg_file], fn _x -> new_cfg_file end)
-    s = put_in(s, [:args], args)
-
-    s = Lights.Config.reload_if_needed(s)
-
-    cfg_fstat = s.cfg.fstat
-
-    refute is_nil(cfg_fstat)
-
-    assert Map.equal?(cfg_fstat, new_fstat)
+      assert true
+    end
   end
 end

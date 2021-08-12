@@ -2,13 +2,12 @@ defmodule Lights.Config.Transforms do
   @moduledoc false
 
   def all do
-    import Module, only: [concat: 1]
     base = ["Lights", "Config"]
 
     transforms = ["DurationTransform", "SunRefToDateTimeTransform", "ValueToAtomTransform"]
 
     for x <- transforms do
-      List.flatten([base, x]) |> concat()
+      List.flatten([base, x]) |> Module.concat()
     end
   end
 end

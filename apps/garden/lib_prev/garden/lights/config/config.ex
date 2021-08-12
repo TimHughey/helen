@@ -1,33 +1,6 @@
 defmodule Lights.Config do
   @moduledoc false
 
-  @suninfo_wait_ms Application.compile_env!(:garden, [Lights, :suninfo_wait_ms]) || 1000
-
-  # (1 of 2) entry for ensuring suninfo is available
-  def ensure_suninfo(cfg_file) do
-    ensure_suninfo(cfg_file, 0)
-  end
-
-  # (2 of 2) accumulator to only wait for 1000ms
-  def ensure_suninfo(cfg_file, acc) do
-    import Agnus, only: [sun_info: 1]
-
-    # only wait when the first check failed
-    if acc > 0, do: Process.sleep(1)
-
-    failed_msg = {:suninfo, "suninfo not available"}
-
-    if acc < @suninfo_wait_ms do
-      case sun_info(:sunrise) do
-        %DateTime{} -> cfg_file
-        false -> ensure_suninfo(cfg_file, acc + 1)
-        [] -> failed_msg
-      end
-    else
-      failed_msg
-    end
-  end
-
   def file_info(cfg_file) do
     import File, only: [stat: 2]
     alias File.Stat
@@ -50,10 +23,7 @@ defmodule Lights.Config do
 
   # (1 of 4) attempt to parse the specified file at binary path
   def parse(cfg_file) when is_binary(cfg_file) do
-    case ensure_suninfo(cfg_file) do
-      x when is_tuple(x) -> x
-      x -> parse(x, file_info(cfg_file))
-    end
+    parse(cfg_file, file_info(cfg_file))
   end
 
   # (2 of 4) whoops, the cfg_file path isn't a binary

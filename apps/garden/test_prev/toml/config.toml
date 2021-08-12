@@ -1,0 +1,135 @@
+tz = "America/New_York"
+
+[cmd.fade_bright]
+type = "random"
+min = 256
+max = 2048
+primes = 35
+step_ms = 55
+step = 31
+priority = 7
+
+[cmd.fade_dim]
+type = "random"
+min = 256
+max = 1024
+primes = 35
+step_ms = 55
+step = 13
+priority = 7
+
+# INDOOR GARDEN
+
+[lighting.indoor_garden]
+device = "indoor garden alpha"
+description = "indoor garden"
+
+[lighting.indoor_garden.day]
+description = "daylight"
+start = {sun_ref = "nautical rise", cmd = "on"}
+finish = {sun_ref = "nautical rise", plus = "PT14H"}
+otherwise = {cmd = "off"}
+
+# FRONT PORCH
+
+[lighting.porch]
+device = "front leds porch"
+description = "front porch chandelier"
+
+[lighting.porch.day]
+description = "daytime"
+start = {sun_ref = "civil rise", cmd = "off"}
+finish = {sun_ref = "sunset"}
+
+[lighting.porch.evening]
+description = "random bright fading"
+start = {sun_ref = "sunset", cmd = "fade_bright"}
+finish = {sun_ref = "civil set"}
+
+[lighting.porch.night]
+description = "random dim fading"
+start = {sun_ref = "civil set", cmd = "fade_dim"}
+finish = {sun_ref = "civil rise"}
+
+# RED MAPLE
+
+[lighting.red_maple]
+device = "front leds red maple"
+description = "red maple"
+
+[lighting.red_maple.day]
+description = "no light"
+start = {sun_ref = "civil rise", cmd = "off"}
+finish = {sun_ref = "sunset"}
+
+[lighting.red_maple.evening]
+description = "random bright fading"
+start = {sun_ref = "sunset", cmd = "fade_bright"}
+finish = {sun_ref = "civil set"}
+
+[lighting.red_maple.night]
+description = "random dim fading"
+start = {sun_ref = "civil set", cmd = "fade_dim"}
+finish = {sun_ref = "civil rise"}
+
+# EVERGREEN
+
+[lighting.evergreen]
+device = "front leds evergreen"
+description = "front evergreen"
+
+[lighting.evergreen.day]
+description = "no light"
+start = {sun_ref = "civil rise", cmd = "off"}
+finish = {sun_ref = "sunset"}
+
+[lighting.evergreen.evening]
+description = "random bright fading"
+start = {sun_ref = "sunset", cmd = "fade_bright"}
+finish = {sun_ref = "civil set"}
+
+[lighting.evergreen.night]
+description = "random dim fading"
+start = {sun_ref = "civil set", cmd = "fade_dim"}
+finish = {sun_ref = "civil rise"}
+
+##
+## irrigation
+##
+
+[irrigation.flower_boxes]
+equipment = "Irrigation Flower Boxes"
+description = "flower boxes on front porch"
+
+[irrigation.flower_boxes.morning]
+description = "morning irrigation"
+start = {sun_ref = "civil rise", cmd = "on"}
+finish = {sun_ref = "civil rise", plus = "PT3M"}
+
+[irrigation.flower_boxes.midday]
+description = "midday irrigation"
+start = {sun_ref = "noon", cmd = "on"}
+finish = {sun_ref = "noon", plus = "PT1M"}
+
+[irrigation.flower_boxes.evening]
+description = "evening irrigation"
+start = {sun_ref = "sunset", cmd = "on"}
+finish = {sun_ref = "sunset", plus = "PT3M"}
+
+#
+# garden
+#
+
+[irrigation.garden]
+equipment = "Irrigation Garden"
+description = "garden"
+
+[irrigation.garden.morning]
+description = "morning irrigation"
+start = {sun_ref = "civil rise", cmd = "on"}
+finish = {sun_ref = "civil rise", plus = "PT15M"}
+
+[irrigation.garden.evening]
+description = "evening irrigation"
+start = {sun_ref = "sunset", cmd = "on"}
+finish = {sun_ref = "sunset", plus = "PT15M"}

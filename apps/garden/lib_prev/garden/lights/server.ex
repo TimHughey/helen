@@ -9,19 +9,10 @@ defmodule Lights.Server do
 
   import Helpers, only: [noreply: 1, reply: 2, server_name: 1]
 
-  def alive?(args \\ []) do
-    case GenServer.whereis(server_name(args)) do
-      x when is_pid(x) -> true
-      nil -> false
-    end
-  end
-
   def call(msg, args \\ []) do
-    if alive?(args) do
-      GenServer.call(server_name(args), msg)
-    else
-      :no_server
-    end
+    GenServer.call(server_name(args), msg)
+  rescue
+    _ -> :no_server
   end
 
   def start_link(args) do
@@ -77,7 +68,6 @@ defmodule Lights.Server do
 
     case step do
       :startup -> {:noreply, s, {:continue, :wait_suninfo}}
-      :wait_suninfo -> {:noreply, s, {:continue, check_suninfo()}}
       :load_cfg -> {:noreply, reload_if_needed(s), {:continue, :run}}
       :run -> change_token(s) |> run() |> schedule_run() |> noreply()
     end
@@ -104,18 +94,5 @@ defmodule Lights.Server do
     |> timeout_hook()
     |> update_last_timeout()
     |> noreply()
-  end
-
-  defp check_suninfo do
-    import Agnus, only: [sun_info: 1]
-
-    case sun_info(:sunrise) do
-      %DateTime{} ->
-        :load_cfg
-
-      false ->
-        Process.sleep(10)
-        :wait_suninfo
-    end
   end
 end
