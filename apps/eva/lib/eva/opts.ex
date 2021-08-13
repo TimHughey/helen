@@ -48,16 +48,12 @@ defmodule Eva.Opts do
   end
 
   def make_opts(mod, start_opts, use_opts) do
-    # cfg_path = System.get_env(start_opts[:env_vars][:cfg_path], ".")
-    cfg_path = [System.get_env(@helen_base), start_opts[:cfg_path]] |> Path.join()
-    #   cfg_file = System.get_env(start_opts[:env_vars][:cfg_file], "not_specified.toml")
-    cfg_file = start_opts[:cfg_file]
-    toml_file = [cfg_path, cfg_file] |> Path.join()
-
     {id, rest} = Keyword.pop(use_opts, :id, mod)
     {name, genserver_opts} = Keyword.pop(rest, :name, mod)
 
-    %Opts{server: %Server{id: id, name: name, genserver: genserver_opts}, toml_file: toml_file}
+    cfg_file = [System.get_env(@helen_base), start_opts[:cfg_file]] |> Path.join()
+
+    %Opts{server: %Server{id: id, name: name, genserver: genserver_opts}, toml_file: cfg_file}
   end
 
   def server_name(%Opts{} = opts), do: opts.server.name
