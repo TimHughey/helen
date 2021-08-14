@@ -1,0 +1,7 @@
+name = "Lighting Evergreen"
+variant = "timed_cmd"
+description = "fairy lights on front evergreen"
+initial_mode = "ready"
+
+[equipment]
+  name = "pwm1"

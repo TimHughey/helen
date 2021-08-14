@@ -68,6 +68,7 @@ defmodule Garden.Config do
             longitude: nil,
             cmds: %{on: CmdDef.new(:on), off: CmdDef.new(:off)},
             ations: %{},
+            irrigation_power: nil,
             valid?: true,
             invalid_reason: ""
 
@@ -79,8 +80,8 @@ defmodule Garden.Config do
     [timezone: tz, latitude: lat, longitude: long]
   end
 
-  def new({:ok, raw}) do
-    %Config{}
+  def new({:ok, %{power: %{irrigation: irrigation_power}} = raw}) do
+    %Config{irrigation_power: irrigation_power}
     |> handle_location(raw[:location])
     |> handle_cmds(raw[:cmd])
     |> handle_ation(:illumination, raw)

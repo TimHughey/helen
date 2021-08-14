@@ -1,0 +1,7 @@
+name = "Irrigation Porch"
+variant = "timed_cmd"
+description = "water valve for porch irrigation"
+initial_mode = "ready"
+
+[equipment]
+  name = "relay5"

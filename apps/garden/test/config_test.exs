@@ -15,6 +15,9 @@ defmodule GardenConfigTest do
 
       should_be_struct(cfg, Garden.Config)
 
+      fail = "irrigation power should be binary: #{inspect(cfg.irrigation_power)}"
+      assert is_binary(cfg.irrigation_power), fail
+
       # cfg |> inspect(pretty: true) |> IO.puts()
     end
 

@@ -7,6 +7,9 @@ timezone = "America/New_York"
 latitude = 40.21089564609479
 longitude = -74.0109850020794
 
+[power]
+irrigation = "Irrigation 12v Power"
+
 [cmd.fade_bright]
 type = "random"
 min = 256

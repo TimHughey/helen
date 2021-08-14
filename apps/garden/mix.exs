@@ -41,6 +41,7 @@ defmodule Garden.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:eva, in_umbrella: true},
       {:toml, "~> 0.6.1"},
       {:timex, "~> 3.0"},
       {:solar, in_umbrella: true},
