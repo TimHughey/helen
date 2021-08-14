@@ -13,7 +13,7 @@ defmodule Alfred.Test.CallbackMod do
     %ImmutableStatus{}
   end
 
-  def status(:mutable, name, opts) do
+  def status(:mutable, name, _opts) do
     case name do
       "Mutable Always On" = x -> make_good_mutable_status(x, "on")
       "Mutable Pending On" = x -> make_pending_mutable_status(x, "on")
