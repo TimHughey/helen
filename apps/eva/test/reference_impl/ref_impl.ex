@@ -12,22 +12,19 @@ end
 defmodule Eva.RefImpl.ManualTest do
   def setup do
     for num <- 0..7 do
-      name = "relay#{num}"
+      relay = "relay#{num}"
+      i2c = "i2c#{num}"
 
-      case Alfred.status(name) do
-        {:failed, _} -> Sally.make_alias("relay#{num}", "ds29241708000000", num)
-        _ -> nil
-      end
+      if Alfred.available?(relay), do: Sally.make_alias(relay, "ds29241708000000", num), else: nil
+      if Alfred.available?(i2c), do: Sally.make_alias(i2c, "i2c30aea423a210.mcp23008:20", num), else: nil
+
+      :ok
     end
 
-    for num <- 0..7 do
-      name = "i2c#{num}"
-
-      case Alfred.status(name) do
-        {:failed, _} -> Sally.make_alias("i2c#{num}", "i2c30aea423a210.mcp23008:20", num)
-        _ -> nil
-      end
-    end
+    Sally.make_alias("led", "pwm30aea423a210", 0)
+    Sally.make_alias("pwm1", "pwm30aea423a210", 1)
+    Sally.make_alias("pwm2", "pwm30aea423a210", 2)
+    Sally.make_alias("pwm3", "pwm30aea423a210", 3)
 
     Sally.make_alias("sht31", "i2c30aea423a210.sht31:44", 0)
     Sally.make_alias("pcb", "ds28ff280b6e1801", 0)

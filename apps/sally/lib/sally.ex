@@ -59,7 +59,7 @@ defmodule Sally do
     opts_map = Keyword.take(opts, [:ttl_ms, :description]) |> Enum.into(%{})
     changes = %{name: name, pio: pio} |> Map.merge(opts_map)
 
-    case {Device.find(ident: dev_ident), Alfred.available(name)} do
+    case {Device.find(ident: dev_ident), Alfred.available?(name)} do
       {%Device{} = dev, true} -> DevAlias.create(dev, changes)
       {%Device{}, false} -> {:failed, "name exists: #{name}"}
       {nil, _} -> {:failed, "device does not exist: #{dev_ident}"}

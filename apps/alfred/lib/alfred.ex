@@ -8,7 +8,7 @@ defmodule Alfred do
   alias Alfred.{ExecCmd, ExecResult, ImmutableStatus, KnownName, MutableStatus, Names, Notify}
 
   # is a name available (aka unknown)
-  def available(name), do: not Names.exists?(name)
+  def available?(name), do: not Names.exists?(name)
 
   defdelegate delete(name), to: Names
 

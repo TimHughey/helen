@@ -43,7 +43,7 @@ defmodule AlfredTest do
     end
 
     test "success: can determine a name is available", _ctx do
-      rc = Alfred.available("mutable10")
+      rc = Alfred.available?("mutable10")
 
       assert rc == true, "should return true: #{rc}"
     end
