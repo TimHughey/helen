@@ -1,0 +1,8 @@
+name = "Lighting Greenhouse"
+variant = "timed_cmd"
+description = "brian's secret garden"
+initial_mode = "ready"
+
+[equipment]
+  name = "relay0"
+  impact = "lights"

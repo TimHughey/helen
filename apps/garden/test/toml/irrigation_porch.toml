@@ -4,4 +4,4 @@ description = "water valve for porch irrigation"
 initial_mode = "ready"
 
 [equipment]
-  name = "relay5"
+  name = "relay2"

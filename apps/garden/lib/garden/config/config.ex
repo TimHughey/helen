@@ -49,8 +49,15 @@ end
 
 defmodule Garden.CmdDef do
   alias __MODULE__
+  alias Alfred.ExecCmd
 
   defstruct cmd: nil, params: %{}
+
+  def make_exec_cmd(equipment_name, cmd, cmd_defs) when is_map(cmd_defs) do
+    cmd_key = String.to_atom(cmd)
+    cmd_def = get_in(cmd_defs, [cmd_key])
+    %ExecCmd{name: equipment_name, cmd: cmd, cmd_params: cmd_def.params}
+  end
 
   def new(cmd, params \\ %{}) when is_atom(cmd) do
     %CmdDef{cmd: Atom.to_string(cmd), params: params}
@@ -101,6 +108,26 @@ defmodule Garden.Config do
         else
           %{acc | equipment => %{entry | type: type}}
         end
+    end
+  end
+
+  def make_timeline(%Config{ations: ations}, %DateTime{} = now_dt) do
+    for {{_type, _ation_id, _tod}, %Ation{schedule: schedule}} <- ations, reduce: [] do
+      acc ->
+        %Schedule{start_at: start_at, finish_at: finish_at} = schedule
+
+        for dt <- [start_at, finish_at], reduce: acc do
+          acc -> if Timex.after?(dt, now_dt), do: [dt] ++ acc, else: acc
+        end
+    end
+    |> Enum.sort(fn lhs, rhs -> Timex.compare(lhs, rhs) < 0 end)
+    |> Enum.uniq()
+  end
+
+  def next_wakeup_ms(%Config{} = cfg, %DateTime{} = now_dt) do
+    case make_timeline(cfg, now_dt) do
+      [] -> 1000
+      [%DateTime{} = next_dt | _] -> Timex.diff(next_dt, now_dt, :milliseconds) |> trunc()
     end
   end
 

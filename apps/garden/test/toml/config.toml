@@ -31,19 +31,19 @@ priority = 7
 # INDOOR GARDEN
 
 [illumination.indoor_garden]
-equipment = "indoor garden alpha"
+equipment = "Lighting Greenhouse"
 description = "indoor garden"
 
 [illumination.indoor_garden.day]
 description = "daylight"
 cmd = "on"
 start = {sun_ref = "nautical rise"}
-finish = {sun_ref = "nautical rise", plus = "PT14H"}
+finish = {sun_ref = "nautical rise", plus = "PT16H"}
 
 # FRONT PORCH
 
 [illumination.porch]
-equipment = "front leds porch"
+equipment = "Lighting Chandelier"
 description = "front porch chandelier"
 
 [illumination.porch.evening]
@@ -67,7 +67,7 @@ finish = {sun_ref = "civil rise"}
 # RED MAPLE
 
 [illumination.red_maple]
-equipment = "front leds red maple"
+equipment = "Lighting Red Maple"
 description = "red maple"
 
 [illumination.red_maple.evening]
@@ -91,7 +91,7 @@ finish = {sun_ref = "civil rise"}
 # EVERGREEN
 
 [illumination.evergreen]
-equipment = "front leds evergreen"
+equipment = "Lighting Evergreen"
 description = "front evergreen"
 
 [illumination.evergreen.evening]
@@ -117,7 +117,7 @@ finish = {sun_ref = "civil rise"}
 ##
 
 [irrigation.flower_boxes]
-equipment = "Irrigation Flower Boxes"
+equipment = "Irrigation Porch"
 description = "flower boxes on front porch"
 
 [irrigation.flower_boxes.morning]

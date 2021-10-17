@@ -6,5 +6,5 @@ watch = ["Irrigation Garden", "Irrigation Porch"]
 settle = "PT10S"  # duration for "on" command to settle before notifying caller of completed
 
 [equipment]
-  name = "relay7"
+  name = "relay1"
   impact = "power"

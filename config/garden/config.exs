@@ -13,6 +13,7 @@ if config_env() in [:dev, :test] do
   config :garden, Garden.Equipment.Lighting.Evergreen, cfg_file: "lighting_evergreen.toml"
   config :garden, Garden.Equipment.Lighting.RedMaple, cfg_file: "lighting_redmaple.toml"
   config :garden, Garden.Equipment.Lighting.Chandelier, cfg_file: "lighting_chandelier.toml"
+  config :garden, Garden.Equipment.Lighting.Greenhouse, cfg_file: "lighting_greenhouse.toml"
 else
   config :garden,
     cfg_path: "rel/toml/garden",

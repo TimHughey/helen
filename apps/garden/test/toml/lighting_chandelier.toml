@@ -4,4 +4,4 @@ description = "fairy lights on porch chandelier"
 initial_mode = "ready"
 
 [equipment]
-  name = "pwm3"
+  name = "led"

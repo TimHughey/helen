@@ -45,22 +45,11 @@ defmodule Eva.TimedCmd.Instruct do
     # link the processes while executing a command
     if is_pid(x.from), do: Process.link(x.from)
 
-    result =
-      %ExecCmd{name: name, cmd: cmd, cmd_params: cmd_params, cmd_opts: [notify_when_released: true]}
-      |> Alfred.execute()
-
-    Logger.debug("\n#{inspect(result, pretty: true)}")
-
-    instruct = %Instruct{x | exec_result: result, ledger: Ledger.executed(x.ledger)}
-
-    case result do
-      # the command is pending, wait for the release before starting for_ms timer (if specified)
-      %ExecResult{rc: :ok, refid: x} when is_binary(x) -> instruct
-      # equipment matches desired cmd, start for_ms timer immediately
-      %ExecResult{rc: :ok} -> instruct |> schedule_timer()
-      # allow caller to deal with errors by checking exec_result
-      _ -> instruct
-    end
+    %ExecCmd{name: name, cmd: cmd, cmd_params: cmd_params, cmd_opts: [notify_when_released: true]}
+    |> Alfred.execute()
+    |> tap(fn er -> Logger.debug("\n#{inspect(er, pretty: true)}") end)
+    |> then(fn er -> %Instruct{x | exec_result: er, ledger: Ledger.executed(x.ledger)} end)
+    |> handle_exec_result()
   end
 
   # (1 of x) quietly ignore expired timers for out of date instructions
@@ -122,6 +111,24 @@ defmodule Eva.TimedCmd.Instruct do
     |> tap(fn x -> Logger.debug("\n#{inspect(x, pretty: true)}") end)
   end
 
+  # (1 of 3) the command is pending, wait for release before starting for_ms timer (if specified)
+  def handle_exec_result(
+        %Instruct{exec_result: %ExecResult{rc: :ok, refid: refid}, ledger: ledger} = instruct
+      )
+      when is_binary(refid) do
+    Ledger.pending(ledger) |> update(instruct)
+  end
+
+  # (2 of 3) the equipment is already at the specified command, start for_ms timer
+  def handle_exec_result(%Instruct{exec_result: %ExecResult{rc: :ok}, for_ms: for_ms} = instruct)
+      when is_integer(for_ms) do
+    instruct |> schedule_timer()
+    %Instruct{instruct | timer: Process.send_after(self(), {:instruct, instruct}, for_ms)}
+  end
+
+  # (3 of 3) no match; likely an error, allow caller to do the necessary
+  def handle_exec_result(%Instruct{} = instruct), do: instruct
+
   defp send_complete(%Instruct{nowait: false, from: from} = instruct) when is_pid(from) do
     from |> Process.send({Eva, :complete, instruct.ref}, [])
 
@@ -133,6 +140,8 @@ defmodule Eva.TimedCmd.Instruct do
   defp schedule_timer(%Instruct{for_ms: for_ms} = x) when is_integer(for_ms) do
     %Instruct{x | timer: Process.send_after(self(), {:instruct, x}, x.for_ms)}
   end
+
+  defp update(%Ledger{} = ledger, %Instruct{} = instruct), do: %Instruct{instruct | ledger: ledger}
 end
 
 defmodule Eva.TimedCmd do
@@ -197,7 +206,7 @@ defmodule Eva.TimedCmd do
       when icmd != ecmd do
     case ledger do
       # make no attempt to correct the equipment cmd while another cmd is inflight
-      %Ledger{executed_at: %DateTime{}, released_at: :none} ->
+      %Ledger{executed_at: %DateTime{}, released_at: :pending} ->
         tc
 
       _ ->

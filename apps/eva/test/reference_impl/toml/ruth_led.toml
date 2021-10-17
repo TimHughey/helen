@@ -4,4 +4,4 @@ description = "Ruth onboard status LED"
 initial_mode = "ready"
 
 [equipment]
-  name = "led"
+  name = "i2c3"

@@ -4,4 +4,4 @@ description = "executes equipment commands"
 initial_mode = "ready"
 
 [equipment]
-  name = "relay0"
+  name = "i2c6"
