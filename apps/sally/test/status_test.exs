@@ -7,7 +7,6 @@ defmodule SallyStatusTest do
   @moduletag sally_status: true
 
   alias Alfred.MutableStatus
-  alias Sally.Status
   alias Sally.Test.Support
 
   setup_all ctx do
@@ -16,8 +15,8 @@ defmodule SallyStatusTest do
 
   # setup [:setup_wrapped]
 
-  test "can Sally.Status.get/2 detect unknown Alias name", _ctx do
-    res = Status.get("unknown", [])
+  test "can Sally.status/3 detect unknown Alias name", _ctx do
+    res = Sally.status(:mutable, "unknown", [])
     should_be_struct(res, MutableStatus)
 
     fail = pretty("Status result did not match", res)
@@ -31,7 +30,7 @@ defmodule SallyStatusTest do
 
   @tag dev_alias_opts: [name: "Status TTL Test WITH OPTS", pio: 0]
   @tag status_opts: [ttl_ms: 0]
-  test "can Sally.Status.get/2 detect ttl expired with ttl_ms opt", ctx do
+  test "can Sally.status/3 detect ttl expired with ttl_ms opt", ctx do
     host_opts = [ident: @host_ident_default, name: @host_name_default]
     device_opts = [ident: "status_test01", family: "ds", mutable: false]
 
@@ -39,7 +38,7 @@ defmodule SallyStatusTest do
     dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
-    res = Status.get(dev_alias.name, ctx.status_opts)
+    res = Sally.status(:mutable, dev_alias.name, ctx.status_opts)
     should_be_struct(res, MutableStatus)
 
     fail = pretty("Status result did not match", res)
@@ -51,7 +50,7 @@ defmodule SallyStatusTest do
   @tag host_opts: [host: @host_ident_default, name: @host_name_default]
   @tag device_opts: [device: "status_test02", family: "i2c", mutable: true]
   @tag dev_alias_opts: [name: "Status TTL Test NO OPTS", ttl_ms: 50, pio: 1]
-  test "can Sally.Status.get/2 detect ttl expired based on Alias ttl_ms", ctx do
+  test "can Sally.status/3 detect ttl expired based on Alias ttl_ms", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
 
     dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
@@ -61,7 +60,7 @@ defmodule SallyStatusTest do
     # allow dev alias TTL to elapsed
     Process.sleep(51)
 
-    res = Status.get(dev_alias.name, [])
+    res = Sally.status(:mutable, dev_alias.name, [])
     should_be_struct(res, MutableStatus)
 
     fail = pretty("Status result did not match", res)
@@ -74,7 +73,7 @@ defmodule SallyStatusTest do
   @tag device_opts: [device: "status_test03", family: "pwm", mutable: true]
   @tag dev_alias_opts: [name: "Status Pending Test", ttl_ms: 1000, pio: 2]
   @tag cmd: "pending"
-  test "can Sally.Status.get/2 detect pending Alias cmd", ctx do
+  test "can Sally.status/3 detect pending Alias cmd", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
     dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
@@ -82,7 +81,7 @@ defmodule SallyStatusTest do
     cmd = Support.add_command(dev_alias, ctx.cmd)
     should_be_schema(cmd, Sally.Command)
 
-    res = Status.get(dev_alias.name, [])
+    res = Sally.status(:mutable, dev_alias.name, [])
     should_be_struct(res, MutableStatus)
 
     fail = pretty("Status result did not match", res)
@@ -100,7 +99,7 @@ defmodule SallyStatusTest do
   @tag dev_alias_opts: [name: "Status Unresponsive Test", ttl_ms: 1000, pio: 3]
   @tag cmd: "unresponsive"
   @tag cmd_disposition: :orphan
-  test "can Sally.Status.get/2 detect unresponsive Alias (orphaned cmd)", ctx do
+  test "can Sally.status/3 detect unresponsive Alias (orphaned cmd)", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
     dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
@@ -111,7 +110,7 @@ defmodule SallyStatusTest do
     acked_cmd = Sally.Command.ack_now(cmd, ctx.cmd_disposition, DateTime.utc_now())
     should_be_schema(acked_cmd, Sally.Command)
 
-    res = Status.get(dev_alias.name, [])
+    res = Sally.status(:mutable, dev_alias.name, [])
     should_be_struct(res, MutableStatus)
 
     fail = pretty("Status result did not match", res)
@@ -129,7 +128,7 @@ defmodule SallyStatusTest do
   @tag dev_alias_opts: [name: "Status Good Test", ttl_ms: 1000, pio: 4]
   @tag cmd: "good"
   @tag cmd_disposition: :ack
-  test "can Sally.Status.get/2 detect good status", ctx do
+  test "can Sally.status/3 detect good status", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
     dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
@@ -140,7 +139,7 @@ defmodule SallyStatusTest do
     acked_cmd = Sally.Command.ack_now(cmd, ctx.cmd_disposition, DateTime.utc_now())
     should_be_schema(acked_cmd, Sally.Command)
 
-    res = Status.get(dev_alias.name, [])
+    res = Sally.status(:mutable, dev_alias.name, [])
     should_be_struct(res, MutableStatus)
 
     fail = pretty("Status result did not match", res)
