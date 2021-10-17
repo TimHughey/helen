@@ -4,11 +4,7 @@ import Config
 
 local_secrets = [System.user_home(), "devel", "shell", "local"]
 
-config :agnus, day_info: [cache_file: "priv/agnus.json"]
-
 config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
-config :helen, :default_tz, "America/New_York"
-config :easy_time, :default_tz, "America/New_York"
 
 # Configures Elixir's Logger
 config :logger,
@@ -22,7 +18,7 @@ config :logger,
     [application: :helen, level_lower_than: :info]
   ]
 
-apps = ["betty", "broom", "eva", "sally", "garden", "helen", "ui", "ruth_sim"]
+apps = ["betty", "broom", "eva", "sally", "garden", "ruth_sim"]
 
 for app <- apps do
   import_config "#{app}/config.exs"

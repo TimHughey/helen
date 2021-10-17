@@ -1,5 +1,6 @@
 defmodule Broom.Tracker do
   require Logger
+  use Timex
 
   alias __MODULE__
 
@@ -26,7 +27,7 @@ defmodule Broom.Tracker do
         }
 
   def apply_opts(%Tracker{} = t, %TrackOpts{} = track_opts) do
-    to_ms = fn key -> Map.get(track_opts, key) |> EasyTime.iso8601_duration_to_ms() end
+    to_ms = fn key -> Map.get(track_opts, key) |> iso8601_duration_to_ms() end
 
     %Tracker{
       t
@@ -66,6 +67,15 @@ defmodule Broom.Tracker do
     %Tracker{t | refs: Map.drop(t.refs, prune_refs), released: keep_refs}
     |> schedule_prune()
   end
+
+  defp iso8601_duration_to_ms(binary) when is_binary(binary) do
+    case Duration.parse(binary) do
+      {:ok, x} -> Duration.to_milliseconds(x, truncate: true)
+      {:error, msg} -> {:failed, msg}
+    end
+  end
+
+  defp iso8601_duration_to_ms(_what), do: nil
 
   defp schedule_prune(%Tracker{} = t) do
     %Tracker{t | prune_timer: Process.send_after(self(), :prune_refs, t.prune_interval_ms)}

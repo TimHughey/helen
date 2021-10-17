@@ -28,8 +28,7 @@ defmodule RuthSim.MixProject do
       {:timex, "~> 3.0"},
       {:tortoise, "~> 0.9"},
       {:msgpax, "~> 2.0"},
-      {:ecto_sql, "~> 3.1"},
-      {:easy_time, in_umbrella: true}
+      {:ecto_sql, "~> 3.1"}
     ]
   end
 end

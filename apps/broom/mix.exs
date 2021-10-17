@@ -74,8 +74,8 @@ defmodule Broom.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.1"},
+      {:timex, "~> 3.0"},
       {:betty, in_umbrella: true},
-      {:easy_time, in_umbrella: true},
       {:should, in_umbrella: true, only: :test, runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
       {:postgrex, ">= 0.0.0", only: :test}

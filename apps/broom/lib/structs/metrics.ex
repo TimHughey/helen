@@ -1,5 +1,6 @@
 defmodule Broom.Metrics do
   require Logger
+  use Timex
 
   alias __MODULE__
 
@@ -21,7 +22,7 @@ defmodule Broom.Metrics do
         }
 
   def init(%MetricsOpts{} = metrics_opts) do
-    %Metrics{interval_ms: metrics_opts.interval |> EasyTime.iso8601_duration_to_ms()} |> schedule()
+    %Metrics{interval_ms: metrics_opts.interval |> iso8601_duration_to_ms()} |> schedule()
   end
 
   def report(%Metrics{} = m, mod, %Counts{} = c) do
@@ -32,7 +33,7 @@ defmodule Broom.Metrics do
   end
 
   def update_opts(%Metrics{} = m, %MetricsOpts{} = new_opts) do
-    %Metrics{m | interval_ms: new_opts.interval |> EasyTime.iso8601_duration_to_ms()}
+    %Metrics{m | interval_ms: new_opts.interval |> iso8601_duration_to_ms()}
     |> cancel_timer_if_needed()
     |> schedule()
   end
@@ -46,6 +47,15 @@ defmodule Broom.Metrics do
 
   # (2 of 2)
   defp cancel_timer_if_needed(m), do: m
+
+  defp iso8601_duration_to_ms(binary) when is_binary(binary) do
+    case Duration.parse(binary) do
+      {:ok, x} -> Duration.to_milliseconds(x, truncate: true)
+      {:error, msg} -> {:failed, msg}
+    end
+  end
+
+  defp iso8601_duration_to_ms(_what), do: nil
 
   defp schedule(%Metrics{} = m) do
     cancel_timer_if_needed(m) |> start_timer()

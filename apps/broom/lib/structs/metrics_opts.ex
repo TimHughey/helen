@@ -1,4 +1,6 @@
 defmodule Broom.MetricsOpts do
+  use Timex
+
   alias __MODULE__
 
   defstruct interval: "PT5M"
@@ -7,7 +9,10 @@ defmodule Broom.MetricsOpts do
   @type t :: %__MODULE__{interval: iso8601_duration()}
 
   def is_valid?(%MetricsOpts{} = metrics_opts) do
-    EasyTime.is_iso_duration?(metrics_opts.interval)
+    case Duration.parse(metrics_opts.interval) do
+      {:ok, _} -> true
+      _error -> false
+    end
   end
 
   def make(start_opts, use_opts) do
