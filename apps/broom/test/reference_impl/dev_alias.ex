@@ -143,11 +143,11 @@ defmodule Broom.DevAlias do
     Repo.all(q)
   end
 
-  defp upsert(params, %Schema{} = device) when is_map(params) do
-    insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
-
-    params
-    |> changeset(device)
-    |> Repo.insert(insert_opts)
-  end
+  # defp upsert(params, %Schema{} = device) when is_map(params) do
+  #   insert_opts = [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name]]
+  #
+  #   params
+  #   |> changeset(device)
+  #   |> Repo.insert(insert_opts)
+  # end
 end

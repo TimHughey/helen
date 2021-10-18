@@ -1,8 +1,8 @@
 import Config
 
-config :broom, ecto_repos: [Broom.Repo]
-
 if Config.config_env() == :test do
+  config :broom, ecto_repos: [Broom.Repo]
+
   config :broom, Broom.Repo,
     username: "broom_test",
     password: "broom_test",
