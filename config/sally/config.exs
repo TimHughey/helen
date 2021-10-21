@@ -20,3 +20,8 @@ if config_env() in [:dev, :test] do
   import_config "test.exs"
   import_config "test-secret.exs"
 end
+
+if config_env() == :prod do
+  import_config "#{config_env()}.exs"
+  import_config "#{config_env()}-secret.exs"
+end

@@ -1,0 +1,33 @@
+[server]
+timeout = "PT15S"
+timezone = "America/New_York"
+device_group = "irrigation"
+
+[power]
+device = "irrigation 12v power"
+settle = "PT5S"
+
+[job.flower_boxes]
+enabled = false
+power_required = true
+device = "irrigation flower boxes"
+
+[job.flower_boxes.schedule.morning]
+sun_ref = "sunrise"
+offset = {plus = "PT0S"}
+duration = "PT30S"
+
+[job.flower_boxes.schedule.afternoon]
+sun_ref = "sunset"
+offset = {minus = "PT3H"}
+duration = "PT30S"
+
+[job.garden]
+enabled = false
+power_required = true
+device = "irrigation garden"
+
+[job.garden.schedule.morning]
+sun_ref = "sunrise"
+offset = {plus = "PT0S"}
+duration = "PT15M"

@@ -32,7 +32,7 @@ defmodule FatHelen.MixProject do
   defp releases do
     [
       helen: [
-        version: "0.1.2",
+        version: "0.2.0",
         applications: applications(),
         include_erts: true,
         include_executables_for: [:unix],
@@ -55,7 +55,8 @@ defmodule FatHelen.MixProject do
       betty: :permanent,
       broom: :permanent,
       sally: :permanent,
-      helen: :permanent
+      garden: :permanent,
+      legacy_db: :permanent
     ]
   end
 

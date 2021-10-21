@@ -12,6 +12,7 @@ defmodule Garden.Server do
   @impl true
   def init(args) do
     cfg_file = [System.get_env("HELEN_BASE"), args[:cfg_file]] |> Path.join()
+
     cfg = Config.Decode.file_to_map(cfg_file) |> Config.new()
 
     {:ok, State.new(cfg), {:continue, :check_equipment}}
@@ -46,6 +47,10 @@ defmodule Garden.Server do
   @impl true
   def handle_info({Eva, :complete, _ref}, %State{} = s) do
     s |> noreply()
+  end
+
+  def state do
+    :sys.get_state(__MODULE__)
   end
 
   defp control_equipment(%State{cfg: %Config{cmds: cmd_defs} = cfg} = s) do

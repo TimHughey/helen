@@ -92,7 +92,8 @@ defmodule Garden.Config do
     |> handle_location(raw[:location])
     |> handle_cmds(raw[:cmd])
     |> handle_ation(:illumination, raw)
-    |> handle_ation(:irrigation, raw)
+
+    # |> handle_ation(:irrigation, raw)
   end
 
   def equipment_cmds(%Config{ations: ations} = cfg, %DateTime{} = now_dt) do

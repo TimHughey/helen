@@ -1,8 +1,8 @@
 [meta]
-name = "all engines"
+name = "ds i2c"
 # the description is not sent to the Host
 # rather, it is used by Sally to log the profile sent to the host
-description = "dalsemi, pwm and i2c"
+description = "dalsemi and i2c"
 version = 1
 
 [host]
@@ -22,7 +22,3 @@ command = {stack = 4096, pri = 14}
 [i2c]
 report = {stack = 4096, pri = 5, send_ms = 7_000, loops_per_discover = 10 }
 command = {stack = 4096, pri = 14}
-
-[pwm]
-command = {stack = 4096, pri = 13}
-report = {stack = 3072, pri = 1, send_ms = 7_000}

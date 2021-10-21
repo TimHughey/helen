@@ -11,26 +11,26 @@ defmodule Garden.Application do
   @cfg_file Application.compile_env!(:garden, :cfg_file)
 
   @irrigation [
-    garden: Application.compile_env!(:garden, [Equipment.Irrigation.Garden, :cfg_file]),
-    porch: Application.compile_env!(:garden, [Equipment.Irrigation.Porch, :cfg_file]),
+    # garden: Application.compile_env!(:garden, [Equipment.Irrigation.Garden, :cfg_file]),
+    # porch: Application.compile_env!(:garden, [Equipment.Irrigation.Porch, :cfg_file]),
     power: Application.compile_env!(:garden, [Equipment.Irrigation.Power, :cfg_file])
   ]
 
   @lighting [
-    evergreen: Application.compile_env!(:garden, [Equipment.Lighting.Evergreen, :cfg_file]),
-    red_maple: Application.compile_env!(:garden, [Equipment.Lighting.RedMaple, :cfg_file]),
-    chandelier: Application.compile_env!(:garden, [Equipment.Lighting.Chandelier, :cfg_file]),
+    # evergreen: Application.compile_env!(:garden, [Equipment.Lighting.Evergreen, :cfg_file]),
+    # red_maple: Application.compile_env!(:garden, [Equipment.Lighting.RedMaple, :cfg_file]),
+    # chandelier: Application.compile_env!(:garden, [Equipment.Lighting.Chandelier, :cfg_file]),
     greenhouse: Application.compile_env!(:garden, [Equipment.Lighting.Greenhouse, :cfg_file])
   ]
 
   def start(_type, _args) do
     children = [
-      {Equipment.Irrigation.Garden, irrigation_opts(:garden)},
-      {Equipment.Irrigation.Porch, irrigation_opts(:porch)},
+      # {Equipment.Irrigation.Garden, irrigation_opts(:garden)},
+      # {Equipment.Irrigation.Porch, irrigation_opts(:porch)},
       {Equipment.Irrigation.Power, irrigation_opts(:power)},
-      {Equipment.Lighting.Evergreen, lighting_opts(:evergreen)},
-      {Equipment.Lighting.RedMaple, lighting_opts(:red_maple)},
-      {Equipment.Lighting.Chandelier, lighting_opts(:chandelier)},
+      # {Equipment.Lighting.Evergreen, lighting_opts(:evergreen)},
+      # {Equipment.Lighting.RedMaple, lighting_opts(:red_maple)},
+      # {Equipment.Lighting.Chandelier, lighting_opts(:chandelier)},
       {Equipment.Lighting.Greenhouse, lighting_opts(:greenhouse)},
       {Server, server_opts()}
     ]

@@ -1,6 +1,6 @@
 import Config
 
-if Config.config_env() == :test do
+if Config.config_env() in [:dev, :test] do
   config :broom, ecto_repos: [Broom.Repo]
 
   config :broom, Broom.Repo,

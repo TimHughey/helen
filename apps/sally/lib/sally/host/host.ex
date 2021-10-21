@@ -100,10 +100,6 @@ defmodule Sally.Host do
   def find_by_ident(ident), do: Repo.get_by(Schema, ident: ident)
   def find_by_name(name), do: Repo.get_by(Schema, name: name)
 
-  def get_devices(%Schema{id: id}) do
-    Repo.all(Sally.Device, host_id: id)
-  end
-
   def idents_begin_with(pattern) when is_binary(pattern) do
     like_string = IO.iodata_to_binary([pattern, "%"])
 

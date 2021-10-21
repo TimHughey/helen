@@ -2,7 +2,7 @@
 name = "all engines"
 # the description is not sent to the Host
 # rather, it is used by Sally to log the profile sent to the host
-description = "dalsemi, pwm and i2c"
+description = "dalsemi, i2c and pwm"
 version = 1
 
 [host]
