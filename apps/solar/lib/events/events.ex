@@ -6,18 +6,20 @@ defmodule Solar.Opts do
             latitude: 40.21089564609479,
             longitude: -74.0109850020794,
             timezone: "America/New_York",
+            datetime: nil,
             valid?: true,
             invalid_reason: ""
 
   @type event_type() :: :rise | :set
   @type zenith() :: :astro | :nautical | :civil | :official
-  @type date_option() :: DateTime.t()
+  @type for_datetime() :: DateTime.t()
   @type t :: %Opts{
           type: event_type(),
           zenith: zenith(),
           latitude: float(),
           longitude: float(),
           timezone: Calendar.time_zone(),
+          datetime: for_datetime(),
           valid?: boolean(),
           invalid_reason: String.t()
         }
@@ -27,11 +29,14 @@ defmodule Solar.Opts do
   end
 
   defp make_location(%Opts{} = opts, location_opts) do
+    timezone = location_opts[:timezone] || opts.timezone
+
     %Opts{
       opts
       | latitude: location_opts[:latitude] || opts.latitude,
         longitude: location_opts[:longitude] || opts.longitude,
-        timezone: location_opts[:timezone] || opts.timezone
+        timezone: timezone,
+        datetime: location_opts[:datetime] || Timex.now(timezone)
     }
   end
 
@@ -127,7 +132,7 @@ defmodule Solar.Events do
       lat_rad: opts.latitude |> deg_to_rad(),
       long_deg: opts.longitude,
       long_rad: opts.longitude |> deg_to_rad(),
-      loc_date: Timex.now(opts.timezone) |> Timex.to_date(),
+      loc_date: opts.datetime,
       timezone: opts.timezone
     }
 
@@ -144,7 +149,7 @@ defmodule Solar.Events do
          %Events{} = x <- right_ascension(x),
          %Events{} = x <- local_mean_time(x) do
       # calculate the final result as a DateTime for the location date with the requested sun position
-      tzi = Timex.timezone(x.timezone, x.loc_date)
+      tzi = Timex.timezone(x.timezone, opts.datetime)
       offset_minutes = Timex.Timezone.total_offset(tzi)
 
       utc_time = x.local_mean_time - x.base_long_hour
@@ -157,7 +162,8 @@ defmodule Solar.Events do
       tsecs = (tmins - min) * 60
       sec = tsecs |> trunc()
 
-      Timex.now(x.timezone) |> Timex.set(hour: hr, minute: min, second: sec, microsecond: 0)
+      # Timex.now(x.timezone) |> Timex.set(hour: hr, minute: min, second: sec, microsecond: 0)
+      Timex.set(opts.datetime, hour: hr, minute: min, second: sec, microsecond: 0)
     else
       %Opts{valid?: false, invalid_reason: x} -> {:error, x}
       %Events{invalid_reason: x} -> {:error, x}

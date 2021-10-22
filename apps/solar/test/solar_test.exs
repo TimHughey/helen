@@ -58,6 +58,14 @@ defmodule SolarTest do
       should_be_tuple_with_rc(res, :error)
     end
 
+    test "success: can produce event for different date" do
+      future_day = Timex.now("America/New_York") |> Timex.shift(days: 30)
+
+      res = Solar.event("noon", datetime: future_day)
+
+      assert future_day.day == res.day
+    end
+
     # test "success: event set datetime" do
     #   dt = Solar.Opts.new(type: :set) |> Solar.event()
     #
