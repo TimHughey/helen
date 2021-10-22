@@ -32,7 +32,7 @@ defmodule Solar.MixProject do
   defp deps do
     [
       {:timex, "~> 3.0"},
-      {:should, in_umbrella: true},
+      {:should, in_umbrella: true, only: :test},
       {:excoveralls, "~> 0.10", only: :test}
     ]
   end
