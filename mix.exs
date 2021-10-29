@@ -1,4 +1,4 @@
-defmodule FatHelen.MixProject do
+defmodule Helen.MixProject do
   @moduledoc false
 
   use Mix.Project
@@ -55,8 +55,9 @@ defmodule FatHelen.MixProject do
       betty: :permanent,
       broom: :permanent,
       sally: :permanent,
-      garden: :permanent,
-      legacy_db: :permanent
+      garden: :none,
+      legacy_db: :permanent,
+      illumination: :permanent
     ]
   end
 
