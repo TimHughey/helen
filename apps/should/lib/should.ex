@@ -101,9 +101,19 @@ defmodule Should do
     quote location: :keep, bind_quoted: [res: res, val: val] do
       should_be_ok_tuple(res)
 
-      fail = pretty("val should be", val)
+      fail = pretty("val should be ", val)
       {_, x} = res
       assert x == val, fail
+    end
+  end
+
+  defmacro should_be_ok_pid(res) do
+    quote location: :keep, bind_quoted: [res: res] do
+      fail = pretty("should be {:ok, pid}: ", res)
+      assert is_tuple(res), fail
+      assert tuple_size(res) == 2, fail
+      assert elem(res, 0) == :ok, fail
+      assert elem(res, 1) |> is_pid, fail
     end
   end
 
@@ -118,6 +128,16 @@ defmodule Should do
     quote location: :keep, bind_quoted: [res: res] do
       fail = pretty("result should be a tuple", res)
       assert is_tuple(res), fail
+    end
+  end
+
+  defmacro should_be_tuple_with_size(res, size) do
+    quote location: :keep, bind_quoted: [res: res, size: size] do
+      fail = pretty("result should be a tuple", res)
+      assert is_tuple(res), fail
+
+      fail = pretty("tuple should be size #{size}", res)
+      assert tuple_size(res) == size, fail
     end
   end
 
@@ -205,6 +225,17 @@ defmodule Should do
       should_be_status_map(x)
       fail = pretty("should not be ttl expired", x)
       refute is_map_key(x, :ttl_expired), fail
+    end
+  end
+
+  defmacro should_be_noreply_tuple_with_state(res, struct) do
+    quote location: :keep, bind_quoted: [res: res, struct: struct] do
+      fail = pretty("result should be a noreply tuple", res)
+      assert is_tuple(res), fail
+      assert tuple_size(res) == 2, fail
+      assert elem(res, 0) == :noreply, fail
+      assert elem(res, 1) |> is_struct(), fail
+      assert elem(res, 1).__struct__ == struct, fail
     end
   end
 
