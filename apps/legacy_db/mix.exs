@@ -28,7 +28,8 @@ defmodule LegacyDb.MixProject do
     [
       {:postgrex, ">= 0.0.0"},
       {:ecto_sql, "~> 3.1"},
-      {:jason, "~> 1.0"}
+      {:jason, "~> 1.0"},
+      {:timex, "~> 3.0"}
     ]
   end
 end
