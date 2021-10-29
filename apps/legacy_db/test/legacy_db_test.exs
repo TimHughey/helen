@@ -1,5 +1,6 @@
 defmodule LegacyDbTest do
   use ExUnit.Case, async: true
+  use Should
 
   test "legacy db sensor" do
     import Ecto.Query, only: [from: 1]
@@ -55,5 +56,37 @@ defmodule LegacyDbTest do
 
     assert is_list(profiles)
     refute profiles == []
+  end
+
+  test "pwm all aliases" do
+    res = LegacyDb.all_pwm_aliases()
+    should_be_non_empty_list(res)
+
+    for pwm_alias <- res do
+      should_be_struct(pwm_alias, LegacyDb.PulseWidth.Alias)
+    end
+  end
+
+  test "pwm all alias names" do
+    res = LegacyDb.all_pwm_names()
+    should_be_non_empty_list(res)
+  end
+
+  test "pwm lookup alias details" do
+    res = LegacyDb.pwm_alias("front leds porch")
+    should_be_non_empty_map(res)
+    should_contain_key(res, :name)
+  end
+
+  test "sensor lookup alias details" do
+    res = LegacyDb.sensor_alias("display_tank")
+    should_be_non_empty_map(res)
+    should_contain_key(res, :host)
+  end
+
+  test "switch lookup alias details" do
+    res = LegacyDb.switch_alias("display tank heater")
+    should_be_non_empty_map(res)
+    should_contain_key(res, :pio)
   end
 end

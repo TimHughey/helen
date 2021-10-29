@@ -4,7 +4,7 @@ defmodule LegacyDb.MixProject do
   def project do
     [
       app: :legacy_db,
-      version: "0.1.0",
+      version: "0.1.1",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -29,7 +29,8 @@ defmodule LegacyDb.MixProject do
       {:postgrex, ">= 0.0.0"},
       {:ecto_sql, "~> 3.1"},
       {:jason, "~> 1.0"},
-      {:timex, "~> 3.0"}
+      {:timex, "~> 3.0"},
+      {:should, in_umbrella: true}
     ]
   end
 end
