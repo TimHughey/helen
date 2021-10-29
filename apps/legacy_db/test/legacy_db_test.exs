@@ -89,4 +89,10 @@ defmodule LegacyDbTest do
     should_be_non_empty_map(res)
     should_contain_key(res, :pio)
   end
+
+  test "ds sensor lookup by device name" do
+    res = LegacyDb.ds_sensor("ds.280cd73a1a1901")
+    should_be_non_empty_map(res)
+    should_contain_value(res, "ds.280cd73a1a1901")
+  end
 end

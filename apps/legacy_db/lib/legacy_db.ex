@@ -26,6 +26,20 @@ defmodule LegacyDb do
 
   def all_switch_names, do: all_alias_names(Switch.Alias)
 
+  def ds_sensor(dev_name) do
+    legacy_dev_name = String.replace(dev_name, ".", "/")
+    query = Query.from(x in Sensor.Device, where: x.device == ^legacy_dev_name)
+
+    case Repo.one(query) |> Repo.preload(:_alias_) do
+      %Sensor.Device{} = device ->
+        %Sensor.Device{_alias_: dev_alias} = Repo.preload(device, :_alias_)
+        %{description: dev_alias.description, device: device.device, host: device.host, name: dev_name}
+
+      error ->
+        error
+    end
+  end
+
   def pwm_alias(name) do
     alias PulseWidth.Alias, as: Schema
 

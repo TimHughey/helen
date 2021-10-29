@@ -47,6 +47,11 @@ defmodule Illumination.Server do
   end
 
   @impl true
+  def handle_info({:activate, _schedule, _opts}, %State{} = s) do
+    handle_info(:schedule, s)
+  end
+
+  @impl true
   def handle_info(
         {Broom, :release, %Broom.TrackerEntry{refid: ref, acked_at: acked_at}},
         %State{result: %Result{schedule: schedule, exec: %Alfred.ExecResult{refid: ref}}} = s
