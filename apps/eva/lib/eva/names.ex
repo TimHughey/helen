@@ -18,7 +18,7 @@ defmodule Eva.Names do
 
         case reg_rc do
           {:ok, %NotifyTo{} = nt} -> {add_found_name(names, name), [nt] ++ notifies}
-          _ -> {add_needed_name(names, name), notifies}
+          {:failed, _msg} -> {add_needed_name(names, name), notifies}
         end
     end
   end
