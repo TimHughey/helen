@@ -2,7 +2,7 @@ defmodule Garden.Schedule do
   use Timex
   alias __MODULE__
 
-  defstruct id: nil, description: nil, start_at: nil, finish_at: nil
+  defstruct id: nil, description: nil, start_tod: nil, start_at: nil, finish_at: nil, finish_tod: nil
 
   def active?(%Schedule{} = schedule, dt) do
     Timex.between?(dt, schedule.start_at, schedule.finish_at, inclusive: true)
@@ -12,8 +12,10 @@ defmodule Garden.Schedule do
     %Schedule{
       id: id,
       description: description,
+      start_tod: start,
       start_at: start |> make_at(location_opts),
-      finish_at: finish |> make_at(location_opts)
+      finish_at: finish |> make_at(location_opts),
+      finish_tod: finish
     }
   end
 
