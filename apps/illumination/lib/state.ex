@@ -6,6 +6,7 @@ defmodule Illumination.State do
   defstruct alfred: Alfred,
             equipment: "unset",
             schedules: [],
+            cmds: %{},
             result: nil,
             timezone: "America/New_York"
 
@@ -13,6 +14,7 @@ defmodule Illumination.State do
           alfred: module(),
           equipment: String.t() | NotifyTo.t(),
           schedules: list(),
+          cmds: map(),
           result: Schedule.Result.t(),
           timezone: Timex.time_zone()
         }

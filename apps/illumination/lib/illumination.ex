@@ -12,6 +12,14 @@ defmodule Illumination do
 
         Supervisor.child_spec({Illumination.Server, all_args}, [id: module] ++ child_args)
       end
+
+      def info do
+        :sys.get_state(unquote(__CALLER__.module)).result
+      end
+
+      def restart do
+        GenServer.call(unquote(__CALLER__.module), :restart)
+      end
     end
   end
 end

@@ -1,14 +1,6 @@
 defmodule Greenhouse do
   use Illumination, shutdown: 10_000
 
-  def info do
-    :sys.get_state(Greenhouse).result
-  end
-
-  def restart do
-    GenServer.call(Greenhouse, :restart)
-  end
-
   def start_args do
     alias Illumination.Schedule
     alias Illumination.Schedule.Point

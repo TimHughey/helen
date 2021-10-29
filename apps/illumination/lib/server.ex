@@ -13,6 +13,7 @@ defmodule Illumination.Server do
       alfred: args[:alfred] || state.alfred,
       equipment: args[:equipment] || state.equipment,
       schedules: args[:schedules] || state.schedules,
+      cmds: args[:cmds] || state.cmds,
       timezone: args[:timezone] || state.timezone
     }
 
@@ -75,12 +76,13 @@ defmodule Illumination.Server do
   end
 
   @impl true
-  def handle_info(:schedule, %State{alfred: alfred, equipment: equipment, timezone: tz} = s) do
+  def handle_info(:schedule, %State{} = s) do
     sched_opts = [
-      alfred: alfred,
-      equipment: equipment.name,
-      timezone: tz,
-      datetime: Timex.now(tz)
+      alfred: s.alfred,
+      equipment: s.equipment.name,
+      timezone: s.timezone,
+      datetime: Timex.now(s.timezone),
+      cmds: s.cmds
     ]
 
     latest_schedules = Schedule.calc_points(s.schedules, sched_opts)

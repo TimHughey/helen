@@ -58,13 +58,22 @@ defmodule Illumination.Schedule do
 
   def activate(%Schedule{} = schedule, opts) do
     alfred = opts[:alfred] || Alfred
+    cmds = opts[:cmds] || %{}
 
+    cmd = schedule.start.cmd
+    cmd_params = cmds[cmd] || %{}
     cmd_opts = [force: true, notify_when_released: true]
-    ec = %ExecCmd{name: opts[:equipment], cmd: schedule.start.cmd, cmd_opts: cmd_opts}
+
+    ec = %ExecCmd{
+      name: opts[:equipment],
+      cmd: cmd,
+      cmd_params: Enum.into(cmd_params, %{}),
+      cmd_opts: cmd_opts
+    }
 
     %Result{exec: alfred.execute(ec), schedule: schedule, action: :activated}
 
-    # NOTE: receipt of Broom Release triggers finish timer
+    # NOTE: see handle_cmd_ack/3 for logic that creates the finish timer
   end
 
   def calc_points([], _opts), do: []

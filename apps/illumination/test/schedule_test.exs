@@ -151,7 +151,7 @@ defmodule IlluminationScheduleTest do
     schedules = [
       %Schedule{
         id: "active",
-        start: %Point{sunref: "sunrise", cmd: "on"},
+        start: %Point{sunref: "sunrise", cmd: "fade"},
         finish: %Point{sunref: "sunrise", offset_ms: 60_000}
       },
       %Schedule{
@@ -161,7 +161,8 @@ defmodule IlluminationScheduleTest do
       }
     ]
 
-    opts = [alfred: AlfredSendExecMsg, equipment: "active_equipment"]
+    cmds = %{"fade" => [type: "random", min: 256, max: 1024]}
+    opts = [alfred: AlfredSendExecMsg, equipment: "active_equipment", cmds: cmds]
     active_dt = Solar.event("sunrise", timezone: @tz)
 
     schedules = Schedule.calc_points(schedules, opts ++ [datetime: active_dt])
@@ -177,8 +178,11 @@ defmodule IlluminationScheduleTest do
     should_be_equal(res.action, :activated)
 
     receive do
-      %Alfred.ExecCmd{name: "active_equipment", cmd: "on"} -> assert true
-      error -> refute error
+      %Alfred.ExecCmd{name: "active_equipment", cmd: "fade", cmd_params: %{type: "random"}} ->
+        assert true
+
+      error ->
+        refute error
     after
       1000 -> assert false, "Alfred Exec Msg not recevied"
     end
