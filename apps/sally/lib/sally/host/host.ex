@@ -119,6 +119,16 @@ defmodule Sally.Host do
     [System.get_env(@helen_base), @profiles_dir] |> Path.join()
   end
 
+  def unnamed do
+    Query.from(x in Schema, where: x.ident == x.name, order_by: [desc: x.last_start_at]) |> Repo.all()
+  end
+
+  def setup(%Schema{} = schema, opts) do
+    changes = Enum.into(opts, %{authorized: true})
+
+    changeset(schema, changes, Map.keys(changes)) |> Repo.update()
+  end
+
   defp validate_profile_exists(%Ecto.Changeset{} = cs) do
     alias Ecto.Changeset
 

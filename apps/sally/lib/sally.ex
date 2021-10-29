@@ -4,7 +4,7 @@ defmodule Sally do
   """
 
   alias Alfred.ExecCmd
-  alias Sally.{DevAlias, Device}
+  alias Sally.{DevAlias, Device, Host, Repo}
 
   def delete_alias(name_or_id) do
     case DevAlias.delete(name_or_id) do
@@ -21,16 +21,12 @@ defmodule Sally do
   def execute(%ExecCmd{} = ec), do: Sally.Execute.cmd(ec)
 
   def host_devices(name) do
-    alias Sally.{Host, Repo}
-
     host = Host.find_by_name(name) |> Repo.preload(:devices)
 
     host.devices
   end
 
   def host_name(ident, new_name) do
-    alias Sally.{Host, Repo}
-
     case Host.find_by_ident(ident) do
       %Host{name: name} when name == new_name -> :no_change
       %Host{} = x -> Host.changeset(x, %{name: new_name}, [:name]) |> Repo.update()
@@ -38,14 +34,12 @@ defmodule Sally do
     end
   end
 
-  @default_firmware_file Application.compile_env!(:sally, [Sally.Host.Firmware, :uri, :file])
+  @default_firmware_file Application.compile_env!(:sally, [Host.Firmware, :uri, :file])
   def host_ota(name, firmware_file \\ @default_firmware_file) do
-    Sally.Host.Firmware.ota(name, firmware_file)
+    Host.Firmware.ota(name, firmware_file)
   end
 
   def host_profile(hostname, profile_name) do
-    alias Sally.{Host, Repo}
-
     case Host.find_by_name(hostname) do
       %Host{profile: profile} when profile == profile_name -> :no_change
       %Host{} = x -> Host.changeset(x, %{profile: profile_name}, [:profile]) |> Repo.update()
@@ -53,16 +47,20 @@ defmodule Sally do
     end
   end
 
-  def host_restart(name) when is_binary(name), do: Sally.Host.Restart.now(name)
+  def host_restart(name) when is_binary(name), do: Host.Restart.now(name)
+
+  def host_setup(:unnamed, opts) do
+    case Host.unnamed() do
+      [%Host{} = host] -> Host.setup(host, opts)
+      [] -> {:all_named, []}
+      multiple -> {:multiple, multiple}
+    end
+  end
 
   def host_setup(ident, opts) when is_binary(ident) do
-    alias Sally.{Host, Repo}
-
-    opts = Enum.into(opts, %{authorized: true})
-
     case Host.find_by_ident(ident) do
-      %Host{} = x -> Host.changeset(x, opts, Map.keys(opts)) |> Repo.update()
-      _ -> :not_found
+      %Host{} = host -> Host.setup(host, opts)
+      _ -> {:not_found, ident}
     end
   end
 
