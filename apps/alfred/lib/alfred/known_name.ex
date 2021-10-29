@@ -21,7 +21,9 @@ defmodule Alfred.KnownName do
     ttl_dt = DateTime.add(kn.seen_at, kn.ttl_ms, :millisecond)
     now = utc_now.()
 
-    if DateTime.compare(now, ttl_dt) == :gt, do: %KnownName{kn | missing?: true}, else: kn
+    %KnownName{kn | missing?: DateTime.compare(now, ttl_dt) == :gt}
+
+    # if DateTime.compare(now, ttl_dt) == :gt, do: %KnownName{kn | missing?: true}, else: kn
   end
 
   def immutable?(%KnownName{} = kn), do: not kn.mutable?
@@ -38,7 +40,7 @@ defmodule Alfred.KnownName do
     }
   end
 
-  def unknown(name), do: %KnownName{name: name}
+  def unknown(name), do: %KnownName{name: name, missing?: true}
 
   def unknown?(%KnownName{} = kn) do
     case kn do

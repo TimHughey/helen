@@ -186,7 +186,7 @@ defmodule Alfred.Notify.Server do
     Logger.debug("#{inspect(pid)} exited, removing notify registration(s)")
 
     # remove the registration
-    for {reg_key, _nt} <- regs, elem(reg_key, 3) == ref, reduce: %State{} do
+    for {reg_key, _nt} <- regs, elem(reg_key, 2) == ref, reduce: %State{} do
       %State{} -> %State{s | registrations: Map.delete(regs, reg_key)}
     end
     |> noreply()
