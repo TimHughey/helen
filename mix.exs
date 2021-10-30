@@ -32,7 +32,7 @@ defmodule Helen.MixProject do
   defp releases do
     [
       helen: [
-        version: "0.2.1",
+        version: "0.2.2",
         applications: applications(),
         include_erts: true,
         include_executables_for: [:unix],

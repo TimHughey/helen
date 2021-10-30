@@ -33,3 +33,15 @@ defmodule AlfredSendExecMsg do
     %Alfred.ExecResult{name: ec.name, cmd: ec.cmd, refid: "12345"}
   end
 end
+
+defmodule AlfredAlwaysOn do
+  def status(name) do
+    %Alfred.MutableStatus{name: name, good?: true, cmd: "on"}
+  end
+end
+
+defmodule AlfredAlwaysPending do
+  def status(name) do
+    %Alfred.MutableStatus{name: name, good?: true, pending?: true, cmd: "on"}
+  end
+end

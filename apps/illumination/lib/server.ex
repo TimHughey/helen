@@ -82,6 +82,8 @@ defmodule Illumination.Server do
 
   @impl true
   def handle_info(:schedule, %State{} = s) do
+    Result.cancel_timers_if_needed(s.result)
+
     sched_opts = [
       alfred: s.alfred,
       equipment: s.equipment.name,
@@ -100,7 +102,35 @@ defmodule Illumination.Server do
   end
 
   @impl true
-  def handle_info({Alfred, :notify, %Alfred.NotifyMemo{} = _memo}, %State{} = s) do
+  def handle_info(
+        {Alfred, :notify, %Alfred.NotifyMemo{ref: ref} = memo},
+        %State{equipment: %Alfred.NotifyTo{ref: ref}, result: result} = s
+      ) do
+    alias Alfred.MutableStatus, as: MutStatus
+
+    expected_cmd = Result.expected_cmd(result)
+    status = s.alfred.status(memo.name)
+
+    case status do
+      # skip check when cmd is pending
+      %MutStatus{pending?: true} ->
+        noreply(s)
+
+      # do nothing when expected cmd matches status cmd
+      %MutStatus{good?: true, cmd: cmd} when cmd == expected_cmd ->
+        noreply(s)
+
+      # anything else attempt to correct the mismatch by restarting
+      _ ->
+        Logger.warn("equipment cmd mismatch, restarting")
+        {:stop, :normal, s}
+    end
+  end
+
+  @impl true
+  def handle_info({Alfred, :notify, %Alfred.NotifyMemo{} = memo}, %State{} = s) do
+    Logger.warn("unmatched notify ref:\n#{inspect(memo, pretty: true)}")
+
     noreply(s)
   end
 

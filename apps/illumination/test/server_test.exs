@@ -92,4 +92,54 @@ defmodule IlluminationServerTest do
     state = elem(res, 1)
     should_be_struct(state, Illumination.State)
   end
+
+  test "Illumination.Server handles Alfred.NotifyMemo matching equipment status" do
+    alias Alfred.{NotifyMemo, NotifyTo}
+    alias Illumination.Schedule
+    alias Illumination.Schedule.{Point, Result}
+    alias Illumination.State
+
+    equipment = "test_equipment"
+    ref = make_ref()
+
+    notify_to = %NotifyTo{name: equipment, ref: ref}
+
+    state = %State{
+      alfred: AlfredAlwaysOn,
+      equipment: notify_to,
+      result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}
+    }
+
+    notify_memo = %NotifyMemo{ref: ref, name: equipment}
+    notify_msg = {Alfred, :notify, notify_memo}
+
+    res = Illumination.Server.handle_info(notify_msg, state)
+
+    should_be_noreply_tuple_with_state(res, State)
+  end
+
+  test "Illumination.Server handles Alfred.NotifyMemo when equipment cmd is pending" do
+    alias Alfred.{NotifyMemo, NotifyTo}
+    alias Illumination.Schedule
+    alias Illumination.Schedule.{Point, Result}
+    alias Illumination.State
+
+    equipment = "test_equipment"
+    ref = make_ref()
+
+    notify_to = %NotifyTo{name: equipment, ref: ref}
+
+    state = %State{
+      alfred: AlfredAlwaysPending,
+      equipment: notify_to,
+      result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}
+    }
+
+    notify_memo = %NotifyMemo{ref: ref, name: equipment}
+    notify_msg = {Alfred, :notify, notify_memo}
+
+    res = Illumination.Server.handle_info(notify_msg, state)
+
+    should_be_noreply_tuple_with_state(res, State)
+  end
 end
