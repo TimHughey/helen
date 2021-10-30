@@ -37,7 +37,15 @@ defmodule LegacyDb do
     case Repo.one(query) |> Repo.preload(:_alias_) do
       %Sensor.Device{} = device ->
         %Sensor.Device{_alias_: dev_alias} = Repo.preload(device, :_alias_)
-        %{description: dev_alias.description, device: device.device, host: device.host, name: dev_alias.name}
+
+        %{
+          description: dev_alias.description,
+          legacy_device: device.device,
+          legacy_name: dev_alias.name,
+          device: dev_name,
+          host: device.host,
+          name: String.replace(dev_alias.name, "_", " ")
+        }
 
       error ->
         error
