@@ -26,7 +26,11 @@ defmodule LegacyDb do
 
   def all_switch_names, do: all_alias_names(Switch.Alias)
 
-  def ds_sensor(dev_name) do
+  def ds_sensor(dev_name_list) when is_list(dev_name_list) do
+    for dev_name <- dev_name_list, do: ds_sensor(dev_name)
+  end
+
+  def ds_sensor(dev_name) when is_binary(dev_name) do
     legacy_dev_name = String.replace(dev_name, ".", "/")
     query = Query.from(x in Sensor.Device, where: x.device == ^legacy_dev_name)
 
