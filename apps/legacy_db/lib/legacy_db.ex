@@ -33,7 +33,7 @@ defmodule LegacyDb do
     case Repo.one(query) |> Repo.preload(:_alias_) do
       %Sensor.Device{} = device ->
         %Sensor.Device{_alias_: dev_alias} = Repo.preload(device, :_alias_)
-        %{description: dev_alias.description, device: device.device, host: device.host, name: dev_name}
+        %{description: dev_alias.description, device: device.device, host: device.host, name: dev_alias.name}
 
       error ->
         error
