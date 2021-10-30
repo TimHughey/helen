@@ -44,7 +44,7 @@ defmodule LegacyDb do
           legacy_name: dev_alias.name,
           device: dev_name,
           host: device.host,
-          name: String.replace(dev_alias.name, "_", " ")
+          name: String.replace(dev_alias.name, "_", " ") |> String.replace(":", " ")
         }
 
       error ->
