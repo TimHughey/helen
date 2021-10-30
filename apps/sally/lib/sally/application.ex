@@ -19,7 +19,7 @@ defmodule Sally.Application do
       {Sally.Host.Handler, []}
     ]
 
-    opts = [strategy: :one_for_one, name: Sally.Supervisor]
+    opts = [strategy: :one_for_one, name: Sally.Supervisor, max_restarts: 10, max_seconds: 5]
     Supervisor.start_link(children, opts)
   end
 end
