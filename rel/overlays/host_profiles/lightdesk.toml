@@ -6,8 +6,11 @@ description = "lightdesk only"
 version = 1
 
 [host]
-base_url = "https://www.wisslanding.com/sally/firmware"
 report_ms = 7_000
+
+[ota]
+base_url = "https://www.wisslanding.com/sally/firmware"
+valid_ms = 59_000
 
 [lightdesk]
 dmx_port = 48005

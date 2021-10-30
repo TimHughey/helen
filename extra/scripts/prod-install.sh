@@ -12,30 +12,31 @@ function run_cmd {
     return $rc
 }
 
-pushd -q ${HOME}/devel/shell/local/helen-home/helen_app_ui
-source ./secret-base.sh
+setopt local_options rm_star_silent
+
+helen_base=/usr/local/helen_v2
+helen_bin=${helen_base}/bin
+
+# pushd -q ${HOME}/devel/shell/local/helen-home/helen_app_ui
+# source ./secret-base.sh
 
 pushd -q ${HOME}/devel/helen
 
-helen_base=/usr/local/helen
-helen_bin=${helen_base}/bin
+tarball=$(ls -t ${HOME}/devel/helen/_build/prod/*.tar.gz | grep --max-count=1 helen)
 
-setopt local_options rm_star_silent
-
-tarball="$(pwd)/_build/prod/helen.tar.gz"
 if [[ ! -f $tarball ]]; then
   echo "${tarball} does not exist, has prod-build.sh been executed?"
   exit 1
 fi
 
-pushd -q /usr/local/helen/bin
+pushd -q ${helen_base}
 
-if [[ -f ./helen ]]; then
+if [[ -f ./bin/helen ]]; then
   print -n "stopping helen... "
-  ./helen stop 1> /dev/null 2>&1
+  ./bin/helen stop 1> /dev/null 2>&1
   sleep 5
   # check helen is really shutdown
-  ./helen ping 1> /dev/null 2>&1
+  ./bin/helen ping 1> /dev/null 2>&1
   if [[ $? -eq 0 ]]; then
     print "FAILED, aborting install."
     return 1
@@ -51,7 +52,7 @@ print "executing mix ecto.migrate..."
 
 run_cmd env MIX_ENV=prod mix ecto.migrate
 
-pushd -q /usr/local/helen
+pushd -q ${helen_base}
 print -n "untarring $tarball into `pwd`"
 tar_out=$(tar -xf $tarball)
 
@@ -73,6 +74,6 @@ chmod -R g+X . && print "done."
 
 print -n "starting latest release of helen..."
 
-PORT=4009 ./bin/helen daemon
+./bin/helen daemon
 
 print " done."

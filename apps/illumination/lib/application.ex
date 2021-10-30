@@ -14,7 +14,13 @@ defmodule Illumination.Application do
       {FrontEvergreen, FrontEvergreen.start_args()}
     ]
 
-    opts = [strategy: :one_for_one, name: Illumination.Supervisor]
+    opts = [
+      strategy: :one_for_one,
+      name: Illumination.Supervisor,
+      max_restarts: 10,
+      max_seconds: 5
+    ]
+
     Supervisor.start_link(children, opts)
   end
 end

@@ -17,4 +17,4 @@ fi
 
 pushd -q ${HOME}/devel/helen/extra/scripts
 
-./prod-cp-ui-dist.sh && ./prod-build.sh && ./prod-install.sh 
+./prod-build.sh && ./prod-install.sh 
