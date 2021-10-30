@@ -4,6 +4,7 @@ defmodule Illumination.State do
   alias Illumination.Schedule
 
   defstruct alfred: Alfred,
+            module: nil,
             equipment: "unset",
             schedules: [],
             cmds: %{},
@@ -12,6 +13,7 @@ defmodule Illumination.State do
 
   @type t :: %State{
           alfred: module(),
+          module: module(),
           equipment: String.t() | NotifyTo.t(),
           schedules: list(),
           cmds: map(),

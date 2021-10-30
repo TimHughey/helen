@@ -6,6 +6,7 @@ defmodule FrontChandelier do
     alias Illumination.Schedule.Point
 
     [
+      module: __MODULE__,
       equipment: "front chandelier pwm",
       schedules: [
         %Schedule{

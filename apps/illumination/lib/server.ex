@@ -11,6 +11,7 @@ defmodule Illumination.Server do
 
     initial_state = %State{
       alfred: args[:alfred] || state.alfred,
+      module: args[:module] || __MODULE__,
       equipment: args[:equipment] || state.equipment,
       schedules: args[:schedules] || state.schedules,
       cmds: args[:cmds] || state.cmds,
@@ -42,7 +43,13 @@ defmodule Illumination.Server do
 
   @impl true
   def handle_continue(:first_schedule, %State{} = s) do
-    # s = State.first_schedule(s)
+    # calculate the initial schedule which could be outdated (all schedules are past)
+    # so handle_info(:schedule) can refresh them if needed.  this is necessary because
+    # the first call to calc_points sees :at == nil and does not automatically refresh
+    # outdated schedules
+    sched_opts = [timezone: s.timezone, datetime: Timex.now(s.timezone)]
+    initial_schedules = Schedule.calc_points(s.schedules, sched_opts)
+    s = [schedules: initial_schedules] |> State.save_schedules_and_result(s)
     handle_info(:schedule, s)
   end
 
@@ -122,7 +129,7 @@ defmodule Illumination.Server do
 
       # anything else attempt to correct the mismatch by restarting
       _ ->
-        Logger.warn("equipment cmd mismatch, restarting")
+        Logger.warn("#{memo.name} cmd mismatch, restarting")
         {:stop, :normal, s}
     end
   end

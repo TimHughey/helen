@@ -6,11 +6,12 @@ defmodule FrontRedMaple do
     alias Illumination.Schedule.Point
 
     [
+      module: __MODULE__,
       equipment: "front red maple pwm",
       schedules: [
         %Schedule{
           id: "early evening",
-          start: %Point{sunref: "civil set", cmd: "fade_bright"},
+          start: %Point{sunref: "sunset", cmd: "fade_bright"},
           finish: %Point{sunref: "astro set"}
         },
         %Schedule{
