@@ -23,7 +23,16 @@ defmodule Sally do
   def host_devices(name) do
     host = Host.find_by_name(name) |> Repo.preload(:devices)
 
-    host.devices
+    with %Host{} = host <- Host.find_by_name(name),
+         %Host{devices: devices} <- Repo.preload(host, :devices) do
+      for %Device{ident: ident} <- devices, do: ident
+    else
+      _ -> {:not_found, host}
+    end
+  end
+
+  def host_info(name) do
+    Sally.Host.find_by_name(name)
   end
 
   def host_name(ident, new_name) do
@@ -34,9 +43,8 @@ defmodule Sally do
     end
   end
 
-  @default_firmware_file Application.compile_env!(:sally, [Host.Firmware, :uri, :file])
-  def host_ota(name, firmware_file \\ @default_firmware_file) do
-    Host.Firmware.ota(name, firmware_file)
+  def host_ota(name, opts \\ []) do
+    Host.Firmware.ota(name, opts)
   end
 
   def host_profile(hostname, profile_name) do

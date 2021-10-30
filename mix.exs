@@ -3,10 +3,12 @@ defmodule Helen.MixProject do
 
   use Mix.Project
 
+  @vsn "2.0.3"
+
   def project do
     [
       apps_path: "apps",
-      version: "1.0.0",
+      version: @vsn,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       releases: releases(),
@@ -32,7 +34,7 @@ defmodule Helen.MixProject do
   defp releases do
     [
       helen: [
-        version: "0.2.2",
+        version: @vsn,
         applications: applications(),
         include_erts: true,
         include_executables_for: [:unix],
