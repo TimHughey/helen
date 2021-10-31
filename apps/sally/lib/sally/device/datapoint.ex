@@ -35,7 +35,7 @@ defmodule Sally.Datapoint do
     c
     |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required([:temp_c, :reading_at, :dev_alias_id])
-    |> Changeset.validate_number(:temp_c, greater_than: -30.0, less_than: 55.0)
+    |> Changeset.validate_number(:temp_c, greater_than: -30.0, less_than: 80.0)
     |> Changeset.validate_number(:relhum, greater_than: 0.0, less_than_or_equal_to: 100.0)
   end
 
