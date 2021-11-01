@@ -173,7 +173,7 @@ defmodule Sally.Host.Handler do
     end
   end
 
-  @months ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Dec"]
+  @months ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
   defp make_build_datetime(%{build_date: build_date, build_time: build_time}) do
     [month_bin, day, year] = String.split(build_date, " ", trim: true)
     month = Enum.find_index(@months, fn x -> x == month_bin end) + 1
