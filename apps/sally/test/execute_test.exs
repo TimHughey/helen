@@ -49,7 +49,7 @@ defmodule SallyPwmExecuteTest do
   @tag dev_alias_opts: [name: "Execute TTL Expired", pio: 0]
   test "can Sally.Execute.cmd/1 detect ttl expired", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     res = %ExecCmd{name: ctx.dev_alias_opts[:name], cmd: "on", cmd_opts: [ttl_ms: 0]} |> Execute.cmd()
@@ -71,7 +71,7 @@ defmodule SallyPwmExecuteTest do
   @tag dev_alias_opts: [name: "Execute Nominal Case", pio: 1]
   test "can Sally.Execute.cmd/1 execute an 'on' ExecCmd", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     res = %ExecCmd{name: ctx.dev_alias_opts[:name], cmd: "on"} |> Execute.cmd()
@@ -91,7 +91,7 @@ defmodule SallyPwmExecuteTest do
   @tag dev_alias_opts: [name: "Execute Ack Immediate", pio: 2]
   test "can Sally.Execute.cmd/1 and ack immediate", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     cmd_opts = [ack: :immediate, notify_when_released: true]
@@ -126,7 +126,7 @@ defmodule SallyPwmExecuteTest do
   @tag dev_alias_opts: [name: "Execute Orphan", pio: 3]
   test "can Sally.Execute process Broom track timeouts and orphan a command", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     cmd_opts = [track_timeout_ms: 1, notify_when_released: true]
@@ -162,7 +162,7 @@ defmodule SallyPwmExecuteTest do
   @tag dev_alias_opts: [name: "Duplicate Cmd", pio: 4]
   test "can Sally.Execute.cmd/1 detect same cmd is active", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     cmd_opts = [ack: :immediate, notify_when_released: true]

@@ -69,6 +69,19 @@ defmodule Sally.DevAlias do
       ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
     }
     |> changeset(dev_alias)
+    |> Repo.insert(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
+  end
+
+  def create!(%Device{} = device, opts) do
+    dev_alias = Ecto.build_assoc(device, :aliases)
+
+    %{
+      name: opts[:name],
+      pio: opts[:pio],
+      description: opts[:description] || dev_alias.description,
+      ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
+    }
+    |> changeset(dev_alias)
     |> Repo.insert!(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
   end
 
@@ -77,7 +90,9 @@ defmodule Sally.DevAlias do
          {:ok, cmd_count} <- Command.purge(a, :all),
          {:ok, dp_count} <- Datapoint.purge(a, :all),
          {:ok, %Schema{name: n}} <- Repo.delete(a) do
-      {:ok, [name: n, commands: cmd_count, datapoints: dp_count]}
+      res = [name: n, commands: cmd_count, datapoints: dp_count] |> Enum.reject(fn x -> x == 0 end)
+
+      {:ok, res}
     else
       nil -> {:unknown, name_or_id}
       error -> error

@@ -2,13 +2,22 @@ defmodule Sally.Test.Support do
   def add_device(%Sally.Host{} = host, opts) do
     device = Ecto.build_assoc(host, :devices)
 
-    %{
-      ident: opts[:device] || opts[:ident],
-      pios: opts[:pios] || 10,
-      family: opts[:family],
-      mutable: opts[:mutable],
-      last_seen_at: opts[:last_seen_at] || DateTime.utc_now()
-    }
+    cond do
+      opts[:auto] == :mcp23008 ->
+        %{ident: unique(:mcp23008), pios: 8, family: "i2c", mutable: true}
+
+      opts[:auto] == :ds ->
+        %{ident: unique(:ds), pios: 1, family: "ds", mutable: false}
+
+      true ->
+        %{
+          ident: opts[:device] || opts[:ident],
+          pios: opts[:pios] || 10,
+          family: opts[:family],
+          mutable: opts[:mutable]
+        }
+    end
+    |> Map.merge(%{last_seen_at: opts[:last_seen_at] || DateTime.utc_now()})
     |> Sally.Device.changeset(device)
     |> Sally.Repo.insert!(
       on_conflict: {:replace, Sally.Device.columns(:replace)},
@@ -21,8 +30,8 @@ defmodule Sally.Test.Support do
     alias Sally.Host.ChangeControl
 
     raw = %{
-      ident: opts[:host] || opts[:ident],
-      name: opts[:name],
+      ident: opts[:host] || opts[:ident] || unique(:host),
+      name: opts[:name] || unique(:name),
       profile: opts[:profile] || "generic",
       last_start_at: opts[:last_start_at] || DateTime.utc_now(),
       last_seen_at: opts[:last_seen_at] || DateTime.utc_now()
@@ -63,4 +72,20 @@ defmodule Sally.Test.Support do
       end
     end
   end
+
+  def unique(what) when is_atom(what) do
+    unique = Ecto.UUID.generate() |> String.split("-") |> Enum.at(4)
+
+    case what do
+      :host -> "host.#{unique}"
+      :dev_alias -> "dev alias #{unique}"
+      :ds -> "ds.#{unique}"
+      :mcp23008 -> "i2c.#{unique}.mcp23008.20"
+      :name -> "name #{unique}"
+    end
+  end
+
+  # def unique_string do
+  #   Ecto.UUID.generate() |> String.split("-") |> Enum.at(4)
+  # end
 end

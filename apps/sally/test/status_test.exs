@@ -35,7 +35,7 @@ defmodule SallyStatusTest do
     device_opts = [ident: "status_test01", family: "ds", mutable: false]
 
     device = Support.add_host(host_opts) |> Support.add_device(device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     res = Sally.status(:mutable, dev_alias.name, ctx.status_opts)
@@ -53,7 +53,7 @@ defmodule SallyStatusTest do
   test "can Sally.status/3 detect ttl expired based on Alias ttl_ms", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
 
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
 
     should_be_schema(dev_alias, Sally.DevAlias)
 
@@ -75,7 +75,7 @@ defmodule SallyStatusTest do
   @tag cmd: "pending"
   test "can Sally.status/3 detect pending Alias cmd", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     cmd = Support.add_command(dev_alias, ctx.cmd)
@@ -101,7 +101,7 @@ defmodule SallyStatusTest do
   @tag cmd_disposition: :orphan
   test "can Sally.status/3 detect unresponsive Alias (orphaned cmd)", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     cmd = Support.add_command(dev_alias, ctx.cmd)
@@ -130,7 +130,7 @@ defmodule SallyStatusTest do
   @tag cmd_disposition: :ack
   test "can Sally.status/3 detect good status", ctx do
     device = Support.add_host(ctx.host_opts) |> Support.add_device(ctx.device_opts)
-    dev_alias = Sally.DevAlias.create(device, ctx.dev_alias_opts)
+    dev_alias = Sally.DevAlias.create!(device, ctx.dev_alias_opts)
     should_be_schema(dev_alias, Sally.DevAlias)
 
     cmd = Support.add_command(dev_alias, ctx.cmd)

@@ -7,6 +7,7 @@ defmodule Sally.Device do
 
   use Ecto.Schema
   require Ecto.Query
+  alias Ecto.Query
 
   alias __MODULE__, as: Schema
   alias Sally.{DevAlias, Host, Repo}
@@ -122,6 +123,21 @@ defmodule Sally.Device do
     [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
   end
 
+  def latest(opts) do
+    age = opts[:age] || [hours: -1]
+    before = Timex.now() |> Timex.shift(age)
+
+    q = Query.from(x in Schema, where: x.inserted_at >= ^before, order_by: [desc: x.inserted_at], limit: 1)
+
+    device = Repo.one(q)
+
+    cond do
+      is_nil(device) -> nil
+      opts[:schema] == true -> device
+      true -> device.ident
+    end
+  end
+
   def load_aliases(device) do
     Repo.preload(device, [:aliases])
   end
@@ -134,15 +150,18 @@ defmodule Sally.Device do
       |> Ecto.Changeset.put_assoc(:aliases, src_dev.aliases)
       |> Repo.update()
     else
-      %Schema{ident: ident} -> {:existing_aliases, ident}
+      {:dest, %Schema{ident: ident}} -> {:error, "destination #{ident} must not have any aliases"}
       {:src, _} -> {:not_found, src_ident}
       {:dest, _} -> {:not_found, dest_ident}
     end
   end
 
-  def newest do
-    Ecto.Query.from(x in Schema, order_by: [desc: x.inserted_at], limit: 1)
-    |> Repo.one()
+  def pio_check(schema, opts) when is_list(opts) do
+    case schema do
+      %Schema{mutable: true} -> opts[:pio]
+      %Schema{mutable: false} -> 0
+      _ -> nil
+    end
   end
 
   def pio_aliased?(%Schema{pios: pios} = device, pio) when pio < pios do
