@@ -76,6 +76,44 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_error_tuple(res) do
+    quote location: :keep, bind_quoted: [res: res] do
+      should_be_tuple_with_size(res, 2)
+
+      fail = pretty("rc should be :error", res)
+      {rc, res_binary} = res
+      assert :error == rc, fail
+    end
+  end
+
+  defmacro should_be_error_tuple_with_binary(res, binary) do
+    quote location: :keep, bind_quoted: [res: res, binary: binary] do
+      should_be_tuple_with_size(res, 2)
+
+      fail = pretty("rc should be :error", res)
+      {rc, res_binary} = res
+      assert :error == rc, fail
+
+      fail = pretty("tuple element 1 should be binary", res_binary)
+      assert is_binary(res_binary), fail
+
+      fail = pretty("#{res_binary} should contain", binary)
+      assert String.contains?(res_binary, binary), fail
+    end
+  end
+
+  defmacro should_be_error_tuple_with_ecto_changeset(res) do
+    quote location: :keep, bind_quoted: [res: res] do
+      should_be_tuple_with_size(res, 2)
+
+      fail = pretty("rc should be :error", res)
+      {rc, changeset} = res
+      assert :error == rc, fail
+
+      should_be_struct(changeset, Ecto.Changeset)
+    end
+  end
+
   defmacro should_be_ok_tuple(res) do
     quote location: :keep, bind_quoted: [res: res] do
       should_be_tuple(res)
@@ -114,6 +152,22 @@ defmodule Should do
       assert tuple_size(res) == 2, fail
       assert elem(res, 0) == :ok, fail
       assert elem(res, 1) |> is_pid, fail
+    end
+  end
+
+  defmacro should_be_not_found_tuple_with_binary(res, binary) do
+    quote location: :keep, bind_quoted: [res: res, binary: binary] do
+      should_be_tuple_with_size(res, 2)
+      {rc, res_binary} = res
+
+      fail = pretty("rc should be :not_found", res)
+      assert :not_found == rc, fail
+
+      fail = pretty("tuple element 1 should be binary", res_binary)
+      assert is_binary(res_binary), fail
+
+      fail = pretty("#{res_binary} should contain", binary)
+      assert String.contains?(res_binary, binary), fail
     end
   end
 
