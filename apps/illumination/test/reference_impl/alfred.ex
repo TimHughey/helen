@@ -1,14 +1,3 @@
-# simulates calls to Alfred register for notifications when the name is
-# not found
-defmodule AlfredNotFound do
-  alias Alfred.NotifyTo
-
-  def notify_register(opts) do
-    name = opts[:name]
-    {:failed, "unknown name: #{name}"}
-  end
-end
-
 defmodule AlfredFound do
   alias Alfred.NotifyTo
 
@@ -28,11 +17,20 @@ defmodule AlfredNull do
   def execute(%ExecCmd{name: name, cmd: cmd}), do: %ExecResult{name: name, cmd: cmd}
 end
 
+# NOTE: sends a message to the calling process containing the ExecCmd passed.
+# this message is received in test cases to validate the ExecCmd
 defmodule AlfredSendExecMsg do
-  def execute(%Alfred.ExecCmd{} = ec) do
+  alias Alfred.{ExecCmd, ExecResult, NotifyTo}
+
+  def execute(%ExecCmd{} = ec) do
     Process.send(self(), ec, [])
 
-    %Alfred.ExecResult{name: ec.name, cmd: ec.cmd, refid: "12345"}
+    %ExecResult{name: ec.name, cmd: ec.cmd, refid: "12345"}
+  end
+
+  def notify_register(opts) do
+    name = opts[:name]
+    {:ok, %NotifyTo{name: name, ref: make_ref()}}
   end
 end
 

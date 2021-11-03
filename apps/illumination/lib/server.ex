@@ -2,6 +2,7 @@ defmodule Illumination.Server do
   require Logger
   use GenServer
 
+  alias Alfred.{NotifyMemo, NotifyTo}
   alias Illumination.{Schedule, State}
   alias Illumination.Schedule.Result
 
@@ -18,7 +19,7 @@ defmodule Illumination.Server do
       timezone: args[:timezone] || state.timezone
     }
 
-    {:ok, initial_state, {:continue, :find_equipment}}
+    {:ok, initial_state, {:continue, :bootstrap}}
   end
 
   def start_link(start_args) do
@@ -36,21 +37,24 @@ defmodule Illumination.Server do
   end
 
   @impl true
-  def handle_continue(:find_equipment, %State{} = s) do
-    # s = State.finding_equipment(s)
-    handle_info(:find_equipment, s)
-  end
-
-  @impl true
-  def handle_continue(:first_schedule, %State{} = s) do
-    # calculate the initial schedule which could be outdated (all schedules are past)
-    # so handle_info(:schedule) can refresh them if needed.  this is necessary because
-    # the first call to calc_points sees :at == nil and does not automatically refresh
-    # outdated schedules
+  def handle_continue(:bootstrap, %State{equipment: equipment} = s) do
+    # important to calculate initial schedules some of which may be outdated depending on the
+    # time of day the server is started.  subsequent schedule calculations will refresh
+    # the out of date schedules.
     sched_opts = [timezone: s.timezone, datetime: Timex.now(s.timezone)]
     initial_schedules = Schedule.calc_points(s.schedules, sched_opts)
-    s = [schedules: initial_schedules] |> State.save_schedules_and_result(s)
-    handle_info(:schedule, s)
+
+    # register for equipment notifications
+    {:ok, notify_to} = s.alfred.notify_register(name: equipment, frequency: :all, link: true)
+
+    # save the schedules and the notification registration
+    [schedules: initial_schedules]
+    |> State.save_schedules_and_result(s)
+    |> State.save_equipment(notify_to)
+    |> noreply()
+
+    # NOTE: at this point the server is running and no further actions occur until an
+    #       equipment notification is received
   end
 
   @impl true
@@ -63,28 +67,14 @@ defmodule Illumination.Server do
         {Broom, :release, %Broom.TrackerEntry{refid: ref, acked_at: acked_at}},
         %State{result: %Result{schedule: schedule, exec: %Alfred.ExecResult{refid: ref}}} = s
       ) do
-    Schedule.handle_cmd_ack(schedule, acked_at, timezone: s.timezone)
-    |> State.save_result(s)
+    [result: Schedule.handle_cmd_ack(schedule, acked_at, timezone: s.timezone)]
+    |> State.save_schedules_and_result(s)
     |> noreply()
   end
 
   @impl true
   def handle_info({:finish, _schedule, _opts}, %State{} = s) do
     handle_info(:schedule, s)
-  end
-
-  @impl true
-  def handle_info(:find_equipment, %State{equipment: equipment} = s) do
-    reg = s.alfred.notify_register(name: equipment, frequency: :all, link: true)
-
-    case reg do
-      {:ok, %Alfred.NotifyTo{} = x} ->
-        State.save_equipment(x, s) |> noreply_continue(:first_schedule)
-
-      {:failed, _msg} ->
-        Process.send_after(self(), :find_equipment, 1900)
-        s |> noreply()
-    end
   end
 
   @impl true
@@ -108,39 +98,48 @@ defmodule Illumination.Server do
     |> noreply()
   end
 
+  # (1 of 3) handle equipment missing messages
+  @impl true
+  def handle_info({Alfred, :notify, %NotifyMemo{missing?: true}}, %State{} = s) do
+    # TODO: handle missing equipment
+    State.update_last_notify_at(s) |> noreply()
+  end
+
+  # (2 of x) handle the first notification (result == nil) by simply performing a schedule
+  @impl true
+  def handle_info({Alfred, :notify, %NotifyMemo{}}, %State{result: nil} = s) do
+    handle_info(:schedule, State.update_last_notify_at(s))
+  end
+
+  # (3 of 3) handle subsequent notifications (result != nil) comparing the equipment status
+  # to the expected cmd (based on previous execute result)
   @impl true
   def handle_info(
         {Alfred, :notify, %Alfred.NotifyMemo{ref: ref} = memo},
-        %State{equipment: %Alfred.NotifyTo{ref: ref}, result: result} = s
+        %State{equipment: %NotifyTo{ref: ref}, result: result} = s
       ) do
     alias Alfred.MutableStatus, as: MutStatus
 
     expected_cmd = Result.expected_cmd(result)
     status = s.alfred.status(memo.name)
 
+    new_state = State.update_last_notify_at(s)
+
     case status do
       # skip check when cmd is pending
       %MutStatus{pending?: true} ->
-        noreply(s)
+        noreply(new_state)
 
       # do nothing when expected cmd matches status cmd
       %MutStatus{good?: true, cmd: cmd} when cmd == expected_cmd ->
-        noreply(s)
+        noreply(new_state)
 
       # anything else attempt to correct the mismatch by restarting
       _ ->
         Logger.warn("#{memo.name} cmd mismatch, restarting")
-        {:stop, :normal, s}
+        {:stop, :normal, new_state}
     end
   end
 
-  @impl true
-  def handle_info({Alfred, :notify, %Alfred.NotifyMemo{} = memo}, %State{} = s) do
-    Logger.warn("unmatched notify ref:\n#{inspect(memo, pretty: true)}")
-
-    noreply(s)
-  end
-
   defp noreply(%State{} = s), do: {:noreply, s}
-  defp noreply_continue(%State{} = s, term), do: {:noreply, s, {:continue, term}}
 end
