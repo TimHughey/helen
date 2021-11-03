@@ -117,7 +117,7 @@ defmodule Alfred.NotifyMemo do
           ref: reference(),
           pid: pid(),
           seen_at: DateTime.t(),
-          missing?: false
+          missing?: boolean()
         }
 
   def new(%NotifyTo{} = nt, opts) do
