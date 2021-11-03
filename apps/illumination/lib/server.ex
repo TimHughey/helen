@@ -75,7 +75,7 @@ defmodule Illumination.Server do
 
   @impl true
   def handle_info(:find_equipment, %State{equipment: equipment} = s) do
-    reg = s.alfred.notify_register(equipment, frequency: :all, link: true)
+    reg = s.alfred.notify_register(name: equipment, frequency: :all, link: true)
 
     case reg do
       {:ok, %Alfred.NotifyTo{} = x} ->

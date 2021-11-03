@@ -14,7 +14,7 @@ defmodule Eva.Names do
     for name <- names.needed, reduce: {%Names{names | needed: []}, []} do
       {%Names{} = names, notifies} ->
         # we want all notifications and to restart when Alfred restarts
-        reg_rc = Alfred.notify_register(name, frequency: :all, link: true)
+        reg_rc = Alfred.notify_register(name: name, frequency: :all, link: true)
 
         case reg_rc do
           {:ok, %NotifyTo{} = nt} -> {add_found_name(names, name), [nt] ++ notifies}

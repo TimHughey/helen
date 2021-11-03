@@ -3,33 +3,38 @@ defmodule Alfred.Notify do
   Alfred Notify Public API
   """
 
-  alias Alfred.KnownName
-
   @server Alfred.Notify.Server
 
   def alive? do
     if GenServer.whereis(@server), do: true, else: false
   end
 
-  def just_saw(%KnownName{} = kn), do: {:just_saw, kn} |> cast()
+  def just_saw(opts), do: {:just_saw, opts} |> cast()
 
   @register_default_opts [frequency: [interval_ms: 0], link: true]
-  @type notify_frequency_opts() :: nil | [interval_ms: pos_integer()] | :all | :use_ttl
+  @type notify_frequency_opts() :: nil | [interval_ms: pos_integer()] | :all
   @type register_opts() :: [pid: pid(), frequency: notify_frequency_opts]
-  @spec register(String.t(), register_opts()) :: {:ok, NotifyTo.t()} | {:error, term()}
 
-  def register(name, opts) do
-    alias Alfred.{KnownName, Names}
-
+  @spec register(register_opts()) :: {:ok, Alfred.NotifyTo.t()} | {:error, term()}
+  def register(opts) when is_list(opts) do
     opts = Keyword.merge(@register_default_opts, opts)
 
-    case Names.lookup(name) do
-      %KnownName{missing?: false} = kn -> {:register, kn, opts} |> call()
-      _ -> {:failed, "unknown name: #{name}"}
-    end
+    call({:register, opts})
   end
 
-  def registrations, do: {:registrations} |> call()
+  @doc """
+    Retrieve NotifyTo registrations
+
+      iex> Alfred.Notify.registrations([all: true])
+
+    Opts
+      1. `all: true`    return all registrations (default)
+      2. `name: binary` return registrations for a specific name
+  """
+
+  @type registrations_opts() :: [all: true, name: String.t()]
+  @spec registrations(registrations_opts()) :: [Alfred.NotifyTo.t(), ...]
+  def registrations(opts \\ [all: true]), do: {:registrations, opts} |> call()
   def unregister(ref) when is_reference(ref), do: {:unregister, ref} |> call()
 
   defp call(msg), do: (alive?() && GenServer.call(@server, msg)) || {:no_server, @server}

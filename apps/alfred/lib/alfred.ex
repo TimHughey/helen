@@ -58,7 +58,7 @@ defmodule Alfred do
     end
   end
 
-  defdelegate notify_register(name, opts \\ []), to: Notify, as: :register
+  defdelegate notify_register(opts), to: Notify, as: :register
   defdelegate notify_unregister(notify_to), to: Notify, as: :unregister
 
   def off(name, opts \\ []) when is_binary(name) do

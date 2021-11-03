@@ -124,6 +124,20 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_ok_tuple_with_struct(res, struct) do
+    quote location: :keep, bind_quoted: [res: res, struct: struct] do
+      should_be_tuple_with_size(res, 2)
+
+      fail = pretty("rc should be :ok", res)
+      {rc, res_struct} = res
+      assert :ok == rc, fail
+
+      fail = pretty("should be #{inspect(struct, pretty: true)}", res_struct)
+      assert is_struct(res_struct), fail
+      assert res_struct.__struct__ == struct, fail
+    end
+  end
+
   defmacro should_be_ok_tuple_with_schema(res, schema) do
     quote location: :keep, bind_quoted: [res: res, schema: schema] do
       should_be_tuple(res)

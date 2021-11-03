@@ -4,7 +4,7 @@ defmodule Alfred.MixProject do
   def project do
     [
       app: :alfred,
-      version: "0.1.2",
+      version: "0.1.3",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -31,6 +31,7 @@ defmodule Alfred.MixProject do
     [
       {:betty, in_umbrella: true},
       {:tzdata, "~> 1.1"},
+      {:ecto, "~> 3.7", only: :test},
       {:excoveralls, "~> 0.10", only: :test},
       {:should, in_umbrella: true, only: :test}
     ]

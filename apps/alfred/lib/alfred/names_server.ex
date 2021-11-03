@@ -83,12 +83,17 @@ defmodule Alfred.Names.Server do
 
     for %Alias{} = a <- js.seen_list, reduce: {s, []} do
       {%State{} = s, acc} ->
-        kn = KnownName.new(a.name, js.mutable?, a.ttl_ms, js.callback_mod)
+        name = a.name
+        ttl_ms = a.ttl_ms
+        seen_at = DateTime.utc_now()
 
-        Notify.just_saw(kn)
+        kn = KnownName.new(name, js.mutable?, ttl_ms, js.callback_mod)
+
+        notify_opts = [name: name, ttl_ms: ttl_ms, seen_at: seen_at]
+        Notify.just_saw(notify_opts)
 
         state = State.add_or_update(s, kn)
-        acc = [a.name] ++ acc
+        acc = [name, acc] |> List.flatten()
 
         {state, acc}
     end

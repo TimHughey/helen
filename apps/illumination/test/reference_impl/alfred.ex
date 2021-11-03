@@ -3,7 +3,8 @@
 defmodule AlfredNotFound do
   alias Alfred.NotifyTo
 
-  def notify_register(name, _opts) do
+  def notify_register(opts) do
+    name = opts[:name]
     {:failed, "unknown name: #{name}"}
   end
 end
@@ -15,7 +16,8 @@ defmodule AlfredFound do
     %Alfred.ExecResult{name: ec.name, cmd: ec.cmd}
   end
 
-  def notify_register(name, _opts) do
+  def notify_register(opts) do
+    name = opts[:name]
     {:ok, %NotifyTo{name: name, ref: make_ref()}}
   end
 end
