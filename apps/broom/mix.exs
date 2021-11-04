@@ -77,6 +77,7 @@ defmodule Broom.MixProject do
       {:timex, "~> 3.0"},
       {:betty, in_umbrella: true},
       {:should, in_umbrella: true, only: :test, runtime: false},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
       {:postgrex, ">= 0.0.0", only: :test}
     ]

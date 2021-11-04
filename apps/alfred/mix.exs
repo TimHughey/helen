@@ -31,6 +31,7 @@ defmodule Alfred.MixProject do
     [
       {:betty, in_umbrella: true},
       {:tzdata, "~> 1.1"},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ecto, "~> 3.7", only: :test},
       {:excoveralls, "~> 0.10", only: :test},
       {:should, in_umbrella: true, only: :test}

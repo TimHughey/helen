@@ -30,6 +30,7 @@ defmodule Betty.MixProject do
   defp deps do
     [
       {:instream, "~> 1.0"},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false}
     ]

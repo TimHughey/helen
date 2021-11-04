@@ -75,6 +75,7 @@ defmodule Sally.MixProject do
       {:alfred, in_umbrella: true},
       {:betty, in_umbrella: true},
       {:broom, in_umbrella: true},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:should, in_umbrella: true, only: :test, runtime: false},
       {:excoveralls, "~> 0.10", only: :test}

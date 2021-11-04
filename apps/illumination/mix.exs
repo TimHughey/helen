@@ -30,6 +30,7 @@ defmodule Illumination.MixProject do
   defp deps do
     [
       {:alfred, in_umbrella: true},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:broom, in_umbrella: true},
       {:excoveralls, "~> 0.10", only: :test},
       {:timex, "~> 3.7"},
