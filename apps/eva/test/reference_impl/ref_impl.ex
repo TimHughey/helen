@@ -15,21 +15,26 @@ defmodule Eva.RefImpl.ManualTest do
       relay = "relay#{num}"
       i2c = "i2c#{num}"
 
-      if Alfred.available?(relay), do: Sally.make_alias(relay, "ds29241708000000", num), else: nil
-      if Alfred.available?(i2c), do: Sally.make_alias(i2c, "i2c30aea423a210.mcp23008:20", num), else: nil
+      if Alfred.available?(relay),
+        do: Sally.device_add_alias(name: relay, device: "ds.29241708000000", pio: num),
+        else: nil
+
+      if Alfred.available?(i2c),
+        do: Sally.device_add_alias(name: i2c, device: "i2c.30aea423a210.mcp23008:20", pio: num),
+        else: nil
 
       :ok
     end
 
-    Sally.make_alias("led", "pwm30aea423a210", 0)
-    Sally.make_alias("pwm1", "pwm30aea423a210", 1)
-    Sally.make_alias("pwm2", "pwm30aea423a210", 2)
-    Sally.make_alias("pwm3", "pwm30aea423a210", 3)
+    Sally.device_add_alias(name: "led", device: "pwm.30aea423a210", pio: 0)
+    Sally.device_add_alias(name: "pwm1", device: "pwm.30aea423a210", pio: 1)
+    Sally.device_add_alias(name: "pwm2", device: "pwm.30aea423a210", pio: 2)
+    Sally.device_add_alias(name: "pwm3", device: "pwm.30aea423a210", pio: 3)
 
-    Sally.make_alias("sht31", "i2c30aea423a210.sht31:44", 0)
-    Sally.make_alias("pcb", "ds28ff280b6e1801", 0)
-    Sally.make_alias("black temp", "ds28ff9ace011703", 0)
-    Sally.make_alias("green temp", "ds28ff88d4011703", 0)
+    Sally.device_add_alias(name: "sht31", device: "i2c.30aea423a210.sht31:44", pio: 0)
+    Sally.device_add_alias(name: "pcb", device: "ds.28ff280b6e1801", pio: 0)
+    Sally.device_add_alias(name: "black temp", device: "ds.28ff9ace011703")
+    Sally.device_add_alias(name: "green temp", device: "ds28ff88d4011703")
 
     :ok
   end
