@@ -33,7 +33,7 @@ defmodule FrontChandelier do
         "fade_dim" => [
           type: "random",
           min: 256,
-          max: 1024,
+          max: 768,
           primes: 35,
           step_ms: 55,
           step: 13,
