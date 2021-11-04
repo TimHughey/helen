@@ -1,7 +1,0 @@
-name = "Lighting Red Maple"
-variant = "timed_cmd"
-description = "fairy lights on front red maple"
-initial_mode = "ready"
-
-[equipment]
-  name = "pwm2"

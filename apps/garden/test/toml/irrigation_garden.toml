@@ -1,8 +1,0 @@
-name = "Irrigation Garden"
-variant = "timed_cmd"
-description = "water valve for garden irrigation"
-initial_mode = "ready"
-
-[equipment]
-  name = "relay3"
-  impact = "irrigates"
