@@ -376,7 +376,7 @@ defmodule BroomTest do
           assert {Broom, %Broom.TrackerEntry{}} = msg, fail
 
           # return the TrackerEntry
-          %{ctx | tracker_entry: elem(msg, 2)}
+          %{ctx | tracker_entry: elem(msg, 1)}
       after
         1000 ->
           fail = pretty("should have received: {Broom, %Broom.TrackerEntry{}}", :timeout)

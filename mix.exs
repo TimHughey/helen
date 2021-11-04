@@ -3,7 +3,7 @@ defmodule Helen.MixProject do
 
   use Mix.Project
 
-  @vsn "2.0.10"
+  @vsn "2.0.11"
 
   def project do
     [
@@ -52,7 +52,6 @@ defmodule Helen.MixProject do
       betty: :permanent,
       broom: :permanent,
       sally: :permanent,
-      garden: :none,
       illumination: :permanent,
       legacy_db: :permanent
     ]
