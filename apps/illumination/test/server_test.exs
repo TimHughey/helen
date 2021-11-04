@@ -110,7 +110,7 @@ defmodule IlluminationServerTest do
     {:noreply, state} = reply
 
     notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: false}
-    notify_msg = {Alfred, :notify, notify_memo}
+    notify_msg = {Alfred, notify_memo}
 
     reply = Illumination.Server.handle_info(notify_msg, state)
 
@@ -146,7 +146,7 @@ defmodule IlluminationServerTest do
     }
 
     notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: false}
-    notify_msg = {Alfred, :notify, notify_memo}
+    notify_msg = {Alfred, notify_memo}
 
     res = Illumination.Server.handle_info(notify_msg, state)
 
@@ -171,7 +171,7 @@ defmodule IlluminationServerTest do
     }
 
     notify_memo = %NotifyMemo{ref: ref, name: equipment}
-    notify_msg = {Alfred, :notify, notify_memo}
+    notify_msg = {Alfred, notify_memo}
 
     res = Illumination.Server.handle_info(notify_msg, state)
 

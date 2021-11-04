@@ -64,7 +64,7 @@ defmodule Illumination.Server do
 
   @impl true
   def handle_info(
-        {Broom, :release, %Broom.TrackerEntry{refid: ref, acked_at: acked_at}},
+        {Broom, %Broom.TrackerEntry{refid: ref, acked_at: acked_at}},
         %State{result: %Result{schedule: schedule, exec: %Alfred.ExecResult{refid: ref}}} = s
       ) do
     [result: Schedule.handle_cmd_ack(schedule, acked_at, timezone: s.timezone)]
@@ -100,14 +100,14 @@ defmodule Illumination.Server do
 
   # (1 of 3) handle equipment missing messages
   @impl true
-  def handle_info({Alfred, :notify, %NotifyMemo{missing?: true}}, %State{} = s) do
+  def handle_info({Alfred, %NotifyMemo{missing?: true}}, %State{} = s) do
     # TODO: handle missing equipment
     State.update_last_notify_at(s) |> noreply()
   end
 
   # (2 of x) handle the first notification (result == nil) by simply performing a schedule
   @impl true
-  def handle_info({Alfred, :notify, %NotifyMemo{}}, %State{result: nil} = s) do
+  def handle_info({Alfred, %NotifyMemo{}}, %State{result: nil} = s) do
     handle_info(:schedule, State.update_last_notify_at(s))
   end
 
@@ -115,7 +115,7 @@ defmodule Illumination.Server do
   # to the expected cmd (based on previous execute result)
   @impl true
   def handle_info(
-        {Alfred, :notify, %Alfred.NotifyMemo{ref: ref} = memo},
+        {Alfred, %Alfred.NotifyMemo{ref: ref} = memo},
         %State{equipment: %NotifyTo{ref: ref}, result: result} = s
       ) do
     alias Alfred.MutableStatus, as: MutStatus

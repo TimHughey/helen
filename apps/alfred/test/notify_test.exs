@@ -50,10 +50,9 @@ defmodule Alfred.NotifyTest do
 
     receive do
       res ->
-        should_be_tuple_with_size(res, 3)
-        {mod, action, memo} = res
+        should_be_tuple_with_size(res, 2)
+        {mod, memo} = res
         should_be_equal(mod, Alfred)
-        should_be_equal(action, :notify)
         should_be_struct(memo, NotifyMemo)
         should_be_equal(memo.missing?, false)
         should_be_equal(memo.name, name)
@@ -81,10 +80,9 @@ defmodule Alfred.NotifyTest do
 
     receive do
       res ->
-        should_be_tuple_with_size(res, 3)
-        {mod, action, memo} = res
+        should_be_tuple_with_size(res, 2)
+        {mod, memo} = res
         should_be_equal(mod, Alfred)
-        should_be_equal(action, :notify)
         should_be_struct(memo, NotifyMemo)
         should_be_equal(memo.missing?, false)
         should_be_equal(memo.name, name)

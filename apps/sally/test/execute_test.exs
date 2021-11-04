@@ -110,7 +110,7 @@ defmodule SallyPwmExecuteTest do
     assert res.will_notify_when_released, fail
 
     receive do
-      {Broom, :release, %Broom.TrackerEntry{} = te} ->
+      {Broom, %Broom.TrackerEntry{} = te} ->
         fail = pretty("TrackerEntry did not match", te)
         assert te.refid == res.refid, fail
         assert te.acked == true, fail
@@ -145,7 +145,7 @@ defmodule SallyPwmExecuteTest do
     assert res.will_notify_when_released, fail
 
     receive do
-      {Broom, :release, %Broom.TrackerEntry{} = te} ->
+      {Broom, %Broom.TrackerEntry{} = te} ->
         fail = pretty("TrackerEntry did not match", te)
         assert te.refid == res.refid, fail
         assert te.acked, fail
@@ -181,7 +181,7 @@ defmodule SallyPwmExecuteTest do
     assert res.will_notify_when_released, fail
 
     receive do
-      {Broom, :release, %Broom.TrackerEntry{} = te} ->
+      {Broom, %Broom.TrackerEntry{} = te} ->
         fail = pretty("TrackerEntry did not match", te)
         assert te.refid == res.refid, fail
         assert te.acked, fail

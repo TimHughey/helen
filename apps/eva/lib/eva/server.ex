@@ -98,13 +98,13 @@ defmodule Eva.Server do
 
   # ignore notifies while initializing or finding names
   @impl true
-  def handle_info({Alfred, :notify, %Memo{}}, %State{mode: mode} = s)
+  def handle_info({Alfred, %Memo{}}, %State{mode: mode} = s)
       when mode in [:starting, :finding_names] do
     noreply(s)
   end
 
   @impl true
-  def handle_info({Alfred, :notify, %Memo{} = memo}, %State{} = s) do
+  def handle_info({Alfred, %Memo{} = memo}, %State{} = s) do
     s.variant
     |> Variant.handle_notify(memo, s.mode)
     |> Variant.control(memo, s.mode)
@@ -114,7 +114,7 @@ defmodule Eva.Server do
   end
 
   @impl true
-  def handle_info({Broom, :release, %TrackerEntry{} = te}, %State{} = s) do
+  def handle_info({Broom, %TrackerEntry{} = te}, %State{} = s) do
     s.variant
     |> Variant.handle_release(te)
     |> State.update(s)

@@ -103,7 +103,7 @@ defmodule Broom.TrackerEntry do
   end
 
   defp notify_if_needed(%Entry{notify_pid: pid} = te) do
-    if pid, do: send(pid, {Broom, :release, te})
+    if pid, do: send(pid, {Broom, te})
 
     te
   end

@@ -57,7 +57,7 @@ defmodule Alfred.NotifyTo do
 
     case DateTime.compare(utc_now, next_notify) do
       x when x in [:eq, :gt] ->
-        Process.send(nt.pid, {Alfred, :notify, NotifyMemo.new(nt, opts)}, [])
+        Process.send(nt.pid, {Alfred, NotifyMemo.new(nt, opts)}, [])
 
         %NotifyTo{nt | last_notify: DateTime.utc_now()} |> schedule_missing()
 

@@ -373,13 +373,13 @@ defmodule BroomTest do
       receive do
         msg ->
           fail = pretty("notification msg did not match", msg)
-          assert {Broom, :release, %Broom.TrackerEntry{}} = msg, fail
+          assert {Broom, %Broom.TrackerEntry{}} = msg, fail
 
           # return the TrackerEntry
           %{ctx | tracker_entry: elem(msg, 2)}
       after
         1000 ->
-          fail = pretty("should have received: {Broom, :release, %Broom.TrackerEntry{}}", :timeout)
+          fail = pretty("should have received: {Broom, %Broom.TrackerEntry{}}", :timeout)
 
           assert :timeout == true, fail
       end
