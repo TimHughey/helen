@@ -1,24 +1,33 @@
 defmodule Rena.Sensor.Result do
   alias __MODULE__
 
-  defstruct gt_high: false, gt_mid: false, lt_low: false, lt_mid: false, invalid: 0, valid: 0
+  defstruct gt_high: 0, gt_mid: 0, lt_low: 0, lt_mid: 0, invalid: 0, valid: 0, total: 0
 
+  @type zero_or_positive_integer() :: 0 | pos_integer()
   @type t :: %Result{
-          gt_high: boolean(),
-          gt_mid: boolean(),
-          lt_low: boolean(),
-          lt_mid: boolean(),
-          invalid: 0 | pos_integer(),
-          valid: 0 | pos_integer()
+          gt_high: zero_or_positive_integer(),
+          gt_mid: zero_or_positive_integer(),
+          lt_low: zero_or_positive_integer(),
+          lt_mid: zero_or_positive_integer(),
+          invalid: zero_or_positive_integer(),
+          valid: zero_or_positive_integer(),
+          total: zero_or_positive_integer()
         }
 
   @known_keys [:gt_high, :gt_mid, :lt_low, :lt_mid]
-  def summarize(check, %Result{} = r) when is_map_key(r, check) do
+  def tally_datapoint(check, %Result{} = r) when is_map_key(r, check) do
     case check do
-      key when key in @known_keys -> %Result{r | valid: r.valid + 1} |> Map.put(key, true)
-      _ -> %Result{r | invalid: r.invalid + 1}
+      key when key in @known_keys -> inc_datapoint(r, key) |> inc_valid()
+      _ -> inc_invalid(r)
     end
   end
+
+  def tally_total(%Result{} = r), do: %Result{r | total: r.valid + r.invalid}
+
+  defp inc(val), do: val + 1
+  defp inc_datapoint(%Result{} = r, dp), do: Map.update!(r, dp, &inc/1)
+  defp inc_valid(%Result{} = r), do: Map.update!(r, :valid, &inc/1)
+  defp inc_invalid(%Result{} = r), do: Map.update!(r, :invalid, &inc/1)
 end
 
 defmodule Rena.Sensor.Range do
@@ -30,7 +39,7 @@ defmodule Rena.Sensor.Range do
   @type units() :: :temp_f | :temp_c | :relhum
   @type t :: %Range{low: float(), high: float(), unit: units()}
 
-  def check(dpts, %Range{low: lpt, high: hpt, unit: unit})
+  def compare(dpts, %Range{low: lpt, high: hpt, unit: unit})
       when is_number(lpt) and is_number(hpt) and hpt >= lpt do
     mid_pt = (hpt - lpt) / 2.0 + lpt
     sensor_val = dpts[unit]
@@ -44,7 +53,7 @@ defmodule Rena.Sensor.Range do
     end
   end
 
-  def check(_dpts, _range), do: :invalid
+  def compare(_dpts, _range), do: :invalid
 end
 
 defmodule Rena.Sensor do
@@ -52,7 +61,7 @@ defmodule Rena.Sensor do
 
   @type alfred() :: module() | nil
   @type names() :: [String.t()]
-  @type check_opts() :: [{:alfred, module()}]
+  @type compare_opts() :: [{:alfred, module()}]
 
   @spec range_compare(names(), %Range{}, list()) :: Result.t()
   def range_compare(names, %Range{} = range, opts \\ []) when is_list(opts) do
@@ -63,9 +72,10 @@ defmodule Rena.Sensor do
     for name when is_binary(name) <- List.wrap(names), reduce: %Result{} do
       acc ->
         case alfred.status(name) do
-          %Status{good?: true, datapoints: dpts} -> Range.check(dpts, range) |> Result.summarize(acc)
-          _ -> Result.summarize(:invalid, acc)
+          %Status{good?: true, datapoints: dpts} -> Range.compare(dpts, range) |> Result.tally_datapoint(acc)
+          _ -> Result.tally_datapoint(:invalid, acc)
         end
     end
+    |> Result.tally_total()
   end
 end
