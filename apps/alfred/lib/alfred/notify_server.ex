@@ -147,8 +147,8 @@ end
 
 defmodule Alfred.Notify.Server.State do
   alias __MODULE__
-  alias Alfred.NotifyTo
   alias Alfred.Notify.Registration.Key
+  alias Alfred.NotifyTo
 
   defstruct registrations: %{}, started_at: nil
 
@@ -219,9 +219,9 @@ defmodule Alfred.Notify.Server do
 
   require Logger
 
-  alias Alfred.NotifyTo
   alias Alfred.Notify.Server, as: Mod
   alias Alfred.Notify.Server.State
+  alias Alfred.NotifyTo
 
   @impl true
   def init(_args) do
