@@ -43,14 +43,11 @@ defmodule BettyTest do
 
   test "can Betty write an %AppError{} to the database", _ctx do
     metric_rc = Betty.app_error(__MODULE__, env: :test, success: false, temp_f: 78.7, val: 42)
-
-    fail = "metric rc should be a ok tuple with a map: #{inspect(metric_rc)}"
-    assert {:ok, %{}} = metric_rc, fail
+    should_be_equal(metric_rc, __MODULE__)
   end
 
   test "Betty.runtime_metric/3 can write a runtime metric with tags and fields", _ctx do
     metric_rc = Betty.runtime_metric(__MODULE__, [name: "test"], val: 1)
-
-    should_be_ok_tuple_with_size(metric_rc, 2)
+    should_be_equal(metric_rc, __MODULE__)
   end
 end

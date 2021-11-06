@@ -42,6 +42,12 @@ defmodule Betty.Metric do
     {Connection.write(points_map, instream_opts), points_map}
   end
 
+  def record(measurement, tags = [_ | _], fields = [_ | _]) when is_binary(measurement) do
+    new(measurement, fields, tags) |> write()
+  end
+
+  def record(_, _), do: :bad_args
+
   # tags or fields common mappings
   defp map_common(field_or_tag) do
     case field_or_tag do

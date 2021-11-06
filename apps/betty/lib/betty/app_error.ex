@@ -17,4 +17,10 @@ defmodule Betty.AppError do
 
     Metric.new("app_error", fields, tags) |> Metric.write()
   end
+
+  def record(module, tags) when is_atom(module) and is_list(tags) and tags != [] do
+    new(module, tags) |> write()
+  end
+
+  def record(_, _), do: :bad_args
 end

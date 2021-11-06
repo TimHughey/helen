@@ -1,12 +1,36 @@
 defmodule Betty do
   @moduledoc false
 
-  alias Betty.{Connection, Metric}
+  alias Betty.{AppError, Connection, Metric}
 
-  def app_error(module, tags) when is_atom(module) and is_list(tags) do
-    alias Betty.AppError
+  # def app_error(module, tags) when is_atom(module) and is_list(tags) do
+  #   AppError.new(module, tags) |> AppError.write()
+  # end
+  #
+  # def app_error(%{server_name: module} = pass_through, tags)
+  #     when is_atom(module) and is_list(tags) do
+  #   app_error(module, tags)
+  #
+  #   pass_through
+  # end
+  #
+  # def app_error(opts, tags) when is_list(opts) do
+  #   Enum.into(opts, %{}) |> app_error(tags)
+  # end
+  #
+  # def app_error(_, _), do: :invalid_args
 
-    AppError.new(module, tags) |> AppError.write()
+  def app_error(passthrough, tags) do
+    case {passthrough, tags} do
+      {x, tags} when is_nil(x) or tags == [] or not is_list(tags) -> :failed
+      {x, tags} when is_atom(x) -> AppError.record(x, tags)
+      {x, tags} when is_list(x) -> Enum.into(x, %{}) |> app_error(tags)
+      {%{server_name: module}, tags} -> app_error(module, tags)
+      {%{module: module}, tags} -> app_error(module, tags)
+      _ -> :failed
+    end
+
+    passthrough
   end
 
   @doc """
@@ -42,10 +66,17 @@ defmodule Betty do
       iex> Betty.runtime_metric(SomeModule, tags, fields)
   """
   @doc since: "0.2.3"
-  def runtime_metric(module, tags, fields) do
-    alias Betty.Metric
+  def runtime_metric(passthrough, tags, fields) do
+    module = find_module(passthrough)
 
-    Metric.new("runtime", fields, [module: module] ++ tags) |> Metric.write()
+    if module == :no_module do
+      :failed
+    else
+      tags = [module: module] ++ tags
+      Metric.record("runtime", tags, fields)
+    end
+
+    passthrough
   end
 
   @doc """
@@ -79,5 +110,15 @@ defmodule Betty do
 
     # now write the point to the timeseries database
     {Connection.write(points_map, instream_opts), points_map}
+  end
+
+  defp find_module(x) do
+    case x do
+      module when is_atom(module) -> module
+      list when is_list(list) and list != [] -> Enum.into(list, %{}) |> find_module()
+      %{server_name: module} -> module |> find_module()
+      %{module: module} -> module |> find_module()
+      _ -> :no_module
+    end
   end
 end
