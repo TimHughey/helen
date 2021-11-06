@@ -4,7 +4,7 @@ defmodule Illumination.MixProject do
   def project do
     [
       app: :illumination,
-      version: "0.1.9",
+      version: "0.1.10",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -30,8 +30,9 @@ defmodule Illumination.MixProject do
   defp deps do
     [
       {:alfred, in_umbrella: true},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:betty, in_umbrella: true},
       {:broom, in_umbrella: true},
+      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
       {:timex, "~> 3.7"},
       {:solar, in_umbrella: true},

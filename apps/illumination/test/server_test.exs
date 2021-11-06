@@ -33,7 +33,7 @@ defmodule IlluminationServerTest do
     start_args = [alfred: AlfredFound, equipment: "test_equip"]
     start_res = start_supervised({Illumination.RefImpl, start_args})
 
-    should_be_ok_pid(start_res)
+    should_be_ok_tuple_with_pid(start_res)
 
     state = :sys.get_state(Illumination.RefImpl)
     should_be_struct(state, Illumination.State)
@@ -47,7 +47,7 @@ defmodule IlluminationServerTest do
     start_args = [alfred: AlfredFound, equipment: "test_equip"]
     start_res = start_supervised({Illumination.RefImpl, start_args})
 
-    should_be_ok_pid(start_res)
+    should_be_ok_tuple_with_pid(start_res)
 
     info = Illumination.RefImpl.info()
     assert is_nil(info), "info should be nil"
@@ -72,7 +72,7 @@ defmodule IlluminationServerTest do
     start_args = [alfred: AlfredFound, equipment: "test_equip", schedules: schedules]
     start_res = start_supervised({Illumination.RefImpl, start_args})
 
-    should_be_ok_pid(start_res)
+    should_be_ok_tuple_with_pid(start_res)
 
     state = :sys.get_state(Illumination.RefImpl)
     should_be_struct(state, Illumination.State)
