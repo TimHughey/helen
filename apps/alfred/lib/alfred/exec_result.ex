@@ -12,7 +12,7 @@ defmodule Alfred.ExecResult do
             will_notify_when_released: false,
             instruct: nil
 
-  @type(exec_rc :: :ok | :not_found | :tty_expired, {:invalid, String.t()} | {:error, any()})
+  @type exec_rc :: :ok | :pending | :not_found | {:ttl_expired, pos_integer()} | {:invalid, String.t()}
 
   @type t :: %__MODULE__{
           name: String.t(),
