@@ -1,6 +1,20 @@
 defmodule Rena.Alfred do
+  alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.ImmutableStatus, as: ImmutStatus
   alias Alfred.MutableStatus, as: MutStatus
+  alias Alfred.NotifyTo
+
+  def execute(%ExecCmd{} = ec, _opts \\ []) do
+    case String.split(ec.name) do
+      [_mutable, "bad", cmd] -> %ExecResult{name: ec.name, rc: {:ttl_expired, 10_000}, cmd: cmd}
+      [_mutable, "pending", cmd] -> %ExecResult{name: ec.name, rc: :pending, cmd: cmd, refid: "123456"}
+      [_mutable, _name, cmd] -> %ExecResult{name: ec.name, rc: :ok, cmd: cmd}
+    end
+  end
+
+  def notify_register(opts) do
+    %NotifyTo{name: opts[:name], pid: self(), ref: make_ref()}
+  end
 
   def status(name, opts \\ []) do
     case String.split(name) do

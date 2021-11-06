@@ -1,7 +1,56 @@
 defmodule Rena.SetPt.Cmd do
-  alias Alfred.ExecCmd
+  alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.MutableStatus, as: MutStatus
   alias Rena.Sensor.Result
+
+  def effectuate(make_result, opts) do
+    case make_result do
+      {action, %ExecCmd{} = ec} when action in [:activate, :deactivate] ->
+        execute(ec, opts) |> log_execute_result(action, opts)
+
+      {:datapoint_error = x, _} ->
+        Betty.app_error(opts, [{x, true}])
+        :failed
+
+      {:error, reason} ->
+        Betty.app_error(opts, [{reason, true}])
+        :failed
+
+      {:equipment_error, %MutStatus{name: name, ttl_expired?: true}} ->
+        Betty.app_error(opts, equipment: name, equipment_error: "ttl_expired")
+        :failed
+
+      {:equipment_error, %MutStatus{name: name, error: error}} ->
+        Betty.app_error(opts, equipment: name, equipment_error: error)
+        :failed
+
+      {:no_change, _status} ->
+        :no_change
+    end
+  end
+
+  def execute(%ExecCmd{} = ec, opts) do
+    alfred = opts[:alfred] || Alfred
+
+    case alfred.execute(ec) do
+      %ExecResult{rc: rc} = exec_result when rc in [:ok, :pending] -> {:ok, exec_result}
+      %ExecResult{} = exec_result -> {:failed, exec_result}
+    end
+  end
+
+  def log_execute_result({rc, %ExecResult{} = er}, action, opts) when action in [:activate, :deactivate] do
+    tags = [equipment: er.name]
+
+    # always log that an action was performed (even if it failed)
+    Betty.runtime_metric(opts, tags, [{action, true}])
+
+    if rc == :failed do
+      Betty.app_error(opts, tags ++ [cmd_fail: true])
+    end
+
+    # pass through the ExecResult
+    er
+  end
 
   def make(name, %Result{} = result, opts \\ []) do
     alfred = opts[:alfred] || Alfred
@@ -14,12 +63,12 @@ defmodule Rena.SetPt.Cmd do
          %MutStatus{good?: true} = mut_status <- alfred.status(name) do
       status = simple_status(mut_status, active_cmd)
 
-      activate? = status == :active and should_be_inactive?(result)
-      deactivate? = status == :inactive and should_be_active?(result)
+      activate? = status == :inactive and should_be_active?(result)
+      deactivate? = status == :active and should_be_inactive?(result)
 
       cond do
-        activate? -> {:ok, %ExecCmd{inactive_cmd | name: name}}
-        deactivate? -> {:ok, %ExecCmd{active_cmd | name: name}}
+        activate? -> {:activate, %ExecCmd{active_cmd | name: name}}
+        deactivate? -> {:deactivate, %ExecCmd{inactive_cmd | name: name}}
         true -> {:no_change, status}
       end
     else

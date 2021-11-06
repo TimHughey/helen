@@ -4,16 +4,16 @@ defmodule Rena.SetPt.CmdTest do
 
   @moduletag rena: true, setpt_cmd_test: true
 
-  alias Alfred.ExecCmd
+  alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.MutableStatus, as: MutStatus
   alias Rena.Sensor.Result
   alias Rena.SetPt.Cmd
 
-  defmacro check_exec_cmd(name, cmd, res) do
-    quote location: :keep, bind_quoted: [name: name, cmd: cmd, res: res] do
-      should_be_ok_tuple_with_struct(res, ExecCmd)
+  defmacro check_exec_cmd(name, cmd, action, res) do
+    quote location: :keep, bind_quoted: [name: name, cmd: cmd, action: action, res: res] do
+      should_be_rc_tuple_with_struct(res, action, ExecCmd)
 
-      {:ok, %ExecCmd{} = ec} = res
+      {_, %ExecCmd{} = ec} = res
       should_be_equal(ec.name, name)
       should_be_equal(ec.cmd, cmd)
     end
@@ -28,7 +28,7 @@ defmodule Rena.SetPt.CmdTest do
 
       res = Cmd.make(name, r, alfred: Rena.Alfred)
 
-      check_exec_cmd(name, "on", res)
+      check_exec_cmd(name, "on", :activate, res)
     end
 
     @tag result_opts: [gt_high: 1, gt_mid: 2]
@@ -37,7 +37,7 @@ defmodule Rena.SetPt.CmdTest do
 
       res = Cmd.make(name, r, alfred: Rena.Alfred)
 
-      check_exec_cmd(name, "off", res)
+      check_exec_cmd(name, "off", :deactivate, res)
     end
 
     @tag result_opts: [gt_mid: 2, lt_mid: 1]
@@ -46,7 +46,7 @@ defmodule Rena.SetPt.CmdTest do
 
       res = Cmd.make(name, r, alfred: Rena.Alfred)
 
-      check_exec_cmd(name, "off", res)
+      check_exec_cmd(name, "off", :deactivate, res)
     end
 
     @tag result_opts: [gt_mid: 2]
@@ -71,7 +71,7 @@ defmodule Rena.SetPt.CmdTest do
     end
 
     @tag result_opts: [lt_low: 3]
-    test "equipment error tuple with MutableStatus is not good", %{result: r} do
+    test "equipment error tuple with MutableStatus not good", %{result: r} do
       name = "mutable bad on"
 
       res = Cmd.make(name, r, alfred: Rena.Alfred)
@@ -82,6 +82,57 @@ defmodule Rena.SetPt.CmdTest do
       should_be_equal(rc, :equipment_error)
       should_be_struct(mut_status, MutStatus)
     end
+  end
+
+  describe "Rena.SetPt.Cmd.effectuate/2" do
+    setup [:setup_opts]
+
+    test "handles datapoint errors", %{opts: opts} do
+      res = Cmd.effectuate({:datapoint_error, :foo}, opts)
+      should_be_equal(res, :failed)
+    end
+
+    test "handles general error", %{opts: opts} do
+      res = Cmd.effectuate({:error, :foo}, opts)
+      should_be_equal(res, :failed)
+    end
+
+    test "handles equipment ttl expired", %{opts: opts} do
+      res = Cmd.effectuate({:equipment_error, %MutStatus{name: "bad equipment", ttl_expired?: true}}, opts)
+      should_be_equal(res, :failed)
+    end
+
+    test "handles equipment error", %{opts: opts} do
+      res = Cmd.effectuate({:equipment_error, %MutStatus{name: "bad equipment", error: :unknown}}, opts)
+      should_be_equal(res, :failed)
+    end
+
+    test "handles no change", %{opts: opts} do
+      res = Cmd.effectuate({:no_change, :foo}, opts)
+      should_be_equal(res, :no_change)
+    end
+  end
+
+  test "Rena.SetPt.Cmd.execute/2 executes an ExecCmd" do
+    opts = [alfred: Rena.Alfred, server_name: __MODULE__]
+
+    ec = %ExecCmd{name: "mutable good on", cmd: "on"}
+    res = Cmd.execute(ec, opts)
+    should_be_ok_tuple_with_struct(res, ExecResult)
+    {_rc, exec_result} = res
+    should_be_equal(exec_result.rc, :ok)
+
+    ec = %ExecCmd{name: "mutable pending on", cmd: "on"}
+    res = Cmd.execute(ec, opts)
+    should_be_ok_tuple_with_struct(res, ExecResult)
+    {_rc, exec_result} = res
+    should_be_equal(exec_result.rc, :pending)
+
+    ec = %ExecCmd{name: "mutable bad on", cmd: "on"}
+    res = Cmd.execute(ec, opts)
+    should_be_failed_tuple_with_struct(res, ExecResult)
+    {_rc, exec_result} = res
+    should_be_equal(exec_result.rc, {:ttl_expired, 10_000})
   end
 
   defp assemble_result(%{result_opts: opts} = ctx) do
@@ -108,5 +159,9 @@ defmodule Rena.SetPt.CmdTest do
 
   defp finalize_result_total(%Result{valid: valid, invalid: invalid} = r) do
     %Result{r | total: valid + invalid}
+  end
+
+  defp setup_opts(ctx) do
+    Map.put(ctx, :opts, server_name: Rena.SetPt.ServerTest)
   end
 end
