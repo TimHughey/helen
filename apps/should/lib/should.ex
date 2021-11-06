@@ -124,6 +124,16 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_ok_tuple_with_size(res, size) do
+    quote location: :keep, bind_quoted: [res: res, size: size] do
+      should_be_tuple_with_size(res, size)
+
+      fail = pretty("rc should be :ok", res)
+      rc = elem(res, 0)
+      assert :ok == rc, fail
+    end
+  end
+
   defmacro should_be_ok_tuple_with_struct(res, struct) do
     quote location: :keep, bind_quoted: [res: res, struct: struct] do
       should_be_tuple_with_size(res, 2)
@@ -159,13 +169,15 @@ defmodule Should do
     end
   end
 
-  defmacro should_be_ok_pid(res) do
+  defmacro should_be_ok_tuple_with_pid(res) do
     quote location: :keep, bind_quoted: [res: res] do
+      should_be_tuple_with_size(res, 2)
+
+      {:ok, pid} = res
       fail = pretty("should be {:ok, pid}: ", res)
-      assert is_tuple(res), fail
-      assert tuple_size(res) == 2, fail
-      assert elem(res, 0) == :ok, fail
-      assert elem(res, 1) |> is_pid, fail
+      assert is_pid(pid), fail
+
+      pid
     end
   end
 
@@ -189,6 +201,16 @@ defmodule Should do
     quote location: :keep, bind_quoted: [res: res] do
       fail = pretty("should be a pid", res)
       assert is_pid(res), fail
+    end
+  end
+
+  defmacro should_be_rc_tuple_with_struct(res, rc, struct) do
+    quote location: :keep, bind_quoted: [res: res, rc: rc, struct: struct] do
+      should_be_tuple_with_size(res, 2)
+
+      {res_rc, res_struct} = res
+      should_be_equal(res_rc, rc)
+      should_be_struct(res_struct, struct)
     end
   end
 
