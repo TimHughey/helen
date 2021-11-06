@@ -34,6 +34,17 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_map_with_keys(map, keys) do
+    quote location: :keep, bind_quoted: [map: map, keys: keys] do
+      should_be_non_empty_map(map)
+
+      for key <- keys do
+        fail = pretty("should contain key #{inspect(key)}", map)
+        assert is_map_key(map, key), fail
+      end
+    end
+  end
+
   defmacro should_be_non_empty_list(res) do
     quote location: :keep, bind_quoted: [res: res] do
       fail = pretty("should be non-empty list", res)
