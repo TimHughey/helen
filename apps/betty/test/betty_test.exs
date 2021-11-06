@@ -1,5 +1,6 @@
 defmodule BettyTest do
   use ExUnit.Case, async: true
+  use Should
 
   test "can Betty retrieve the connection configuration", _ctx do
     cfg = Application.get_env(:betty, Betty.Connection)
@@ -45,5 +46,11 @@ defmodule BettyTest do
 
     fail = "metric rc should be a ok tuple with a map: #{inspect(metric_rc)}"
     assert {:ok, %{}} = metric_rc, fail
+  end
+
+  test "Betty.runtime_metric/3 can write a runtime metric with tags and fields", _ctx do
+    metric_rc = Betty.runtime_metric(__MODULE__, [name: "test"], val: 1)
+
+    should_be_ok_tuple_with_size(metric_rc, 2)
   end
 end

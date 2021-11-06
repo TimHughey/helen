@@ -34,6 +34,21 @@ defmodule Betty do
   end
 
   @doc """
+  Create and write a runtime metric to the cnvironment configured database
+
+      ### Examples
+      iex> tags = [name: "foobar"]
+      iex> fields = [val: 1]
+      iex> Betty.runtime_metric(SomeModule, tags, fields)
+  """
+  @doc since: "0.2.3"
+  def runtime_metric(module, tags, fields) do
+    alias Betty.Metric
+
+    Metric.new("runtime", fields, [module: module] ++ tags) |> Metric.write()
+  end
+
+  @doc """
     Retrieves a map of all Influx Shards for the specified database
 
       ### Examples
