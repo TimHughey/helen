@@ -165,6 +165,7 @@ defmodule IlluminationServerTest do
     notify_to = %NotifyTo{name: equipment, ref: ref}
 
     state = %State{
+      module: Illumination.RefImpl,
       alfred: AlfredAlwaysPending,
       equipment: notify_to,
       result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}

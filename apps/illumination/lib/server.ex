@@ -101,9 +101,9 @@ defmodule Illumination.Server do
   # (1 of 3) handle equipment missing messages
   @impl true
   def handle_info({Alfred, %NotifyMemo{missing?: true} = memo}, %State{} = s) do
-    Betty.app_error(s.module, equipment: memo.name, missing: true)
-
-    State.update_last_notify_at(s) |> noreply()
+    Betty.app_error(s, equipment: memo.name, missing: true)
+    |> State.update_last_notify_at()
+    |> noreply()
   end
 
   # (2 of x) handle the first notification (result == nil) by simply performing a schedule
