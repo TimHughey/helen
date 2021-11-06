@@ -125,6 +125,26 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_error_tuple_with_struct(res, struct) do
+    quote location: :keep, bind_quoted: [res: res, struct: struct] do
+      should_be_tuple_with_size(res, 2)
+      {rc, res_struct} = res
+
+      should_be_equal(rc, :error)
+      should_be_struct(res_struct, struct)
+    end
+  end
+
+  defmacro should_be_failed_tuple_with_struct(res, struct) do
+    quote location: :keep, bind_quoted: [res: res, struct: struct] do
+      should_be_tuple_with_size(res, 2)
+      {rc, res_struct} = res
+
+      should_be_equal(rc, :failed)
+      should_be_struct(res_struct, struct)
+    end
+  end
+
   defmacro should_be_ok_tuple(res) do
     quote location: :keep, bind_quoted: [res: res] do
       should_be_tuple(res)
@@ -331,7 +351,7 @@ defmodule Should do
 
   defmacro should_be_noreply_tuple_with_state(res, struct) do
     quote location: :keep, bind_quoted: [res: res, struct: struct] do
-      fail = pretty("result should be a noreply tuple", res)
+      fail = pretty("result should be a noreply tuple with state", res)
       assert is_tuple(res), fail
       assert tuple_size(res) == 2, fail
       assert elem(res, 0) == :noreply, fail
