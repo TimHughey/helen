@@ -27,6 +27,13 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_datetime_greater_than(res, dt) do
+    quote location: :keep, bind_quoted: [res: res, dt: dt] do
+      fail = "#{inspect(res)} should be greater than #{inspect(dt)}"
+      assert DateTime.compare(dt, res) == :gt, fail
+    end
+  end
+
   defmacro should_be_equal(res, expected) do
     quote location: :keep, bind_quoted: [res: res, expected: expected] do
       fail = "#{inspect(res)} should be equal to #{inspect(expected)}"
@@ -42,6 +49,15 @@ defmodule Should do
         fail = pretty("should contain key #{inspect(key)}", map)
         assert is_map_key(map, key), fail
       end
+    end
+  end
+
+  defmacro should_be_match(res, to_match) do
+    quote location: :keep, bind_quoted: [res: res, to_match: to_match] do
+      res_binary = inspect(res, pretty: true)
+      to_match_binary = inspect(res, pretty: true)
+      fail = "#{res_binary} should match #{to_match_binary}"
+      assert to_match = res, fail
     end
   end
 
