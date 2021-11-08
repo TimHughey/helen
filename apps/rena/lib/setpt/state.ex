@@ -1,7 +1,7 @@
 defmodule Rena.SetPt.State do
   alias __MODULE__
 
-  alias Alfred.{ExecCmd, NotifyTo}
+  alias Alfred.{ExecCmd, ExecResult, NotifyTo}
   alias Rena.Sensor
 
   defstruct alfred: Alfred,
