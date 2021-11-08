@@ -116,7 +116,7 @@ defmodule Illumination.Server do
   # to the expected cmd (based on previous execute result)
   @impl true
   def handle_info(
-        {Alfred, %Alfred.NotifyMemo{ref: ref} = memo},
+        {Alfred, %NotifyMemo{ref: ref} = memo},
         %State{equipment: %NotifyTo{ref: ref}, result: result} = s
       ) do
     alias Alfred.MutableStatus, as: MutStatus
@@ -124,22 +124,36 @@ defmodule Illumination.Server do
     expected_cmd = Result.expected_cmd(result)
     status = s.alfred.status(memo.name)
 
-    new_state = State.update_last_notify_at(s)
-
     case status do
-      # skip check when cmd is pending
-      %MutStatus{pending?: true} ->
-        noreply(new_state)
+      # skip check when cmd is pending and don't update last notify
+      %MutStatus{pending?: true} = _x ->
+        noreply(s)
 
       # do nothing when expected cmd matches status cmd
       %MutStatus{good?: true, cmd: cmd} when cmd == expected_cmd ->
-        noreply(new_state)
+        State.update_last_notify_at(s) |> noreply()
 
       # anything else attempt to correct the mismatch by restarting
-      _ ->
-        Logger.warn("#{memo.name} cmd mismatch, restarting")
-        {:stop, :normal, new_state}
+      status ->
+        {:stop, :normal, tap(s, fn x -> log_cmd_mismatch(x, status) end)}
     end
+  end
+
+  defp log_cmd_mismatch(%State{result: result} = s, status) do
+    %Result{queue_timer: qtimer, run_timer: rtimer} = result
+    qt_ms = if is_reference(qtimer), do: Process.read_timer(qtimer), else: :unset
+    rt_ms = if is_reference(rtimer), do: Process.read_timer(rtimer), else: :unset
+
+    [
+      "\n",
+      "queue_timer_ms(#{qt_ms}) run_timer_ms(#{rt_ms})",
+      "\n",
+      "#{inspect(status, pretty: true)}",
+      "\n",
+      "#{inspect(s, pretty: true)}"
+    ]
+    |> IO.iodata_to_binary()
+    |> Logger.warn()
   end
 
   defp noreply(%State{} = s), do: {:noreply, s}

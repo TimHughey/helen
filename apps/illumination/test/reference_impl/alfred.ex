@@ -40,6 +40,12 @@ defmodule AlfredAlwaysOn do
   end
 end
 
+defmodule AlfredAlwaysOff do
+  def status(name) do
+    %Alfred.MutableStatus{name: name, good?: true, cmd: "off"}
+  end
+end
+
 defmodule AlfredAlwaysPending do
   def status(name) do
     %Alfred.MutableStatus{name: name, good?: true, pending?: true, cmd: "on"}
