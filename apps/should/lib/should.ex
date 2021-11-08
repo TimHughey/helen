@@ -5,6 +5,13 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_simple_ok(res) do
+    quote location: :keep, bind_quoted: [res: res] do
+      fail = "#{res} should be :ok"
+      assert res == :ok, fail
+    end
+  end
+
   defmacro should_be_cmd_equal(res, what) do
     quote location: :keep, bind_quoted: [res: res, what: what] do
       should_contain_key(res, :cmd)
@@ -284,6 +291,16 @@ defmodule Should do
       {res_rc, _} = res
       fail = pretty("rc should be #{inspect(rc)}", res)
       assert res_rc == rc
+    end
+  end
+
+  def should_be_tuple_with_rc_and_val(res, rc, val) do
+    quote location: :keep, bind_quoted: [res: res, rc: rc, val: val] do
+      should_be_tuple_with_size(res, 2)
+      {res_rc, res_val} = res
+
+      should_be_equal(res_rc, rc)
+      should_be_equal(res_val, val)
     end
   end
 
