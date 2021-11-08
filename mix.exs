@@ -53,7 +53,8 @@ defmodule Helen.MixProject do
       broom: :permanent,
       sally: :permanent,
       illumination: :permanent,
-      legacy_db: :permanent
+      legacy_db: :permanent,
+      farm: :permanent
     ]
   end
 end
