@@ -2,14 +2,16 @@ defmodule Sally.Host.Restart do
   alias Sally.Host
   alias Sally.Host.Instruct
 
-  def now(name) when is_binary(name) do
+  def now(name, opts) when is_binary(name) and is_list(opts) do
     case Host.find_by_name(name) do
-      %Host{} = h -> now(h)
+      %Host{} = h -> now(h, opts)
       nil -> {:not_found, name}
     end
   end
 
-  def now(%Host{} = host) do
-    Instruct.send(ident: host.ident, subsystem: "host", filters: ["restart"])
+  def now(%Host{} = host, opts) when is_list(opts) do
+    instruct = opts[:instruct] || Instruct
+
+    instruct.send(ident: host.ident, subsystem: "host", filters: ["restart"])
   end
 end

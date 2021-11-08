@@ -4,13 +4,83 @@ defmodule Sally do
   """
 
   alias Alfred.ExecCmd
-  alias Sally.{DevAlias, Device, Host, Repo}
+  alias Sally.{Command, DevAlias, Device, Host, Repo}
 
   def delete_alias(name_or_id) do
     case DevAlias.delete(name_or_id) do
       {:ok, results} ->
         kn = Alfred.delete(results[:name])
         {:ok, results ++ [alfred: kn]}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Show info of a DevAlias
+
+  ## Examples:
+      iex> Sally.devalias_info("dev alias")
+
+  ## Opts as of list of atoms
+  1. `:summary`   return map of most revelant info (default)
+  2. `:raw`       returns complete schema
+
+  ## Returns:
+  1. map or `Sally.DevAlias`   when dev alias found and dependent on opts
+  2. `nil`                     when dev alias is not found
+  """
+  @doc since: "0.5.9"
+  def devalias_info(name, opts \\ [:summary]) when is_binary(name) do
+    dev_alias = DevAlias.find(name) |> Repo.preload(device: [:host])
+
+    case {dev_alias, opts} do
+      {nil, _opts} ->
+        nil
+
+      {%DevAlias{} = x, [:summary]} ->
+        extended = %{
+          device: Device.summary(x.device),
+          host: Host.summary(x.device.host),
+          cmd: Command.summary(x.cmds)
+        }
+
+        DevAlias.summary(x) |> Map.merge(extended)
+
+      {%DevAlias{} = x, [:raw]} ->
+        x
+
+      _ ->
+        {:bad_args, opts}
+    end
+  end
+
+  @doc """
+  Renames an existing DevAlias
+
+  ## Examples:
+      iex> Sally.devalias_rename([from: "old name", to: "new name"])
+
+  ## Returns:
+    1. `:ok`                       -> rename successful
+    2. `{:not_found, String.t()}`  -> a host with `from:` name does not exist
+    2. `{:name_taken, String.t()}` -> requested name is already in use
+    3. `{:bad_args, list()}`       -> the opts passed failed validation
+
+
+  ## Opts as of list of atoms
+  1. `:from`   existing DevAlias name
+  2. `:to`     desired new DevAlias name
+  """
+  @doc since: "0.5.9"
+  def devalias_rename(opts) when is_list(opts) do
+    alfred = opts[:alfred] || Alfred
+
+    case DevAlias.rename(opts) do
+      %DevAlias{} ->
+        alfred.delete(opts[:from])
+        :ok
 
       error ->
         error
@@ -25,7 +95,7 @@ defmodule Sally do
       ...>         description: "power", ttl_ms: 15_000]
       iex> Sally.device_add_alias(opts)
 
-  ## Opts
+  ## Opts as keyword list
   1. `device:`       when binary denotes device for new alias | :latest to use latest discovered device
   2. `name:`         alias name
   3. `pio:`          pio to alias (required for mutable devices, optional for immutable devices)
@@ -66,6 +136,21 @@ defmodule Sally do
     end
   end
 
+  @doc """
+  Find the most recent Device added to Sally
+
+  ## Examples:
+      iex> Sally.device_latest()
+
+      iex> Sally.device_latest(age: [hours: -2])
+
+      iex> Sally.device_latest(schema: true)
+
+  ## Opts
+  1. 'age: Timex.shift_opts()'  now shifted shift opts to set threshold past DateTime
+  2. `schema: boolean()` device identifier to move aliases from
+  """
+  @doc since: "0.5.9"
   def device_latest(opts \\ [schema: false, age: [hours: -1]]), do: Device.latest(opts)
 
   @doc """
@@ -112,13 +197,30 @@ defmodule Sally do
     Host.find_by_name(name)
   end
 
-  def host_name(ident, new_name) do
-    case Host.find_by_ident(ident) do
-      %Host{name: name} when name == new_name -> :no_change
-      %Host{} = x -> Host.changeset(x, %{name: new_name}, [:name]) |> Repo.update()
-      _ -> :not_found
-    end
-  end
+  @doc """
+  Find the most recent Host added to Sally
+
+  ## Examples:
+      iex> Sally.host_latest()
+
+      iex> Sally.host_latest(age: [hours: -2])
+
+      iex> Sally.host_latest(schema: true)
+
+  ## Opts
+  1. 'age: Timex.shift_opts()'  now shifted shift opts to set threshold past DateTime
+  2. `schema: boolean()` device identifier to move aliases from
+  """
+  @doc since: "0.5.9"
+  def host_latest(opts \\ [schema: false, age: [hours: -1]]), do: Host.latest(opts)
+
+  # def host_name(ident, new_name) do
+  #   case Host.find_by_ident(ident) do
+  #     %Host{name: name} when name == new_name -> :no_change
+  #     %Host{} = x -> Host.changeset(x, %{name: new_name}, [:name]) |> Repo.update()
+  #     _ -> :not_found
+  #   end
+  # end
 
   def host_ota(name, opts \\ []) do
     Host.Firmware.ota(name, opts)
@@ -132,8 +234,74 @@ defmodule Sally do
     end
   end
 
-  def host_restart(name) when is_binary(name), do: Host.Restart.now(name)
+  # def host_replace_hardware(opts) when is_list(opts) do
+  #   from = opts[:from_ident]
+  #   to = opts[:to_ident]
+  # end
 
+  @doc """
+  Renames an existing Host
+
+  ## Examples:
+      iex> Sally.host_rename(from: "existing name", to: "new name")
+
+  ## Returns:
+    1. `:ok`                       -> rename successful
+    2. `{:not_found, String.t()}`  -> a host with `from:` name does not exist
+    2. `{:name_taken, String.t()}` -> requested name is already in use
+    3. `{:bad_args, list()}`       -> the opts passed failed validation
+
+  ## Opts
+  1. `from:` host name to rename
+  2. `to:`   new host name
+  """
+  @doc since: "0.5.9"
+  def host_rename(opts) when is_list(opts) do
+    case Host.rename(opts) do
+      %Host{} -> :ok
+      error -> error
+    end
+  end
+
+  def host_restart(name, opts \\ []) when is_binary(name) do
+    Host.Restart.now(name, opts)
+  end
+
+  @doc """
+  Retire an existing host
+
+  The named host is retired by:
+
+   1. Setting the host name equal to the ident
+   2. Removing authorization
+   3. Setting the reset_reason to retired
+
+  ## Examples:
+      iex> Sally.host_retire("name of host to retire")
+
+  """
+  @doc since: "0.5.9"
+  def host_retire(name) when is_binary(name) do
+    case Host.find_by_name(name) do
+      %Host{} = x -> Host.retire(x)
+      _ -> {:not_found, name}
+    end
+  end
+
+  @doc """
+  Setup unnamed Hosts
+
+  ## Examples:
+      iex> opts = [name: "new host name", profile: "all_engines"]
+      iex> Sally.host_setup(:unnamed, opts)
+
+      iex> Sally.host_setup("ruth.1234567890", opts)
+
+  ## Opts
+  1. 'name: String.t()'    name to assign to host
+  2. `profile: String.t()` profile to assign to host
+  """
+  @doc since: "0.5.9"
   def host_setup(:unnamed, opts) do
     case Host.unnamed() do
       [%Host{} = host] -> Host.setup(host, opts)

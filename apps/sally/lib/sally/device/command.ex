@@ -104,4 +104,12 @@ defmodule Sally.Command do
     %{refid: refid, cmd: cmd, acked: true, orphan: false, acked_at: utc_now, sent_at: reported_at}
     |> changeset(reported_cmd)
   end
+
+  def summary(%Schema{} = x) do
+    Map.take(x, [:cmd, :acked, :sent_at])
+  end
+
+  def summary([%Schema{} = x | _]), do: summary(x)
+
+  def summary([]), do: %{}
 end

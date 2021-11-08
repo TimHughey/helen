@@ -8,6 +8,7 @@ defmodule Sally.DevAlias do
   require Ecto.Query
 
   alias __MODULE__, as: Schema
+  alias Ecto.Changeset
   alias Sally.{Command, Datapoint, Device, Repo}
 
   @pio_min 0
@@ -27,12 +28,12 @@ defmodule Sally.DevAlias do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def changeset(changes, %Schema{} = a) do
-    alias Ecto.Changeset
+  def changeset(changes, %Schema{} = a, opts \\ []) do
+    required = opts[:required] || columns(:required)
 
     a
     |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required(columns(:required))
+    |> Changeset.validate_required(required)
     |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:name, max: 128)
     |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
@@ -123,6 +124,8 @@ defmodule Sally.DevAlias do
     end
   end
 
+  def find_by_name(name) when is_binary(name), do: find(name: name)
+
   def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
   def just_saw(repo, %Schema{} = da, seen_at) do
@@ -179,4 +182,20 @@ defmodule Sally.DevAlias do
     Ecto.Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
     |> Repo.all()
   end
+
+  def rename(opts) when is_list(opts) do
+    with {:opts, from} when is_binary(from) <- {:opts, opts[:from]},
+         {:opts, to} when is_binary(to) <- {:opts, opts[:to]},
+         {:found, %Schema{} = x} <- {:found, find_by_name(from)},
+         cs <- changeset(%{name: to}, x, [:name]),
+         {:ok, %Schema{} = updated_schema} <- Repo.update(cs, returning: true) do
+      updated_schema
+    else
+      {:opts, _} -> {:bad_args, opts}
+      {:found, nil} -> {:not_found, opts[:from]}
+      {:error, %Changeset{} = cs} -> {:name_taken, cs.changes.name}
+    end
+  end
+
+  def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
 end

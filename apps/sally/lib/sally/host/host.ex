@@ -4,6 +4,7 @@ defmodule Sally.Host do
   use Ecto.Schema
   require Ecto.Query
 
+  alias Ecto.Changeset
   alias Ecto.Query
 
   alias Sally.Host, as: Schema
@@ -30,7 +31,6 @@ defmodule Sally.Host do
 
   @helen_base "HELEN_BASE"
   @profiles_dir Application.compile_env!(:sally, [Sally.Host, :profiles_path])
-  # @env_profile_path Application.compile_env!(:sally, [Sally.Host, :env_vars, :profile_path])
 
   def authorize(name, val \\ true) when is_boolean(val) do
     case Repo.get_by(Schema, name: name) do
@@ -54,8 +54,6 @@ defmodule Sally.Host do
 
   # (2 of 2) traditional implementation accepting a Schema, changes and what's required
   def changeset(%Schema{} = schema, changes, required) do
-    alias Ecto.Changeset
-
     schema
     |> Changeset.cast(changes, required)
     |> Changeset.validate_required(required)
@@ -70,6 +68,10 @@ defmodule Sally.Host do
     |> Changeset.validate_length(:idf_vsn, max: 12)
     |> Changeset.validate_length(:app_sha, max: 12)
     |> Changeset.validate_length(:reset_reason, max: 24)
+  end
+
+  def changeset_with_name_constraint(%Schema{} = schema, changes, required) do
+    changeset(schema, changes, required) |> Changeset.unique_constraint(:name)
   end
 
   def columns(:all) do
@@ -115,6 +117,21 @@ defmodule Sally.Host do
     [on_conflict: {:replace, replace_columns}, returning: true, conflict_target: [:ident]]
   end
 
+  def latest(opts) do
+    age = opts[:age] || [hours: -1]
+    before = Timex.now() |> Timex.shift(age)
+
+    q = Query.from(x in Schema, where: x.inserted_at >= ^before, order_by: [desc: x.inserted_at], limit: 1)
+
+    host = Repo.one(q)
+
+    cond do
+      is_nil(host) -> nil
+      opts[:schema] == true -> host
+      true -> host.ident
+    end
+  end
+
   defp profiles_path do
     [System.get_env(@helen_base), @profiles_dir] |> Path.join()
   end
@@ -123,15 +140,35 @@ defmodule Sally.Host do
     Query.from(x in Schema, where: x.ident == x.name, order_by: [desc: x.last_start_at]) |> Repo.all()
   end
 
+  def rename(opts) when is_list(opts) do
+    with {:opts, from} when is_binary(from) <- {:opts, opts[:from]},
+         {:opts, to} when is_binary(to) <- {:opts, opts[:to]},
+         {:found, %Schema{} = x} <- {:found, find_by_name(from)},
+         cs <- changeset_with_name_constraint(x, %{name: to}, [:name]),
+         {:ok, %Schema{} = updated_schema} <- Repo.update(cs, returning: true) do
+      updated_schema
+    else
+      {:opts, _} -> {:bad_args, opts}
+      {:found, nil} -> {:not_found, opts[:from]}
+      {:error, %Changeset{} = cs} -> {:name_taken, cs.changes.name}
+    end
+  end
+
+  def retire(%Schema{} = schema) do
+    changes = %{authorized: false, name: schema.ident, reset_reason: "retired"}
+
+    changeset(schema, changes, Map.keys(changes)) |> Repo.update(returning: true)
+  end
+
   def setup(%Schema{} = schema, opts) do
     changes = Enum.into(opts, %{authorized: true})
 
-    changeset(schema, changes, Map.keys(changes)) |> Repo.update()
+    changeset(schema, changes, Map.keys(changes)) |> Repo.update(returning: true)
   end
 
-  defp validate_profile_exists(%Ecto.Changeset{} = cs) do
-    alias Ecto.Changeset
+  def summary(%Schema{} = x), do: Map.take(x, [:name, :ident, :profile, :last_seen_at])
 
+  defp validate_profile_exists(%Changeset{} = cs) do
     #  profile_dir = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles"] |> Path.join()
 
     case Changeset.fetch_field(cs, :profile) do

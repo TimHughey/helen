@@ -125,21 +125,24 @@ defmodule Sally.Device do
 
   def latest(opts) do
     age = opts[:age] || [hours: -1]
+    schema = if opts[:schema] == true, do: true, else: false
     before = Timex.now() |> Timex.shift(age)
 
     q = Query.from(x in Schema, where: x.inserted_at >= ^before, order_by: [desc: x.inserted_at], limit: 1)
 
-    device = Repo.one(q)
-
-    cond do
-      is_nil(device) -> nil
-      opts[:schema] == true -> device
-      true -> device.ident
+    case Repo.all(q) do
+      [] -> nil
+      [%Schema{} = x] when schema == true -> x
+      [%Schema{ident: ident}] -> ident
     end
   end
 
   def load_aliases(device) do
     Repo.preload(device, [:aliases])
+  end
+
+  def load_host(device) do
+    Repo.preload(device, [:host])
   end
 
   def move_aliases(src_ident, dest_ident) do
@@ -179,6 +182,8 @@ defmodule Sally.Device do
   def pios(%Schema{pios: pios}), do: pios
 
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
+
+  def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
 
   defp determine_family(ident) do
     case ident do
