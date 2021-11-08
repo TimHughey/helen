@@ -37,7 +37,7 @@ defmodule Rena.SetPt.State do
   def update_last_exec(%State{} = s, what) do
     case what do
       %DateTime{} = at -> %State{s | last_exec: at}
-      %ExecCmd{} = ec -> %State{s | last_exec: ec}
+      %ExecResult{} = er -> %State{s | last_exec: er}
       :failed -> %State{s | last_exec: :failed}
       _ -> s
     end
