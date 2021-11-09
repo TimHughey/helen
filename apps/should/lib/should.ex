@@ -304,6 +304,16 @@ defmodule Should do
     end
   end
 
+  def should_be_msg_tuple_with_mod_and_struct(res, mod, struct) do
+    quote location: :keep, bind_quoted: [res: res, mod: mod, struct: struct] do
+      should_be_tuple_with_size(res, 2)
+      {res_mod, res_struct} = res
+
+      should_be_equal(res_mod, mod)
+      should_be_struct(res_struct, struct)
+    end
+  end
+
   defmacro should_be_status_map(x) do
     quote location: :keep, bind_quoted: [x: x] do
       should_be_non_empty_map(x)
