@@ -61,11 +61,15 @@ defmodule Rena.SetPt.Server do
     opts = [alfred: s.alfred, server_name: s.server_name]
     sensor_results = Sensor.range_compare(s.sensors, s.sensor_range, opts)
 
-    Cmd.make(memo.name, sensor_results, opts)
-    |> Cmd.effectuate(opts)
-    |> State.update_last_exec(s)
-    |> State.update_last_notify_at()
-    |> noreply()
+    if State.allow_transition?(s) do
+      Cmd.make(memo.name, sensor_results, opts)
+      |> Cmd.effectuate(opts)
+      |> State.update_last_exec(s)
+      |> State.update_last_notify_at()
+      |> noreply()
+    else
+      noreply(s)
+    end
   end
 
   @impl true

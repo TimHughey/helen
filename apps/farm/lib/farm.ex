@@ -7,15 +7,18 @@ defmodule Farm do
     alias Alfred.ExecCmd
 
     child_id = Farm.Womb
-    ec = %ExecCmd{name: "womb heater power", cmd: "25% of max", type: "fixed", cmd_params: %{percent: 25}}
+    heater = "womb heater power"
+    ec = %ExecCmd{name: heater, cmd: "25% of max", cmd_params: %{type: "fixed", percent: 25}}
+
+    available_actions = [:circulation_on, :circulation_off, :restart, :state, :terminate]
 
     case action do
       :circulation_on -> Alfred.execute(ec)
-      :circulation_off -> Alfred.off()
+      :circulation_off -> Alfred.off(heater)
       :restart -> Supervisor.restart_child(Farm.Supervisor, child_id)
       :state -> :sys.get_state(child_id)
       :terminate -> Supervisor.terminate_child(Farm.Supervisor, child_id)
-      _ -> {:unknown_action, available_actions: [:circulation, :restart, :state, :terminate]}
+      _ -> {:unknown_action, available_actions: available_actions}
     end
   end
 end
