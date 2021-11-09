@@ -5,7 +5,7 @@ defmodule IlluminationServerTest do
 
   @moduletag illumination: true, illumination_server_test: true
 
-  setup(:setup_basic_schedule)
+  setup [:setup_basic_schedule]
 
   test "Illuminaton.child_spec/2 creates correct spec map" do
     spec = Illumination.RefImpl.child_spec(config: true)
@@ -52,8 +52,6 @@ defmodule IlluminationServerTest do
   end
 
   describe "Illumination.Server starts supervised" do
-    setup [:setup_basic_schedule]
-
     test "without schedules" do
       start_args = [alfred: AlfredFound, equipment: "test_equip"]
       start_res = start_supervised({Illumination.RefImpl, start_args})
@@ -86,8 +84,6 @@ defmodule IlluminationServerTest do
   end
 
   describe "Illumination.Server.handle_info/2 handles" do
-    setup [:basic_schedule]
-
     @tag basic_schedule: true
     test "first NotifyMemo", %{schedules: schedules} do
       alias Alfred.{NotifyMemo, NotifyTo}

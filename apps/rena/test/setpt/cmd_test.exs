@@ -40,15 +40,6 @@ defmodule Rena.SetPt.CmdTest do
       check_exec_cmd(name, "off", :deactivate, res)
     end
 
-    @tag result_opts: [gt_mid: 2, lt_mid: 1]
-    test "inactive cmd when above mid range value and active", %{result: r} do
-      name = "mutable power on"
-
-      res = Cmd.make(name, r, alfred: Rena.Alfred)
-
-      check_exec_cmd(name, "off", :deactivate, res)
-    end
-
     @tag result_opts: [gt_mid: 2]
     test "datapoint error when only two datapoints", %{result: r} do
       name = "mutable power on"
