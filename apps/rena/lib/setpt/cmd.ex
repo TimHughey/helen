@@ -83,14 +83,14 @@ defmodule Rena.SetPt.Cmd do
   # the focus of deciding active vs inactive is safety first so the preference is
   # to error on the side of inactive.
   #
+  # safety checks (e.g. sufficient valid data points) are performed prior to
+  # determining active vs inactive
+  #
   # should_be_active? and should_be_inactive? are closely related however do not
-  # mirror each other exactly  both functions implement safety vhecks.
+  # mirror each other exactly
   #
   # system is inactive when:
-  #  1. one or more sensors are gt_high
-  #  2. two or more esnsors are gt_mid (to prevent temperature overshoot)
-  #  3. less than three available datapoints (ensure redundancy)
-  #  4. less than three valid datapoints (ensure good data)
+  #  1. one or more sensors are gt_high (prcent over temp)
   #
   # system is active when:
   #  1. one or more sensors are lt_low (prevent low temperature)
@@ -98,10 +98,8 @@ defmodule Rena.SetPt.Cmd do
 
   defp should_be_active?(result) do
     case result do
-      %Result{total: x} when x < 3 -> false
-      %Result{valid: x} when x < 3 -> false
-      %Result{gt_high: x} when x > 0 -> false
-      %Result{lt_low: x} when x > 0 -> true
+      %Result{gt_high: x} when x >= 1 -> false
+      %Result{lt_low: x} when x >= 1 -> true
       %Result{lt_mid: x} when x >= 2 -> true
       _ -> false
     end
@@ -109,10 +107,7 @@ defmodule Rena.SetPt.Cmd do
 
   defp should_be_inactive?(result) do
     case result do
-      %Result{total: x} when x < 3 -> true
-      %Result{valid: x} when x < 3 -> true
-      %Result{gt_high: x} when x > 0 -> true
-      %Result{gt_mid: x} when x >= 2 -> true
+      %Result{gt_high: x} when x >= 1 -> true
       _ -> false
     end
   end
@@ -122,10 +117,4 @@ defmodule Rena.SetPt.Cmd do
 
   defp sufficient_datapoints?(%Result{valid: x, total: y}) when x >= 3 and y >= 3, do: true
   defp sufficient_datapoints?(%Result{}), do: false
-
-  # defp should_be_inactive?(%Result{invalid: x}) when x >= 2, do: true
-  # defp should_be_inactive?(%Result{total: x}) when x < 3, do: true
-  # defp should_be_inactive?(%Result{gt_high: x}) when x > 0, do: true
-  # defp should_be_inactive?(%Result{gt_mid: x}) when x >= 2, do: true
-  # defp should_be_inactive?(%Result{}), do: false
 end
