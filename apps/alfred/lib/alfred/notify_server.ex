@@ -24,10 +24,6 @@ defmodule Alfred.NotifyTo do
           missing_timer: reference()
         }
 
-  # def new(%Alfred.KnownName{} = kn, opts) do
-  #   new([ttl_ms: kn.ttl_ms] ++ opts)
-  # end
-
   def new(opts) when is_list(opts) do
     %NotifyTo{
       name: opts[:name],
@@ -45,7 +41,7 @@ defmodule Alfred.NotifyTo do
     next_notify = DateTime.add(nt.last_notify, nt.interval_ms, :millisecond)
 
     # capture ttl_ms from opts (if provided) to handle when a name is
-    # registered before having been seen
+    # registered before being seen
     ttl_ms = opts[:ttl_ms] || nt.ttl_ms
     missing_ms = nt.missing_ms
 
@@ -78,7 +74,6 @@ defmodule Alfred.NotifyTo do
     %NotifyTo{nt | missing_timer: nil}
   end
 
-  # TODO is missing_ms really necessary?
   defp make_missing_interval(opts) when is_list(opts) do
     missing_ms = opts[:missing_ms] || 60_000
     ttl_ms = opts[:ttl_ms]
@@ -121,8 +116,6 @@ defmodule Alfred.NotifyMemo do
         }
 
   def new(%NotifyTo{} = nt, opts) do
-    opts = Keyword.put_new(opts, :missing?, false)
-
     %NotifyMemo{
       name: opts[:name],
       pid: nt.pid,
@@ -171,14 +164,18 @@ defmodule Alfred.Notify.Server.State do
   def register(opts, %State{} = s) when is_list(opts) do
     pid = opts[:pid]
 
-    # only link if requested but always monitor
-    if opts[:link], do: Process.link(pid)
-    monitor_ref = Process.monitor(pid)
+    if Process.alive?(pid) do
+      # only link if requested but always monitor
+      if opts[:link], do: Process.link(pid)
+      monitor_ref = Process.monitor(pid)
 
-    notify_opts = [monitor_ref: monitor_ref] ++ opts
-    nt = NotifyTo.new(notify_opts) |> NotifyTo.schedule_missing()
+      notify_opts = [monitor_ref: monitor_ref] ++ opts
+      nt = NotifyTo.new(notify_opts) |> NotifyTo.schedule_missing()
 
-    {State.save_notify_to(nt, s), {:ok, nt}}
+      {State.save_notify_to(nt, s), {:ok, nt}}
+    else
+      {s, {:failed, :no_process_for_pid}}
+    end
   end
 
   def registrations(opts, %State{} = s) do
@@ -233,12 +230,6 @@ defmodule Alfred.Notify.Server do
     GenServer.start_link(__MODULE__, [], name: Mod)
   end
 
-  # @impl true
-  # def handle_call({:register, %KnownName{} = kn, opts}, from, %State{} = s) do
-  #   opts = [name: kn.name, ttl_ms: kn.ttl_ms] ++ opts
-  #   handle_call({:register, opts}, from, s)
-  # end
-
   @impl true
   def handle_call({:register, opts}, {pid, _ref}, %State{} = s) when is_list(opts) do
     opts = Keyword.put_new(opts, :pid, pid)
@@ -257,13 +248,8 @@ defmodule Alfred.Notify.Server do
 
   @impl true
   def handle_cast({:just_saw, opts}, %State{} = s) do
-    # for {{name, _pid, _monitor_ref}, nt} <- s.registrations, name == kn.name, reduce: s do
-    #   %State{} = s ->
-    #     NotifyTo.notify(nt, kn) |> State.update(s)
-    # end
-    # |> noreply()
-
-    State.notify(opts, s)
+    Keyword.put_new(opts, :missing?, false)
+    |> State.notify(s)
     |> noreply()
   end
 
@@ -273,17 +259,16 @@ defmodule Alfred.Notify.Server do
 
     Betty.app_error(__MODULE__, name: nt.name, missing: true)
 
-    nt |> NotifyTo.schedule_missing() |> State.save_notify_to(s) |> noreply()
+    [name: nt.name, missing?: true]
+    |> State.notify(s)
+    |> noreply()
+
+    # nt |> NotifyTo.schedule_missing() |> State.save_notify_to(s) |> noreply()
   end
 
   @impl true
   def handle_info({:DOWN, ref, :process, pid, _reason}, %State{} = s) do
     Logger.debug("#{inspect(pid)} exited, removing notify registration(s)")
-
-    # remove the registration
-    # for {reg_key, _nt} <- regs, elem(reg_key, 2) == ref, reduce: %State{} do
-    #   %State{} -> %State{s | registrations: Map.delete(regs, reg_key)}
-    # end
 
     State.unregister(ref, s)
     |> noreply()

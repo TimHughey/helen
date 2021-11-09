@@ -1,5 +1,5 @@
 defmodule Alfred.NotifyTest do
-  # can not use async due message send/receive
+  # can not use async due to message send/receive
   use ExUnit.Case
   use Should
 
@@ -103,6 +103,47 @@ defmodule Alfred.NotifyTest do
       msg -> refute true, "should not have received notification:\n#{inspect(msg, pretty: true)}"
     after
       100 -> assert true
+    end
+  end
+
+  describe "Alfred.Notify.Server.handle_info/2 handles" do
+    @tag create_known_name: true
+    @tag register_name: true
+    @tag frequency: [interval_ms: 0]
+    @tag missing_ms: 10
+    test "missing messages", %{name: name, notify_to: nt} do
+      receive do
+        msg ->
+          should_be_msg_tuple_with_mod_and_struct(msg, Alfred, NotifyMemo)
+          {_mod, memo} = msg
+          should_be_equal(memo.name, name)
+          should_be_equal(memo.missing?, true)
+          should_be_equal(memo.pid, nt.pid)
+          should_be_equal(memo.ref, nt.ref)
+      after
+        1000 -> refute true, "{Alfred, NotifyMemo} missing msg never received"
+      end
+    end
+
+    @tag create_known_name: true
+    @tag register_name: true
+    @tag frequency: [interval_ms: 0]
+    test "down messages", %{notify_to: nt} do
+      alias Alfred.Notify.Registration.Key
+
+      genserver_pid = GenServer.whereis(Alfred.Notify.Server)
+      should_be_pid(genserver_pid)
+
+      res = Process.send(genserver_pid, {:DOWN, nt.ref, :process, self(), :test}, [])
+      should_be_simple_ok(res)
+
+      registrations = Notify.registrations()
+
+      %NotifyTo{ref: down_ref} = nt
+
+      for {%Key{ref: ^down_ref}, _} <- registrations do
+        refute true, "#{inspect(down_ref)} should not be registered"
+      end
     end
   end
 
