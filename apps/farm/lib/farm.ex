@@ -4,15 +4,18 @@ defmodule Farm do
   """
 
   def womb(action) when is_atom(action) do
+    alias Alfred.ExecCmd
+
     child_id = Farm.Womb
-    circulation = "womb heater power"
+    ec = %ExecCmd{name: "womb heater power", cmd: "25% of max", type: "fixed", cmd_params: %{percent: 25}}
 
     case action do
-      :circulation -> Alfred.toggle(circulation)
+      :circulation_on -> Alfred.execute(ec)
+      :circulation_off -> Alfred.off()
       :restart -> Supervisor.restart_child(Farm.Supervisor, child_id)
       :state -> :sys.get_state(child_id)
       :terminate -> Supervisor.terminate_child(Farm.Supervisor, child_id)
-      _ -> {:unknown_action, available_actions: [:restart, :state, :terminate]}
+      _ -> {:unknown_action, available_actions: [:circulation, :restart, :state, :terminate]}
     end
   end
 end
