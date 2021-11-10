@@ -33,8 +33,7 @@ defmodule Eva.Setpoint do
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.ImmutableStatus, as: ImmStatus
   alias Alfred.MutableStatus, as: MutStatus
-  alias Alfred.NotifyMemo, as: Memo
-  alias Alfred.NotifyTo
+  alias Alfred.Notify.{Entry, Memo}
   alias Broom.TrackerEntry
   alias Eva.{Equipment, Names, Opts}
   alias Eva.Setpoint.Leader
@@ -60,7 +59,7 @@ defmodule Eva.Setpoint do
           leader: Leader.t(),
           equipment: Equipment.t(),
           names: %{needed: list(), found: list()},
-          notifies: %{required(reference()) => NotifyTo.t()},
+          notifies: %{required(reference()) => Entry.t()},
           mode: mode(),
           valid?: boolean()
         }
@@ -197,7 +196,7 @@ end
 
 defimpl Eva.Variant, for: Eva.Setpoint do
   alias Alfred.ExecCmd
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
   alias Eva.Setpoint
 

@@ -1,7 +1,8 @@
 defmodule Rena.SetPt.State do
   alias __MODULE__
 
-  alias Alfred.{ExecCmd, ExecResult, NotifyTo}
+  alias Alfred.{ExecCmd, ExecResult}
+  alias Alfred.Notify.Ticket
   alias Rena.Sensor
 
   defstruct alfred: Alfred,
@@ -21,7 +22,7 @@ defmodule Rena.SetPt.State do
   @type t :: %State{
           alfred: module(),
           server_name: atom(),
-          equipment: String.t() | Alfred.NotifyTo.t(),
+          equipment: String.t() | Ticket.t(),
           sensors: list(),
           sensor_range: Sensor.Range.t(),
           cmds: cmds(),
@@ -38,7 +39,7 @@ defmodule Rena.SetPt.State do
     if DateTime.diff(now, last, :millisecond) > ms, do: true, else: false
   end
 
-  def save_equipment(%State{} = s, %NotifyTo{} = nt), do: %State{s | equipment: nt}
+  def save_equipment(%State{} = s, %Ticket{} = nt), do: %State{s | equipment: nt}
 
   def transition(%State{} = s), do: %State{s | last_transition: DateTime.utc_now()}
 

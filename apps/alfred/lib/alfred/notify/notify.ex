@@ -3,6 +3,8 @@ defmodule Alfred.Notify do
   Alfred Notify Public API
   """
 
+  alias Alfred.Notify.Entry
+
   @server Alfred.Notify.Server
 
   def alive? do
@@ -15,7 +17,7 @@ defmodule Alfred.Notify do
   @type notify_frequency_opts() :: nil | [interval_ms: pos_integer()] | :all
   @type register_opts() :: [pid: pid(), frequency: notify_frequency_opts]
 
-  @spec register(register_opts()) :: {:ok, Alfred.NotifyTo.t()} | {:error, term()}
+  @spec register(register_opts()) :: {:ok, Entry.t()} | {:error, term()}
   def register(opts) when is_list(opts) do
     opts = Keyword.merge(@register_default_opts, opts)
 
@@ -23,7 +25,7 @@ defmodule Alfred.Notify do
   end
 
   @doc """
-    Retrieve NotifyTo registrations
+    Retrieve all notify registrations
 
       iex> Alfred.Notify.registrations([all: true])
 
@@ -33,7 +35,7 @@ defmodule Alfred.Notify do
   """
 
   @type registrations_opts() :: [all: true, name: String.t()]
-  @spec registrations(registrations_opts()) :: [Alfred.NotifyTo.t(), ...]
+  @spec registrations(registrations_opts()) :: [Entry.t(), ...]
   def registrations(opts \\ [all: true]), do: {:registrations, opts} |> call()
   def unregister(ref) when is_reference(ref), do: {:unregister, ref} |> call()
 

@@ -2,7 +2,7 @@ defprotocol Eva.Variant do
   @type server_mode() :: :starting | :ready | :standby
   @type instruct() :: struct()
   @type variant() :: struct()
-  @spec control(variant(), Alfred.NotifyMemo.t(), server_mode()) :: variant()
+  @spec control(variant(), Alfred.Notify.Memo.t(), server_mode()) :: variant()
   def control(variant, memo, mode)
 
   @spec execute(struct(), Alfred.ExecCmd.t(), GenServer.from()) :: Alfred.ExecResult.t()
@@ -11,7 +11,7 @@ defprotocol Eva.Variant do
   @spec handle_instruct(variant(), instruct()) :: variant()
   def handle_instruct(variant, instruct)
 
-  @spec handle_notify(struct(), Alfred.NotifyMemo.t(), server_mode()) :: struct()
+  @spec handle_notify(struct(), Alfred.Notify.Memo.t(), server_mode()) :: struct()
   def handle_notify(variant, memo, mode)
 
   @spec handle_release(struct(), Broom.TrackerEntry.t()) :: struct()

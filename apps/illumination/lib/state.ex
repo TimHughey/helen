@@ -1,6 +1,7 @@
 defmodule Illumination.State do
   alias __MODULE__
 
+  alias Alfred.Notify.Ticket
   alias Illumination.Schedule
 
   defstruct alfred: Alfred,
@@ -15,7 +16,7 @@ defmodule Illumination.State do
   @type t :: %State{
           alfred: module(),
           module: module(),
-          equipment: String.t() | NotifyTo.t(),
+          equipment: String.t() | Ticket.t(),
           schedules: list(),
           cmds: map(),
           result: Schedule.Result.t(),
@@ -24,7 +25,7 @@ defmodule Illumination.State do
         }
 
   # NOTE: state is passed first for use in pipeline
-  def save_equipment(%State{} = s, %Alfred.NotifyTo{} = x),
+  def save_equipment(%State{} = s, %Ticket{} = x),
     do: %State{s | equipment: x}
 
   # def save_result(%Schedule.Result{} = r, %State{} = s), do: %State{s | result: r}

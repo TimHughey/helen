@@ -61,7 +61,7 @@ defmodule Eva.Follow do
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.ImmutableStatus, as: ImmStatus
   alias Alfred.MutableStatus, as: MutStatus
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.{Entry, Memo}
   alias Broom.TrackerEntry
   alias Eva.Equipment
   alias Eva.Follow.{Follower, Leader}
@@ -86,7 +86,7 @@ defmodule Eva.Follow do
           follower: Follower.t(),
           equipment: Equipment.t(),
           names: %{needed: list(), found: list()},
-          notifies: %{required(reference()) => Alfred.NotifyTo.t()},
+          notifies: %{required(reference()) => Entry.t()},
           mode: mode(),
           valid?: boolean()
         }
@@ -234,7 +234,7 @@ end
 
 defimpl Eva.Variant, for: Eva.Follow do
   alias Alfred.ExecCmd
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
   alias Eva.Follow
 

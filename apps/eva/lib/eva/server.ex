@@ -3,7 +3,7 @@ defmodule Eva.Server do
 
   alias __MODULE__
   alias Alfred.{ExecCmd, ExecResult}
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
   alias Eva.{Names, Opts, State, Variant}
 

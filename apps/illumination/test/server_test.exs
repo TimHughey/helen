@@ -3,6 +3,8 @@ defmodule IlluminationServerTest do
   use ExUnit.Case
   use Should
 
+  alias Alfred.Notify.{Memo, Ticket}
+
   @moduletag illumination: true, illumination_server_test: true
 
   setup [:setup_basic_schedule]
@@ -85,8 +87,7 @@ defmodule IlluminationServerTest do
 
   describe "Illumination.Server.handle_info/2 handles" do
     @tag basic_schedule: true
-    test "first NotifyMemo", %{schedules: schedules} do
-      alias Alfred.{NotifyMemo, NotifyTo}
+    test "first Memo", %{schedules: schedules} do
       alias Illumination.Schedule
       alias Illumination.Schedule.{Point, Result}
       alias Illumination.State
@@ -96,11 +97,9 @@ defmodule IlluminationServerTest do
       equipment = "test_equipment"
       ref = make_ref()
 
-      notify_to = %NotifyTo{name: equipment, ref: ref}
-
       initial_state = %State{
         alfred: AlfredSendExecMsg,
-        equipment: notify_to,
+        equipment: %Ticket{name: equipment, ref: ref},
         schedules: schedules,
         result: nil
       }
@@ -110,7 +109,7 @@ defmodule IlluminationServerTest do
 
       {:noreply, state} = reply
 
-      notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: false}
+      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
       notify_msg = {Alfred, notify_memo}
 
       reply = Illumination.Server.handle_info(notify_msg, state)
@@ -129,8 +128,7 @@ defmodule IlluminationServerTest do
       end
     end
 
-    test "NotifyMemo matching equipment status" do
-      alias Alfred.{NotifyMemo, NotifyTo}
+    test "Memo matching equipment status" do
       alias Illumination.Schedule
       alias Illumination.Schedule.{Point, Result}
       alias Illumination.State
@@ -138,15 +136,13 @@ defmodule IlluminationServerTest do
       equipment = "test_equipment"
       ref = make_ref()
 
-      notify_to = %NotifyTo{name: equipment, ref: ref}
-
       state = %State{
         alfred: AlfredAlwaysOn,
-        equipment: notify_to,
+        equipment: %Ticket{name: equipment, ref: ref},
         result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}
       }
 
-      notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: false}
+      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
       notify_msg = {Alfred, notify_memo}
 
       res = Illumination.Server.handle_info(notify_msg, state)
@@ -154,8 +150,7 @@ defmodule IlluminationServerTest do
       should_be_noreply_tuple_with_state(res, State)
     end
 
-    test "NotifyMemo when equipment is missing" do
-      alias Alfred.{NotifyMemo, NotifyTo}
+    test "Memo when equipment is missing" do
       alias Illumination.Schedule
       alias Illumination.Schedule.{Point, Result}
       alias Illumination.State
@@ -163,17 +158,15 @@ defmodule IlluminationServerTest do
       equipment = "test_equipment"
       ref = make_ref()
 
-      notify_to = %NotifyTo{name: equipment, ref: ref}
-
       state = %State{
         module: Illumination.RefImpl,
         alfred: AlfredAlwaysPending,
-        equipment: notify_to,
+        equipment: %Ticket{name: equipment, ref: ref},
         result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live},
         last_notify_at: DateTime.utc_now()
       }
 
-      notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: true}
+      notify_memo = %Memo{ref: ref, name: equipment, missing?: true}
       notify_msg = {Alfred, notify_memo}
 
       res = Illumination.Server.handle_info(notify_msg, state)
@@ -183,8 +176,7 @@ defmodule IlluminationServerTest do
       should_be_datetime_greater_than(state.last_notify_at, new_state.last_notify_at)
     end
 
-    test "NotifyMemo when equipment cmd is pending" do
-      alias Alfred.{NotifyMemo, NotifyTo}
+    test "Memo when equipment cmd is pending" do
       alias Illumination.Schedule
       alias Illumination.Schedule.{Point, Result}
       alias Illumination.State
@@ -192,17 +184,15 @@ defmodule IlluminationServerTest do
       equipment = "test_equipment"
       ref = make_ref()
 
-      notify_to = %NotifyTo{name: equipment, ref: ref}
-
       state = %State{
         module: Illumination.RefImpl,
         alfred: AlfredAlwaysPending,
-        equipment: notify_to,
+        equipment: %Ticket{name: equipment, ref: ref},
         result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live},
         last_notify_at: DateTime.utc_now()
       }
 
-      notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: false}
+      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
       notify_msg = {Alfred, notify_memo}
 
       res = Illumination.Server.handle_info(notify_msg, state)
@@ -213,8 +203,7 @@ defmodule IlluminationServerTest do
     end
 
     @tag capture_log: true
-    test "NotifyMemo when cmd is mismatched" do
-      alias Alfred.{NotifyMemo, NotifyTo}
+    test "Memo when cmd is mismatched" do
       alias Illumination.Schedule
       alias Illumination.Schedule.{Point, Result}
       alias Illumination.State
@@ -222,15 +211,13 @@ defmodule IlluminationServerTest do
       equipment = "test_equipment"
       ref = make_ref()
 
-      notify_to = %NotifyTo{name: equipment, ref: ref}
-
       state = %State{
         alfred: AlfredAlwaysOff,
-        equipment: notify_to,
+        equipment: %Ticket{name: equipment, ref: ref},
         result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}
       }
 
-      notify_memo = %NotifyMemo{ref: ref, name: equipment, missing?: false}
+      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
       notify_msg = {Alfred, notify_memo}
 
       res = Illumination.Server.handle_info(notify_msg, state)

@@ -173,8 +173,10 @@ defmodule Should do
       should_be_tuple(res)
 
       fail = pretty("rc should be :ok", res)
-      {rc, _} = res
+      {rc, returned} = res
       assert :ok == rc, fail
+
+      returned
     end
   end
 
@@ -199,6 +201,8 @@ defmodule Should do
       fail = pretty("should be #{inspect(struct, pretty: true)}", res_struct)
       assert is_struct(res_struct), fail
       assert res_struct.__struct__ == struct, fail
+
+      res_struct
     end
   end
 
@@ -311,6 +315,8 @@ defmodule Should do
 
       should_be_equal(res_mod, mod)
       should_be_struct(res_struct, struct)
+
+      res_struct
     end
   end
 

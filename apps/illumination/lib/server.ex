@@ -2,7 +2,7 @@ defmodule Illumination.Server do
   require Logger
   use GenServer
 
-  alias Alfred.{NotifyMemo, NotifyTo}
+  alias Alfred.Notify.{Memo, Ticket}
   alias Illumination.{Schedule, State}
   alias Illumination.Schedule.Result
 
@@ -100,7 +100,7 @@ defmodule Illumination.Server do
 
   # (1 of 3) handle equipment missing messages
   @impl true
-  def handle_info({Alfred, %NotifyMemo{missing?: true} = memo}, %State{} = s) do
+  def handle_info({Alfred, %Memo{missing?: true} = memo}, %State{} = s) do
     Betty.app_error(s, equipment: memo.name, missing: true)
     |> State.update_last_notify_at()
     |> noreply()
@@ -108,7 +108,7 @@ defmodule Illumination.Server do
 
   # (2 of x) handle the first notification (result == nil) by simply performing a schedule
   @impl true
-  def handle_info({Alfred, %NotifyMemo{}}, %State{result: nil} = s) do
+  def handle_info({Alfred, %Memo{}}, %State{result: nil} = s) do
     handle_info(:schedule, State.update_last_notify_at(s))
   end
 
@@ -116,8 +116,8 @@ defmodule Illumination.Server do
   # to the expected cmd (based on previous execute result)
   @impl true
   def handle_info(
-        {Alfred, %NotifyMemo{ref: ref} = memo},
-        %State{equipment: %NotifyTo{ref: ref}, result: result} = s
+        {Alfred, %Memo{ref: ref} = memo},
+        %State{equipment: %Ticket{ref: ref}, result: result} = s
       ) do
     alias Alfred.MutableStatus, as: MutStatus
 

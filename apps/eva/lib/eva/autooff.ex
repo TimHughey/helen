@@ -98,7 +98,7 @@ defmodule Eva.AutoOff do
   alias __MODULE__
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.MutableStatus, as: MutStatus
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
   alias Eva.AutoOff.Instruct
   alias Eva.{Equipment, Names, Opts}
@@ -272,7 +272,7 @@ end
 
 defimpl Eva.Variant, for: Eva.AutoOff do
   alias Alfred.ExecCmd
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
   alias Eva.AutoOff
 

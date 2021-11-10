@@ -6,7 +6,8 @@ defmodule Alfred.NotifyTest do
   @moduletag alfred_test: true, alfred_notify: true
 
   alias Alfred.KnownName
-  alias Alfred.{Notify, NotifyMemo, NotifyTo}
+  alias Alfred.Notify
+  alias Alfred.Notify.{Entry, Memo, Ticket}
   alias Alfred.Test.Support
 
   setup [:create_known_name]
@@ -16,17 +17,17 @@ defmodule Alfred.NotifyTest do
     name = Support.unique(:name)
 
     res = Notify.register(name: name)
-    should_be_ok_tuple_with_struct(res, NotifyTo)
+    should_be_ok_tuple_with_struct(res, Ticket)
 
-    {:ok, %NotifyTo{} = nt} = res
+    {:ok, %Ticket{} = ticket} = res
 
-    should_be_equal(nt.name, name)
+    should_be_equal(ticket.name, name)
 
     registrations = Notify.registrations(name: name)
     fail = "#{name} should be registered for notifications"
     assert Enum.any?(registrations, fn nt -> nt.name == name end), fail
 
-    res = Notify.unregister(nt.ref)
+    res = Notify.unregister(ticket.ref)
     should_be_equal(res, :ok)
 
     registrations = Notify.registrations(name: name)
@@ -37,15 +38,15 @@ defmodule Alfred.NotifyTest do
 
   @tag create_known_name: true
   @tag register_name: true
-  test "Alfred.Notify registers a name and notifies", %{name: name, notify_to: nt} do
+  test "Alfred.Notify registers a name and notifies", %{name: name, ticket: ticket} do
     just_saw_opts = [name: name, seen_at: DateTime.utc_now(), ttl_ms: 15_000]
     res = Notify.just_saw(just_saw_opts)
 
-    assert res == :ok
+    should_be_simple_ok(res)
 
     registrations = Notify.registrations(all: true)
-    reg = Enum.find(registrations, fn reg_nt -> reg_nt.ref == nt.ref end)
-    should_be_struct(reg, NotifyTo)
+    reg = Enum.find(registrations, fn reg_nt -> reg_nt.ref == ticket.ref end)
+    should_be_struct(reg, Entry)
     should_be_equal(reg.ttl_ms, just_saw_opts[:ttl_ms])
 
     receive do
@@ -53,11 +54,11 @@ defmodule Alfred.NotifyTest do
         should_be_tuple_with_size(res, 2)
         {mod, memo} = res
         should_be_equal(mod, Alfred)
-        should_be_struct(memo, NotifyMemo)
+        should_be_struct(memo, Memo)
         should_be_equal(memo.missing?, false)
         should_be_equal(memo.name, name)
         should_be_equal(memo.pid, self())
-        should_be_equal(memo.ref, nt.ref)
+        should_be_equal(memo.ref, ticket.ref)
         should_be_equal(memo.seen_at, just_saw_opts[:seen_at])
     after
       1000 -> refute true, "receive timeout"
@@ -67,15 +68,15 @@ defmodule Alfred.NotifyTest do
   @tag create_known_name: true
   @tag register_name: true
   @tag frequency: [interval_ms: 1000]
-  test "Alfred.Notify honors notify interval", %{name: name, notify_to: nt} do
+  test "Alfred.Notify honors notify interval", %{name: name, ticket: ticket} do
     just_saw_opts = [name: name, seen_at: DateTime.utc_now(), ttl_ms: 15_000]
     res = Notify.just_saw(just_saw_opts)
 
     assert res == :ok
 
     registrations = Notify.registrations(all: true)
-    reg = Enum.find(registrations, fn reg_nt -> reg_nt.ref == nt.ref end)
-    should_be_struct(reg, NotifyTo)
+    reg = Enum.find(registrations, fn reg_nt -> reg_nt.ref == ticket.ref end)
+    should_be_struct(reg, Entry)
     should_be_equal(reg.ttl_ms, just_saw_opts[:ttl_ms])
 
     receive do
@@ -83,11 +84,11 @@ defmodule Alfred.NotifyTest do
         should_be_tuple_with_size(res, 2)
         {mod, memo} = res
         should_be_equal(mod, Alfred)
-        should_be_struct(memo, NotifyMemo)
+        should_be_struct(memo, Memo)
         should_be_equal(memo.missing?, false)
         should_be_equal(memo.name, name)
         should_be_equal(memo.pid, self())
-        should_be_equal(memo.ref, nt.ref)
+        should_be_equal(memo.ref, ticket.ref)
         should_be_equal(memo.seen_at, just_saw_opts[:seen_at])
     after
       1000 -> refute true, "receive timeout"
@@ -111,35 +112,34 @@ defmodule Alfred.NotifyTest do
     @tag register_name: true
     @tag frequency: [interval_ms: 0]
     @tag missing_ms: 10
-    test "missing messages", %{name: name, notify_to: nt} do
+    test "missing messages", %{name: name, ticket: ticket} do
       receive do
         msg ->
-          should_be_msg_tuple_with_mod_and_struct(msg, Alfred, NotifyMemo)
+          should_be_msg_tuple_with_mod_and_struct(msg, Alfred, Memo)
           {_mod, memo} = msg
           should_be_equal(memo.name, name)
           should_be_equal(memo.missing?, true)
-          should_be_equal(memo.pid, nt.pid)
-          should_be_equal(memo.ref, nt.ref)
+          should_be_equal(memo.ref, ticket.ref)
       after
-        1000 -> refute true, "{Alfred, NotifyMemo} missing msg never received"
+        1000 -> refute true, "{Alfred, Memo} missing msg never received"
       end
     end
 
     @tag create_known_name: true
     @tag register_name: true
     @tag frequency: [interval_ms: 0]
-    test "down messages", %{notify_to: nt} do
+    test "down messages", %{ticket: ticket} do
       alias Alfred.Notify.Registration.Key
 
       genserver_pid = GenServer.whereis(Alfred.Notify.Server)
       should_be_pid(genserver_pid)
 
-      res = Process.send(genserver_pid, {:DOWN, nt.ref, :process, self(), :test}, [])
+      res = Process.send(genserver_pid, {:DOWN, ticket.ref, :process, self(), :test}, [])
       should_be_simple_ok(res)
 
       registrations = Notify.registrations()
 
-      %NotifyTo{ref: down_ref} = nt
+      %Ticket{ref: down_ref} = ticket
 
       for {%Key{ref: ^down_ref}, _} <- registrations do
         refute true, "#{inspect(down_ref)} should not be registered"
@@ -163,11 +163,9 @@ defmodule Alfred.NotifyTest do
     register_opts = Map.take(ctx, [:name, :ttl_ms, :missing_ms, :frequency]) |> Enum.into([])
     res = Notify.register(register_opts)
 
-    should_be_ok_tuple_with_struct(res, NotifyTo)
-    {:ok, nt} = res
+    ticket = should_be_ok_tuple(res)
 
-    merge = %{notify_to: nt}
-    Map.merge(merge, ctx)
+    Map.put(ctx, :ticket, ticket)
   end
 
   def register_name(ctx), do: ctx

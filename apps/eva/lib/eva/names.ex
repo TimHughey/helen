@@ -1,7 +1,7 @@
 defmodule Eva.Names do
   alias __MODULE__
 
-  alias Alfred.NotifyTo
+  alias Alfred.Notify.Ticket
 
   defstruct needed: [], found: []
 
@@ -17,7 +17,7 @@ defmodule Eva.Names do
         reg_rc = Alfred.notify_register(name: name, frequency: :all, link: true)
 
         case reg_rc do
-          {:ok, %NotifyTo{} = nt} -> {add_found_name(names, name), [nt] ++ notifies}
+          {:ok, %Ticket{} = nt} -> {add_found_name(names, name), [nt] ++ notifies}
           {:failed, _msg} -> {add_needed_name(names, name), notifies}
         end
     end

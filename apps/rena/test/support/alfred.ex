@@ -2,7 +2,7 @@ defmodule Rena.Alfred do
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.ImmutableStatus, as: ImmutStatus
   alias Alfred.MutableStatus, as: MutStatus
-  alias Alfred.NotifyTo
+  alias Alfred.Notify.Ticket
 
   def execute(%ExecCmd{} = ec, _opts \\ []) do
     case String.split(ec.name) do
@@ -13,7 +13,7 @@ defmodule Rena.Alfred do
   end
 
   def notify_register(opts) do
-    %NotifyTo{name: opts[:name], pid: self(), ref: make_ref()}
+    %Ticket{name: opts[:name], ref: make_ref()}
   end
 
   def status(name, opts \\ []) do

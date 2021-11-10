@@ -5,8 +5,7 @@ defmodule Rena.SetPt.ServerTest do
   @moduletag rena: true, rena_server: true
 
   alias Alfred.ExecResult
-  alias Alfred.NotifyMemo, as: Memo
-  alias Alfred.NotifyTo
+  alias Alfred.Notify.{Memo, Ticket}
   alias Broom.TrackerEntry
   alias Rena.Sensor
   alias Rena.SetPt.{Server, ServerTest, State}
@@ -23,7 +22,7 @@ defmodule Rena.SetPt.ServerTest do
 
       state = :sys.get_state(ServerTest)
       should_be_struct(state, State)
-      should_be_struct(state.equipment, NotifyTo)
+      should_be_struct(state.equipment, Ticket)
 
       res = stop_supervised(child_spec.id)
       should_be_equal(res, :ok)

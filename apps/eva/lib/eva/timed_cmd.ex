@@ -150,8 +150,7 @@ defmodule Eva.TimedCmd do
   alias __MODULE__
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.MutableStatus, as: MutStatus
-  alias Alfred.NotifyMemo, as: Memo
-  alias Alfred.NotifyTo
+  alias Alfred.Notify.{Entry, Memo}
   alias Broom.TrackerEntry
   alias Eva.{Equipment, Ledger, Names, Opts}
   alias Eva.TimedCmd.Instruct
@@ -171,7 +170,7 @@ defmodule Eva.TimedCmd do
           mod: module(),
           equipment: Equipment.t(),
           names: %{needed: list(), found: list()},
-          notifies: %{required(reference()) => NotifyTo.t()},
+          notifies: %{required(reference()) => Entry.t()},
           instruct: Instruct.t() | nil,
           mode: mode(),
           valid?: boolean()
@@ -309,7 +308,7 @@ end
 
 defimpl Eva.Variant, for: Eva.TimedCmd do
   alias Alfred.ExecCmd
-  alias Alfred.NotifyMemo, as: Memo
+  alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
   alias Eva.TimedCmd
   alias Eva.TimedCmd.Instruct
