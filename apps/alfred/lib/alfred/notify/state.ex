@@ -24,7 +24,7 @@ defmodule Alfred.Notify.Server.State do
   def register(opts, %State{} = s) when is_list(opts) do
     pid = opts[:pid]
 
-    if Process.alive?(pid) do
+    try do
       # only link if requested but always monitor
       if opts[:link], do: Process.link(pid)
       monitor_ref = Process.monitor(pid)
@@ -34,8 +34,8 @@ defmodule Alfred.Notify.Server.State do
       ticket = Ticket.new(e)
 
       {State.save_notify_to(e, s), {:ok, ticket}}
-    else
-      {s, {:failed, :no_process_for_pid}}
+    catch
+      :exit, {:noproc, _} -> {s, {:failed, :no_process_for_pid}}
     end
   end
 
