@@ -2,7 +2,7 @@ defmodule Rena.SetPt.ServerTest do
   use ExUnit.Case, async: true
   use Should
 
-  @moduletag rena: true, rena_server: true
+  @moduletag rena: true, rena_setpt_server: true
 
   alias Alfred.ExecResult
   alias Alfred.Notify.{Memo, Ticket}

@@ -46,7 +46,7 @@ defmodule Alfred do
   defdelegate just_saw(js), to: Names
   defdelegate just_saw_cast(js), to: Names
 
-  def known_names(what \\ :names) do
+  def known_names(what \\ :names, opts \\ []) when is_atom(what) and is_list(opts) do
     for %KnownName{} = kn <- Names.all_known() do
       case what do
         :details -> kn

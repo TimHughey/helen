@@ -35,9 +35,9 @@ defmodule Rena.SetPt.Server do
 
   @impl true
   def handle_continue(:bootstrap, %State{} = s) do
-    {:ok, nt} = s.alfred.notify_register(name: s.equipment, frequency: :all, link: true)
+    {:ok, ticket} = s.alfred.notify_register(name: s.equipment, frequency: :all, link: true)
 
-    State.save_equipment(s, nt)
+    State.save_equipment(s, ticket)
     |> noreply()
 
     # NOTE: at this point the server is running and no further actions occur until an

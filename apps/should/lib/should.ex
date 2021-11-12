@@ -76,6 +76,15 @@ defmodule Should do
     end
   end
 
+  defmacro should_be_non_empty_list_with_length(res, len) do
+    quote location: :keep, bind_quoted: [res: res, len: len] do
+      fail = pretty("should be non-empty list with length #{len}", res)
+      assert is_list(res), fail
+      refute [] == res, fail
+      assert length(res) == len, fail
+    end
+  end
+
   defmacro should_be_non_empty_list(ctx, what) when is_atom(what) do
     quote location: :keep, bind_quoted: [ctx: ctx, what: what] do
       fail = pretty(inspect(what, pretty: true), "should be non-empty list", ctx)

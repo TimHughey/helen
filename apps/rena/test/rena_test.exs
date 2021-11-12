@@ -1,8 +1,7 @@
 defmodule RenaTest do
   use ExUnit.Case
-  doctest Rena
 
-  test "greets the world" do
-    assert Rena.hello() == :world
+  test "the truth will set you free" do
+    assert true == true
   end
 end
