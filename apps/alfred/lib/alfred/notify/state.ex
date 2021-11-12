@@ -35,7 +35,8 @@ defmodule Alfred.Notify.Server.State do
 
       {State.save_notify_to(e, s), {:ok, ticket}}
     catch
-      :exit, {:noproc, _} -> {s, {:failed, :no_process_for_pid}}
+      :error, :noproc ->
+        {s, {:failed, :no_process_for_pid}}
     end
   end
 

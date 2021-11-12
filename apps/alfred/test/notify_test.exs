@@ -13,27 +13,36 @@ defmodule Alfred.NotifyTest do
   setup [:create_known_name]
   setup [:register_name]
 
-  test "Alfred.Notify.register/1 registers and unregisters a name" do
-    name = Support.unique(:name)
+  describe "Alfred.Notify.register/1" do
+    test "registers and unregisters a name" do
+      name = Support.unique(:name)
 
-    res = Notify.register(name: name)
-    should_be_ok_tuple_with_struct(res, Ticket)
+      res = Notify.register(name: name)
+      should_be_ok_tuple_with_struct(res, Ticket)
 
-    {:ok, %Ticket{} = ticket} = res
+      {:ok, %Ticket{} = ticket} = res
 
-    should_be_equal(ticket.name, name)
+      should_be_equal(ticket.name, name)
 
-    registrations = Notify.registrations(name: name)
-    fail = "#{name} should be registered for notifications"
-    assert Enum.any?(registrations, fn nt -> nt.name == name end), fail
+      registrations = Notify.registrations(name: name)
+      fail = "#{name} should be registered for notifications"
+      assert Enum.any?(registrations, fn nt -> nt.name == name end), fail
 
-    res = Notify.unregister(ticket.ref)
-    should_be_equal(res, :ok)
+      res = Notify.unregister(ticket.ref)
+      should_be_equal(res, :ok)
 
-    registrations = Notify.registrations(name: name)
+      registrations = Notify.registrations(name: name)
 
-    fail = "#{name} should not be registered for notifications"
-    refute Enum.any?(registrations, fn nt -> nt.name == name end), fail
+      fail = "#{name} should not be registered for notifications"
+      refute Enum.any?(registrations, fn nt -> nt.name == name end), fail
+    end
+
+    test "handles when pid isn't alive" do
+      name = Support.unique(:name)
+
+      res = Notify.register(name: name, pid: :c.pid(0, 4096, 0))
+      should_be_match(res, {:failed, :no_process_for_pid})
+    end
   end
 
   @tag create_known_name: true
