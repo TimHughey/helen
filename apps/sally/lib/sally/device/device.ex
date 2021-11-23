@@ -7,6 +7,8 @@ defmodule Sally.Device do
 
   use Ecto.Schema
   require Ecto.Query
+
+  alias Ecto.Changeset
   alias Ecto.Query
 
   alias __MODULE__, as: Schema
@@ -31,12 +33,13 @@ defmodule Sally.Device do
     ident = List.first(p.filter_extra)
     mutable? = p.subsystem == "mut"
     device = Ecto.build_assoc(host, :devices)
+    pios = if(mutable?, do: length(p.data[:pins]), else: 1)
 
     %{
       ident: ident,
       family: determine_family(ident),
       mutable: mutable?,
-      pios: (mutable? && length(p.data[:pins])) || 1,
+      pios: pios,
       last_seen_at: p[:sent_at]
     }
     |> changeset(device)
@@ -46,11 +49,11 @@ defmodule Sally.Device do
     Ecto.build_assoc(host, :devices) |> changeset(changes)
   end
 
-  def changeset(p, %Schema{} = device) when is_map(p), do: changeset(device, p)
+  def changeset(p, %Schema{} = device) when is_map(p) do
+    changeset(device, p)
+  end
 
   def changeset(%Schema{} = device, p) when is_map(p) do
-    alias Ecto.Changeset
-
     device
     |> Changeset.cast(p, columns(:cast))
     |> Changeset.validate_required(columns(:required))
@@ -123,6 +126,17 @@ defmodule Sally.Device do
     [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
   end
 
+  # def last_seen_at_cs(id, last_seen_at \\ nil) do
+  #   alias Ecto.Changeset
+  #
+  #   at = if(is_nil(id), do: DateTime.utc_now(), else: last_seen_at)
+  #
+  #   changes = %{id: id, last_seen_at: at}
+  #
+  #   %Schema{}
+  #   |> Changeset.cast(changes, Map.keys(changes))
+  # end
+
   def latest(opts) do
     age = opts[:age] || [hours: -1]
     schema = if opts[:schema] == true, do: true, else: false
@@ -184,6 +198,19 @@ defmodule Sally.Device do
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
 
   def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
+
+  def type(schema_or_id) do
+    case schema_or_id do
+      %Schema{} = x -> if(x.mutable, do: :mutable, else: :immutable)
+      x when is_integer(x) -> Repo.get(Schema, x) |> type()
+      x when is_nil(x) -> :unknown
+    end
+  end
+
+  def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
+    %Schema{id: id}
+    |> Changeset.cast(%{last_een_at: at}, [:last_seen_at])
+  end
 
   defp determine_family(ident) do
     case ident do

@@ -173,7 +173,7 @@ defmodule IlluminationServerTest do
 
       should_be_noreply_tuple_with_state(res, State)
       {:noreply, new_state} = res
-      should_be_datetime_greater_than(state.last_notify_at, new_state.last_notify_at)
+      should_be_datetime_greater_than(new_state.last_notify_at, state.last_notify_at)
     end
 
     test "Memo when equipment cmd is pending" do

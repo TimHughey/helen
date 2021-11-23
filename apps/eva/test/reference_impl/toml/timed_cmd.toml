@@ -1,7 +1,0 @@
-name = "Reef Mix Equipment Simulation"
-variant = "timed_cmd"
-description = "executes equipment commands"
-initial_mode = "ready"
-
-[equipment]
-  name = "i2c6"

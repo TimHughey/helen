@@ -4,17 +4,41 @@ defmodule Alfred.Notify.Server do
   require Logger
 
   alias Alfred.Notify.Entry
-  alias Alfred.Notify.Server
-  alias Alfred.Notify.Server.State
+  alias Alfred.Notify.State
+
+  def call(msg, opts)
+      when is_list(opts) do
+    server = opts[:notify_server] || __MODULE__
+
+    try do
+      GenServer.call(server, msg)
+    rescue
+      _ -> {:no_server, server}
+    catch
+      :exit, _ -> {:no_server, server}
+    end
+  end
+
+  def cast(msg, opts)
+      when is_list(opts) do
+    server = opts[:notify_server] || __MODULE__
+
+    GenServer.cast(server, msg)
+  end
 
   @impl true
   def init(_args) do
     State.new() |> reply_ok()
   end
 
-  def start_link(_opts) do
-    Logger.debug(["starting ", inspect(Server)])
-    GenServer.start_link(__MODULE__, [], name: Server)
+  def start_link(initial_args) do
+    name = initial_args[:notify_server] || __MODULE__
+    GenServer.start_link(__MODULE__, [], name: name)
+  end
+
+  @impl true
+  def handle_call({:notify, seen_list}, _, %State{} = s) when is_list(seen_list) do
+    State.notify(seen_list, s) |> reply()
   end
 
   @impl true
@@ -24,8 +48,8 @@ defmodule Alfred.Notify.Server do
   end
 
   @impl true
-  def handle_call({:registrations, opts}, _from, %State{} = s) do
-    State.registrations(opts, s) |> reply(s)
+  def handle_call(:registrations, _from, %State{} = s) do
+    s.registrations |> reply(s)
   end
 
   @impl true
@@ -34,10 +58,8 @@ defmodule Alfred.Notify.Server do
   end
 
   @impl true
-  def handle_cast({:just_saw, opts}, %State{} = s) do
-    Keyword.put_new(opts, :missing?, false)
-    |> State.notify(s)
-    |> noreply()
+  def handle_cast({:notify, seen_list}, %State{} = s) do
+    State.notify(seen_list, s) |> noreply_discard_result()
   end
 
   @impl true
@@ -46,16 +68,16 @@ defmodule Alfred.Notify.Server do
 
     Betty.app_error(__MODULE__, name: e.name, missing: true)
 
-    [name: e.name, missing?: true]
-    |> State.notify(s)
+    Entry.notify(e, missing?: true)
+    |> State.save_entry(s)
     |> noreply()
   end
 
   @impl true
-  def handle_info({:DOWN, ref, :process, pid, _reason}, %State{} = s) do
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, %State{} = s) do
     Logger.debug("#{inspect(pid)} exited, removing notify registration(s)")
 
-    State.unregister(ref, s)
+    State.unregister(pid, s)
     |> noreply()
   end
 
@@ -64,6 +86,7 @@ defmodule Alfred.Notify.Server do
   ##
 
   defp noreply(%State{} = s), do: {:noreply, s}
+  defp noreply_discard_result({%State{} = s, _}), do: noreply(s)
   defp reply(%State{} = s, val), do: {:reply, val, s}
   defp reply(val, %State{} = s), do: {:reply, val, s}
   defp reply({%State{} = s, val}), do: {:reply, val, s}

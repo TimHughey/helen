@@ -6,10 +6,10 @@ defmodule Alfred.Notify.Entry do
             pid: nil,
             ref: nil,
             monitor_ref: nil,
-            last_notify: DateTime.from_unix!(0),
+            last_notify_at: DateTime.from_unix!(0),
             ttl_ms: 0,
             interval_ms: 60_000,
-            missing_ms: 60_100,
+            missing_ms: 60_000,
             missing_timer: nil
 
   @type t :: %Entry{
@@ -17,55 +17,68 @@ defmodule Alfred.Notify.Entry do
           pid: pid(),
           ref: reference(),
           monitor_ref: reference(),
-          last_notify: DateTime.t(),
-          ttl_ms: pos_integer() | 0,
+          last_notify_at: DateTime.t(),
+          ttl_ms: non_neg_integer(),
           interval_ms: pos_integer(),
           missing_ms: pos_integer(),
           missing_timer: reference()
         }
 
-  def new(opts) when is_list(opts) do
+  @type frequency_opts :: :all | [interval_ms: pos_integer()]
+  @type ttl_ms :: non_neg_integer()
+  @type new_opts() :: [
+          name: binary(),
+          pid: pid(),
+          link: boolean(),
+          ttl_ms: ttl_ms(),
+          missing_ms: pos_integer(),
+          frequency: frequency_opts()
+        ]
+  @spec new(new_opts()) :: Entry.t()
+  def new(args) when is_list(args) do
+    pid = args[:pid]
+
+    # NOTE: only link if requested but always monitor
+    if args[:link] && pid != self(), do: Process.link(pid)
+
     %Entry{
-      name: opts[:name],
-      pid: opts[:pid],
+      name: args[:name],
+      pid: args[:pid],
       ref: make_ref(),
-      monitor_ref: opts[:monitor_ref],
-      ttl_ms: opts[:ttl_ms] || 0,
-      interval_ms: make_notify_interval(opts),
-      missing_ms: make_missing_interval(opts)
+      monitor_ref: Process.monitor(pid),
+      interval_ms: make_notify_interval(args)
     }
+    |> update_ttl_ms(args)
+    |> update_missing_ms(args)
+    |> schedule_missing()
   end
 
+  @type notify_opts :: [missing?: boolean(), seen_at: DateTime.t()]
+  @spec notify(Entry.t(), opts :: notify_opts()) :: Entry.t()
   def notify(%Entry{} = e, opts) do
-    utc_now = DateTime.utc_now()
-    next_notify = DateTime.add(e.last_notify, e.interval_ms, :millisecond)
+    seen_at = opts[:seen_at] || DateTime.utc_now()
+    next_notify_at = Timex.shift(e.last_notify_at, milliseconds: e.interval_ms)
 
-    # capture ttl_ms from opts (if provided) to handle when a name is
-    # registered before being seen
-    ttl_ms = opts[:ttl_ms] || e.ttl_ms
-    missing_ms = e.missing_ms
+    # notifications only occur when a name is known so update the ttl_ms
+    # then update the missing interval considering the ttl_ms
+    e = update_ttl_ms(e, opts) |> update_missing_ms()
 
-    e = %Entry{
+    if Timex.compare(seen_at, next_notify_at) >= 0 do
+      memo = Memo.new(e, opts)
+      Process.send(e.pid, {Alfred, memo}, [])
+
+      %Entry{e | last_notify_at: seen_at} |> schedule_missing()
+    else
       e
-      | ttl_ms: ttl_ms,
-        missing_ms: make_missing_interval(missing_ms: missing_ms, ttl_ms: ttl_ms)
-    }
-
-    case DateTime.compare(utc_now, next_notify) do
-      x when x in [:eq, :gt] ->
-        Process.send(e.pid, {Alfred, Memo.new(e, opts)}, [])
-
-        %Entry{e | last_notify: DateTime.utc_now()} |> schedule_missing()
-
-      _ ->
-        e
     end
   end
 
   def schedule_missing(%Entry{} = e) do
     unschedule_missing(e)
 
-    %Entry{e | missing_timer: Process.send_after(self(), {:missing, e}, e.missing_ms)}
+    missing_timer = Process.send_after(self(), {:missing, e}, e.missing_ms)
+
+    %Entry{e | missing_timer: missing_timer}
   end
 
   def unschedule_missing(%Entry{} = e) do
@@ -75,19 +88,20 @@ defmodule Alfred.Notify.Entry do
   end
 
   defp make_missing_interval(opts) when is_list(opts) do
-    missing_ms = opts[:missing_ms] || 60_000
-    ttl_ms = opts[:ttl_ms]
+    # NOTE:
+    # -missing_ms controls the missing timer frequenxy
+    #
+    # most notify registrations are done at startup before ttl_ms is available
+    #
+    # 1. use missing_ms when ttl_ms is unknown
+    # 2. use ttl_ms when available (e.g. after a name becomes known)
 
-    # NOTE: missing_ms controls the missing timer
-    #       ttl_ms is unavailable when names are registered before they are known (e.g. at startup)
-    #       missing_ms should always be set to ttl_ms when it is known
+    missing_ms = opts[:missing_ms] || 60_000
+    ttl_ms = opts[:ttl_ms] || 0
 
     cond do
-      # when ttl_ms is unavailable always use missing ms
-      is_nil(ttl_ms) and is_integer(missing_ms) -> missing_ms
-      # when ttl_ms is available always use it
-      is_integer(ttl_ms) -> ttl_ms
-      # when all else fails default to one minute
+      ttl_ms == 0 and is_integer(missing_ms) -> missing_ms
+      is_integer(ttl_ms) > 0 -> ttl_ms
       true -> 60_000
     end
   end
@@ -98,5 +112,17 @@ defmodule Alfred.Notify.Entry do
       [interval_ms: x] when is_integer(x) -> x
       _x -> 60_000
     end
+  end
+
+  defp update_missing_ms(%Entry{} = e, opts \\ []) do
+    missing_ms = opts[:missing_ms] || e.missing_ms
+    ttl_ms = opts[:ttl_ms] || e.ttl_ms
+
+    missing_opts = [missing_ms: missing_ms, ttl_ms: ttl_ms]
+    %Entry{e | missing_ms: make_missing_interval(missing_opts)}
+  end
+
+  defp update_ttl_ms(%Entry{} = e, opts) do
+    %Entry{e | ttl_ms: opts[:ttl_ms] || e.ttl_ms}
   end
 end

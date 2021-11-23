@@ -1,6 +1,6 @@
 # Sally
 
-Sally provides support for [Ruth]([https://github.com/TimHughey/ruth):
+Sally provides support for [Ruth](https://github.com/TimHughey/ruth):
 
 - Host
 - Immutable and Mutable Devices

@@ -20,19 +20,33 @@ defmodule Sally.Datapoint do
     belongs_to(:dev_alias, DevAlias)
   end
 
-  def add(%DevAlias{} = a, dp_map) do
+  def add(repo, %DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
+    raw_data
+    |> Map.take([:temp_c, :relhum])
+    |> Map.put(:reading_at, at)
+    |> changeset(Ecto.build_assoc(a, :datapoints))
+    |> repo.insert(returning: true)
+  end
+
+  @deprecated "Use Sally.Datapoint.add/4 instead"
+  def add(%DevAlias{} = a, dp_map, reading_at \\ nil) do
+    at = reading_at || DateTime.utc_now()
     # associate the new command with the DevAlias
     new_dp = Ecto.build_assoc(a, :datapoints)
 
-    cs = Map.take(dp_map, [:temp_c, :relhum]) |> put_in([:reading_at], DateTime.utc_now())
-
-    changeset(new_dp, cs) |> Repo.insert(returning: true)
+    dp_map
+    |> Map.take([:temp_c, :relhum])
+    |> Map.put(:reading_at, at)
+    |> changeset(new_dp)
+    |> Repo.insert(returning: true)
   end
 
-  def changeset(%Schema{} = c, changes) when is_map(changes) do
+  def changeset(changes, %Schema{} = dp) when is_map(changes), do: changeset(dp, changes)
+
+  def changeset(%Schema{} = dp, changes) when is_map(changes) do
     alias Ecto.Changeset
 
-    c
+    dp
     |> Changeset.cast(changes, columns(:cast))
     |> Changeset.validate_required([:temp_c, :reading_at, :dev_alias_id])
     |> Changeset.validate_number(:temp_c, greater_than: -30.0, less_than: 80.0)

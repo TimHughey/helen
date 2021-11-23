@@ -28,6 +28,17 @@ defmodule Sally.DevAlias do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
+      when is_map(raw_data) do
+    for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
+      {:ok, acc} ->
+        case Datapoint.add(repo, schema, raw_data, reading_at) do
+          {:ok, %Datapoint{} = x} -> {:ok, [x] ++ acc}
+          {:error, _reason} = rc -> rc
+        end
+    end
+  end
+
   def changeset(changes, %Schema{} = a, opts \\ []) do
     required = opts[:required] || columns(:required)
 
@@ -100,6 +111,9 @@ defmodule Sally.DevAlias do
     end
   end
 
+  def device_id([%Schema{} = x | _]), do: device_id(x)
+  def device_id(%Schema{device_id: x}), do: x
+
   def exists?(name_or_id) do
     case find(name_or_id) do
       %Schema{} -> true
@@ -128,8 +142,49 @@ defmodule Sally.DevAlias do
 
   def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
-  def just_saw(repo, %Schema{} = da, seen_at) do
-    changeset(%{updated_at: seen_at}, da) |> repo.update!(returning: true)
+  @doc """
+    Mark a list of DevAlias as just seen within an Ecto.Multi sequence
+
+    Returns:
+    ```
+    {:ok, [%DevAlias{} | []]}  # success
+    {:error, error}            # update failed for one DevAlias
+    ```
+
+  """
+  @doc since: "0.5.10"
+  @type multi_changes :: %{aliases: [Ecto.Schema.t(), ...]}
+  @type ok_tuple :: {:ok, Ecto.Schema.t()}
+  @type error_tuple :: {:error, any()}
+  @type db_result :: ok_tuple() | error_tuple()
+  @spec just_saw(Ecto.Repo.t(), multi_changes(), DateTime.t()) :: db_result()
+  def just_saw(repo, %{aliases: schemas}, %DateTime{} = seen_at) when is_list(schemas) do
+    for %Schema{} = schema <- schemas, reduce: {:ok, []} do
+      {:ok, acc} ->
+        cs = changeset(%{updated_at: seen_at}, schema)
+
+        case repo.update(cs, returning: true) do
+          {:ok, %Schema{} = x} -> {:ok, [x] ++ acc}
+          {:error, error} -> {:error, error}
+        end
+
+      {:error, _} = acc ->
+        acc
+    end
+  end
+
+  @doc """
+    Mark a single DevAlias (by id) as just seen
+
+    Looks up the DevAlias by id then reuses `just_saw/3`
+  """
+  @doc since: "0.5.10"
+  @spec just_saw_id(Ecto.Repo.t(), multi_changes, id :: integer, DateTime.t()) :: db_result()
+  def just_saw_id(repo, _changes, id, %DateTime{} = seen_at) when is_integer(id) do
+    case repo.get(Schema, id) do
+      %Schema{} = x -> just_saw(repo, %{aliases: [x]}, seen_at)
+      x when is_nil(x) -> just_saw(repo, %{aliases: []}, seen_at)
+    end
   end
 
   defp load_command_ids(schema_or_nil) do
@@ -148,6 +203,17 @@ defmodule Sally.DevAlias do
       %Schema{} = a -> Repo.preload(a, [:device])
       x -> x
     end
+  end
+
+  def load_alias_with_last_cmd(name) when is_binary(name) do
+    cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
+
+    Ecto.Query.from(a in Schema,
+      where: a.name == ^name,
+      order_by: [asc: a.pio],
+      preload: [cmds: ^cmd_q, device: []]
+    )
+    |> Repo.one()
   end
 
   def load_aliases_with_last_cmd(repo, multi_changes) do

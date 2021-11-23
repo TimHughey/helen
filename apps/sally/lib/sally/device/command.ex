@@ -43,22 +43,41 @@ defmodule Sally.Command do
 
   def columns(:cast), do: columns(:all)
 
-  # (1 of 2) ack via a schema id
-  def ack_now(id, %DateTime{} = at) when is_integer(id), do: Repo.get(Schema, id) |> ack_now(:ack, at)
+  # # (1 of 2) ack via a schema id
+  # def ack_now(id, %DateTime{} = at) when is_integer(id), do: Repo.get(Schema, id) |> ack_now(:ack, at)
+  #
+  # # (2 of 3) ack via a schema
+  # def ack_now(%Schema{} = cmd_to_ack, disposition, at) when disposition in [:ack, :orphan] do
+  #   # determine acked at here for updating the schema and calculating the rt_latency
+  #   acked_at = cmd_to_ack.acked_at || at
+  #
+  #   %{
+  #     acked: true,
+  #     acked_at: acked_at,
+  #     orphaned: disposition == :orphan,
+  #     rt_latency_us: DateTime.diff(acked_at, cmd_to_ack.sent_at, :microsecond)
+  #   }
+  #   |> changeset(cmd_to_ack)
+  #   |> Repo.update!(returning: true)
+  # end
 
-  # (2 of 3) ack via a schema
-  def ack_now(%Schema{} = cmd_to_ack, disposition, at) when disposition in [:ack, :orphan] do
-    # determine acked at here for updating the schema and calculating the rt_latency
-    acked_at = cmd_to_ack.acked_at || at
+  # def ack_now_cs(id, sent_at, ack_at \\ nil) do
+  #   alias Ecto.Changeset
+  #
+  #   ack_at = if(is_nil(ack_at), do: DateTime.utc_now(), else: ack_at)
+  #   rt_us = DateTime.diff(ack_at, sent_at, :microsecond)
+  #   changes = %{acked: true, acked_at: ack_at, orphaned: false, rt_latency_us: rt_us}
+  #
+  #   %Schema{id: id} |> Changeset.cast(changes, Map.keys(changes))
+  # end
 
-    %{
-      acked: true,
-      acked_at: acked_at,
-      orphaned: disposition == :orphan,
-      rt_latency_us: DateTime.diff(acked_at, cmd_to_ack.sent_at, :microsecond)
-    }
-    |> changeset(cmd_to_ack)
-    |> Repo.update!(returning: true)
+  def ack_now_cs(id, %DateTime{} = sent_at, %DateTime{} = ack_at, disposition) when is_atom(disposition) do
+    alias Ecto.Changeset
+
+    rt_us = DateTime.diff(ack_at, sent_at, :microsecond)
+    changes = %{acked: true, acked_at: ack_at, orphaned: disposition == :orphan, rt_latency_us: rt_us}
+
+    %Schema{id: id} |> Changeset.cast(changes, Map.keys(changes))
   end
 
   def add(%DevAlias{} = da, cmd, opts) do
@@ -67,16 +86,23 @@ defmodule Sally.Command do
     [refid | _] = Ecto.UUID.generate() |> String.split("-")
 
     # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
-    utc_now = DateTime.utc_now()
+    sent_at = opts[:sent_at] || DateTime.utc_now()
 
     # handle special case of ack immediate
     ack_immediate? = opts[:ack] == :immediate
-    acked_at = if ack_immediate?, do: utc_now, else: nil
+    acked_at = if ack_immediate?, do: sent_at, else: nil
 
     # base changes for all new cmds
-    %{refid: refid, cmd: cmd, acked: ack_immediate?, acked_at: acked_at, sent_at: utc_now}
+    %{refid: refid, cmd: cmd, acked: ack_immediate?, acked_at: acked_at, sent_at: sent_at}
     |> changeset(new_cmd)
     |> Repo.insert!(returning: true)
+  end
+
+  def load(id) when is_integer(id) do
+    case Repo.get(Schema, id) do
+      %Schema{} = x -> {:ok, x}
+      _ -> {:error, :not_found}
+    end
   end
 
   def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do

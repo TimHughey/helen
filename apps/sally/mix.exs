@@ -4,7 +4,7 @@ defmodule Sally.MixProject do
   def project do
     [
       app: :sally,
-      version: "0.5.9",
+      version: "0.5.10",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -12,9 +12,21 @@ defmodule Sally.MixProject do
       elixir: "~> 1.12",
       start_permanent: Mix.env() in [:prod, :test],
       deps: deps(),
+
+      ## Compile Paths
       elixirc_paths: elixirc_paths(Mix.env()),
+
+      ## Test Coverage
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: preferred_cli_env(),
+
+      ## Docs
+      name: "Sally",
+      source_url: "https://github.com/timhughey/helen",
+      homepage_url: "http://www.wisslanding.com",
+      docs: docs(),
+
+      ## Extra Mix commands
       aliases: aliases()
     ]
   end
@@ -82,8 +94,31 @@ defmodule Sally.MixProject do
     ]
   end
 
+  defp docs do
+    [
+      # The main page in the docs
+      main: "Sally",
+      # logo: "path/to/logo.png",
+      extras: ["README.md"],
+      nest_modules_by_prefix: [
+        Sally.Host,
+        Instruct,
+        Instruct.State,
+        Sally.Immutable,
+        Immutable,
+        Sally.Mutable,
+        Mutable
+      ],
+      groups_for_modules: [
+        Hosts: ~r/Host/,
+        Immutables: ~r/Immutable/,
+        Mutables: ~r/Mutable/
+      ]
+    ]
+  end
+
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/shared"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp preferred_cli_env do

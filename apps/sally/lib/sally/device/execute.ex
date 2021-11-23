@@ -16,47 +16,52 @@ defmodule Sally.Execute do
     restart: :permanent,
     shutdown: 1000
 
-  def ack_now(refid, at) do
-    Repo.transaction(fn ->
-      case Broom.get_refid_tracker_entry(refid) do
-        %TrackerEntry{} = te -> Command.ack_now(te.schema_id, at) |> Broom.release()
-        _ -> nil
-      end
-    end)
+  def ack(%TrackerEntry{} = te, disposition, %DateTime{} = ack_at \\ DateTime.utc_now())
+      when is_atom(disposition)
+      when disposition in [:ack, :orphan] do
+    alias Ecto.Multi
+    cs = Command.ack_now_cs(te.schema_id, te.sent_at, ack_at, disposition)
+
+    Multi.new()
+    |> Multi.update(:command, cs, returning: true)
+    |> Repo.transaction()
   end
 
-  def cmd(%ExecCmd{} = ec) do
+  def cmd(%ExecCmd{} = ec, _opts \\ []) do
     # NOTE!
     #
     # 1. Broom.track/2 must be invoked outside the cmd insert to ensure the command is available
     #    when immediate ack is requested
     #
     # 2. insert_cmd_if_needed/1 *MUST* preload the dev alias, device and host for downstream
-    with %ExecCmd{valid?: true} = ec <- ExecCmd.validate(ec),
-         {:ok, %ExecCmd{inserted_cmd: %Command{}} = ec} <- insert_cmd_if_needed(ec),
-         {:ok, %TrackerEntry{} = te} <- Broom.track(ec.inserted_cmd, ec.cmd_opts) do
+    # with %ExecCmd{valid?: true} = ec <- ExecCmd.validate(ec),
+    with {:ok, %ExecCmd{inserted_cmd: %Command{}} = ec} <- insert_cmd_if_needed(ec),
+         {:ok, %TrackerEntry{} = te} <- track(ec.inserted_cmd, ec.cmd_opts) do
       # everything is in order, send the command to the remote host
       %ExecCmd{ec | instruct: Payload.send_cmd(ec)} |> ExecResult.ok(te)
     else
-      %ExecCmd{valid?: false} = x -> ExecResult.invalid(x)
+      # %ExecCmd{valid?: false} = x -> ExecResult.invalid(x)
       {:ok, :no_change} -> ExecResult.no_change(ec)
       {:ok, %MutStatus{} = x} -> ExecResult.from_status(x)
       {:error, _} = rc -> ExecResult.error(ec.name, rc)
     end
   end
 
-  def get_tracker_entry(refid), do: Broom.get_refid_tracker_entry(refid)
+  def get_tracked(refid), do: Broom.get_refid_tracker_entry(refid)
+
+  def release(%Command{} = x), do: Broom.release(x)
+
+  def track(%Command{} = cmd, opts) when is_list(opts) do
+    Broom.track(cmd, opts)
+  end
 
   @impl true
-  def track_timeout(%Broom.TrackerEntry{} = te) do
-    Repo.transaction(fn ->
-      case Repo.get!(Command, te.schema_id) do
-        %Command{acked: false} = c -> Command.ack_now(c, :orphan, DateTime.utc_now())
-        %Command{acked: true} = c -> c
-      end
-      |> Repo.preload(dev_alias: [device: [:host]])
-    end)
-    |> elem(1)
+  def track_timeout(%TrackerEntry{} = te) do
+    case Command.load(te.schema_id) do
+      {:ok, %Command{acked: true} = x} -> x
+      {:ok, %Command{acked: false}} -> ack(te, :orphan)
+      {:error, _error} = rc -> rc
+    end
   end
 
   defp insert_cmd_if_needed(%ExecCmd{} = ec) do

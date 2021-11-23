@@ -8,15 +8,15 @@ defmodule Sally.Host.Handler do
   alias Sally.Host.ChangeControl
   alias Sally.Host.Instruct
 
-  @impl true
-  def finalize(%Dispatch{} = msg) do
-    log = fn x ->
-      Logger.debug("\n#{inspect(x, pretty: true)}")
-      x
-    end
-
-    %Dispatch{msg | final_at: DateTime.utc_now()} |> log.()
-  end
+  # @impl true
+  # def finalize(%Dispatch{} = msg) do
+  #   log = fn x ->
+  #     Logger.debug("\n#{inspect(x, pretty: true)}")
+  #     x
+  #   end
+  #
+  #   %Dispatch{msg | final_at: DateTime.utc_now()} |> log.()
+  # end
 
   @impl true
   def process(%Dispatch{category: cat} = msg) when cat in ["startup", "boot", "run"] do
@@ -30,8 +30,9 @@ defmodule Sally.Host.Handler do
     |> Ecto.Multi.insert(:host, Host.changeset(cc), Host.insert_opts(cc.replace))
     |> Sally.Repo.transaction()
     |> check_result(msg)
-    |> post_process()
-    |> finalize()
+
+    # |> post_process()
+    # |> finalize()
   end
 
   # @impl true
@@ -45,9 +46,6 @@ defmodule Sally.Host.Handler do
   #   |> post_process()
   #   |> finalize()
   # end
-
-  @impl true
-  def post_process(%Dispatch{valid?: false} = msg), do: msg
 
   @impl true
   def post_process(%Dispatch{category: "startup"} = msg) do

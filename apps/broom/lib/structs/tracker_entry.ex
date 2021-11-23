@@ -44,20 +44,25 @@ defmodule Broom.TrackerEntry do
 
   # NOTE: invoked after track_timeout AND when entry is released via a db_result
 
-  # (1 of 4) actual schema, apply to entry
+  # (1 of 5) actual schema, apply to entry
   def apply_db_result(%_{acked: _} = schema, %Entry{} = te) do
     %Entry{te | acked: schema.acked, orphaned: schema.orphaned, acked_at: schema.acked_at}
   end
 
-  # (1 of 4) support pipeline when the Entry is passed first
+  # (2 of 5) support pipeline when the Entry is passed first
   def apply_db_result(%Entry{} = te, db_result_or_schema),
     do: apply_db_result(db_result_or_schema, te)
 
-  # (3 of 4) good db result, apply the schema
+  # (3 of 5) good db result, apply the schema
   def apply_db_result({:ok, %_{acked: _} = schema}, %Entry{} = te),
     do: apply_db_result(schema, te)
 
-  # (4 of 4) db error
+  # (3 of 5) good Ecto.Multi transaction
+  def apply_db_result({:ok, %{command: cmd}}, %Entry{} = te) do
+    struct(te, acked: cmd.acked, orphaned: cmd.orphaned, acked_at: cmd.acked_at)
+  end
+
+  # (5 of 5) db error
   def apply_db_result({:error, e}, %Entry{} = te) do
     Logger.warn(["\n", inspect(e, pretty: true)])
     te

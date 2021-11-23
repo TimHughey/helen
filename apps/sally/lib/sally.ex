@@ -9,7 +9,7 @@ defmodule Sally do
   def delete_alias(name_or_id) do
     case DevAlias.delete(name_or_id) do
       {:ok, results} ->
-        kn = Alfred.delete(results[:name])
+        kn = Alfred.names_delete(results[:name])
         {:ok, results ++ [alfred: kn]}
 
       error ->
@@ -79,7 +79,7 @@ defmodule Sally do
 
     case DevAlias.rename(opts) do
       %DevAlias{} ->
-        alfred.delete(opts[:from])
+        alfred.names_delete(opts[:from])
         :ok
 
       error ->
@@ -118,7 +118,7 @@ defmodule Sally do
     with {:device_opt, device} when is_binary(device) <- {:device_opt, opts[:device]},
          {:device, %Device{} = device} <- {:device, Device.find(ident: device)},
          {:name_opt, name} when is_binary(name) <- {:name_opt, opts[:name]},
-         {:available, true} <- {:available, Alfred.available?(name)},
+         {:available, true} <- {:available, Alfred.names_available?(name)},
          {:pio_opt, pio} when is_integer(pio) <- {:pio_opt, Device.pio_check(device, opts)} do
       final_opts = [name: name, pio: pio] ++ Keyword.take(opts, [:description, :ttl_ms])
 
@@ -180,7 +180,7 @@ defmodule Sally do
   end
 
   # required as callback from Alfred
-  def execute(%ExecCmd{} = ec), do: Sally.Execute.cmd(ec)
+  def execute(%ExecCmd{} = ec, opts \\ []) when is_list(opts), do: Sally.Execute.cmd(ec, opts)
 
   def host_devices(name) do
     host = Host.find_by_name(name) |> Repo.preload(:devices)
@@ -315,6 +315,27 @@ defmodule Sally do
       %Host{} = host -> Host.setup(host, opts)
       _ -> {:not_found, ident}
     end
+  end
+
+  @doc """
+
+  """
+  @doc since: "0.5.10"
+  def just_saw(%Device{} = device, dev_aliases) when is_list(dev_aliases) do
+    alias Alfred.{JustSaw, SeenName}
+
+    type = Device.type(device)
+
+    JustSaw.new(type, dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
+    |> Alfred.just_saw()
+  end
+
+  def just_saw([%DevAlias{device_id: dev_id} | _] = dev_aliases) do
+    alias Alfred.{JustSaw, SeenName}
+
+    Device.type(dev_id)
+    |> JustSaw.new(dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
+    |> Alfred.just_saw()
   end
 
   # required as callback from Alfred
