@@ -209,7 +209,7 @@ defmodule Sally.Device do
 
   def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
     %Schema{id: id}
-    |> Changeset.cast(%{last_een_at: at}, [:last_seen_at])
+    |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
   end
 
   defp determine_family(ident) do

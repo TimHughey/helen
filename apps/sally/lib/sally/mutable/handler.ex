@@ -36,7 +36,7 @@ defmodule Sally.Mutable.Handler do
     Multi.new()
     |> Multi.update(:command, command_cs, returning: true)
     |> Multi.run(:seen_list, DevAlias, :just_saw_id, [dev_alias_id, sent_at])
-    |> Multi.update(:device, fn x -> DevAlias.device_id(x.seen_list) |> Device.seen_at_cs(sent_at) end)
+    |> Multi.update(:device, fn %{seen_list: x} -> device_last_seen_cs(x, sent_at) end, returning: true)
     |> Repo.transaction()
   end
 
@@ -45,9 +45,10 @@ defmodule Sally.Mutable.Handler do
     Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
 
     case db_actions(msg) do
-      {:ok, %{device: device, seen_list: seen_list} = txn_results} ->
+      {:ok, txn_results} ->
         # NOTE: alert Alfred of just seen names after txn is complete
-        Sally.just_saw(device, seen_list)
+
+        Sally.just_saw(txn_results.device, txn_results.seen_list)
         |> Dispatch.save_seen_list(msg)
         |> Dispatch.valid(txn_results)
 
@@ -72,13 +73,11 @@ defmodule Sally.Mutable.Handler do
 
     case db_cmd_ack(msg, te.schema_id, te.dev_alias_id) do
       {:ok, txn_results} ->
-        %{device: device, seen_list: seen_list} = txn_results
-
         released_te = Execute.release(txn_results.command)
-        write_ack_metrics(seen_list, released_te, msg)
+        write_ack_metrics(txn_results.seen_list, released_te, msg)
 
         # NOTE: alert Alfred of just seen names after txn is complete
-        Sally.just_saw(device, seen_list)
+        Sally.just_saw(txn_results.device, txn_results.seen_list)
         |> Dispatch.save_seen_list(msg)
         |> Dispatch.valid(txn_results)
 
@@ -86,11 +85,6 @@ defmodule Sally.Mutable.Handler do
         Dispatch.invalid(msg, error)
     end
   end
-
-  # Unwrap the DevAlias if needed
-  # def write_ack_metrics([dev_alias], te, msg) do
-  #   write_ack_metrics(dev_alias, te, msg)
-  # end
 
   def write_ack_metrics([%DevAlias{} | _] = seen_list, te, msg) do
     for %DevAlias{} = dev_alias <- seen_list do
@@ -107,66 +101,11 @@ defmodule Sally.Mutable.Handler do
     end
   end
 
-  # @impl true
-  # def post_process(%Dispatch{valid?: true} = msg) do
-  #   msg
-  # end
-  #
-  # @impl true
-  # def post_process(%Dispatch{valid?: false} = msg), do: msg
+  ##
+  ## Private
+  ##
 
-  # def align_status(repo, changes, %Dispatch{} = msg) do
-  #   alias Sally.Mutable
-  #
-  #   pins = msg.data.pins
-  #   reported_at = msg.sent_at
-  #
-  #   for dev_alias <- changes.aliases, reduce: {:ok, []} do
-  #     {:ok, acc} ->
-  #       cmd = pin_status(pins, dev_alias.pio)
-  #       status = Mutable.status(dev_alias.name, [])
-  #       Logger.debug(inspect(status, pretty: true))
-  #
-  #       case status do
-  #         # there's a cmd pending, don't get in the way of ack or ack timeout
-  #         %MutStatus{pending?: true} ->
-  #           {:ok, acc}
-  #
-  #         # accept the device reported cmd when our view of the cmd is unknown
-  #         # (e.g. no cmd history, ttl is expired)
-  #         %MutStatus{cmd: "unknown"} ->
-  #           cmd = Command.reported_cmd_changeset(dev_alias, cmd, reported_at) |> repo.insert!(returning: true)
-  #
-  #           {:ok, [cmd] ++ acc}
-  #
-  #         %MutStatus{cmd: local_cmd} when local_cmd != cmd ->
-  #           cmd = Command.reported_cmd_changeset(dev_alias, cmd, reported_at) |> repo.insert!(returning: true)
-  #
-  #           {:ok, [cmd] ++ acc}
-  #
-  #         _ ->
-  #           {:ok, acc}
-  #       end
-  #   end
-  # end
-
-  # def just_saw(_repo, results) do
-  #   case results do
-  #     %{device: %Device{}, aliases: [_ | _]} -> Sally.just_saw(results.device, results.aliases)
-  #     _ -> []
-  #   end
-  # end
-
-  # defp check_result(txn_result, %Dispatch{} = msg) do
-  #   case txn_result do
-  #     {:ok, results} -> %Dispatch{msg | valid?: true, results: results}
-  #     {:error, e} -> Dispatch.invalid(msg, e)
-  #   end
-  # end
-
-  # defp pin_status(pins, pin_num) do
-  #   for [pin, status] <- pins, pin == pin_num, reduce: nil do
-  #     _ -> status
-  #   end
-  # end
+  defp device_last_seen_cs(seen_list, sent_at) do
+    DevAlias.device_id(seen_list) |> Device.seen_at_cs(sent_at)
+  end
 end

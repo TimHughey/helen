@@ -92,6 +92,8 @@ defmodule Sally.MutableHandlerTest do
 
       DispatchAid.assert_processed(dispatch)
 
+      Alfred.status(ctx.dev_alias.name) |> Should.Be.struct(Alfred.MutableStatus)
+
       # pretty_puts(dispatch)
     end
 
