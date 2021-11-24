@@ -17,8 +17,8 @@ defmodule Illumination.Application do
     opts = [
       strategy: :one_for_one,
       name: Illumination.Supervisor,
-      max_restarts: 10,
-      max_seconds: 5
+      max_restarts: 40,
+      max_seconds: 10
     ]
 
     Supervisor.start_link(children, opts)

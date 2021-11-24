@@ -1,7 +1,7 @@
 defmodule Sally.MutableHandlerTest do
   use ExUnit.Case, async: true
   use Should
-  use Sally.DispatchAid
+  use Sally.TestAids
 
   @moduletag sally: true, sally_mutable_handler: true
 
@@ -88,32 +88,20 @@ defmodule Sally.MutableHandlerTest do
     @tag command_add: [cmd: "on", track: true]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "handles a cmdack Dispatch", ctx do
-      dispatch = Should.Be.Map.with_key(ctx, :dispatch) |> Handler.process()
-
-      DispatchAid.assert_processed(dispatch)
-
-      Alfred.status(ctx.dev_alias.name) |> Should.Be.struct(Alfred.MutableStatus)
-
-      # pretty_puts(dispatch)
+      ctx
+      |> Should.Be.Map.with_key(:dispatch)
+      |> Handler.process()
+      |> DispatchAid.assert_processed()
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag command_add: []
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "handles a status Dispatch", ctx do
-      dispatch = Should.Be.Map.with_key(ctx, :dispatch) |> Handler.process()
-
-      _dispatch = DispatchAid.assert_processed(dispatch)
-
-      # pretty_puts(dispatch)
+      ctx
+      |> Should.Be.Map.with_key(:dispatch)
+      |> Handler.process()
+      |> DispatchAid.assert_processed()
     end
   end
-
-  def command_add(ctx), do: Sally.CommandAid.add(ctx)
-  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
-  def dispatch_add(ctx), do: Sally.DispatchAid.add(ctx)
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

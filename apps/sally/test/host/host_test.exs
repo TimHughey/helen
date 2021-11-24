@@ -2,8 +2,9 @@ defmodule Sally.HostTest do
   # NOTE:  don't use async: true due to testing Sally.host_setup(:unnamed)
   use ExUnit.Case
   use Should
+  use Sally.TestAids
 
-  alias Sally.{Host, HostAid}
+  alias Sally.Host
 
   @moduletag sally: true, sally_host: true
 
@@ -49,7 +50,4 @@ defmodule Sally.HostTest do
       Sally.host_rename([]) |> Should.Be.Tuple.with_rc(:bad_args)
     end
   end
-
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

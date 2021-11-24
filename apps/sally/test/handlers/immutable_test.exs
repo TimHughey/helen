@@ -1,7 +1,7 @@
 defmodule Sally.ImmutableHandlerTest do
   use ExUnit.Case, async: true
   use Should
-  use Sally.DispatchAid
+  use Sally.TestAids
 
   @moduletag sally: true, sally_immutable_handler: true
 
@@ -54,7 +54,7 @@ defmodule Sally.ImmutableHandlerTest do
       ctx
       |> Should.Be.Map.with_key(:dispatch)
       |> Handler.process()
-      |> DispatchAid.assert_processed()
+      |> Should.Be.struct(Dispatch)
     end
   end
 
@@ -70,11 +70,4 @@ defmodule Sally.ImmutableHandlerTest do
       |> DispatchAid.assert_processed()
     end
   end
-
-  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
-  def dispatch_add(ctx), do: Sally.DispatchAid.add(ctx)
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

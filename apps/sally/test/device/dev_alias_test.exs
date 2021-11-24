@@ -2,17 +2,19 @@ defmodule SallyDevAliasTest do
   # can not use async: true due to indirect use of Sally.device_latest/1
   use ExUnit.Case
   use Should
+  use Sally.TestAids
 
   @moduletag sally: true, sally_dev_alias: true
 
-  alias Sally.{DevAlias, DevAliasAid}
+  alias Sally.DevAlias
 
   setup_all do
     # always create and setup a host
     {:ok, %{host_add: [], host_setup: []}}
   end
 
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw, :command_add, :dispatch_add]
+  setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
+  setup [:command_add, :datapoint_add, :dispatch_add]
 
   describe "Sally.device_add_alias/1" do
     @tag device_add: [auto: :mcp23008]
@@ -51,6 +53,26 @@ defmodule SallyDevAliasTest do
 
       dev_alias = DevAlias.load_device(dev_alias) |> Should.Be.schema(DevAlias)
       Should.Be.asserted(fn -> dev_alias.device.ident == device.ident end)
+    end
+  end
+
+  describe "Sally.devalias_delete/1" do
+    @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
+    @tag command_add: [count: 1000, shift_unit: :days, shift_increment: -1]
+    test "deletes a mutable DevAlias name", ctx do
+      ctx.dev_alias.name
+      |> Sally.devalias_delete()
+      |> Should.Be.Tuple.with_rc_and_list(:ok)
+      |> Should.Be.NonEmpty.list()
+    end
+
+    @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
+    @tag datapoint_add: [count: 1000, shift_unit: :days, shift_increment: -1]
+    test "deletes an immutable DevAlias name", ctx do
+      ctx.dev_alias.name
+      |> Sally.devalias_delete()
+      |> Should.Be.Tuple.with_rc_and_list(:ok)
+      |> Should.Be.NonEmpty.list()
     end
   end
 
@@ -102,12 +124,4 @@ defmodule SallyDevAliasTest do
       Sally.devalias_rename([]) |> Should.Be.Tuple.with_rc(:bad_args)
     end
   end
-
-  def command_add(ctx), do: Sally.CommandAid.add(ctx)
-  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
-  def dispatch_add(ctx), do: Sally.DispatchAid.add(ctx)
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

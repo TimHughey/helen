@@ -15,6 +15,8 @@ defmodule Sally.DevAlias do
   @ttl_default 15_000
   @ttl_min 50
 
+  @type list_or_schema() :: [Ecto.Schema.t(), ...] | Ecto.Schema.t()
+
   schema "dev_alias" do
     field(:name, :string)
     field(:pio, :integer)
@@ -84,18 +86,18 @@ defmodule Sally.DevAlias do
     |> Repo.insert(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
   end
 
-  def create!(%Device{} = device, opts) do
-    dev_alias = Ecto.build_assoc(device, :aliases)
-
-    %{
-      name: opts[:name],
-      pio: opts[:pio],
-      description: opts[:description] || dev_alias.description,
-      ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
-    }
-    |> changeset(dev_alias)
-    |> Repo.insert!(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
-  end
+  # def create!(%Device{} = device, opts) do
+  #   dev_alias = Ecto.build_assoc(device, :aliases)
+  #
+  #   %{
+  #     name: opts[:name],
+  #     pio: opts[:pio],
+  #     description: opts[:description] || dev_alias.description,
+  #     ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
+  #   }
+  #   |> changeset(dev_alias)
+  #   |> Repo.insert!(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
+  # end
 
   def delete(name_or_id) do
     with %Schema{} = a <- find(name_or_id) |> load_command_ids() |> load_datapoint_ids(),
@@ -111,6 +113,10 @@ defmodule Sally.DevAlias do
     end
   end
 
+  @doc """
+  Get the `Sally.Device` id from a `DevAlias` or list of `DevAlias`
+  """
+  @spec device_id(list_or_schema) :: pos_integer()
   def device_id([%Schema{} = x | _]), do: device_id(x)
   def device_id(%Schema{device_id: x}), do: x
 
@@ -187,22 +193,14 @@ defmodule Sally.DevAlias do
     end
   end
 
-  defp load_command_ids(schema_or_nil) do
-    q = Ecto.Query.from(c in Command, select: [:id])
-    Repo.preload(schema_or_nil, [cmds: q], force: true)
+  def load_aliases(repo, multi_changes) do
+    q = Ecto.Query.from(a in Schema, where: a.device_id == ^multi_changes.device.id, order_by: [asc: a.pio])
+
+    {:ok, q |> repo.all()}
   end
 
-  defp load_datapoint_ids(schema_or_nil) do
-    q = Ecto.Query.from(dp in Datapoint, select: [:id])
-    Repo.preload(schema_or_nil, [datapoints: q], force: true)
-  end
-
-  def load_device(schema_or_tuple) do
-    case schema_or_tuple do
-      {:ok, %Schema{} = a} -> {:ok, Repo.preload(a, [:device])}
-      %Schema{} = a -> Repo.preload(a, [:device])
-      x -> x
-    end
+  def load_cmd_last(%Schema{} = x) do
+    Repo.preload(x, cmds: Ecto.Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
   end
 
   def load_alias_with_last_cmd(name) when is_binary(name) do
@@ -228,14 +226,26 @@ defmodule Sally.DevAlias do
      |> repo.all()}
   end
 
-  def load_aliases(repo, multi_changes) do
-    q = Ecto.Query.from(a in Schema, where: a.device_id == ^multi_changes.device.id, order_by: [asc: a.pio])
-
-    {:ok, q |> repo.all()}
+  defp load_command_ids(schema_or_nil) do
+    q = Ecto.Query.from(c in Command, select: [:id])
+    Repo.preload(schema_or_nil, [cmds: q], force: true)
   end
 
-  def load_cmd_last(%Schema{} = x) do
-    Repo.preload(x, cmds: Ecto.Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
+  defp load_datapoint_ids(schema_or_nil) do
+    q = Ecto.Query.from(dp in Datapoint, select: [:id])
+    Repo.preload(schema_or_nil, [datapoints: q], force: true)
+  end
+
+  def load_device(schema_or_tuple) do
+    case schema_or_tuple do
+      {:ok, %Schema{} = a} -> {:ok, Repo.preload(a, [:device])}
+      %Schema{} = a -> Repo.preload(a, [:device])
+      x -> x
+    end
+  end
+
+  def load_info(%Schema{} = schema) do
+    schema |> Repo.preload(device: [:host]) |> load_cmd_last()
   end
 
   def names do

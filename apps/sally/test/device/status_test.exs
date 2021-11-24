@@ -1,11 +1,12 @@
 defmodule SallyStatusTest do
   use ExUnit.Case, async: true
   use Should
+  use Sally.TestAids
 
   @moduletag sally: true, sally_status: true
 
   alias Alfred.MutableStatus
-  alias Sally.{DevAlias, DevAliasAid}
+  alias Sally.DevAlias
 
   setup_all do
     # always create and setup a host
@@ -111,12 +112,4 @@ defmodule SallyStatusTest do
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
   end
-
-  def command_add(ctx), do: Sally.CommandAid.add(ctx)
-  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
-  def dispatch_add(ctx), do: Sally.DispatchAid.add(ctx)
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

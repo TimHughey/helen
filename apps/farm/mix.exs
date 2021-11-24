@@ -10,7 +10,7 @@ defmodule Farm.MixProject do
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
       elixir: "~> 1.12",
-      start_permanent: Mix.env() == :prod,
+      start_permanent: Mix.env() in [:test, :prod],
       deps: deps()
     ]
   end
@@ -29,9 +29,6 @@ defmodule Farm.MixProject do
       {:alfred, in_umbrella: true},
       {:rena, in_umbrella: true},
       {:should, in_umbrella: true, only: :test}
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
-      # {:sibling_app_in_umbrella, in_umbrella: true}
     ]
   end
 end

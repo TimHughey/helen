@@ -28,19 +28,6 @@ defmodule Sally.Datapoint do
     |> repo.insert(returning: true)
   end
 
-  @deprecated "Use Sally.Datapoint.add/4 instead"
-  def add(%DevAlias{} = a, dp_map, reading_at \\ nil) do
-    at = reading_at || DateTime.utc_now()
-    # associate the new command with the DevAlias
-    new_dp = Ecto.build_assoc(a, :datapoints)
-
-    dp_map
-    |> Map.take([:temp_c, :relhum])
-    |> Map.put(:reading_at, at)
-    |> changeset(new_dp)
-    |> Repo.insert(returning: true)
-  end
-
   def changeset(changes, %Schema{} = dp) when is_map(changes), do: changeset(dp, changes)
 
   def changeset(%Schema{} = dp, changes) when is_map(changes) do

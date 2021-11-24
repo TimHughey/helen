@@ -3,12 +3,6 @@ defmodule Sally.DispatchAid do
 
   alias Sally.Dispatch
 
-  defmacro __using__(_opts) do
-    quote location: :keep do
-      alias Sally.DispatchAid
-    end
-  end
-
   def add(%{dispatch_add: opts} = ctx) when is_list(opts) do
     fields = [
       env: "test",
@@ -66,11 +60,22 @@ defmodule Sally.DispatchAid do
 
   defmacro assert_processed(x) do
     quote location: :keep, bind_quoted: [x: x] do
+      alias Sally.{DevAlias, Device}
+
       base_valid_kv = [valid?: true, invalid_reason: :none]
       dispatch = Should.Be.Struct.with_all_key_value(x, Dispatch, base_valid_kv)
 
-      Should.Be.map(dispatch.results)
-      Should.Be.list(dispatch.seen_list)
+      results = Should.Be.map(dispatch.results)
+
+      device = Should.Be.Map.with_key(results, :device) |> Should.Be.struct(Device)
+      seen_list = Should.Be.NonEmpty.list(dispatch.seen_list)
+
+      # validate the device processed established appropriate Alfred linkages
+      want_struct = if device.mutable, do: Alfred.MutableStatus, else: Alfred.ImmutableStatus
+
+      for name <- seen_list do
+        Alfred.status(name) |> Should.Be.struct(want_struct)
+      end
 
       # return the processed dispatch
       dispatch
@@ -78,6 +83,7 @@ defmodule Sally.DispatchAid do
   end
 
   defp add_known_host(base, ctx), do: struct(base, ident: ctx.host.ident, host: ctx.host)
+
   # defp add_subsystem(base, x), do: struct(base, subsystem: x)
   defp make_pins(count, cmd), do: for(pin <- 0..(count - 1), do: [pin, cmd])
 

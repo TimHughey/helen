@@ -48,7 +48,7 @@ defmodule Sally.HostAid do
 
     case what do
       :ident -> "host.#{unique}"
-      :name -> "hostname-#{unique}"
+      :name -> "hostname_#{unique}"
     end
   end
 end

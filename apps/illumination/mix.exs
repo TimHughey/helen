@@ -10,7 +10,7 @@ defmodule Illumination.MixProject do
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
       elixir: "~> 1.12",
-      start_permanent: Mix.env() == :prod,
+      start_permanent: Mix.env() in [:test, :prod],
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       test_coverage: [tool: ExCoveralls],

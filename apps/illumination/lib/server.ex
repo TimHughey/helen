@@ -37,7 +37,7 @@ defmodule Illumination.Server do
   end
 
   @impl true
-  def handle_continue(:bootstrap, %State{equipment: equipment} = s) do
+  def handle_continue(:bootstrap, %State{} = s) do
     # important to calculate initial schedules some of which may be outdated depending on the
     # time of day the server is started.  subsequent schedule calculations will refresh
     # the out of date schedules.
@@ -45,13 +45,19 @@ defmodule Illumination.Server do
     initial_schedules = Schedule.calc_points(s.schedules, sched_opts)
 
     # register for equipment notifications
-    {:ok, notify_to} = s.alfred.notify_register(name: equipment, frequency: :all, link: true)
+    register_result = s.alfred.notify_register(name: s.equipment, frequency: :all, link: true)
 
-    # save the schedules and the notification registration
-    [schedules: initial_schedules]
-    |> State.save_schedules_and_result(s)
-    |> State.save_equipment(notify_to)
-    |> noreply()
+    case register_result do
+      {:ok, ticket} ->
+        # save the schedules and the notification ticket
+        [schedules: initial_schedules]
+        |> State.save_schedules_and_result(s)
+        |> State.save_equipment(ticket)
+        |> noreply()
+
+      {:no_server, _} ->
+        {:stop, :normal, s}
+    end
 
     # NOTE: at this point the server is running and no further actions occur until an
     #       equipment notification is received

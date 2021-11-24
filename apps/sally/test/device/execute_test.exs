@@ -1,6 +1,7 @@
 defmodule SallyExecuteTest do
   use ExUnit.Case, async: true
   use Should
+  use Sally.TestAids
 
   @moduletag sally: true, sally_execute: true
 
@@ -82,12 +83,4 @@ defmodule SallyExecuteTest do
       end
     end
   end
-
-  def command_add(ctx), do: Sally.CommandAid.add(ctx)
-  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
-  def dispatch_add(ctx), do: Sally.DispatchAid.add(ctx)
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

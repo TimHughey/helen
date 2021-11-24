@@ -141,8 +141,6 @@ defmodule Sally.Dispatch do
     end
   end
 
-  # def save_result(%Dispatch{} = x, results), do: %Dispatch{x | results: results}
-
   def save_seen_list(seen_list, %Dispatch{} = m) do
     %Dispatch{m | seen_list: seen_list}
   end

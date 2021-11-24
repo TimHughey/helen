@@ -6,11 +6,38 @@ defmodule Sally do
   alias Alfred.ExecCmd
   alias Sally.{Command, DevAlias, Device, Host, Repo}
 
-  def delete_alias(name_or_id) do
+  @doc """
+  Deletes a DevAlias by name or id
+
+  ## Examples
+  ```
+  # delete a known name
+  Sally.devalias_delete("devalias name")
+  #=> {:ok, ["devalias name"]}
+
+  # delete a known name by database id, ret
+  Sally.devalias_delete(76758)
+  #=> {:ok, ["devalias for id 76758"]}
+
+  ```
+
+  If the name or id is found, `{:ok, [names, ...]}` is returned.
+
+  If the name or id isn't found, `{:not_found, name_or_id}` is returned
+
+  It returns `{:error, changeset}` for validation failures (see `c:Ecto.Repo.delete/2`).
+
+  ### Note
+  > If the name is registered with `Alfred` it is deleted.
+
+  """
+  @type devalias_delete_result() :: [String.t(), ...] | {:error, term()} | {:not_found, String.t()}
+  @type name_or_id() :: String.t() | pos_integer()
+  @spec devalias_delete(name_or_id()) :: devalias_delete_result()
+  def devalias_delete(name_or_id) do
     case DevAlias.delete(name_or_id) do
       {:ok, results} ->
-        kn = Alfred.names_delete(results[:name])
-        {:ok, results ++ [alfred: kn]}
+        {:ok, results ++ [alfred: Alfred.names_delete(results[:name])]}
 
       error ->
         error
@@ -20,58 +47,64 @@ defmodule Sally do
   @doc """
   Show info of a DevAlias
 
-  ## Examples:
-      iex> Sally.devalias_info("dev alias")
+  ## Examples
+  ```
+  # get info on a specific DevAlias
+  Sally.devalias_info("dev alias")
+  ```
 
-  ## Opts as of list of atoms
-  1. `:summary`   return map of most revelant info (default)
-  2. `:raw`       returns complete schema
+  ## Options
+  * `:summary` - map of most revelant info (default)
+  * `:raw` - complete schema
 
-  ## Returns:
-  1. map or `Sally.DevAlias`   when dev alias found and dependent on opts
-  2. `nil`                     when dev alias is not found
+  If the name is not found, `{:not_found, name}` is returned.
+
   """
   @doc since: "0.5.9"
   def devalias_info(name, opts \\ [:summary]) when is_binary(name) do
-    dev_alias = DevAlias.find(name) |> Repo.preload(device: [:host])
+    with %DevAlias{} = dev_alias <- Repo.get_by(DevAlias, name: name),
+         dev_alias <- DevAlias.load_info(dev_alias) do
+      cond do
+        [:summary] == opts ->
+          assoc = %{
+            device: Device.summary(dev_alias.device),
+            host: Host.summary(dev_alias.device.host),
+            cmd: Command.summary(dev_alias.cmds)
+          }
 
-    case {dev_alias, opts} do
-      {nil, _opts} ->
-        nil
+          DevAlias.summary(dev_alias) |> Map.merge(assoc)
 
-      {%DevAlias{} = x, [:summary]} ->
-        extended = %{
-          device: Device.summary(x.device),
-          host: Host.summary(x.device.host),
-          cmd: Command.summary(x.cmds)
-        }
+        [:raw] == opts ->
+          dev_alias
 
-        DevAlias.summary(x) |> Map.merge(extended)
-
-      {%DevAlias{} = x, [:raw]} ->
-        x
-
-      _ ->
-        {:bad_args, opts}
+        true ->
+          {:bad_args, opts}
+      end
+    else
+      nil -> {:not_found, name}
     end
   end
 
   @doc """
   Renames an existing DevAlias
 
-  ## Examples:
-      iex> Sally.devalias_rename([from: "old name", to: "new name"])
+  ## Examples
+  ```
+  Sally.devalias_rename([from: "old name", to: "new name"])
+  ```
 
-  ## Returns:
-    1. `:ok`                       -> rename successful
-    2. `{:not_found, String.t()}`  -> a host with `from:` name does not exist
-    2. `{:name_taken, String.t()}` -> requested name is already in use
-    3. `{:bad_args, list()}`       -> the opts passed failed validation
+  ## Options
+  * `:from` - name of existing DevAlias
+  * `:to` - desired new name
 
+  Successful rename returns `:ok`.
 
-  ## Opts as of list of atoms
-  1. `:from`   existing DevAlias name
-  2. `:to`     desired new DevAlias name
+  If the name is not found, `{:not_found, name}` is returned.
+
+  If the `:to` name already exists, `{:name_taken, to_name}` is returned.
+
+  If the passed iist of opts isn't valid, `{:bad_args, ots}` is returned.
+
   """
   @doc since: "0.5.9"
   def devalias_rename(opts) when is_list(opts) do
@@ -88,30 +121,44 @@ defmodule Sally do
   end
 
   @doc """
-  Add a DevAlias to an existing Device
+  Add a logical name for a physical device/pio combination.
+
+  `Sally.DevAlias` are logical names for invoking actions (e.g. `Sally.execute/2`,
+  `Sally.status/2`) on mutable and immutable physical devices.
 
   ## Examples:
-      iex> opts = [device: "i2c.7af1e2b706fc.mcp23008.20", name: "alias name", pio: 1,
-      ...>         description: "power", ttl_ms: 15_000]
-      iex> Sally.device_add_alias(opts)
+  ```
+  # opts for the new DevAlias
+  opts =
+    [device: "i2c.7af1e2b706fc.mcp23008.20", name: "alias name", pio: 1,
+    description: "power", ttl_ms: 15_000]
 
-  ## Opts as keyword list
-  1. `device:`       when binary denotes device for new alias | :latest to use latest discovered device
-  2. `name:`         alias name
-  3. `pio:`          pio to alias (required for mutable devices, optional for immutable devices)
-  4. `description:`  description of the alias (optional)
-  5. `ttl_ms:`       ttl (in ms) of the alias (used to determine status currency)
+  # add the new DevAlias
+  Sally.device_add_alias(opts)
 
-  ## Returns:
-  1. `%Sally.DevAlias{}`    on success
-  2. `{:error, binary}`     where binary indicates missing or invalid option
-  3. `{:not_found, device}` when device is not found
-  4. `{:name_taken, msg}`   when the alias name is already known
-  5. `{:error, list}`       when changeset validation fails the list of failures is returned
+  ```
 
-  ## Notes:
-  1. The device alias is created in the database but will not be known externally (e.g. Alfred)
-     until a reading is received from the host where the physical device is attached.
+  ## Options
+  * `:device` - ident of underlying Device. May also be `:latest` to automatically select the most recently discovered (inserted) Device.
+
+  * `:name` - name of the new `DevAlias`
+
+  * `:pio` - the pio of the new `DevAlias`. This is required for mutable devices with multiple pios and optional for immutable devices with a single pio.
+
+  * `:description` - description of the new DevAlias (optional)
+
+  * `:ttl_ms` - duration (in ms) status is current between readings of the underlying physical device
+
+  ## Returns
+  1. `Sally.DevAlias` - on success
+  2. `{:error, binary}` - on error, the binary is a message describing the error
+  3. `{:not_found, device}` - when device is not found
+  4. `{:name_taken, msg}` - when the name already exists
+  5. `{:error, list}` - when the changeset validation fails
+
+  > The `DevAlias` is created in the database but isn't available for use
+  > externally (i.e. `Alfred`) until a status update is received via MQTT for the
+  > underlying device.
   """
   @doc since: "0.5.7"
   def device_add_alias(opts) when is_list(opts) do
@@ -330,13 +377,13 @@ defmodule Sally do
     |> Alfred.just_saw()
   end
 
-  def just_saw([%DevAlias{device_id: dev_id} | _] = dev_aliases) do
-    alias Alfred.{JustSaw, SeenName}
-
-    Device.type(dev_id)
-    |> JustSaw.new(dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
-    |> Alfred.just_saw()
-  end
+  # def just_saw([%DevAlias{device_id: dev_id} | _] = dev_aliases) do
+  #   alias Alfred.{JustSaw, SeenName}
+  #
+  #   Device.type(dev_id)
+  #   |> JustSaw.new(dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
+  #   |> Alfred.just_saw()
+  # end
 
   # required as callback from Alfred
   # function head

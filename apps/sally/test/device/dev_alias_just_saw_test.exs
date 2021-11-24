@@ -1,11 +1,12 @@
 defmodule Sally.DevAliasJustSawTest do
   use ExUnit.Case, async: true
   use Should
+  use Sally.TestAids
 
   @moduletag sally: true, sally_dev_alias_just_saw: true
 
   alias Ecto.Multi
-  alias Sally.{DevAlias, DevAliasAid, DeviceAid, HostAid}
+  alias Sally.{DevAlias, DeviceAid, HostAid}
   alias Sally.Repo
 
   setup_all do
@@ -72,10 +73,4 @@ defmodule Sally.DevAliasJustSawTest do
       validate_db_result(db_result, seen_at, 1)
     end
   end
-
-  def devalias_add(ctx), do: DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: DeviceAid.add(ctx)
-  def host_add(ctx), do: HostAid.add(ctx)
-  def host_setup(ctx), do: HostAid.setup(ctx)
 end

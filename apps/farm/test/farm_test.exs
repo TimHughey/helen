@@ -1,8 +1,17 @@
 defmodule FarmTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
   test "womb starts" do
+    for _ <- 1..100, reduce: false do
+      false ->
+        Process.sleep(10)
+        GenServer.whereis(Farm.Womb) |> is_pid()
+
+      true ->
+        true
+    end
+
     pid = GenServer.whereis(Farm.Womb)
 
     should_be_pid(pid)
