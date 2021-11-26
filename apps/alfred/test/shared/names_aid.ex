@@ -169,6 +169,10 @@ defmodule Alfred.NamesAid do
     [prefix, "_", serial] |> IO.iodata_to_binary()
   end
 
+  ##
+  ## Private
+  ##
+
   defp merge_and_clean(m1, m2) do
     Map.merge(m1, m2) |> Map.drop([:args])
   end

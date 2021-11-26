@@ -16,7 +16,7 @@ defmodule Alfred.StatusAid do
 
   alias Alfred.NamesAid
 
-  def status(_type, name, opts \\ []) when is_binary(name) and is_list(opts) do
+  def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case NamesAid.to_parts(name) do
       %{type: :imm} = parts -> make_imm_status(parts)
       %{type: :mut} = parts -> make_mut_status(parts)
@@ -27,24 +27,33 @@ defmodule Alfred.StatusAid do
     data = Map.take(parts, [:temp_f, :temp_c, :relhum])
     expired_ms = (parts[:expired_ms] || 0) * -1
     at = DateTime.utc_now() |> DateTime.add(expired_ms)
-    s = %ImmStatus{name: parts.name, found?: true, status_at: at}
+
+    fields = [name: parts.name, found?: true, status_at: at]
+    base_status = struct(ImmStatus, fields)
 
     case parts do
-      %{rc: :ok} -> %ImmStatus{s | datapoints: data}
-      %{rc: :expired} -> %ImmStatus{s | ttl_expired?: true, datapoints: data}
+      %{rc: :ok} -> [datapoints: data]
+      %{rc: :expired} -> [ttl_expired?: true, datapoints: data]
+      %{rc: :error} -> [error: :foobar]
     end
+    |> then(fn fields -> struct(base_status, fields) end)
     |> ImmStatus.finalize()
   end
 
   def make_mut_status(parts) do
     expired_ms = (parts[:expired_ms] || 0) * -1
     at = DateTime.utc_now() |> DateTime.add(expired_ms)
-    s = %MutStatus{name: parts.name, cmd: parts.cmd, found?: true, status_at: at}
+
+    fields = [name: parts.name, cmd: parts.cmd, found?: true, status_at: at]
+    base_status = struct(MutStatus, fields)
 
     case parts do
-      %{rc: :ok} -> s
-      %{rc: :expired} -> %MutStatus{s | ttl_expired?: true}
+      %{rc: :ok} -> []
+      %{rc: :expired} -> [ttl_expired?: true]
+      %{rc: :pending} -> [pending?: true]
+      %{rc: :error} -> [error: :foobar]
     end
+    |> then(fn fields -> struct(base_status, fields) end)
     |> MutStatus.finalize()
   end
 end
