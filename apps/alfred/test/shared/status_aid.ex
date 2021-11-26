@@ -16,6 +16,8 @@ defmodule Alfred.StatusAid do
 
   alias Alfred.NamesAid
 
+  def status(_, name, opts), do: status(name, opts)
+
   def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case NamesAid.to_parts(name) do
       %{type: :imm} = parts -> make_imm_status(parts)
