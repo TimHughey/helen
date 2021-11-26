@@ -4,9 +4,9 @@ defmodule Alfred.NotifyStateTest do
 
   @moduletag alfred: true, alfred_notify_state: true
 
+  alias Alfred.NamesAid
   alias Alfred.Notify.{Memo, State, Ticket}
   alias Alfred.SeenName
-  alias Alfred.Test.Support
 
   defmacro should_receive_memo_for(ticket) do
     quote location: :keep, bind_quoted: [ticket: ticket] do
@@ -37,7 +37,7 @@ defmodule Alfred.NotifyStateTest do
     end
 
     test "catches non-existant pid", %{state: state} do
-      register_opts = [pid: :c.pid(0, 9999, 0), name: Support.unique(:name), link: true]
+      register_opts = [pid: :c.pid(0, 9999, 0), name: NamesAid.unique("notifystate"), link: true]
 
       result = State.register(register_opts, state)
 
@@ -66,7 +66,7 @@ defmodule Alfred.NotifyStateTest do
     @tag register: []
     test "does not notify when name not registered", %{state: state} do
       utc_now = DateTime.utc_now()
-      seen_list = [%SeenName{name: Support.unique(:name), ttl_ms: 10_000, seen_at: utc_now}]
+      seen_list = [%SeenName{name: NamesAid.unique("notifystate"), ttl_ms: 10_000, seen_at: utc_now}]
 
       result = State.notify(seen_list, state)
 
@@ -100,7 +100,7 @@ defmodule Alfred.NotifyStateTest do
   defp register_name(%{register: opts, state: %State{} = state}) when is_list(opts) do
     # NOTE: ttl_ms is generally not provided when registering
 
-    name = opts[:name] || Support.unique(:name)
+    name = opts[:name] || NamesAid.unique("notifystate")
     frequency = opts[:frequency] || []
     missing_ms = opts[:missing_ms] || 60_000
     pid = opts[:pid] || self()

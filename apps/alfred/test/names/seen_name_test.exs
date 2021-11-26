@@ -1,13 +1,17 @@
 defmodule Alfred.SeenNameTest do
   use ExUnit.Case, async: true
   use Should
-  use Alfred.Test.Support
+  use Alfred.NamesAid
 
   @moduletag alfred: true, alfred_seen_name: true
 
   alias Alfred.SeenName
 
-  setup [:make_name]
+  setup_all do
+    {:ok, %{make_name: [type: :imm]}}
+  end
+
+  setup [:name_add]
 
   describe "Alfred.SeenName.validate/1" do
     test "verifies a default SeenName is invalid" do
@@ -38,7 +42,7 @@ defmodule Alfred.SeenNameTest do
 
     test "verifies a list of SeenNames" do
       template = %SeenName{ttl_ms: 1000, seen_at: DateTime.utc_now()}
-      list = for _ <- 1..10, do: %SeenName{template | name: Support.unique(:name)}
+      list = for _ <- 1..10, do: %SeenName{template | name: NamesAid.unique("seenname")}
 
       list = [%SeenName{}] ++ list
 
@@ -47,9 +51,5 @@ defmodule Alfred.SeenNameTest do
     end
   end
 
-  def make_name(_ctx) do
-    name = Support.unique(:name)
-
-    %{name: name}
-  end
+  def name_add(ctx), do: NamesAid.make_name(ctx)
 end

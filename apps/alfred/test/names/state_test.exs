@@ -6,7 +6,7 @@ defmodule Alfred.NamesStateTest do
 
   alias Alfred.KnownName
   alias Alfred.Names.State
-  alias Alfred.Test.Support
+  alias Alfred.NamesAid
 
   defmacro should_be_state_with_name(state, name) do
     quote location: :keep, bind_quoted: [state: state, name: name] do
@@ -67,7 +67,7 @@ defmodule Alfred.NamesStateTest do
   end
 
   def make_known_name(%{make_known_name: opts}) do
-    name = Support.unique(:name)
+    name = NamesAid.unique("state")
     cb = opts[:callback] || {:module, __MODULE__}
     at = opts[:seen_at] |> make_seen_at()
     mut? = if(is_nil(opts[:mutable]), do: false, else: opts[:mutable])

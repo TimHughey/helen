@@ -6,8 +6,7 @@ defmodule Alfred.NamesServerTest do
 
   alias Alfred.KnownName
   alias Alfred.Names.{Server, State}
-
-  alias Alfred.Test.Support
+  alias Alfred.NamesAid
 
   setup_all do
     res = start_supervised({Alfred.Names.Server, [names_server: __MODULE__]})
@@ -140,7 +139,7 @@ defmodule Alfred.NamesServerTest do
   end
 
   def make_known_name(%{make_known_name: opts}) do
-    name = Support.unique(:name)
+    name = NamesAid.unique("server")
     cb = opts[:callback] || {:module, __MODULE__}
     at = opts[:seen_at] |> make_seen_at()
     mut? = if(is_nil(opts[:mutable]), do: false, else: opts[:mutable])

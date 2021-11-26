@@ -1,7 +1,7 @@
 defmodule Alfred.KnownNameTest do
   use ExUnit.Case, async: true
   use Should
-  use Alfred.Test.Support
+  use Alfred.NamesAid
 
   @moduletag alfred: true, alfred_known_name: true
 
@@ -70,7 +70,7 @@ defmodule Alfred.KnownNameTest do
 
   describe "Alfred.KnownName.unknown/1" do
     test "creates an invalid KnownName" do
-      name = Support.unique(:name)
+      name = NamesAid.unique("knownname")
       res = KnownName.unknown(name)
 
       should_be_struct(res, KnownName)
@@ -81,7 +81,7 @@ defmodule Alfred.KnownNameTest do
   end
 
   def make_known_name(%{make_known_name: opts}) do
-    name = Support.unique(:name)
+    name = NamesAid.unique("knownname")
     cb = opts[:callback] || {:module, __MODULE__}
     at = opts[:seen_at] |> make_seen_at()
     mut? = if(is_nil(opts[:mutable]), do: false, else: opts[:mutable])

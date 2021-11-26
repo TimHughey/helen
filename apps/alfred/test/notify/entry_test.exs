@@ -5,7 +5,7 @@ defmodule Alfred.NotifyEntryTest do
   @moduletag alfred: true, alfred_notify_entry: true
 
   alias Alfred.Notify.{Entry, Memo}
-  alias Alfred.Test.Support
+  alias Alfred.NamesAid
 
   defmacro should_receive_memo_for(entry, opts) do
     quote location: :keep, bind_quoted: [entry: entry, opts: opts] do
@@ -103,7 +103,7 @@ defmodule Alfred.NotifyEntryTest do
   def first_notify(ctx), do: ctx
 
   def make_entry(%{make_entry: args}) when is_list(args) do
-    default_args = [name: Support.unique(:name), pid: self()]
+    default_args = [name: NamesAid.unique("entry"), pid: self()]
     final_args = Keyword.merge(args, default_args, fn _k, v1, _v2 -> v1 end)
 
     entry = Entry.new(final_args)

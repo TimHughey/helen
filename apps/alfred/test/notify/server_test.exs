@@ -6,7 +6,7 @@ defmodule Alfred.NotifyServerTest do
 
   alias Alfred.Notify.{Memo, Server, State, Ticket}
   alias Alfred.SeenName
-  alias Alfred.Test.Support
+  alias Alfred.NamesAid
 
   setup_all do
     call_opts = [notify_server: __MODULE__]
@@ -149,7 +149,7 @@ defmodule Alfred.NotifyServerTest do
     for _ <- 1..count, reduce: seen_list do
       acc ->
         utc_now = DateTime.utc_now()
-        seen_name = %SeenName{name: Support.unique(:name), ttl_ms: 15_000, seen_at: utc_now}
+        seen_name = %SeenName{name: NamesAid.unique("notifyserver"), ttl_ms: 15_000, seen_at: utc_now}
         [acc, seen_name]
     end
     |> List.flatten()
@@ -158,7 +158,7 @@ defmodule Alfred.NotifyServerTest do
   defp register_name(%{register_name: opts, call_opts: call_opts}) when is_list(opts) do
     # NOTE: ttl_ms is generally not provided when registering
 
-    name = opts[:name] || Support.unique(:name)
+    name = opts[:name] || NamesAid.unique("notifyserver")
     frequency = opts[:frequency] || []
     missing_ms = opts[:missing_ms] || 60_000
     pid = opts[:pid] || self()

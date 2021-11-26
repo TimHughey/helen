@@ -6,7 +6,7 @@ defmodule Alfred.JustSawTest do
 
   alias Alfred.JustSaw
   alias Alfred.SeenName
-  alias Alfred.Test.Support
+  alias Alfred.NamesAid
 
   defmacro should_be_just_saw(res, mutable, seen_list, callback) do
     quote location: :keep do
@@ -125,7 +125,7 @@ defmodule Alfred.JustSawTest do
 
     seen_list =
       for _ <- 1..count do
-        [name: Support.unique(:name), ttl_ms: ttl_ms, seen_at: seen_at]
+        [name: NamesAid.unique("justsaw"), ttl_ms: ttl_ms, seen_at: seen_at]
       end
 
     %{seen_list: seen_list}
