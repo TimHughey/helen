@@ -55,8 +55,8 @@ defmodule Rena.SetPt.Cmd do
   def make(name, %Result{} = result, opts \\ []) do
     alfred = opts[:alfred] || Alfred
     cmd_opts = [notify_when_released: true]
-    active_cmd_opt = opts[:active_cmd] || %ExecCmd{cmd: "on", cmd_opts: cmd_opts}
-    inactive_cmd_opt = opts[:inactive_cmd] || %ExecCmd{cmd: "off", cmd_opts: cmd_opts}
+    active_cmd_opt = opts[:active_cmd] || %ExecCmd{name: name, cmd: "on", cmd_opts: cmd_opts}
+    inactive_cmd_opt = opts[:inactive_cmd] || %ExecCmd{name: name, cmd: "off", cmd_opts: cmd_opts}
 
     with {:result, true} <- {:result, sufficient_datapoints?(result)},
          {:active_cmd, %ExecCmd{} = active_cmd} <- {:active_cmd, active_cmd_opt},
