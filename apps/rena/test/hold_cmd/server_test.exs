@@ -77,7 +77,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
       memo = %Memo{name: ctx.equipment, missing?: true}
 
-      Server.handle_info({:notify, memo}, state)
+      Server.handle_info({Alfred, memo}, state)
       |> Should.Be.Tuple.noreply_with_struct(State)
       |> Should.Be.Struct.with_all_key_value(State, last_exec: :none)
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
@@ -94,7 +94,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
       memo = %Memo{name: ctx.equipment, missing?: false}
 
-      Server.handle_info({:notify, memo}, state)
+      Server.handle_info({Alfred, memo}, state)
       |> Should.Be.Tuple.noreply_with_struct(State)
       |> Should.Be.Struct.with_all_key_value(State, last_exec: :no_change)
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
@@ -112,7 +112,7 @@ defmodule Rena.HoldCmd.ServerTest do
       memo = %Memo{name: ctx.equipment, missing?: false}
 
       new_state =
-        Server.handle_info({:notify, memo}, state)
+        Server.handle_info({Alfred, memo}, state)
         |> Should.Be.Tuple.noreply_with_struct(State)
 
       # verify the ExecCmd resulted in an actual command

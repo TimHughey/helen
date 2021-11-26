@@ -49,7 +49,7 @@ defmodule Rena.HoldCmd.Server do
   end
 
   @impl true
-  def handle_info({:notify, %Memo{missing?: true} = memo}, %State{} = s) do
+  def handle_info({Alfred, %Memo{missing?: true} = memo}, %State{} = s) do
     s
     |> Betty.app_error(equipment: memo.name, missing: true)
     |> State.update_last_notify_at()
@@ -57,7 +57,7 @@ defmodule Rena.HoldCmd.Server do
   end
 
   @impl true
-  def handle_info({:notify, %Memo{} = memo}, %State{} = s) do
+  def handle_info({Alfred, %Memo{} = memo}, %State{} = s) do
     opts = [alfred: s.alfred, server_name: s.server_name]
 
     memo
