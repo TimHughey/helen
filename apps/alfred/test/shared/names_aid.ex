@@ -127,8 +127,9 @@ defmodule Alfred.NamesAid do
     case ctx do
       %{make_name: opts} ->
         {type, opts_rest} = Keyword.pop(opts, :type)
+        {key, opts_rest} = Keyword.pop(opts_rest, :key, :name)
 
-        %{name: from_opts(type, opts_rest)}
+        %{key => from_opts(type, opts_rest)}
 
       _ ->
         :ok

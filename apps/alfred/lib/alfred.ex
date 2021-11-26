@@ -10,6 +10,7 @@ defmodule Alfred do
   alias Alfred.JustSaw
   alias Alfred.{KnownName, Names}
   alias Alfred.Notify
+  alias Alfred.Notify.Ticket
 
   # is a name available (aka unknown)
   # def available?(name), do: not Names.exists?(name)
@@ -183,8 +184,12 @@ defmodule Alfred do
     Notify.Server.call({:register, call_opts}, server_opts)
   end
 
-  @spec notify_unregister(reference(), notify_server_opts()) :: :ok
-  def notify_unregister(ref, opts \\ [])
+  @spec notify_unregister(reference() | Ticket.t(), notify_server_opts()) :: :ok
+  def notify_unregister(ticket_or_ref, opts \\ [])
+
+  def notify_unregister(%Ticket{ref: ref}, opts), do: notify_unregister(ref, opts)
+
+  def notify_unregister(ref, opts)
       when is_reference(ref)
       when is_list(opts) do
     Notify.Server.call({:unregister, ref}, opts)
