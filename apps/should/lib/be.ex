@@ -4,6 +4,27 @@ defmodule Should.Be do
   """
 
   @doc """
+  Asserts when `pid` is alive
+
+  ```
+  assert Process.alive?(pid), Should.msg(pid, "should be alive")
+
+  # return the pid
+  pid
+  ```
+
+  """
+  @doc since: "0.6.13"
+  defmacro alive(pid) do
+    quote location: :keep, bind_quoted: [pid: pid] do
+      assert Process.alive?(pid), Should.msg(pid, "should be alive")
+
+      # return the pid
+      pid
+    end
+  end
+
+  @doc """
   Asserts `x` when `x` is a function returns true or `x` is true then returns `x`
 
   ```
@@ -101,6 +122,43 @@ defmodule Should.Be do
     quote location: :keep, bind_quoted: [x: x] do
       assert is_map(x), Should.msg(x, "should be a map")
       # return the verified map
+      x
+    end
+  end
+
+  @doc """
+  Asserts when `x` is `:ok`
+
+  ```
+  assert x == :ok, Should.msg(x, "should be :ok")
+  # return the verified map
+  x
+  ```
+  """
+  @doc since: "0.6.13"
+  defmacro ok(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert x == :ok, Should.msg(x, "should be :ok")
+      # return the verified map
+      x
+    end
+  end
+
+  @doc """
+  Asserts when `x` is a pid, then returns the pid
+
+  ```
+  assert is_map(x), Should.msg(x, "should be a map")
+  # return the verified map
+  x
+  ```
+  """
+  @doc since: "0.6.13"
+  defmacro pid(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert is_pid(x), Should.msg(x, "should be a pid")
+
+      # return the pid
       x
     end
   end

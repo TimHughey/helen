@@ -23,6 +23,34 @@ defmodule Should.Be.Struct do
   end
 
   @doc """
+  Asserts when `named/2` and contains all `Keyword` or `Map`
+
+  ```
+  struct = Should.Be.struct(x, want_struct)
+
+  map = Map.from_struct(struct)
+
+  Should.Contain.kv_pairs(map, kv_pairs)
+
+  # return verified struct
+  struct
+  ```
+  """
+  @doc since: "0.6.12"
+  defmacro with_all_key_value(x, want_struct, kv_pairs) do
+    quote location: :keep, bind_quoted: [x: x, want_struct: want_struct, kv_pairs: kv_pairs] do
+      struct = Should.Be.struct(x, want_struct)
+
+      map = Map.from_struct(struct)
+
+      Should.Contain.kv_pairs(map, kv_pairs)
+
+      # return verified struct
+      struct
+    end
+  end
+
+  @doc """
   Asserts when `x` is struct of `named` and has `key` then returns value of `key`
 
   ```
@@ -51,34 +79,22 @@ defmodule Should.Be.Struct do
   end
 
   @doc """
-  Asserts when `named/2` and contains all `Keyword` or `Map`
+  Asserts when `x` is a `struct` with `key` of a struct `want_struct`
 
   ```
-  Should.Be.struct(x, want_struct)
+  struct = Should.Be.struct(x, want_struct)
 
-  assert Should.Be.List.check(kv_pairs) or Should.Be.Map.check(kv_pairs)
+  val = Should.Be.Map.with_key(struct, key)
 
-  map = Map.from_struct(x)
-
-  Should.Contain.kv_pairs(map, kv_pairs)
-
-  # return verified struct
-  x
+  Should.Be.struct(val, key_struct)
   ```
   """
-  @doc since: "0.6.12"
-  defmacro with_all_key_value(x, want_struct, kv_pairs) do
-    quote location: :keep, bind_quoted: [x: x, want_struct: want_struct, kv_pairs: kv_pairs] do
-      Should.Be.struct(x, want_struct)
+  @doc since: "0.6.13"
+  defmacro with_key_struct(x, want_struct, key, key_struct) do
+    quote location: :keep, bind_quoted: [x: x, want_struct: want_struct, key: key, key_struct: key_struct] do
+      val = Should.Be.Struct.with_key(x, want_struct, key)
 
-      assert Should.Be.List.check(kv_pairs) or Should.Be.Map.check(kv_pairs)
-
-      map = Map.from_struct(x)
-
-      Should.Contain.kv_pairs(map, kv_pairs)
-
-      # return verified struct
-      x
+      Should.Be.struct(val, key_struct)
     end
   end
 
