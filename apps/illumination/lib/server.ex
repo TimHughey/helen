@@ -140,27 +140,28 @@ defmodule Illumination.Server do
         State.update_last_notify_at(s) |> noreply()
 
       # anything else attempt to correct the mismatch by restarting
-      status ->
-        {:stop, :normal, tap(s, fn x -> log_cmd_mismatch(x, status) end)}
+      %MutStatus{cmd: cmd, name: name} ->
+        tags = [cmd_mismatch: true, equipment: name, cmd: cmd]
+        {:stop, :normal, Betty.app_error(s, tags)}
     end
   end
 
-  defp log_cmd_mismatch(%State{result: result} = s, status) do
-    %Result{queue_timer: qtimer, run_timer: rtimer} = result
-    qt_ms = if is_reference(qtimer), do: Process.read_timer(qtimer), else: :unset
-    rt_ms = if is_reference(rtimer), do: Process.read_timer(rtimer), else: :unset
-
-    [
-      "\n",
-      "queue_timer_ms(#{qt_ms}) run_timer_ms(#{rt_ms})",
-      "\n",
-      "#{inspect(status, pretty: true)}",
-      "\n",
-      "#{inspect(s, pretty: true)}"
-    ]
-    |> IO.iodata_to_binary()
-    |> Logger.warn()
-  end
+  # defp log_cmd_mismatch(%State{result: result} = s, status) do
+  #   %Result{queue_timer: qtimer, run_timer: rtimer} = result
+  #   qt_ms = if is_reference(qtimer), do: Process.read_timer(qtimer), else: :unset
+  #   rt_ms = if is_reference(rtimer), do: Process.read_timer(rtimer), else: :unset
+  #
+  #   [
+  #     "\n",
+  #     "queue_timer_ms(#{qt_ms}) run_timer_ms(#{rt_ms})",
+  #     "\n",
+  #     "#{inspect(status, pretty: true)}",
+  #     "\n",
+  #     "#{inspect(s, pretty: true)}"
+  #   ]
+  #   |> IO.iodata_to_binary()
+  #   |> Logger.warn()
+  # end
 
   defp noreply(%State{} = s), do: {:noreply, s}
 end
