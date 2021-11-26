@@ -2,6 +2,7 @@ defmodule Rena.SetPt.ServerTest do
   use ExUnit.Case, async: true
   use Should
   use Alfred.NamesAid
+  use Rena.TestAids
 
   @moduletag rena: true, rena_setpt_server: true
 
@@ -11,27 +12,58 @@ defmodule Rena.SetPt.ServerTest do
   alias Rena.Sensor
   alias Rena.SetPt.{Server, ServerTest, State}
 
-  setup [:equipment_add, :sensors_add, :state_add]
+  setup_all do
+    # base ctx
+    alfred = Rena.Alfred
+    server_name = ServerTest
+    start_args = [id: ServerTest]
+    base = %{alfred: alfred, server_name: server_name, start_args: start_args}
 
+    # default setup options
+    setup = %{start_args_add: []}
+
+    # default ctx
+    ctx = Map.merge(base, setup)
+    {:ok, ctx}
+  end
+
+  setup [:equipment_add, :sensors_add, :start_args_add, :server_add, :state_add]
+
+  # NOTE:  only two tests are required for starting supervised because
+  #        once started no code is executed until receipt of a notify
   describe "Rena.SetPt.Server starts supervised" do
-    setup [:setup_child_spec]
+    test "fails when init args missing :server_name" do
+      child_spec = %{id: ServerTest, start: {Server, :start_link, [[]]}, restart: :transient}
+      start_supervised(child_spec) |> Should.Be.Tuple.with_rc(:error)
+    end
 
-    test "with empty init args", %{child_spec: child_spec} do
-      res = start_supervised(child_spec)
+    @tag server_add: []
+    test "when init args contains :server_name", ctx do
+      Should.Be.Map.with_key(ctx, :server_pid)
 
-      pid = should_be_ok_tuple_with_pid(res)
+      state = :sys.get_state(ctx.server_name) |> Should.Be.struct(State)
 
-      assert Process.alive?(pid)
-
-      state = :sys.get_state(ServerTest)
-      should_be_struct(state, State)
       Should.Be.binary(state.equipment)
       Should.Be.struct(state.ticket, Ticket)
-
-      res = stop_supervised(child_spec.id)
-      should_be_equal(res, :ok)
     end
   end
+
+  # describe "Rena.SetPt.Server starts supervised" do
+  #   setup [:setup_child_spec]
+  #
+  #   test "with empty init args" do
+  #     res = start_supervised({Rena.SetPt.Server, [id: __MODULE__]})
+  #
+  #     pid = should_be_ok_tuple_with_pid(res)
+  #
+  #     assert Process.alive?(pid)
+  #
+  #     state = :sys.get_state(ServerTest)
+  #     should_be_struct(state, State)
+  #     Should.Be.binary(state.equipment)
+  #     Should.Be.struct(state.ticket, Ticket)
+  #   end
+  # end
 
   describe "Rena.Server.server.handle_call/3" do
     test "accepts :pause messages" do
@@ -153,6 +185,21 @@ defmodule Rena.SetPt.ServerTest do
       |> Map.get(:name)
     end
     |> then(fn x -> %{sensors: x} end)
+  end
+
+  def server_add(ctx) do
+    case ctx do
+      %{server_add: false} ->
+        :ok
+
+      %{server_add: [], start_args: start_args} ->
+        pid = start_supervised({Server, start_args}) |> Should.Be.Ok.tuple_with_pid()
+
+        %{server_pid: Should.Be.alive(pid)}
+
+      _ ->
+        :ok
+    end
   end
 
   def state_add(%{state_add: opts} = ctx) do

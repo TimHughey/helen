@@ -10,27 +10,41 @@ defmodule Rena.SetPt.Server do
 
   @impl true
   def init(args) do
-    state = %State{}
+    if args[:server_name] do
+      Process.register(self(), args[:server_name])
+      {:ok, State.new(args), {:continue, :bootstrap}}
+    else
+      {:stop, :missing_server_name}
+    end
 
-    cmds = %{active: args[:cmds][:active], inactive: args[:cmds][:inactive]}
+    # state = %State{}
+    #
+    # cmds = %{active: args[:cmds][:active], inactive: args[:cmds][:inactive]}
+    #
+    # initial_state = %State{
+    #   alfred: args[:alfred] || state.alfred,
+    #   server_name: args[:name],
+    #   equipment: args[:equipment] || state.equipment,
+    #   sensors: args[:sensors] || state.sensors,
+    #   sensor_range: args[:range] || state.sensor_range,
+    #   cmds: cmds,
+    #   timezone: args[:timezone] || state.timezone
+    # }
 
-    initial_state = %State{
-      alfred: args[:alfred] || state.alfred,
-      server_name: args[:name],
-      equipment: args[:equipment] || state.equipment,
-      sensors: args[:sensors] || state.sensors,
-      sensor_range: args[:range] || state.sensor_range,
-      cmds: cmds,
-      timezone: args[:timezone] || state.timezone
-    }
+    # {:ok, initial_state, {:continue, :bootstrap}}
+  end
 
-    {:ok, initial_state, {:continue, :bootstrap}}
+  def child_spec(opts) do
+    {id, opts_rest} = Keyword.pop(opts, :id)
+    {restart, opts_rest} = Keyword.pop(opts_rest, :restart, :permanent)
+
+    final_opts = [server_name: id] ++ opts_rest
+
+    %{id: id, start: {Server, :start_link, [final_opts]}, restart: restart}
   end
 
   def start_link(start_args) do
-    server_opts = [name: start_args[:name]]
-
-    GenServer.start_link(Server, start_args, server_opts)
+    GenServer.start_link(Server, start_args)
   end
 
   @impl true

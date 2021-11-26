@@ -1,6 +1,7 @@
 defmodule Rena.HoldCmd.ServerTest do
   use ExUnit.Case
   use Should
+  use Rena.TestAids
 
   @moduletag rena: true, rena_holdcmd_server: true
 
@@ -22,7 +23,7 @@ defmodule Rena.HoldCmd.ServerTest do
     setup = %{start_args_add: []}
 
     # default ctx
-    ctx = base |> Map.merge(setup)
+    ctx = Map.merge(base, setup)
     {:ok, ctx}
   end
 
@@ -154,14 +155,6 @@ defmodule Rena.HoldCmd.ServerTest do
 
       _ ->
         :ok
-    end
-  end
-
-  def start_args_add(ctx) do
-    case ctx do
-      %{start_args_add: false} -> :ok
-      %{start_args_add: opts} -> %{start_args: assemble_start_args(ctx, opts)}
-      _ -> :ok
     end
   end
 
