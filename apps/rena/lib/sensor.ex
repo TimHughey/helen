@@ -39,6 +39,14 @@ defmodule Rena.Sensor.Range do
   @type units() :: :temp_f | :temp_c | :relhum
   @type t :: %Range{low: float(), high: float(), unit: units()}
 
+  def new(opts) do
+    case opts do
+      x when is_list(x) -> struct(Range, opts)
+      x when is_nil(x) -> %Range{}
+      x when is_struct(x) -> x
+    end
+  end
+
   def compare(dpts, %Range{low: lpt, high: hpt, unit: unit})
       when is_number(lpt) and is_number(hpt) and hpt >= lpt do
     mid_pt = (hpt - lpt) / 2.0 + lpt

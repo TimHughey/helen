@@ -4,7 +4,7 @@ defmodule Farm.MixProject do
   def project do
     [
       app: :farm,
-      version: "0.1.4",
+      version: "0.1.5",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",

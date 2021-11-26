@@ -27,7 +27,7 @@ defmodule Farm.Application do
     alias Rena.Sensor.Range
 
     sensors = ["womb 1", "womb 2", "womb 3", "womb 4"]
-    range = %Range{low: 78.0, high: 80.1, unit: :temp_f}
-    [id: Farm.Womb.Heater, equipment: "womb heater power", sensors: sensors, range: range]
+    range = [low: 78.0, high: 80.1]
+    [id: Farm.Womb.Heater, equipment: "womb heater power", sensors: sensors, sensor_range: range]
   end
 end

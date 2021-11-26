@@ -14,7 +14,7 @@ defmodule Rena.SetPt.State do
             cmds: %{},
             transition_min_ms: 60_000,
             last_exec: :none,
-            last_notify_at: nil,
+            last_notify_at: :none,
             last_transition: DateTime.from_unix!(0),
             timezone: "America/New_York"
 
@@ -43,7 +43,7 @@ defmodule Rena.SetPt.State do
   end
 
   def new(args) do
-    struct(State, args) |> finalize_cmds()
+    struct(State, args) |> finalize_cmds() |> finalize_range()
   end
 
   def pause_notifies(%State{ticket: ticket} = s) do
@@ -97,5 +97,11 @@ defmodule Rena.SetPt.State do
   ## Private
   ##
 
-  defp finalize_cmds(%State{cmds: cmds} = s), do: %State{s | cmds: Enum.into(cmds, %{})}
+  defp finalize_cmds(%State{cmds: cmds} = s) do
+    struct(s, cmds: Enum.into(cmds, %{}))
+  end
+
+  defp finalize_range(%State{sensor_range: range} = s) do
+    struct(s, sensor_range: Sensor.Range.new(range))
+  end
 end
