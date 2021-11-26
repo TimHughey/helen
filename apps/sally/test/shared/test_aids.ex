@@ -22,6 +22,24 @@ defmodule Sally.TestAids do
       def dispatch_add(ctx), do: DispatchAid.add(ctx)
       def host_add(ctx), do: HostAid.add(ctx)
       def host_setup(ctx), do: HostAid.setup(ctx)
+
+      # def multiple_add(ctx, add_list), do: Sally.TestAids.multiple_add(ctx, add_list)
     end
   end
+
+  # def multiple_add(ctx, [add_func | _] = add_list)
+  #     when is_map(ctx)
+  #     when is_atom(add_func) do
+  #   for add_func <- add_list, reduce: ctx do
+  #     acc ->
+  #       add_result = add_func.(acc)
+  #
+  #       case add_result do
+  #         result when is_map(result) -> acc |> Map.merge(add_result)
+  #         :ok -> acc
+  #       end
+  #   end
+  # end
+  #
+  # def multiple_add(_ctx, _add), do: :ok
 end

@@ -3,35 +3,77 @@ defmodule Rena.HoldCmd.Server do
   use GenServer
 
   alias __MODULE__
-  alias Alfred.ExecResult
   alias Alfred.Notify.Memo
-  alias Rena.HoldCmd.State
+  alias Broom.TrackerEntry
+  alias Rena.HoldCmd.{Cmd, State}
 
   @impl true
   def init(args) when is_list(args) or is_map(args) do
-    {:ok, State.new(args), {:continue, :bootstrap}}
+    if args[:server_name] do
+      Process.register(self(), args[:server_name])
+      {:ok, State.new(args), {:continue, :bootstrap}}
+    else
+      {:stop, :missing_server_name}
+    end
+  end
+
+  def child_spec(opts) do
+    {id, opts_rest} = Keyword.pop(opts, :id)
+    {restart, opts_rest} = Keyword.pop(opts_rest, :restart, :permanent)
+
+    final_opts = [server_name: id] ++ opts_rest
+
+    %{id: id, start: {Server, :start_link, [final_opts]}, restart: restart}
   end
 
   def start_link(start_args) do
-    server_name = start_args[:name] || start_args[:server_name]
-    server_opts = [name: start_args[:name]]
-    start_args = start_args ++ [server_name: server_name]
+    GenServer.start_link(Server, start_args)
+  end
 
-    GenServer.start_link(Server, start_args, server_opts)
+  @impl true
+  def handle_call(:pause, _from, %State{} = s) do
+    State.pause_notifies(s) |> reply_ok()
+  end
+
+  @impl true
+  def handle_call(:resume, _from, %State{} = s) do
+    State.start_notifies(s) |> reply_ok()
   end
 
   @impl true
   def handle_continue(:bootstrap, %State{} = s) do
-    register_result = s.alfred.notify_register(name: s.equipment, frequency: :all, link: true)
-
-    case register_result do
-      {:ok, ticket} -> State.save_equipment(s, ticket) |> noreply()
-      {:no_server, _} -> {:stop, :normal, s}
-    end
+    State.start_notifies(s) |> noreply()
 
     # NOTE: at this point the server is running and no further actions occur until an
     #       equipment notification is received
   end
 
+  @impl true
+  def handle_info({:notify, %Memo{missing?: true} = memo}, %State{} = s) do
+    s
+    |> Betty.app_error(equipment: memo.name, missing: true)
+    |> State.update_last_notify_at()
+    |> noreply()
+  end
+
+  @impl true
+  def handle_info({:notify, %Memo{} = memo}, %State{} = s) do
+    opts = [alfred: s.alfred, server_name: s.server_name]
+
+    memo
+    |> Cmd.hold(s.hold_cmd, opts)
+    |> State.update_last_exec(s)
+    |> State.update_last_notify_at()
+    |> noreply()
+  end
+
+  @impl true
+  def handle_info({Broom, %TrackerEntry{} = _te}, s) do
+    noreply(s)
+  end
+
   defp noreply(%State{} = s), do: {:noreply, s}
+  defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}
+
+  defp reply_ok(%State{} = s), do: {:reply, :ok, s}
 end

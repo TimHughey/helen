@@ -8,6 +8,7 @@ defmodule Rena.SetPt.State do
   defstruct alfred: Alfred,
             server_name: nil,
             equipment: "unset",
+            ticket: :none,
             sensors: [],
             sensor_range: %Sensor.Range{},
             cmds: nil,
@@ -19,10 +20,12 @@ defmodule Rena.SetPt.State do
 
   @type cmds :: [{:active, ExecCmd.t()}, {:inactive, ExecCmd.t()}]
   @type last_exec :: :none | :failed | DateTime.t() | ExecCmd.t()
+  @type ticket() :: :none | :paused | Ticket.t()
   @type t :: %State{
           alfred: module(),
           server_name: atom(),
           equipment: String.t() | Ticket.t(),
+          ticket: ticket(),
           sensors: list(),
           sensor_range: Sensor.Range.t(),
           cmds: cmds(),
@@ -39,7 +42,35 @@ defmodule Rena.SetPt.State do
     if DateTime.diff(now, last, :millisecond) > ms, do: true, else: false
   end
 
-  def save_equipment(%State{} = s, %Ticket{} = nt), do: %State{s | equipment: nt}
+  def pause_notifies(%State{ticket: ticket} = s) do
+    case ticket do
+      %Ticket{} = x ->
+        s.alfred.notify_unregister(x)
+        save_ticket(:paused, s)
+
+      x when x in [:none, :paused] ->
+        s
+    end
+  end
+
+  def save_ticket(ticket_rc, %State{} = s) do
+    case ticket_rc do
+      x when is_atom(x) -> %State{s | ticket: x}
+      {:ok, x} -> %State{s | ticket: x}
+      {:no_server, _} -> {:stop, :normal, s}
+    end
+  end
+
+  def start_notifies(%State{ticket: ticket} = s) do
+    case ticket do
+      x when x in [:none, :pause] ->
+        s.alfred.notify_register(name: s.equipment, link: true)
+        |> save_ticket(s)
+
+      %Ticket{} ->
+        s
+    end
+  end
 
   def transition(%State{} = s), do: %State{s | last_transition: DateTime.utc_now()}
 

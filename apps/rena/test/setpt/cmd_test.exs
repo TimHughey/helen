@@ -1,6 +1,7 @@
 defmodule Rena.SetPt.CmdTest do
   use ExUnit.Case, async: true
   use Should
+  use Alfred.NamesAid
 
   @moduletag rena: true, setpt_cmd_test: true
 
@@ -20,31 +21,28 @@ defmodule Rena.SetPt.CmdTest do
   end
 
   describe "Rena.SetPt.Cmd.make/3 returns" do
-    setup [:assemble_result]
+    setup [:equipment_add, :assemble_result]
 
+    @tag equipment_add: [cmd: "off"]
     @tag result_opts: [lt_low: 3]
-    test "active cmd when low value and inactive", %{result: r} do
-      name = "mutable power off"
+    test "active cmd when low value and inactive", ctx do
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
 
-      res = Cmd.make(name, r, alfred: Rena.Alfred)
-
-      check_exec_cmd(name, "on", :activate, res)
+      check_exec_cmd(ctx.equipment, "on", :activate, res)
     end
 
+    @tag equipment_add: [cmd: "on"]
     @tag result_opts: [gt_high: 1, gt_mid: 2]
-    test "inactive cmd when high value and active", %{result: r} do
-      name = "mutable power on"
+    test "inactive cmd when high value and active", ctx do
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
 
-      res = Cmd.make(name, r, alfred: Rena.Alfred)
-
-      check_exec_cmd(name, "off", :deactivate, res)
+      check_exec_cmd(ctx.equipment, "off", :deactivate, res)
     end
 
+    @tag equipment_add: [cmd: "on"]
     @tag result_opts: [gt_mid: 2]
-    test "datapoint error when only two datapoints", %{result: r} do
-      name = "mutable power on"
-
-      res = Cmd.make(name, r, alfred: Rena.Alfred)
+    test "datapoint error when only two datapoints", ctx do
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
 
       should_be_tuple_with_size(res, 2)
       {rc, struct} = res
@@ -52,20 +50,18 @@ defmodule Rena.SetPt.CmdTest do
       should_be_struct(struct, Result)
     end
 
+    @tag equipment_add: [cmd: "on"]
     @tag result_opts: [lt_mid: 2, gt_mid: 1]
-    test "no change when result below mid range value and active", %{result: r} do
-      name = "mutable power on"
-
-      res = Cmd.make(name, r, alfred: Rena.Alfred)
+    test "no change when result below mid range value and active", ctx do
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
 
       should_be_equal(res, {:no_change, :active})
     end
 
+    @tag equipment_add: [rc: :error, cmd: "unknown"]
     @tag result_opts: [lt_low: 3]
-    test "equipment error tuple with MutableStatus not good", %{result: r} do
-      name = "mutable bad on"
-
-      res = Cmd.make(name, r, alfred: Rena.Alfred)
+    test "equipment error tuple with MutableStatus not good", ctx do
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
 
       should_be_tuple_with_size(res, 2)
 
@@ -104,29 +100,41 @@ defmodule Rena.SetPt.CmdTest do
     end
   end
 
-  test "Rena.SetPt.Cmd.execute/2 executes an ExecCmd" do
-    opts = [alfred: Rena.Alfred, server_name: __MODULE__]
+  describe "Rena.SetPt.Cmd.execute/2" do
+    setup [:setup_opts, :equipment_add]
 
-    ec = %ExecCmd{name: "mutable good on", cmd: "on"}
-    res = Cmd.execute(ec, opts)
-    should_be_ok_tuple_with_struct(res, ExecResult)
-    {_rc, exec_result} = res
-    should_be_equal(exec_result.rc, :ok)
+    @tag equipment_add: [cmd: "on"]
+    test "handles equipment status :ok", ctx do
+      ec = %ExecCmd{name: ctx.equipment, cmd: "on"}
+      res = Cmd.execute(ec, ctx.opts)
 
-    ec = %ExecCmd{name: "mutable pending on", cmd: "on"}
-    res = Cmd.execute(ec, opts)
-    should_be_ok_tuple_with_struct(res, ExecResult)
-    {_rc, exec_result} = res
-    should_be_equal(exec_result.rc, :pending)
+      should_be_ok_tuple_with_struct(res, ExecResult)
+      {_rc, exec_result} = res
+      should_be_equal(exec_result.rc, :ok)
+    end
 
-    ec = %ExecCmd{name: "mutable bad on", cmd: "on"}
-    res = Cmd.execute(ec, opts)
-    should_be_failed_tuple_with_struct(res, ExecResult)
-    {_rc, exec_result} = res
-    should_be_equal(exec_result.rc, {:ttl_expired, 10_000})
+    @tag equipment_add: [pending: true, cmd: "on"]
+    test "handles equipment status is :pending", ctx do
+      ec = %ExecCmd{name: ctx.equipment, cmd: "on"}
+      res = Cmd.execute(ec, ctx.opts)
+
+      should_be_ok_tuple_with_struct(res, ExecResult)
+      {_rc, exec_result} = res
+      should_be_equal(exec_result.rc, :pending)
+    end
+
+    @tag equipment_add: [expired_ms: 10_000]
+    test "handles when equipment status is :ttl_expired", ctx do
+      ec = %ExecCmd{name: ctx.equipment, cmd: "on"}
+      res = Cmd.execute(ec, ctx.opts)
+
+      should_be_failed_tuple_with_struct(res, ExecResult)
+      {_rc, exec_result} = res
+      should_be_equal(exec_result.rc, {:ttl_expired, 10_000})
+    end
   end
 
-  defp assemble_result(%{result_opts: opts} = ctx) do
+  defp assemble_result(%{result_opts: opts}) do
     result =
       for {key, val} <- opts, reduce: %Result{} do
         r ->
@@ -143,16 +151,27 @@ defmodule Rena.SetPt.CmdTest do
       end
       |> finalize_result_total()
 
-    Map.put(ctx, :result, result)
+    %{result: result}
   end
 
-  defp assemble_result(ctx), do: ctx
+  defp assemble_result(_), do: :ok
+
+  def equipment_add(%{equipment_add: opts}) do
+    rc = opts[:rc] || :ok
+    %{make_name: [type: :mut, rc: rc, key: :equipment] ++ opts} |> NamesAid.make_name()
+  end
+
+  def equipment_add(_) do
+    %{make_name: [type: :mut, rc: :ok, cmd: "on", key: :equipment]}
+    |> NamesAid.make_name()
+  end
 
   defp finalize_result_total(%Result{valid: valid, invalid: invalid} = r) do
     %Result{r | total: valid + invalid}
   end
 
   defp setup_opts(ctx) do
-    Map.put(ctx, :opts, server_name: Rena.SetPt.ServerTest)
+    opts = ctx[:setup_opts] || []
+    %{opts: [alfred: Rena.Alfred, server_name: Rena.SetPt.ServerTest] ++ opts}
   end
 end

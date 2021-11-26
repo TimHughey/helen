@@ -1,6 +1,7 @@
 defmodule Rena.Sensor.SensorTest do
   use ExUnit.Case, async: true
   use Should
+  use Alfred.NamesAid
 
   @moduletag rena: true, sensor_test: true
 
@@ -47,14 +48,13 @@ defmodule Rena.Sensor.SensorTest do
   end
 
   describe "Rena.Sensor.range_compare/3" do
-    setup [:basic_range]
+    setup [:sensors_add, :basic_range]
 
-    test "creates accurate summary", %{range: range} do
+    @tag sensors_add: [[temp_f: 6.0], [temp_f: 6.1], [temp_f: 0.5], [temp_f: 11.1], [rc: :error, temp_f: 0]]
+    test "creates accurate summary", %{range: range, sensors: sensors} do
       alias Rena.Sensor.Result
 
-      names = ["mid 6", "mid 6.1", "low 0.5", "high 11.1", "bad fail"]
-
-      res = Sensor.range_compare(names, range, alfred: Rena.Alfred)
+      res = Sensor.range_compare(sensors, range, alfred: Rena.Alfred)
       good = %Result{gt_mid: 1, gt_high: 1, invalid: 1, lt_low: 1, lt_mid: 1, valid: 4, total: 5}
       should_be_equal(res, good)
     end
@@ -66,5 +66,28 @@ defmodule Rena.Sensor.SensorTest do
     merge = %{range: range, mid_pt: mid_pt}
 
     Map.merge(merge, ctx)
+  end
+
+  def sensors_add(%{sensors_add: opts}) do
+    for sensor_opts <- opts do
+      rc = sensor_opts[:rc] || :ok
+      temp_f = sensor_opts[:temp_f]
+
+      %{make_name: [type: :imm, rc: rc, temp_f: temp_f]}
+      |> NamesAid.make_name()
+      |> Map.get(:name)
+    end
+    |> then(fn x -> %{sensors: x} end)
+  end
+
+  def sensors_add(_) do
+    sensors_temp_f = [11.0, 11.1, 11.2, 6.2]
+
+    for temp_f <- sensors_temp_f do
+      %{make_name: [type: :imm, rc: :ok, temp_f: temp_f]}
+      |> NamesAid.make_name()
+      |> Map.get(:name)
+    end
+    |> then(fn x -> %{sensors: x} end)
   end
 end

@@ -34,13 +34,13 @@ defmodule Rena.SetPt.Server do
   end
 
   @impl true
-  def handle_continue(:bootstrap, %State{} = s) do
-    register_result = s.alfred.notify_register(name: s.equipment, frequency: :all, link: true)
+  def handle_call(:pause, _from, %State{} = s) do
+    State.pause_notifies(s) |> reply_ok()
+  end
 
-    case register_result do
-      {:ok, ticket} -> State.save_equipment(s, ticket) |> noreply()
-      {:no_server, _} -> {:stop, :normal, s}
-    end
+  @impl true
+  def handle_continue(:bootstrap, %State{} = s) do
+    State.start_notifies(s) |> noreply()
 
     # NOTE: at this point the server is running and no further actions occur until an
     #       equipment notification is received
@@ -49,7 +49,7 @@ defmodule Rena.SetPt.Server do
   # (1 of 2) handle missing messages
   @impl true
   def handle_info({Alfred, %Memo{missing?: true} = memo}, %State{} = s) do
-    Betty.app_error(s.server_name, equipment: memo.name, missing?: true)
+    Betty.app_error(s.server_name, equipment: memo.name, missing: true)
 
     State.update_last_notify_at(s) |> noreply()
   end
@@ -102,4 +102,6 @@ defmodule Rena.SetPt.Server do
   end
 
   defp noreply(%State{} = s), do: {:noreply, s}
+  defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}
+  defp reply_ok(%State{} = s), do: {:reply, :ok, s}
 end
