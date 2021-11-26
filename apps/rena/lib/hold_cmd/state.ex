@@ -76,7 +76,7 @@ defmodule Rena.HoldCmd.State do
   def update_last_notify_at(%State{} = s), do: %State{s | last_notify_at: DateTime.utc_now()}
 
   defp finalize_hold_cmd(%State{hold_cmd: hold_cmd} = s) do
-    cmd_opts = Keyword.put_new(hold_cmd.cmd_opts, :notify_when_released, true)
+    cmd_opts = Keyword.put(hold_cmd.cmd_opts, :notify_when_released, true)
 
     %State{s | hold_cmd: %ExecCmd{hold_cmd | name: s.equipment, cmd_opts: cmd_opts}}
   end
