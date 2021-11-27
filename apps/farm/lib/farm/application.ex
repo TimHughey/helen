@@ -24,8 +24,6 @@ defmodule Farm.Application do
   end
 
   def womb_setpt_args do
-    alias Rena.Sensor.Range
-
     sensors = ["womb 1", "womb 2", "womb 3", "womb 4"]
     range = [low: 78.0, high: 80.1]
     [id: Farm.Womb.Heater, equipment: "womb heater power", sensors: sensors, sensor_range: range]
