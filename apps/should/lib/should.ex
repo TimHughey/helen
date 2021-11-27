@@ -376,7 +376,7 @@ defmodule Should do
       left_ms = Process.read_timer(ref)
 
       refute is_nil(left_ms), msg(ref, "does not reference a timer")
-      assert_in_delta left_ms, ms, 50, msg(left_ms, "should be close to #{ms}")
+      assert_in_delta left_ms, ms, 100, msg(left_ms, "should be close to #{ms}")
     end
   end
 
