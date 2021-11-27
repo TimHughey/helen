@@ -75,7 +75,9 @@ defmodule Alfred.ImmutableStatus do
     }
   end
 
-  def not_found(name), do: %Status{name: name, status_at: DateTime.utc_now(), found?: false}
+  def not_found(name) do
+    %Status{name: name, status_at: DateTime.utc_now(), found?: false, error: :not_found}
+  end
 
   def ttl_expired(%_{} = x) do
     %Status{name: x.name, status_at: x.device.last_seen_at, ttl_expired?: true}

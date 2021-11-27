@@ -206,36 +206,7 @@ defmodule Alfred do
   end
 
   def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    kn = names_lookup(name, opts)
-
-    try do
-      case kn do
-        %KnownName{valid?: false} ->
-          %ImmutableStatus{name: name, good?: false, error: :unknown}
-
-        %KnownName{mutable?: mut?, callback: {:server, server}} ->
-          type = (mut? && :mut_status) || :imm_status
-          # type = if(mut?), do: :mut_status, else: :immut_status
-          GenServer.call(server, {type, name, opts})
-
-        %KnownName{mutable?: mut?, callback: func} when is_function(func) ->
-          type = (mut? && :mutable) || :immutable
-          func.(type, name, opts)
-
-        %KnownName{mutable?: mut?, callback: {:module, mod}} ->
-          type = (mut? && :mutable) || :immutable
-          mod.status(type, name, opts)
-      end
-    rescue
-      error ->
-        msg = [inspect(error), Exception.format_stacktrace()]
-        callback_failure(kn, msg)
-    catch
-      kind, value ->
-        val_msg = inspect(value, pretty: true)
-        msg = ["#{kind}", val_msg, Exception.format_stacktrace()]
-        callback_failure(kn, msg)
-    end
+    names_lookup(name, opts) |> status_for_known_name(opts)
   end
 
   def toggle(name, opts \\ []) when is_binary(name) and is_list(opts) do
@@ -266,5 +237,27 @@ defmodule Alfred do
 
   defp ago_ms(%DateTime{} = dt) do
     DateTime.utc_now() |> DateTime.diff(dt, :millisecond)
+  end
+
+  defp status_for_known_name(%KnownName{valid?: true} = kn, opts) do
+    type = if(kn.mutable?, do: :mut_status, else: :imm_status)
+
+    case kn.callback do
+      {:server, server} -> GenServer.call(server, {type, kn.name, opts})
+      func when is_function(func) -> func.(type, kn.name, opts)
+      {:module, mod} -> mod.status(type, kn.name, opts)
+    end
+  rescue
+    error ->
+      msg = [inspect(error), Exception.format_stacktrace()]
+      callback_failure(kn, msg)
+  catch
+    kind, value ->
+      msg = [inspect(kind), inspect(value, pretty: true), Exception.format_stacktrace()]
+      callback_failure(kn, msg)
+  end
+
+  defp status_for_known_name(%KnownName{name: name} = kn, _opts) do
+    ImmutableStatus.not_found(name)
   end
 end

@@ -15,11 +15,11 @@ defmodule SallyStatusTest do
 
   setup [:host_add, :host_setup, :device_add, :devalias_add, :command_add, :devalias_just_saw]
 
-  describe "Sally.status(:mutable, name, opts)" do
+  describe "Sally.status(:mut_status, name, opts)" do
     test "detects unknown Alias name", _ctx do
       want_kv = [name: "unknown", found?: false, cmd: "unknown", pending?: false, ttl_expired?: false]
 
-      Sally.status(:mutable, "unknown", [])
+      Sally.status(:mut_status, "unknown", [])
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
 
@@ -28,7 +28,7 @@ defmodule SallyStatusTest do
       %DevAlias{name: name} = DevAliasAid.random_pick(ctx.dev_alias)
       want_kv = [name: name, found?: true, ttl_expired?: true]
 
-      Sally.status(:mutable, name, ttl_ms: 0)
+      Sally.status(:mut_status, name, ttl_ms: 0)
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
 
@@ -40,7 +40,7 @@ defmodule SallyStatusTest do
       %DevAlias{name: name} = DevAliasAid.random_pick(ctx.dev_alias)
       want_kv = [name: name, found?: true, ttl_expired?: true]
 
-      Sally.status(:mutable, name, [])
+      Sally.status(:mut_status, name, [])
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
 
@@ -59,7 +59,7 @@ defmodule SallyStatusTest do
         error: :none
       ]
 
-      Sally.status(:mutable, name, [])
+      Sally.status(:mut_status, name, [])
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
 
@@ -71,10 +71,10 @@ defmodule SallyStatusTest do
 
       %DevAlias{name: name} = ctx.dev_alias
 
-      for _ <- 1..10, reduce: Sally.status(:mutable, name, []) do
+      for _ <- 1..10, reduce: Sally.status(:mut_status, name, []) do
         %MutableStatus{pending?: true} ->
           Process.sleep(100)
-          Sally.status(:mutable, name, [])
+          Sally.status(:mut_status, name, [])
 
         %MutableStatus{pending?: false} = acc ->
           acc
@@ -89,7 +89,7 @@ defmodule SallyStatusTest do
         error: :unresponsive
       ]
 
-      Sally.status(:mutable, name, [])
+      Sally.status(:mut_status, name, [])
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
 
@@ -108,7 +108,7 @@ defmodule SallyStatusTest do
         error: :none
       ]
 
-      Sally.status(:mutable, name, [])
+      Sally.status(:mut_status, name, [])
       |> Should.Be.Struct.with_all_key_value(MutableStatus, want_kv)
     end
   end

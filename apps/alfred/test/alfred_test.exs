@@ -16,8 +16,7 @@ defmodule AlfredTest do
 
   defmacro should_be_valid_exec_result(er) do
     quote bind_quoted: [er: er] do
-      should_be_struct(er, Alfred.ExecResult)
-      should_be_equal(er.rc, :ok)
+      Should.Be.Struct.with_all_key_value(er, Alfred.ExecResult, rc: :ok)
     end
   end
 
@@ -251,7 +250,7 @@ defmodule AlfredTest do
       status = Alfred.status(name)
 
       should_be_struct(status, Alfred.ImmutableStatus)
-      should_be_equal(status.error, :unknown)
+      should_be_equal(status.error, :not_found)
     end
 
     @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
