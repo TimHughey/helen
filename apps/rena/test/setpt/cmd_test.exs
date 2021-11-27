@@ -1,22 +1,22 @@
 defmodule Rena.SetPt.CmdTest do
   use ExUnit.Case, async: true
   use Should
-  use Alfred.NamesAid
 
-  @moduletag rena: true, setpt_cmd_test: true
+  @moduletag rena: true, rena_setpt_cmd: true
 
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.MutableStatus, as: MutStatus
   alias Rena.Sensor.Result
   alias Rena.SetPt.Cmd
 
+  import Alfred.NamesAid, only: [equipment_add: 1]
+
   defmacro check_exec_cmd(name, cmd, action, res) do
     quote location: :keep, bind_quoted: [name: name, cmd: cmd, action: action, res: res] do
-      should_be_rc_tuple_with_struct(res, action, ExecCmd)
+      ec = Should.Be.Tuple.with_rc(res, action)
 
-      {_, %ExecCmd{} = ec} = res
-      should_be_equal(ec.name, name)
-      should_be_equal(ec.cmd, cmd)
+      want_kv = [name: name, cmd: cmd]
+      Should.Be.Struct.with_all_key_value(ec, ExecCmd, want_kv)
     end
   end
 
@@ -155,16 +155,6 @@ defmodule Rena.SetPt.CmdTest do
   end
 
   defp assemble_result(_), do: :ok
-
-  def equipment_add(%{equipment_add: opts}) do
-    rc = opts[:rc] || :ok
-    %{make_name: [type: :mut, rc: rc, key: :equipment] ++ opts} |> NamesAid.make_name()
-  end
-
-  def equipment_add(_) do
-    %{make_name: [type: :mut, rc: :ok, cmd: "on", key: :equipment]}
-    |> NamesAid.make_name()
-  end
 
   defp finalize_result_total(%Result{valid: valid, invalid: invalid} = r) do
     %Result{r | total: valid + invalid}

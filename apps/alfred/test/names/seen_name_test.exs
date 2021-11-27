@@ -1,14 +1,15 @@
 defmodule Alfred.SeenNameTest do
   use ExUnit.Case, async: true
   use Should
-  use Alfred.NamesAid
+
+  import Alfred.NamesAid, only: [name_add: 1, unique: 1]
 
   @moduletag alfred: true, alfred_seen_name: true
 
   alias Alfred.SeenName
 
   setup_all do
-    {:ok, %{make_name: [type: :imm]}}
+    {:ok, %{name_add: [type: :imm]}}
   end
 
   setup [:name_add]
@@ -42,7 +43,7 @@ defmodule Alfred.SeenNameTest do
 
     test "verifies a list of SeenNames" do
       template = %SeenName{ttl_ms: 1000, seen_at: DateTime.utc_now()}
-      list = for _ <- 1..10, do: %SeenName{template | name: NamesAid.unique("seenname")}
+      list = for _ <- 1..10, do: %SeenName{template | name: unique("seenname")}
 
       list = [%SeenName{}] ++ list
 
@@ -50,6 +51,4 @@ defmodule Alfred.SeenNameTest do
       should_be_non_empty_list_with_length(res, 10)
     end
   end
-
-  def name_add(ctx), do: NamesAid.make_name(ctx)
 end

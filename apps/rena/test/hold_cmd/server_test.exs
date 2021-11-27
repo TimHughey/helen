@@ -1,16 +1,15 @@
 defmodule Rena.HoldCmd.ServerTest do
   use ExUnit.Case
   use Should
-  use Rena.TestAids
 
   @moduletag rena: true, rena_holdcmd_server: true
 
   alias Alfred.{ExecCmd, ExecResult}
-  alias Alfred.NamesAid
   alias Alfred.Notify.{Memo, Ticket}
   alias Rena.HoldCmd.{Server, ServerTest, State}
 
-  @equipment_default [type: :mut, rc: :ok, cmd: "off"]
+  import Alfred.NamesAid, only: [equipment_add: 1]
+  import Rena.StartArgsAid, only: [start_args_add: 1]
 
   setup_all do
     # base ctx
@@ -126,20 +125,6 @@ defmodule Rena.HoldCmd.ServerTest do
       after
         1000 -> assert :echoed == true, Should.msg(:echoed, "ExecCmd should be echoed")
       end
-    end
-  end
-
-  def equipment_add(ctx) do
-    case ctx do
-      %{equipment_add: opts} ->
-        # add [key: :equipment] so NamesAid returns the proper map to merge into ctx
-        opts = Keyword.put_new(opts, :key, :equipment)
-
-        NamesAid.make_name(%{make_name: opts})
-
-      # when equipment add is not present add the default equipment
-      _ ->
-        %{equipment_add: @equipment_default} |> equipment_add()
     end
   end
 

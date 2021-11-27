@@ -58,7 +58,7 @@ defmodule Rena.SetPt.Cmd do
     active_cmd_opt = opts[:active_cmd] || %ExecCmd{name: name, cmd: "on", cmd_opts: cmd_opts}
     inactive_cmd_opt = opts[:inactive_cmd] || %ExecCmd{name: name, cmd: "off", cmd_opts: cmd_opts}
 
-    with {:result, true} <- {:result, sufficient_datapoints?(result)},
+    with {:datapoints, true} <- sufficient_datapoints?(result),
          {:active_cmd, %ExecCmd{} = active_cmd} <- {:active_cmd, active_cmd_opt},
          {:inactive_cmd, %ExecCmd{} = inactive_cmd} <- {:inactive_cmd, inactive_cmd_opt},
          %MutStatus{good?: true} = mut_status <- alfred.status(name) do
@@ -73,15 +73,14 @@ defmodule Rena.SetPt.Cmd do
         true -> {:no_change, status}
       end
     else
-      {:result, false} -> {:datapoint_error, result}
+      {:datapoints, false} -> {:datapoint_error, result}
       {:active_cmd, _} -> {:error, :invalid_active_cmd}
       {:inactive_cmd, _} -> {:error, :invalid_inactive_cmd}
       %MutStatus{} = x -> {:equipment_error, x}
     end
   end
 
-  # the focus of deciding active vs inactive is safety first so the preference is
-  # to error on the side of inactive.
+  # safety first is the priority so we will always error on the side of inactive
   #
   # safety checks (e.g. sufficient valid data points) are performed prior to
   # determining active vs inactive
@@ -115,6 +114,6 @@ defmodule Rena.SetPt.Cmd do
   defp simple_status(%MutStatus{cmd: scmd}, %ExecCmd{cmd: acmd}) when scmd == acmd, do: :active
   defp simple_status(%MutStatus{}, %ExecCmd{}), do: :inactive
 
-  defp sufficient_datapoints?(%Result{valid: x, total: y}) when x >= 3 and y >= 3, do: true
-  defp sufficient_datapoints?(%Result{}), do: false
+  defp sufficient_datapoints?(%Result{valid: x, total: y}) when x >= 3 and y >= 3, do: {:datapoints, true}
+  defp sufficient_datapoints?(%Result{}), do: {:datapoints, false}
 end

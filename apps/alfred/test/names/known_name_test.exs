@@ -1,11 +1,11 @@
 defmodule Alfred.KnownNameTest do
   use ExUnit.Case, async: true
   use Should
-  use Alfred.NamesAid
 
   @moduletag alfred: true, alfred_known_name: true
 
   alias Alfred.KnownName
+  alias Alfred.NamesAid
 
   defmacro should_be_missing(res, bool) do
     quote location: :keep, bind_quoted: [res: res, bool: bool] do

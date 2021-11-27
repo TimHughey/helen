@@ -1,4 +1,4 @@
-defmodule Rena.Alfred do
+defmodule AlfredSim do
   alias Alfred.Notify.Ticket
 
   def execute(name, opts \\ []), do: Alfred.ExecAid.execute(name, opts)

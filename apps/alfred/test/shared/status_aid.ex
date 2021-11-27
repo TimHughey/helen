@@ -1,31 +1,21 @@
 defmodule Alfred.StatusAid do
-  alias Alfred.ImmutableStatus, as: ImmStatus
-  alias Alfred.MutableStatus, as: MutStatus
+  @moduledoc """
+  Create Mutable and Immutable status and simulates `Alfred.status/2`
 
-  @callback status(name :: binary, opts :: list) :: %ImmStatus{} | %MutStatus{}
-
-  defmacro __using__(opts) do
-    quote location: :keep, bind_quoted: [opts: opts] do
-      @behaviour Alfred.StatusAid
-
-      alias Alfred.StatusAid
-
-      def status(name, opts \\ []), do: StatusAid.status(name, opts)
-    end
-  end
-
-  alias Alfred.NamesAid
+  """
 
   def status(_, name, opts), do: status(name, opts)
 
   def status(name, opts \\ []) when is_binary(name) and is_list(opts) do
-    case NamesAid.to_parts(name) do
+    case Alfred.NamesAid.binary_to_parts(name) do
       %{type: :imm} = parts -> make_imm_status(parts)
       %{type: :mut} = parts -> make_mut_status(parts)
     end
   end
 
   def make_imm_status(parts) do
+    alias Alfred.ImmutableStatus, as: ImmStatus
+
     data = Map.take(parts, [:temp_f, :temp_c, :relhum])
     expired_ms = (parts[:expired_ms] || 0) * -1
     at = DateTime.utc_now() |> DateTime.add(expired_ms)
@@ -43,6 +33,8 @@ defmodule Alfred.StatusAid do
   end
 
   def make_mut_status(parts) do
+    alias Alfred.MutableStatus, as: MutStatus
+
     expired_ms = (parts[:expired_ms] || 0) * -1
     at = DateTime.utc_now() |> DateTime.add(expired_ms)
 

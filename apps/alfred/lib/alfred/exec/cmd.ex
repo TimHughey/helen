@@ -1,5 +1,7 @@
 defmodule Alfred.ExecCmd do
-  alias __MODULE__, as: Cmd
+  require Logger
+
+  alias __MODULE__
 
   defstruct name: "default",
             cmd: "unknown",
@@ -35,14 +37,29 @@ defmodule Alfred.ExecCmd do
           invalid_reason: nil | String.t()
         }
 
-  # def valid(%Cmd{} = ec), do: %Cmd{ec | valid?: true}
-  # def valid?(%Cmd{} = ec), do: ec.valid?
+  def add_notify(%ExecCmd{cmd_opts: opts} = ec) do
+    struct(ec, cmd_opts: Keyword.put(opts, :notify_when_released, true))
+  end
 
-  def validate(%Cmd{} = ec) do
+  def add_type(%ExecCmd{cmd_params: params} = ec, type) when is_binary(type) do
+    struct(ec, params: Map.put(params, :type, type))
+  end
+
+  @allowed_keys [:name, :cmd, :cmd_params, :cmd_opts, :pub_opts]
+  def new(opts) when is_list(opts) do
+    {allowed, opts_rest} = Keyword.split(opts, @allowed_keys)
+
+    if opts_rest != [], do: Logger.warn("unrecognized opts: #{inspect(opts_rest)}")
+
+    struct(ExecCmd, allowed) |> validate()
+  end
+
+  def validate(%ExecCmd{} = ec) do
     case ec do
-      %Cmd{cmd: c} when c in ["on", "off"] -> valid(ec)
-      %Cmd{cmd: c, cmd_params: %{type: t}} when is_binary(c) and is_binary(t) -> valid(ec)
-      %Cmd{cmd: c} when is_binary(c) -> invalid(ec, "custom cmds must include type")
+      %ExecCmd{cmd: c} when c in ["on", "off"] -> valid(ec)
+      %ExecCmd{cmd_params: x} when is_list(x) -> struct(ec, cmd_params: Enum.into(x, %{})) |> validate()
+      %ExecCmd{cmd: c, cmd_params: %{type: t}} when is_binary(c) and is_binary(t) -> valid(ec)
+      %ExecCmd{cmd: c} when is_binary(c) -> invalid(ec, "custom cmds must include type")
       _ -> invalid(ec, "cmd must be a binary")
     end
   end
@@ -51,9 +68,6 @@ defmodule Alfred.ExecCmd do
   ## Private
   ##
 
-  defp invalid(%Cmd{} = ec, reason) do
-    %Cmd{ec | valid: :no, invalid_reason: reason}
-  end
-
-  defp valid(%Cmd{} = ec), do: %Cmd{ec | valid: :yes}
+  defp invalid(%ExecCmd{} = ec, reason), do: %ExecCmd{ec | valid: :no, invalid_reason: reason}
+  defp valid(%ExecCmd{} = ec), do: %ExecCmd{ec | valid: :yes}
 end

@@ -1,5 +1,5 @@
 defmodule Rena.StartArgsAid do
-  def add(ctx) do
+  def start_args_add(ctx) do
     case ctx do
       %{start_args_add: false} -> :ok
       %{start_args_add: opts} -> %{start_args: assemble_args(ctx, opts)}

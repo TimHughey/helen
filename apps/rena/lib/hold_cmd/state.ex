@@ -52,7 +52,8 @@ defmodule Rena.HoldCmd.State do
   def start_notifies(%State{ticket: ticket} = s) do
     case ticket do
       x when x in [:none, :pause] ->
-        s.alfred.notify_register(name: s.equipment, link: true)
+        [name: s.equipment, frequency: :all, link: true]
+        |> s.alfred.notify_register()
         |> save_ticket(s)
 
       %Ticket{} ->

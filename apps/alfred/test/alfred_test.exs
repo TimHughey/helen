@@ -4,11 +4,15 @@ defmodule AlfredTest do
 
   @moduletag alfred: true, alfred_api: true
 
-  use Alfred.ExecAid
-  use Alfred.NamesAid
-  use Alfred.StatusAid
+  alias Alfred.ExecAid
+  import Alfred.ExecAid, only: [exec_cmd_from_parts_add: 1]
 
-  setup [:make_name, :make_parts_auto, :make_parts, :make_seen_name, :just_saw, :make_exec_cmd]
+  import Alfred.NamesAid,
+    only: [just_saw_add: 1, name_add: 1, parts_add_auto: 1, parts_add: 1, seen_name_add: 1]
+
+  alias Alfred.StatusAid
+
+  setup [:name_add, :parts_add_auto, :parts_add, :seen_name_add, :just_saw_add, :exec_cmd_from_parts_add]
 
   defmacro should_be_valid_exec_result(er) do
     quote bind_quoted: [er: er] do
@@ -26,26 +30,26 @@ defmodule AlfredTest do
   end
 
   describe "Alfred.execute/2" do
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
-    @tag make_exec_cmd: []
-    test "processes a well formed ExecCmd", %{name: _, exec_cmd: ec} do
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
+    @tag exec_cmd_from_parts_add: []
+    test "processes a well formed ExecCmd", %{name: _, exec_cmd_from_parts: ec} do
       er = Alfred.execute(ec, [])
       should_be_valid_exec_result(er)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "special"]
-    @tag just_saw: [callback: {:module, ExecAid}]
-    @tag make_exec_cmd: []
-    test "requires type for cmds other than on/off", %{name: _, exec_cmd: ec} do
+    @tag name_add: [type: :mut, rc: :ok, cmd: "special"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
+    @tag exec_cmd_from_parts_add: []
+    test "requires type for cmds other than on/off", %{name: _, exec_cmd_from_parts: ec} do
       er = Alfred.execute(ec)
       should_be_struct(er, Alfred.ExecResult)
       invalid_reason = should_be_invalid_tuple(er.rc)
       should_contain_binaries(invalid_reason, ["must include type"])
     end
 
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 86.1]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 86.1]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "requires known name is a mutable", %{name: name} do
       ec = %Alfred.ExecCmd{name: name, cmd: "on"}
       er = Alfred.execute(ec)
@@ -60,27 +64,27 @@ defmodule AlfredTest do
       should_be_invalid_exec_result(er, "unknown")
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:server, FooBar}]
-    @tag make_exec_cmd: []
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:server, FooBar}]
+    @tag exec_cmd_from_parts_add: []
     @tag capture_log: true
-    test "handles callback failure", %{name: _, exec_cmd: ec} do
+    test "handles callback failure", %{name: _, exec_cmd_from_parts: ec} do
       er = Alfred.execute(ec)
       should_be_struct(er, Alfred.ExecResult)
       reason = should_be_invalid_tuple(er.rc)
       should_contain_binaries(reason, ["callback failed"])
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: &ExecAid.execute/2]
-    @tag make_exec_cmd: []
-    test "honors a function as the callback", %{exec_cmd: ec} do
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: &ExecAid.execute/2]
+    @tag exec_cmd_from_parts_add: []
+    test "honors a function as the callback", %{exec_cmd_from_parts: ec} do
       er = Alfred.execute(ec, [])
       should_be_valid_exec_result(er)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "accepts a binary name and list of opts", %{name: name} do
       params = [type: "fixed", percent: 50]
       cmd_opts = [notify_when_released: true]
@@ -90,18 +94,18 @@ defmodule AlfredTest do
       should_be_valid_exec_result(er)
     end
 
-    @tag make_name: [type: :mut, cmd: "on", expired_ms: 1000]
-    @tag just_saw: [callback: {:module, ExecAid}]
-    @tag make_exec_cmd: []
-    test "detects missing name", %{exec_cmd: ec} do
+    @tag name_add: [type: :mut, cmd: "on", expired_ms: 1000]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
+    @tag exec_cmd_from_parts_add: []
+    test "detects missing name", %{exec_cmd_from_parts: ec} do
       er = Alfred.execute(ec)
       should_be_invalid_exec_result(er, "missing")
     end
   end
 
   describe "Alfred.just_saw/2" do
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    @tag just_saw: []
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag just_saw_add: []
     test "processes a well formed %JustSaw{}", %{just_saw_result: jsr, name: name} do
       should_be_equal(Alfred.names_exists?(name), true)
       should_be_equal(jsr, [name])
@@ -114,30 +118,30 @@ defmodule AlfredTest do
       should_be_equal(res, true)
     end
 
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    # @tag just_saw: []
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    # @tag just_saw_add: []
     test "available/2 returns true when a name is available", %{name: name} do
       res = Alfred.names_available?(name)
       should_be_true(res)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "lookup/2 returns an Alfred.KnownName", %{name: name} do
       known_name = Alfred.names_lookup(name)
       should_be_struct(known_name, Alfred.KnownName)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "exists?/1 returns true when a name is known", %{name: name} do
       rc = Alfred.names_exists?(name)
 
       should_be_true(rc)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "delete/2 removes a known name", %{name: name} do
       deleted_name = Alfred.names_delete(name)
       should_be_equal(name, deleted_name)
@@ -148,16 +152,16 @@ defmodule AlfredTest do
   end
 
   describe "Alfred.names_known/1" do
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "returns a list of names by default", %{name: name} do
       known = Alfred.names_known()
       should_be_non_empty_list(known)
       should_contain_value(known, name)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "returns a list of KnownNames", %{name: name} do
       alias Alfred.KnownName
 
@@ -170,8 +174,8 @@ defmodule AlfredTest do
       assert found?, msg(known, "should contain a KnownName for", name)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "returns a list of names with seen_at", %{name: name} do
       known = Alfred.names_known(seen_at: true)
       should_be_non_empty_list(known)
@@ -185,8 +189,8 @@ defmodule AlfredTest do
       assert found?, msg(known, "should contain a tuple for", name)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "returns a list of tuples of name and seen ago ms", %{name: name} do
       known = Alfred.names_known(seen_ago: true)
       should_be_non_empty_list(known)
@@ -228,21 +232,21 @@ defmodule AlfredTest do
   end
 
   describe "Alfred.status/2" do
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    @tag just_saw: [callback: {:module, StatusAid}]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag just_saw_add: [callback: {:module, StatusAid}]
     test "returns a well formed Alfred.ImmutableStatus", %{name: name} do
       status = Alfred.status(name, [])
       should_be_good_immutable_status(status)
     end
 
-    @tag make_name: [type: :mut, rc: :ok, cmd: "on"]
-    @tag just_saw: [callback: {:module, StatusAid}]
+    @tag name_add: [type: :mut, rc: :ok, cmd: "on"]
+    @tag just_saw_add: [callback: {:module, StatusAid}]
     test "returns a well formed Alfred.MutableStatus", %{name: name} do
       status = Alfred.status(name, [])
       should_be_good_mutable_status(status)
     end
 
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
     test "returns an ImmutableStatus with error when name unknown", %{name: name} do
       status = Alfred.status(name)
 
@@ -250,8 +254,8 @@ defmodule AlfredTest do
       should_be_equal(status.error, :unknown)
     end
 
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    @tag just_saw: [callback: {:server, FooBar}]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag just_saw_add: [callback: {:server, FooBar}]
     @tag capture_log: true
     test "handles callback failure for an immutable", %{name: name} do
       status = Alfred.status(name, [])
@@ -259,8 +263,8 @@ defmodule AlfredTest do
       should_be_equal(status.error, :callback_failed)
     end
 
-    @tag make_name: [type: :mut, cmd: "on"]
-    @tag just_saw: [callback: {:server, FooBar}]
+    @tag name_add: [type: :mut, cmd: "on"]
+    @tag just_saw_add: [callback: {:server, FooBar}]
     @tag capture_log: true
     test "handles callback failure for a mutable", %{name: name} do
       status = Alfred.status(name, [])
@@ -268,8 +272,8 @@ defmodule AlfredTest do
       should_be_equal(status.error, :callback_failed)
     end
 
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    @tag just_saw: [callback: &StatusAid.status/3]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag just_saw_add: [callback: &StatusAid.status/3]
     test "honors a function as a callback for an immutable", %{name: name} do
       status = Alfred.status(name, [])
       should_be_good_immutable_status(status)
@@ -277,8 +281,8 @@ defmodule AlfredTest do
   end
 
   describe "Alfred.notify_*" do
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "register/1 accepts a list of opts and registers for notifications", ctx do
       alias Alfred.Notify.{Memo, Ticket}
       opts = [name: ctx.name]
@@ -288,7 +292,7 @@ defmodule AlfredTest do
 
       # run another just saw to trigger a notification
 
-      Alfred.just_saw(ctx.just_saw)
+      Alfred.just_saw(ctx.just_saw_add)
 
       receive do
         msg ->
@@ -299,8 +303,8 @@ defmodule AlfredTest do
       end
     end
 
-    @tag make_name: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
-    @tag just_saw: [callback: {:module, ExecAid}]
+    @tag name_add: [type: :imm, rc: :ok, temp_f: 81.1, relhum: 65.1]
+    @tag just_saw_add: [callback: {:module, ExecAid}]
     test "unregister/1 reference and unregisters for notifications", ctx do
       alias Alfred.Notify.Ticket
       opts = [name: ctx.name]

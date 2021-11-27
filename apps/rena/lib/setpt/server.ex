@@ -16,22 +16,6 @@ defmodule Rena.SetPt.Server do
     else
       {:stop, :missing_server_name}
     end
-
-    # state = %State{}
-    #
-    # cmds = %{active: args[:cmds][:active], inactive: args[:cmds][:inactive]}
-    #
-    # initial_state = %State{
-    #   alfred: args[:alfred] || state.alfred,
-    #   server_name: args[:name],
-    #   equipment: args[:equipment] || state.equipment,
-    #   sensors: args[:sensors] || state.sensors,
-    #   sensor_range: args[:range] || state.sensor_range,
-    #   cmds: cmds,
-    #   timezone: args[:timezone] || state.timezone
-    # }
-
-    # {:ok, initial_state, {:continue, :bootstrap}}
   end
 
   def child_spec(opts) do
@@ -89,7 +73,7 @@ defmodule Rena.SetPt.Server do
   end
 
   @impl true
-  def handle_info({Broom, %TrackerEntry{} = te}, %State{last_exec: %ExecResult{} = er} = s) do
+  def handle_info({Broom, te}, %State{last_exec: %ExecResult{} = er} = s) do
     want_refid = er.refid
 
     case te do

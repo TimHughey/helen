@@ -4,7 +4,7 @@ defmodule Alfred.MixProject do
   def project do
     [
       app: :alfred,
-      version: "0.2.3",
+      version: "0.2.4",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -24,7 +24,16 @@ defmodule Alfred.MixProject do
         # The main page in the docs
         main: "Alfred",
         # logo: "path/to/logo.png",
-        extras: ["README.md"]
+        extras: ["README.md"],
+        groups_for_modules: [
+          Execute: [~r/Exec(Cmd|Result)/],
+          Names: [~r/(KnownName|JustSaw|Names\.|SeenName)/],
+          Immutable: [~r/Immutable/],
+          Mutable: [~r/Mutable/],
+          Notify: [~r/(Notify.)/],
+          "Testing Aids": [~r/Aid/]
+        ],
+        nest_modules_by_prefix: [Alfred.Immutable, Alfred.Mutable, Alfred.Notify]
       ]
     ]
   end
@@ -44,15 +53,15 @@ defmodule Alfred.MixProject do
       {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:ecto, "~> 3.7", only: :test},
+      {:ecto, "~> 3.7", only: [:dev, :test]},
       {:excoveralls, "~> 0.10", only: :test},
-      {:ex_doc, "~> 0.24", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false},
       {:should, in_umbrella: true, only: :test}
     ]
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/shared"]
+  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/support", "test/shared"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp preferred_cli_env do

@@ -13,104 +13,182 @@ defmodule Alfred.NamesAid do
 
   alias Alfred.{JustSaw, SeenName}
 
-  @type seen_name_opts() :: [name: String.t(), seen_at: %DateTime{}, ttl_ms: integer()]
+  # @type seen_name_opts() :: [name: String.t(), seen_at: %DateTime{}, ttl_ms: integer()]
+  #
+  # @type ctx_map :: %{
+  #         optional(:name_add) => name_opts(),
+  #         optional(:parts_add) => String.t(),
+  #         optional(:seen_name) => seen_name_opts(),
+  #         optional(:name) => String.t()
+  #       }
+  #
+  # @doc "Submits the name in the ctx via Alfred.JustSaw"
+  # @callback just_saw(ctx_map) :: %{optional(:just_saw_result) => [String.t(), ...]}
+  #
+  # @doc "Makes a name for a test context"
+  #
+  # @callback name_add(ctx_map) :: %{optional(:name) => String.t()} | :ok
+  # @callback parts_add(ctx_map) :: %{optional(:parts) => name_parts_map()} | :ok
+  # @callback parts_add_auto(ctx_map) :: %{optional(:name) => String.t()} | :ok
+  # @callback make_seen_name(ctx_map) :: %{optional(:seen_name) => %SeenName{}}
+  #
+  # @doc "Creates a unique name of specified type using passed opts"
+  # @type name_type :: :imm | :mut | :unk
+  # @type name_rc :: :ok | :pending | :error | :unknown
+  # @type name_opts :: [rc: name_rc, cmd: String.t(), expired_ms: integer(), temp_f: float(), relhum: float()]
+  # @callback binary_from_opts(type :: atom(), opts :: name_opts()) :: binary()
+  #
+  # @doc "Creates a map of the parts of a created unique name"
+  # @type name_parts_map() :: %{
+  #         :name => binary(),
+  #         :rc => name_rc(),
+  #         optional(:cmd) => binary(),
+  #         optional(:expired_ms) => integer(),
+  #         optional(:temp_f) => float(),
+  #         optional(:relhum) => float()
+  #       }
+  # @callback name_to_parts(name :: binary()) :: name_parts_map()
+  #
+  # @doc "Creates a unique name with the specified prefix"
+  # @callback unique_with_prefix(prefix :: binary(), index :: integer()) :: binary()
+  #
+  # defmacro __using__(use_opts) do
+  #   quote location: :keep, bind_quoted: [use_opts: use_opts] do
+  #     alias Alfred.NamesAid
+  #
+  #     if use_opts != [] do
+  #       for what when what in [:equipment, :sensor, :sensors] <- use_opts do
+  #         fn_name = [Atom.to_string(what), "_add"] |> Enum.join() |> String.to_atom()
+  #         def unquote(fn_name)(ctx), do: NamesAid.unquote(fn_name)(ctx)
+  #       end
+  #     else
+  #       @behaviour Alfred.NamesAid
+  #
+  #       alias Alfred.NamesAid
+  #
+  #       def equipment_add(ctx), do: NamesAid.equipment_add(ctx)
+  #
+  #       def just_saw(ctx), do: NamesAid.just_saw(ctx)
+  #       def name_add(ctx), do: NamesAid.name_add(ctx)
+  #       def parts_add(ctx), do: NamesAid.parts_add(ctx)
+  #       def parts_add_auto(ctx), do: NamesAid.parts_add_auto(ctx)
+  #       def make_seen_name(ctx), do: NamesAid.make_seen_name(ctx)
+  #
+  #       def name_add(ctx), do: NamesAid.name_add(ctx)
+  #
+  #       def binary_from_opts(type, opts)
+  #           when is_atom(type)
+  #           when is_list(opts)
+  #           when opts != [] do
+  #         Alfred.NamesAid.from_opts(type, opts)
+  #       end
+  #
+  #       def name_to_parts(name)
+  #           when is_binary(name) do
+  #         Alfred.NamesAid.to_parts(name)
+  #       end
+  #
+  #       def unique_with_prefix(prefix, index \\ 4)
+  #           when is_binary(prefix)
+  #           when is_integer(index)
+  #           when index >= 0 and index <= 4 do
+  #         Alfred.NamesAid.unique(prefix, index)
+  #       end
+  #     end
+  #   end
+  # end
 
-  @type ctx_map :: %{
-          optional(:make_name) => name_opts(),
-          optional(:make_parts) => String.t(),
-          optional(:seen_name) => seen_name_opts(),
-          optional(:name) => String.t()
-        }
+  ##
+  ## ExUnit setup functions
+  ##
 
-  @doc "Submits the name in the ctx via Alfred.JustSaw"
-  @callback just_saw(ctx_map) :: %{optional(:just_saw_result) => [String.t(), ...]}
+  @doc """
+  Create a unique equipment name for merge into a test `Exunit` test context.
 
-  @doc "Makes a name for a test context"
+  When context contains`%{equipment_add: opts}` returns `%{equipment: "name"}`.
+  Otherwise returns `:ok`.
 
-  @callback make_name(ctx_map) :: %{optional(:name) => String.t()} | :ok
-  @callback make_parts(ctx_map) :: %{optional(:parts) => name_parts_map()} | :ok
-  @callback make_parts_auto(ctx_map) :: %{optional(:name) => String.t()} | :ok
-  @callback make_seen_name(ctx_map) :: %{optional(:seen_name) => %SeenName{}}
+  This is a specialized function for creating a mutable name.
 
-  @doc "Creates a unique name of specified type using passed opts"
-  @type name_type :: :imm | :mut | :unk
-  @type name_rc :: :ok | :pending | :error | :unknown
-  @type name_opts :: [rc: name_rc, cmd: String.t(), expired_ms: integer(), temp_f: float(), relhum: float()]
-  @callback name_from_opts(type :: atom(), opts :: name_opts()) :: binary()
+  See `Alfred.NamesAid.name_add/1` for available options.
 
-  @doc "Creates a map of the parts of a created unique name"
-  @type name_parts_map() :: %{
-          :name => binary(),
-          :rc => name_rc(),
-          optional(:cmd) => binary(),
-          optional(:expired_ms) => integer(),
-          optional(:temp_f) => float(),
-          optional(:relhum) => float()
-        }
-  @callback name_to_parts(name :: binary()) :: name_parts_map()
-
-  @doc "Creates a unique name with the specified prefix"
-  @callback unique_with_prefix(prefix :: binary(), index :: integer()) :: binary()
-
-  defmacro __using__(_opts) do
-    quote location: :keep do
-      @behaviour Alfred.NamesAid
-
-      alias Alfred.NamesAid
-
-      def just_saw(ctx), do: NamesAid.just_saw(ctx)
-      def make_name(ctx), do: NamesAid.make_name(ctx)
-      def make_parts(ctx), do: NamesAid.make_parts(ctx)
-      def make_parts_auto(ctx), do: NamesAid.make_parts_auto(ctx)
-      def make_seen_name(ctx), do: NamesAid.make_seen_name(ctx)
-
-      def name_from_opts(type, opts)
-          when is_atom(type)
-          when is_list(opts)
-          when opts != [] do
-        Alfred.NamesAid.from_opts(type, opts)
-      end
-
-      def name_to_parts(name)
-          when is_binary(name) do
-        Alfred.NamesAid.to_parts(name)
-      end
-
-      def unique_with_prefix(prefix, index \\ 4)
-          when is_binary(prefix)
-          when is_integer(index)
-          when index >= 0 and index <= 4 do
-        Alfred.NamesAid.unique(prefix, index)
-      end
-    end
-  end
-
-  def from_opts(type, opts) when is_list(opts) do
-    opts_map = Enum.into(opts, %{})
-
-    case type do
-      x when x in [:imm, :immutable] -> immutable(opts_map)
-      x when x in [:mut, :mutable] -> mutable(opts_map)
-      x when x in [:unk, :unknown] -> unknown(opts_map)
-    end
-  end
-
-  def just_saw(ctx) do
+  """
+  def equipment_add(ctx) do
     case ctx do
-      %{seen_name: sn, parts: parts, just_saw: opts} when is_list(opts) ->
+      %{equipment_add: opts} -> %{equipment: binary_from_opts(:mut, opts)}
+      _ -> :ok
+    end
+  end
+
+  def just_saw_add(ctx) do
+    case ctx do
+      %{seen_name: sn, parts: parts, just_saw_add: opts} when is_list(opts) ->
         cb = opts[:callback] || {:module, __MODULE__}
         mut? = parts.type == :mut
 
         js = %JustSaw{mutable?: mut?, callback: cb, seen_list: [sn]}
 
-        %{just_saw: js, just_saw_result: Alfred.just_saw(js)}
+        %{just_saw_add: js, just_saw_result: Alfred.just_saw(js)}
 
       _ ->
         :ok
     end
   end
 
-  def make_seen_name(ctx) do
+  @doc """
+  Create a unique name of type for merge into `ExUnit` test context.
+
+  ## Examples
+  ```
+  # create an unknown name
+  %{name: "unknown_71ceb180f436 unknown"} = NamesAid.name_add(%{name_add: [type: :unk]})
+
+  # create a mutable name with cmd: "on"
+  opts = [type: :mut, cmd: "on"]
+  %{name: "mutable_4e03ab01ad2a ok on"} = NamesAid.name_add(%{name_add: opts]})
+  ```
+
+  ## Options
+
+  | Key  | Values | Description | Comment |
+  | -----| ------ | ----------- | ------- |
+  | `type:`  | `:imm`, `:mut`, `:unk`  | immutable, mutable or unknown | default: `:imm` |
+  | `key:` | `any()` | map key of created name | default: `name:` |
+
+
+  ## Options
+  * `:type` - create `:imm` immutable,  `:mut` mutable or `:unk` unknown name
+  * `:key` - key of created name in returned map (i.e. `%{key => name}`), defaults to :name
+
+  """
+  def name_add(ctx) do
+    case ctx do
+      %{name_add: opts} ->
+        {type, opts_rest} = Keyword.pop(opts, :type)
+        {key, opts_rest} = Keyword.pop(opts_rest, :key, :name)
+
+        %{key => binary_from_opts(type, opts_rest)}
+
+      _ ->
+        :ok
+    end
+  end
+
+  def parts_add(ctx) do
+    case ctx do
+      %{parts_add: name} -> %{parts: binary_to_parts(name)}
+      _ -> :ok
+    end
+  end
+
+  def parts_add_auto(ctx) do
+    case ctx do
+      %{name: name} -> %{parts_add: name}
+      _ -> :ok
+    end
+  end
+
+  def seen_name_add(ctx) do
     case ctx do
       %{name: name, parts: parts} ->
         expired_ms = (parts[:expired_ms] || 0) * -1
@@ -123,40 +201,56 @@ defmodule Alfred.NamesAid do
     end
   end
 
-  def make_name(ctx) do
+  def sensor_add(ctx) do
     case ctx do
-      %{make_name: opts} ->
-        {type, opts_rest} = Keyword.pop(opts, :type)
-        {key, opts_rest} = Keyword.pop(opts_rest, :key, :name)
-
-        %{key => from_opts(type, opts_rest)}
-
-      _ ->
-        :ok
-    end
-  end
-
-  def make_parts(ctx) do
-    case ctx do
-      %{make_parts: name} -> %{parts: to_parts(name)}
+      %{sensor_add: opts} when is_list(opts) -> %{sensor: binary_from_opts(:imm, opts)}
       _ -> :ok
     end
   end
 
-  def make_parts_auto(ctx) do
-    case ctx do
-      %{name: name} -> %{make_parts: name}
-      _ -> :ok
+  def sensors_add(%{sensors_add: []}) do
+    temps = [11.0, 11.1, 11.2, 6.2]
+    default_opts = Enum.each(temps, fn temp_f -> [temp_f: temp_f] end)
+
+    %{sensors_add: default_opts}
+    |> sensors_add()
+  end
+
+  def sensors_add(%{sensors_add: multiple_sensor_opts})
+      when is_list(multiple_sensor_opts) do
+    for sensor_opts when is_list(sensor_opts) <- multiple_sensor_opts do
+      %{sensor_add: sensor_opts} |> sensor_add() |> Map.get(:sensor)
+    end
+    |> then(fn sensors -> %{sensors: sensors} end)
+  end
+
+  def sensors_add(_ctx), do: :ok
+
+  ##
+  ## Binary conversions - from opts and to_parts
+  ##
+
+  def binary_from_opts(type, opts) when is_list(opts) do
+    opts_map = Enum.into(opts, %{})
+
+    case type do
+      x when x in [:imm, :immutable] -> immutable(opts_map)
+      x when x in [:mut, :mutable] -> mutable(opts_map)
+      x when x in [:unk, :unknown] -> unknown(opts_map)
     end
   end
 
-  def to_parts(name) when is_binary(name) do
+  def binary_to_parts(name) when is_binary(name) do
     case regex_common(name) do
       %{type: :mut, args: args} = x -> regex_mutable(args) |> merge_and_clean(x)
       %{type: :imm, args: args} = x -> regex_immutable(args) |> merge_and_clean(x)
       %{type: :unk} = x -> %{rc: :unkown} |> Map.merge(x)
     end
   end
+
+  ##
+  ## Misc
+  ##
 
   def unique(prefix, index \\ 4)
       when is_binary(prefix)
