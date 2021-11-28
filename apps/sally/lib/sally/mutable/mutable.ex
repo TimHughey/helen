@@ -45,9 +45,7 @@ defmodule Sally.Mutable do
 
     case status(dev_alias, []) do
       status when pin_cmd == :no_pin ->
-        [inspect(status, pretty: true), "\n", inspect(data, pretty: true)]
-        |> IO.iodata_to_binary()
-        |> Logger.warn()
+        report_cmd_mismatch(dev_alias, status, :no_pin)
 
         :no_change
 
@@ -60,17 +58,8 @@ defmodule Sally.Mutable do
         :no_change
 
       # out of alignment
-      status ->
-        [
-          "out of alignment\n",
-          inspect(dev_alias, pretty: true),
-          "\n",
-          inspect(status, pretty: true),
-          "\n",
-          inspect(data, pretty: true)
-        ]
-        |> IO.iodata_to_binary()
-        |> Logger.info()
+      %MutStatus{} = status ->
+        report_cmd_mismatch(dev_alias, status, pin_cmd)
 
         Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
     end
@@ -148,8 +137,6 @@ defmodule Sally.Mutable do
   end
 
   @doc false
-  # finds a pin status in a list shaped:
-  #  [ [0, "on"], [1, "off"], [2, "some cmd"], ... ]
   def pin_status(pins, pin_num) do
     for [^pin_num, status] when is_binary(status) <- pins, reduce: :no_pin do
       _ -> status
@@ -180,6 +167,19 @@ defmodule Sally.Mutable do
       %DevAlias{cmds: [%Command{acked: false}]} -> true
       _ -> false
     end
+  end
+
+  defp report_cmd_mismatch(%DevAlias{} = da, %MutStatus{} = mut, pin_cmd) do
+    tags = [
+      align_status: true,
+      mismatch: true,
+      reported_cmd: pin_cmd,
+      local_cmd: mut.cmd,
+      status_error: mut.error,
+      name: da.name
+    ]
+
+    Betty.app_error(__MODULE__, tags)
   end
 
   defp ttl_expired?(%DevAlias{updated_at: dev_alias_at} = dev_alias, opts) do

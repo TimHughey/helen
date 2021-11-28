@@ -86,19 +86,6 @@ defmodule Sally.DevAlias do
     |> Repo.insert(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
   end
 
-  # def create!(%Device{} = device, opts) do
-  #   dev_alias = Ecto.build_assoc(device, :aliases)
-  #
-  #   %{
-  #     name: opts[:name],
-  #     pio: opts[:pio],
-  #     description: opts[:description] || dev_alias.description,
-  #     ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
-  #   }
-  #   |> changeset(dev_alias)
-  #   |> Repo.insert!(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
-  # end
-
   def delete(name_or_id) do
     with %Schema{} = a <- find(name_or_id) |> load_command_ids() |> load_datapoint_ids(),
          {:ok, cmd_count} <- Command.purge(a, :all),
@@ -225,6 +212,8 @@ defmodule Sally.DevAlias do
   #    )
   #    |> repo.all()}
   # end
+
+  # TODO: rationalize load_aliases_with_last_cmd/2
 
   def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
     alias Ecto.Query
