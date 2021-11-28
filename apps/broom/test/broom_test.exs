@@ -27,7 +27,7 @@ defmodule BroomTest do
 
   test "can Broom create a child_spec for the using module", ctx do
     spec = ctx.impl_mod.child_spec(initial: :test)
-    should_be_non_empty_map(spec)
+    Should.Be.NonEmpty.map(spec)
     should_contain(spec, id: ctx.impl_mod)
   end
 

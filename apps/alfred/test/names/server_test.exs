@@ -43,7 +43,7 @@ defmodule Alfred.NamesServerTest do
     test "handles when the server is available", ctx do
       res = Server.call(:known, ctx.call_opts)
 
-      should_be_list(res)
+      Should.Be.list(res)
     end
   end
 
@@ -102,7 +102,7 @@ defmodule Alfred.NamesServerTest do
       res = Server.handle_call({:delete, "unknown"}, nil, new_state)
       {result, new_state} = should_be_reply_tuple_with_state(res, State)
 
-      should_be_non_empty_map(new_state.known)
+      Should.Be.NonEmpty.map(new_state.known)
       should_be_equal(result, nil)
     end
   end

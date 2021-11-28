@@ -9,42 +9,6 @@ defmodule Should do
     end
   end
 
-  @doc "Asserts true when passed a binary"
-  defmacro should_be_binary(check) do
-    quote bind_quoted: [check: check] do
-      assert is_binary(check), msg(check, "should be binary")
-    end
-  end
-
-  @doc """
-  Asserts true if the `Enumerable `contains the key `:cmd` and it's value is equal to `what`
-
-  ```
-  should_contain_key(check, :cmd)
-  assert check[:cmd] == what, msg(check, ":cmd key should be equal", what)
-  ```
-
-  """
-  defmacro should_be_cmd_equal(check, what) do
-    quote bind_quoted: [check: check, what: what] do
-      should_contain_key(check, :cmd)
-      assert check[:cmd] == what, msg(check, ":cmd key should be equal", what)
-    end
-  end
-
-  @doc """
-  Asserts true if the passed value is a `%DateTime{}`
-
-  ```
-  should_be_struct(unquote(check), DateTime)
-  ```
-  """
-  defmacro should_be_datetime(check) do
-    quote location: :keep do
-      should_be_struct(unquote(check), DateTime)
-    end
-  end
-
   @doc """
   Asserts true if `check` is greater than `dt`
 
@@ -53,12 +17,6 @@ defmodule Should do
   defmacro should_be_datetime_greater_than(check, dt) do
     quote bind_quoted: [check: check, dt: dt] do
       assert DateTime.compare(check, dt) == :gt, msg(check, "should be greater than", dt)
-    end
-  end
-
-  defmacro should_be_simple_ok(check) do
-    quote bind_quoted: [check: check] do
-      assert check == :ok, msg(check, "should be :ok")
     end
   end
 
@@ -90,12 +48,6 @@ defmodule Should do
     end
   end
 
-  defmacro should_be_list(check) do
-    quote bind_quoted: [check: check] do
-      assert is_list(check), msg(check, "should be list")
-    end
-  end
-
   defmacro should_be_empty_map(check) do
     quote bind_quoted: [check: check] do
       assert is_map(check), msg(check, "should be empty map")
@@ -123,7 +75,7 @@ defmodule Should do
 
   defmacro should_be_map_with_keys(map, keys) do
     quote bind_quoted: [map: map, keys: keys] do
-      should_be_non_empty_map(map)
+      Should.Be.NonEmpty.map(map)
 
       for key <- keys do
         assert is_map_key(map, key), msg(map, "should contain key #{inspect(key)}")
@@ -133,7 +85,7 @@ defmodule Should do
 
   defmacro should_be_map_with_size(map, size) do
     quote bind_quoted: [map: map, size: size] do
-      should_be_non_empty_map(map)
+      Should.Be.NonEmpty.map(map)
       assert map_size(map) == size, msg(map, "should be size", size)
     end
   end
@@ -157,14 +109,6 @@ defmodule Should do
       assert is_list(check), fail
       refute [] == check, fail
       assert length(check) == len, fail
-    end
-  end
-
-  defmacro should_be_non_empty_map(check) do
-    quote bind_quoted: [check: check] do
-      fail = msg(check, "should be non-empty map")
-      assert is_map(check), fail
-      assert map_size(check) > 0, fail
     end
   end
 
@@ -361,7 +305,7 @@ defmodule Should do
 
   defmacro should_be_status_map(x) do
     quote bind_quoted: [x: x] do
-      should_be_non_empty_map(x)
+      Should.Be.NonEmpty.map(x)
       should_contain_key(x, :name)
       should_contain_key(x, :cmd)
       should_contain_key(x, :cmd_last)
@@ -414,11 +358,11 @@ defmodule Should do
 
   defmacro should_contain_binaries(check, binaries) do
     quote bind_quoted: [check: check, binaries: binaries] do
-      should_be_binary(check)
-      should_be_list(binaries)
+      Should.Be.binary(check)
+      Should.Be.list(binaries)
 
       for x <- binaries do
-        should_be_binary(x)
+        Should.Be.binary(x)
 
         assert String.contains?(check, x), msg(check, "should contain #{x}")
       end

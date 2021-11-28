@@ -4,8 +4,8 @@ defmodule Alfred.NotifyEntryTest do
 
   @moduletag alfred: true, alfred_notify_entry: true
 
-  alias Alfred.Notify.{Entry, Memo}
   alias Alfred.NamesAid
+  alias Alfred.Notify.{Entry, Memo}
 
   defmacro should_receive_memo_for(entry, opts) do
     quote location: :keep, bind_quoted: [entry: entry, opts: opts] do
@@ -109,10 +109,10 @@ defmodule Alfred.NotifyEntryTest do
     entry = Entry.new(final_args)
 
     should_be_struct(entry, Entry)
-    should_be_binary(entry.name)
+    Should.Be.binary(entry.name)
     should_be_reference(entry.ref)
     should_be_reference(entry.monitor_ref)
-    should_be_datetime(entry.last_notify_at)
+    Should.Be.struct(entry.last_notify_at, DateTime)
     should_be_integer(entry.ttl_ms)
     should_be_integer(entry.interval_ms)
     should_be_integer(entry.missing_ms)

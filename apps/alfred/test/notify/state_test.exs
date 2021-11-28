@@ -93,7 +93,7 @@ defmodule Alfred.NotifyStateTest do
       new_state = State.unregister(make_ref(), state)
       should_be_struct(new_state, State)
 
-      should_be_non_empty_map(new_state.registrations)
+      Should.Be.NonEmpty.map(new_state.registrations)
     end
   end
 

@@ -74,25 +74,25 @@ defmodule LegacyDbTest do
 
   test "pwm lookup alias details" do
     res = LegacyDb.pwm_alias("front leds porch")
-    should_be_non_empty_map(res)
+    Should.Be.NonEmpty.map(res)
     should_contain_key(res, :name)
   end
 
   test "sensor lookup alias details" do
     res = LegacyDb.sensor_alias("display_tank")
-    should_be_non_empty_map(res)
+    Should.Be.NonEmpty.map(res)
     should_contain_key(res, :host)
   end
 
   test "switch lookup alias details" do
     res = LegacyDb.switch_alias("display tank heater")
-    should_be_non_empty_map(res)
+    Should.Be.NonEmpty.map(res)
     should_contain_key(res, :pio)
   end
 
   test "ds sensor lookup by device name" do
     res = LegacyDb.ds_sensor("ds.280cd73a1a1901")
-    should_be_non_empty_map(res)
+    Should.Be.NonEmpty.map(res)
     should_contain_value(res, "lab window west")
   end
 end

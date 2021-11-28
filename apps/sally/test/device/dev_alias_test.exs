@@ -58,7 +58,7 @@ defmodule SallyDevAliasTest do
 
   describe "Sally.devalias_delete/1" do
     @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
-    @tag command_add: [count: 1000, shift_unit: :days, shift_increment: -1]
+    @tag command_add: [count: 250, shift_unit: :days, shift_increment: -1]
     test "deletes a mutable DevAlias name", ctx do
       ctx.dev_alias.name
       |> Sally.devalias_delete()
@@ -67,7 +67,7 @@ defmodule SallyDevAliasTest do
     end
 
     @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
-    @tag datapoint_add: [count: 1000, shift_unit: :days, shift_increment: -1]
+    @tag datapoint_add: [count: 250, shift_unit: :days, shift_increment: -1]
     test "deletes an immutable DevAlias name", ctx do
       ctx.dev_alias.name
       |> Sally.devalias_delete()

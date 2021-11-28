@@ -52,7 +52,7 @@ defmodule Alfred.NotifyServerTest do
     test "honors :notify_server opt", ctx do
       res = Server.cast({:notify, []}, ctx.call_opts)
 
-      should_be_simple_ok(res)
+      Should.Be.ok(res)
     end
   end
 
@@ -80,7 +80,7 @@ defmodule Alfred.NotifyServerTest do
     @tag register_name: []
     test "handles {:unregister, opts} messages", %{ticket: ticket, call_opts: call_opts} do
       res = Server.call({:unregister, ticket.ref}, call_opts)
-      should_be_simple_ok(res)
+      Should.Be.ok(res)
     end
   end
 
@@ -89,7 +89,7 @@ defmodule Alfred.NotifyServerTest do
     @tag seen_list: [include_ticket: [ttl_ms: 15_000], count: 100]
     test "handles {:notify, seen_list}", ctx do
       res = Server.cast({:notify, ctx.seen_list}, ctx.call_opts)
-      should_be_simple_ok(res)
+      Should.Be.ok(res)
 
       receive do
         {Alfred, memo} ->

@@ -181,8 +181,8 @@ defmodule AlfredTest do
 
       first = List.first(known)
       {check_name, check_dt} = should_be_tuple_with_size(first, 2)
-      should_be_binary(check_name)
-      should_be_datetime(check_dt)
+      Should.Be.binary(check_name)
+      Should.Be.struct(check_dt, DateTime)
 
       found? = Enum.any?(known, fn {x, _dt} -> x == name end)
       assert found?, msg(known, "should contain a tuple for", name)
@@ -196,7 +196,7 @@ defmodule AlfredTest do
 
       first = List.first(known)
       {check_name, check_ms} = should_be_tuple_with_size(first, 2)
-      should_be_binary(check_name)
+      Should.Be.binary(check_name)
       assert is_integer(check_ms), msg(check_ms, "should be an integer")
 
       found? = Enum.any?(known, fn {x, _dt} -> x == name end)
@@ -207,11 +207,11 @@ defmodule AlfredTest do
   defmacro should_be_good_immutable_status(status) do
     quote bind_quoted: [status: status] do
       should_be_struct(status, Alfred.ImmutableStatus)
-      should_be_binary(status.name)
+      Should.Be.binary(status.name)
       should_be_true(status.good?)
       should_be_true(status.found?)
       should_be_map_with_keys(status.datapoints, [:temp_f])
-      should_be_datetime(status.status_at)
+      Should.Be.struct(status.status_at, DateTime)
       should_be_false(status.ttl_expired?)
       should_be_equal(status.error, :none)
     end
@@ -220,11 +220,11 @@ defmodule AlfredTest do
   defmacro should_be_good_mutable_status(status) do
     quote bind_quoted: [status: status] do
       should_be_struct(status, Alfred.MutableStatus)
-      should_be_binary(status.name)
+      Should.Be.binary(status.name)
       should_be_true(status.good?)
       should_be_true(status.found?)
-      should_be_binary(status.cmd)
-      should_be_datetime(status.status_at)
+      Should.Be.binary(status.cmd)
+      Should.Be.struct(status.status_at, DateTime)
       should_be_false(status.ttl_expired?)
       should_be_equal(status.error, :none)
     end
@@ -313,7 +313,7 @@ defmodule AlfredTest do
 
       res = Alfred.notify_unregister(ticket.ref)
 
-      should_be_simple_ok(res)
+      Should.Be.ok(res)
     end
   end
 end

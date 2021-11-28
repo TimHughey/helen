@@ -257,7 +257,7 @@ defmodule Alfred do
       callback_failure(kn, msg)
   end
 
-  defp status_for_known_name(%KnownName{name: name} = kn, _opts) do
+  defp status_for_known_name(%KnownName{name: name}, _opts) do
     ImmutableStatus.not_found(name)
   end
 end
