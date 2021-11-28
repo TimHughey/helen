@@ -56,11 +56,15 @@ defmodule Sally.Mutable do
         :no_change
 
       # nothing to align, local cmd matches reported cmd
-      %MutStatus{cmd: ^pin_cmd} ->
+      %MutStatus{cmd: local_cmd} when local_cmd == pin_cmd ->
         :no_change
 
       # out of alignment
-      _ ->
+      status ->
+        ["out of alignment\n", inspect(status, pretty: true), "\n", inspect(data, pretty: true)]
+        |> IO.iodata_to_binary()
+        |> Logger.info()
+
         Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
     end
   end
