@@ -42,12 +42,22 @@ defmodule BettyTest do
   end
 
   test "can Betty write an %AppError{} to the database", _ctx do
-    metric_rc = Betty.app_error(__MODULE__, env: :test, success: false, temp_f: 78.7, val: 42)
-    should_be_equal(metric_rc, __MODULE__)
+    rc = Betty.app_error(__MODULE__, env: :test, success: false, temp_f: 78.7, val: 42)
+
+    Should.Be.asserted(fn -> rc == __MODULE__ end)
   end
 
   test "Betty.runtime_metric/3 can write a runtime metric with tags and fields", _ctx do
-    metric_rc = Betty.runtime_metric(__MODULE__, [name: "test"], val: 1)
-    should_be_equal(metric_rc, __MODULE__)
+    rc = Betty.runtime_metric(__MODULE__, [name: "test"], val: 1)
+    Should.Be.asserted(fn -> rc == __MODULE__ end)
+  end
+
+  describe "Betty.app_error/2" do
+    @tag capture_log: true
+    test "detects and logs invalid args" do
+      rc = Betty.app_error(nil, [])
+
+      Should.Be.asserted(fn -> is_nil(rc) end)
+    end
   end
 end

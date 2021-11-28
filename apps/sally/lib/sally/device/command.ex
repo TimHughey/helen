@@ -77,6 +77,14 @@ defmodule Sally.Command do
     end
   end
 
+  @doc """
+  Load the `Sally.DevAlias`, if needed
+  """
+  @doc since: "0.5.15"
+  def load_dev_alias(cmd) when is_struct(cmd) or is_nil(cmd) do
+    cmd |> Repo.preload(:dev_alias)
+  end
+
   def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
     all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
     batches = Enum.chunk_every(all_ids, batch_size)

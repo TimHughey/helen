@@ -3,31 +3,13 @@ defmodule Betty do
 
   alias Betty.{AppError, Connection, Metric}
 
-  # def app_error(module, tags) when is_atom(module) and is_list(tags) do
-  #   AppError.new(module, tags) |> AppError.write()
-  # end
-  #
-  # def app_error(%{server_name: module} = pass_through, tags)
-  #     when is_atom(module) and is_list(tags) do
-  #   app_error(module, tags)
-  #
-  #   pass_through
-  # end
-  #
-  # def app_error(opts, tags) when is_list(opts) do
-  #   Enum.into(opts, %{}) |> app_error(tags)
-  # end
-  #
-  # def app_error(_, _), do: :invalid_args
-
   def app_error(passthrough, tags) do
     case {passthrough, tags} do
-      {x, tags} when is_nil(x) or tags == [] or not is_list(tags) -> :failed
-      {x, tags} when is_atom(x) -> AppError.record(x, tags)
-      {x, tags} when is_list(x) -> Enum.into(x, %{}) |> app_error(tags)
+      {x, tags} when is_atom(x) and not is_nil(x) -> AppError.record(x, tags)
+      {x, tags} when is_list(x) and x != [] -> Enum.into(x, %{}) |> app_error(tags)
       {%{server_name: module}, tags} -> app_error(module, tags)
       {%{module: module}, tags} -> app_error(module, tags)
-      _ -> :failed
+      x -> log_app_error_failed(x)
     end
 
     passthrough
@@ -115,10 +97,20 @@ defmodule Betty do
   defp find_module(x) do
     case x do
       module when is_atom(module) -> module
-      list when is_list(list) and list != [] -> Enum.into(list, %{}) |> find_module()
+      x when is_list(x) and x != [] -> Enum.into(x, %{}) |> find_module()
       %{server_name: module} -> module |> find_module()
       %{module: module} -> module |> find_module()
       _ -> :no_module
     end
+  end
+
+  defp log_app_error_failed({passthrough, tags}) do
+    require Logger
+
+    ["\n", "passthrough: ", inspect(passthrough, pretty: true), "\n", "tags: ", inspect(tags, pretty: true)]
+    |> IO.iodata_to_binary()
+    |> Logger.error()
+
+    :failed
   end
 end

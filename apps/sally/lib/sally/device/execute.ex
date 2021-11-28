@@ -19,11 +19,10 @@ defmodule Sally.Execute do
   def ack(%TrackerEntry{} = te, disposition, %DateTime{} = ack_at \\ DateTime.utc_now())
       when is_atom(disposition)
       when disposition in [:ack, :orphan] do
-    alias Ecto.Multi
     cs = Command.ack_now_cs(te.schema_id, te.sent_at, ack_at, disposition)
 
-    Multi.new()
-    |> Multi.update(:command, cs, returning: true)
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:command, cs, returning: true)
     |> Repo.transaction()
   end
 
@@ -68,7 +67,7 @@ defmodule Sally.Execute do
   def track_timeout(%TrackerEntry{} = te) do
     case Command.load(te.schema_id) do
       {:ok, %Command{acked: true} = x} -> x
-      {:ok, %Command{acked: false}} -> ack(te, :orphan)
+      {:ok, %Command{acked: false}} -> ack(te, :orphan) |> log_orphan()
       {:error, _error} = rc -> rc
     end
   end
@@ -91,5 +90,14 @@ defmodule Sally.Execute do
         {:add_cmd, false} -> :no_change
       end
     end)
+  end
+
+  defp log_orphan({:ok, %{command: schema}} = passthrough) do
+    cmd = Command.load_dev_alias(schema)
+
+    tags = [mutable: cmd.dev_alias.name, cmd: cmd.cmd, orphaned: true, refid: cmd.refid]
+    Betty.app_error(Execute, tags)
+
+    passthrough
   end
 end
