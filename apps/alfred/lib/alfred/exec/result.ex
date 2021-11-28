@@ -10,7 +10,7 @@ defmodule Alfred.ExecResult do
             refid: nil,
             track_timeout_ms: nil,
             will_notify_when_released: false,
-            instruct: nil
+            instruct: :none
 
   @type exec_rc :: :ok | :pending | :not_found | {:ttl_expired, pos_integer()} | {:invalid, String.t()}
 
@@ -21,7 +21,7 @@ defmodule Alfred.ExecResult do
           refid: nil | String.t(),
           track_timeout_ms: nil | pos_integer(),
           will_notify_when_released: boolean(),
-          instruct: nil | struct()
+          instruct: :none | struct()
         }
 
   def error(name, rc), do: %ExecResult{name: name, rc: rc}
@@ -35,7 +35,7 @@ defmodule Alfred.ExecResult do
           cmd: ec.cmd,
           refid: opts[:refid],
           track_timeout_ms: opts[:track_timeout_ms],
-          will_notify_when_released: if(is_boolean(opts[:will_notify]), do: opts[:will_notify], else: false),
+          will_notify_when_released: Keyword.get(opts, :will_notify, false),
           instruct: opts[:instruct]
         }
 
