@@ -61,7 +61,14 @@ defmodule Sally.Mutable do
 
       # out of alignment
       status ->
-        ["out of alignment\n", inspect(status, pretty: true), "\n", inspect(data, pretty: true)]
+        [
+          "out of alignment\n",
+          inspect(dev_alias, pretty: true),
+          "\n",
+          inspect(status, pretty: true),
+          "\n",
+          inspect(data, pretty: true)
+        ]
         |> IO.iodata_to_binary()
         |> Logger.info()
 
