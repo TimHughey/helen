@@ -18,6 +18,19 @@ defmodule Helen.MixProject do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test
+      ],
+
+      ## Docs
+      name: "Helen",
+      source_url: "https://github.com/timhughey/helen",
+      homepage_url: "http://www.wisslanding.com",
+      docs: [
+        # The main page in the docs
+        main: "readme",
+        # logo: "path/to/logo.png",
+        extras: ["README.md"],
+        groups_for_modules: [],
+        nest_modules_by_prefix: []
       ]
     ]
   end
@@ -28,7 +41,9 @@ defmodule Helen.MixProject do
   #
   # Run "mix help deps" for examples and options.
   defp deps do
-    []
+    [
+      {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false}
+    ]
   end
 
   defp releases do

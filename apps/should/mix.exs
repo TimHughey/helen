@@ -33,7 +33,7 @@ defmodule Should.MixProject do
   defp deps do
     [
       {:excoveralls, "~> 0.10", only: :test},
-      {:ex_doc, "~> 0.24", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false}
     ]
   end
 
