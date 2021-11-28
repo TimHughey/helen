@@ -214,21 +214,38 @@ defmodule Sally.DevAlias do
     |> Repo.one()
   end
 
-  def load_aliases_with_last_cmd(repo, multi_changes) do
-    cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
+  # def load_aliases_with_last_cmd(repo, multi_changes) do
+  #   cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
+  #
+  #   {:ok,
+  #    Ecto.Query.from(a in Schema,
+  #      where: a.device_id == ^multi_changes.device.id,
+  #      order_by: [asc: a.pio],
+  #      preload: [cmds: ^cmd_q]
+  #    )
+  #    |> repo.all()}
+  # end
 
-    {:ok,
-     Ecto.Query.from(a in Schema,
-       where: a.device_id == ^multi_changes.device.id,
-       order_by: [asc: a.pio],
-       preload: [cmds: ^cmd_q]
-     )
-     |> repo.all()}
+  def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
+    alias Ecto.Query
+
+    q = Query.from(a in Schema, where: a.device_id == ^device.id, order_by: [asc: a.pio])
+
+    for %Schema{} = schema <- repo.all(q) do
+      schema |> load_command_last()
+    end
+    |> then(fn dev_aliases -> {:ok, dev_aliases} end)
   end
 
   defp load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])
     Repo.preload(schema_or_nil, [cmds: q], force: true)
+  end
+
+  defp load_command_last(%Schema{} = schema) do
+    cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
+
+    schema |> Repo.preload(cmds: cmd_q)
   end
 
   defp load_datapoint_ids(schema_or_nil) do
