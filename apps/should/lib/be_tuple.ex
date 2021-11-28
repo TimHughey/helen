@@ -163,6 +163,31 @@ defmodule Should.Be.Tuple do
   end
 
   @doc """
+  Asserts when `x` is a `{rc, struct}` tuple and returns struct
+
+  ```
+  {rc, struct} = Should.Be.Tuple.with_size(x, 2)
+  assert rc == want_rc, Should.msg(rc, "should be", want_rc)
+  Should.Be.struct(struct, want_struct)
+
+  # return the struct
+  struct
+  ```
+
+  """
+  @doc since: "0.6.17"
+  defmacro with_rc_and_struct(x, want_rc, want_struct) do
+    quote location: :keep, bind_quoted: [x: x, want_rc: want_rc, want_struct: want_struct] do
+      {rc, struct} = Should.Be.Tuple.with_size(x, 2)
+      assert rc == want_rc, Should.msg(rc, "should be", want_rc)
+      Should.Be.struct(struct, want_struct)
+
+      # return the struct
+      struct
+    end
+  end
+
+  @doc """
   Asserts when `x` is a tuple with size then returns tuple
 
   ```
