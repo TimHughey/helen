@@ -83,4 +83,16 @@ defmodule SallyExecuteTest do
       end
     end
   end
+
+  describe "Sally.Execute.tracked_counts" do
+    alias Broom.Counts
+
+    test "/0 returns current counts" do
+      Execute.tracked_counts() |> Should.Be.struct(Counts)
+    end
+
+    test "_reset/1 resets :orphaned and :errors by default" do
+      Execute.tracked_counts_reset() |> Should.Be.Tuple.with_rc_and_struct(:reset, Counts)
+    end
+  end
 end

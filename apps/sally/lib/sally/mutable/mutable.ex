@@ -84,7 +84,7 @@ defmodule Sally.Mutable do
   ```
   status("name", [ttl_ms: 1000])  # override %DevAlias{ttl_ms: _}
 
-  status("name", [need_dev_alias: ttue])  # returns {%DevAlias{}, %MutableStatus{}}
+  status("name", [need_dev_alias: true])  # returns {%DevAlias{}, %MutableStatus{}}
   ```
   """
   @doc since: "0.5.10"

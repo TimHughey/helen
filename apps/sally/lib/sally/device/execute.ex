@@ -30,11 +30,12 @@ defmodule Sally.Execute do
   def cmd(%ExecCmd{} = ec, _opts \\ []) do
     # NOTE!
     #
-    # 1. Broom.track/2 must be invoked outside the cmd insert to ensure the command is available
-    #    when immediate ack is requested
+    # 1. Broom.track/2 must be invoked outside the cmd insert to ensure
+    #    the command is available when immediate ack is requested
     #
-    # 2. insert_cmd_if_needed/1 *MUST* preload the dev alias, device and host for downstream
-    # with %ExecCmd{valid?: true} = ec <- ExecCmd.validate(ec),
+    # 2. insert_cmd_if_needed/1 *MUST* preload the dev alias, device and host
+    #    for downstream
+    #
     with {:ok, %ExecCmd{inserted_cmd: %Command{}} = ec} <- insert_cmd_if_needed(ec),
          {:ok, %TrackerEntry{} = te} <- track(ec.inserted_cmd, ec.cmd_opts) do
       # everything is in order, send the command to the remote host
@@ -53,6 +54,14 @@ defmodule Sally.Execute do
 
   def track(%Command{} = cmd, opts) when is_list(opts) do
     Broom.track(cmd, opts)
+  end
+
+  @doc since: "0.5.14"
+  def tracked_counts, do: Broom.counts()
+
+  @doc since: "0.5.14"
+  def tracked_counts_reset(opts \\ [:orphaned, :errors]) when is_list(opts) do
+    Broom.counts_reset(opts)
   end
 
   @impl true

@@ -4,7 +4,7 @@ defmodule Sally.MixProject do
   def project do
     [
       app: :sally,
-      version: "0.5.13",
+      version: "0.5.14",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -88,7 +88,7 @@ defmodule Sally.MixProject do
       {:betty, in_umbrella: true},
       {:broom, in_umbrella: true},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
       {:should, in_umbrella: true, only: :test, runtime: false},
       {:excoveralls, "~> 0.10", only: :test}
     ]
