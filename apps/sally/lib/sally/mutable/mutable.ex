@@ -20,8 +20,7 @@ defmodule Sally.Mutable do
   @doc since: "0.5.10"
   @spec align_status_cs(changes_map, data_map, seen_at) :: Ecto.Multi.t()
   # (1 of 2) handle well formed changes map with a list of aliases
-  def align_status_cs(%{aliases: [%DevAlias{} | _]} = changes, data, %DateTime{} = seen_at)
-      when is_map_key(data, :pins) do
+  def align_status_cs(%{aliases: [_ | _]} = changes, %{pins: _} = data, %DateTime{} = seen_at) do
     for %DevAlias{} = dev_alias <- changes.aliases, reduce: Multi.new() do
       acc ->
         multi_name = String.to_atom("aligned_#{dev_alias.pio}")
@@ -42,15 +41,27 @@ defmodule Sally.Mutable do
   """
   @spec align_status_cs_one(Ecto.Schema.t(), data_map(), seen_at) :: Ecto.Changset.t() | :nochange
   def align_status_cs_one(dev_alias, data, seen_at) do
-    cmd = pin_status(data.pins, dev_alias.pio)
+    pin_cmd = pin_status(data.pins, dev_alias.pio)
 
     case status(dev_alias, []) do
+      status when pin_cmd == :no_pin ->
+        [inspect(status, pretty: true), "\n", inspect(data, pretty: true)]
+        |> IO.iodata_to_binary()
+        |> Logger.warn()
+
+        :no_change
+
       # there's a cmd pending, don't get in the way of ack or ack timeout
-      %MutStatus{pending?: true} -> :no_change
+      %MutStatus{pending?: true} ->
+        :no_change
+
       # nothing to align, local cmd matches reported cmd
-      %MutStatus{cmd: ^cmd} -> :no_change
+      %MutStatus{cmd: ^pin_cmd} ->
+        :no_change
+
       # out of alignment
-      _ -> Command.reported_cmd_changeset(dev_alias, cmd, seen_at)
+      _ ->
+        Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
     end
   end
 
@@ -129,7 +140,7 @@ defmodule Sally.Mutable do
   # finds a pin status in a list shaped:
   #  [ [0, "on"], [1, "off"], [2, "some cmd"], ... ]
   def pin_status(pins, pin_num) do
-    for [pin, status] <- pins, pin == pin_num, reduce: nil do
+    for [^pin_num, status] when is_binary(status) <- pins, reduce: :no_pin do
       _ -> status
     end
   end
