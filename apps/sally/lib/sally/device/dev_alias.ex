@@ -224,7 +224,7 @@ defmodule Sally.DevAlias do
     all_query =
       from(a in Schema,
         where: [device_id: ^device.id],
-        order_by: [asc: :sent_at],
+        order_by: [asc: a.pio],
         preload: [cmds: ^cmd_query]
       )
 
