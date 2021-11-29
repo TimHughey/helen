@@ -294,6 +294,13 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: command_dev_alias_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX command_dev_alias_id_index ON public.command USING btree (dev_alias_id);
+
+
+--
 -- Name: command_refid_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -380,3 +387,4 @@ ALTER TABLE ONLY public.device
 
 INSERT INTO public."schema_migrations" (version) VALUES (20210526202613);
 INSERT INTO public."schema_migrations" (version) VALUES (20211101114631);
+INSERT INTO public."schema_migrations" (version) VALUES (20211129190841);

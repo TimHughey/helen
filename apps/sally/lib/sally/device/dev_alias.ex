@@ -114,6 +114,20 @@ defmodule Sally.DevAlias do
     end
   end
 
+  def explain(name, opts \\ [analyze: true]) do
+    import Ecto.Query, only: [where: 2]
+
+    %Schema{id: schema_id} = find(name)
+
+    query = Command.query_preload_latest_cmd(schema_id)
+
+    for line <- Repo.explain(:all, query, opts) |> String.split("\n") do
+      IO.puts(line)
+    end
+
+    :ok
+  end
+
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
     case Repo.get_by(Schema, opts) do
@@ -187,11 +201,12 @@ defmodule Sally.DevAlias do
   end
 
   def load_cmd_last(%Schema{} = x) do
-    Repo.preload(x, cmds: Ecto.Query.from(d in Command, order_by: [desc: d.sent_at], limit: 1))
+    cmd_query = Command.query_preload_latest_cmd()
+    Repo.preload(x, cmds: cmd_query)
   end
 
   def load_alias_with_last_cmd(name) when is_binary(name) do
-    cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
+    cmd_q = Command.query_preload_latest_cmd()
 
     Ecto.Query.from(a in Schema,
       where: a.name == ^name,
@@ -201,40 +216,24 @@ defmodule Sally.DevAlias do
     |> Repo.one()
   end
 
-  # def load_aliases_with_last_cmd(repo, multi_changes) do
-  #   cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
-  #
-  #   {:ok,
-  #    Ecto.Query.from(a in Schema,
-  #      where: a.device_id == ^multi_changes.device.id,
-  #      order_by: [asc: a.pio],
-  #      preload: [cmds: ^cmd_q]
-  #    )
-  #    |> repo.all()}
-  # end
-
-  # TODO: rationalize load_aliases_with_last_cmd/2
-
   def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
-    alias Ecto.Query
+    import Ecto.Query, only: [from: 2]
 
-    q = Query.from(a in Schema, where: a.device_id == ^device.id, order_by: [asc: a.pio])
+    cmd_query = Command.query_preload_latest_cmd()
 
-    for %Schema{} = schema <- repo.all(q) do
-      schema |> load_command_last()
-    end
-    |> then(fn dev_aliases -> {:ok, dev_aliases} end)
+    all_query =
+      from(a in Schema,
+        where: [device_id: ^device.id],
+        order_by: [asc: :sent_at],
+        preload: [cmds: ^cmd_query]
+      )
+
+    {:ok, all_query |> repo.all()}
   end
 
   defp load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])
     Repo.preload(schema_or_nil, [cmds: q], force: true)
-  end
-
-  defp load_command_last(%Schema{} = schema) do
-    cmd_q = Ecto.Query.from(c in Command, order_by: [desc: c.sent_at], limit: 1)
-
-    schema |> Repo.preload(cmds: cmd_q)
   end
 
   defp load_datapoint_ids(schema_or_nil) do

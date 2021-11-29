@@ -4,8 +4,9 @@ defmodule Sally.Command do
   require Logger
 
   use Ecto.Schema
-  require Ecto.Query
-  alias Ecto.Query
+  # require Ecto.Query
+  # alias Ecto.Query
+  # mport Ecto.Query, only: [from: 2]
 
   alias __MODULE__, as: Schema
   alias Sally.{DevAlias, Repo}
@@ -86,17 +87,35 @@ defmodule Sally.Command do
   end
 
   def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
+    import Ecto.Query, only: [from: 2]
+
     all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
     batches = Enum.chunk_every(all_ids, batch_size)
 
     for batch <- batches, reduce: {:ok, 0} do
       {:ok, acc} ->
-        q = Query.from(c in Schema, where: c.id in ^batch)
+        q = from(c in Schema, where: c.id in ^batch)
 
         {deleted, _} = Repo.delete_all(q)
 
         {:ok, acc + deleted}
     end
+  end
+
+  def query_preload_latest_cmd(dev_alias_id) do
+    import Ecto.Query, only: [from: 2]
+
+    from(c in Schema,
+      distinct: c.dev_alias_id,
+      order_by: [desc: c.sent_at],
+      where: [dev_alias_id: ^dev_alias_id]
+    )
+  end
+
+  def query_preload_latest_cmd do
+    import Ecto.Query, only: [from: 2]
+
+    from(c in Schema, distinct: c.dev_alias_id, order_by: [desc: c.sent_at])
   end
 
   def reported_cmd_changeset(%DevAlias{} = da, cmd, reported_at) do

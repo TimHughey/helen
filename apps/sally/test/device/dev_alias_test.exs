@@ -124,4 +124,11 @@ defmodule SallyDevAliasTest do
       Sally.devalias_rename([]) |> Should.Be.Tuple.with_rc(:bad_args)
     end
   end
+
+  @tag device_add: [auto: :mcp23008], devalias_add: [count: 5], command_add: [count: 100]
+  test "Sally.DevAlias.explain/2", ctx do
+    %DevAlias{name: name} = ctx.dev_alias |> List.first()
+
+    DevAlias.explain(name)
+  end
 end
