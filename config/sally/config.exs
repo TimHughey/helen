@@ -10,7 +10,7 @@ config :sally,
     keep_alive: 36
   ]
 
-config :sally, Sally.Host.Instruct, publish: [prefix: "#{config_env()}", qos: 0]
+config :sally, Sally.Host.Instruct, publish: [prefix: "#{config_env()}", qos: 1]
 config :sally, Sally.Message.Handler, msg_mtime_variance_ms: 100_000
 
 if config_env() in [:dev, :test] do
