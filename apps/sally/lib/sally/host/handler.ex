@@ -8,44 +8,15 @@ defmodule Sally.Host.Handler do
   alias Sally.Host.ChangeControl
   alias Sally.Host.Instruct
 
-  # @impl true
-  # def finalize(%Dispatch{} = msg) do
-  #   log = fn x ->
-  #     Logger.debug("\n#{inspect(x, pretty: true)}")
-  #     x
-  #   end
-  #
-  #   %Dispatch{msg | final_at: DateTime.utc_now()} |> log.()
-  # end
-
   @impl true
   def process(%Dispatch{category: cat} = msg) when cat in ["startup", "boot", "run"] do
-    Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
-
     cc = assemble_change_control(msg)
-
-    Logger.debug("\n#{inspect(cc, pretty: true)}")
 
     Ecto.Multi.new()
     |> Ecto.Multi.insert(:host, Host.changeset(cc), Host.insert_opts(cc.replace))
     |> Sally.Repo.transaction()
     |> check_result(msg)
-
-    # |> post_process()
-    # |> finalize()
   end
-
-  # @impl true
-  # def process(%Dispatch{} = msg) do
-  #   Logger.debug("BEFORE PROCESSING\n#{inspect(msg, pretty: true)}")
-  #
-  #   Ecto.Multi.new()
-  #   |> Ecto.Multi.insert(:host, Host.changeset(msg), Host.insert_opts())
-  #   |> Sally.Repo.transaction()
-  #   |> check_result(msg)
-  #   |> post_process()
-  #   |> finalize()
-  # end
 
   @impl true
   def post_process(%Dispatch{category: "startup"} = msg) do
@@ -93,16 +64,6 @@ defmodule Sally.Host.Handler do
 
     msg
   end
-
-  # @impl true
-  # def post_process(%Dispatch{category: "log"} = msg) do
-  #   msg
-  # end
-  #
-  # @impl true
-  # def post_process(%Dispatch{category: "ota"} = msg) do
-  #   msg
-  # end
 
   @impl true
   def post_process(%Dispatch{category: "run"} = msg) do

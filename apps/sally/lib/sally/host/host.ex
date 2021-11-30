@@ -2,10 +2,10 @@ defmodule Sally.Host do
   require Logger
 
   use Ecto.Schema
-  require Ecto.Query
+  # require Ecto.Query
 
   alias Ecto.Changeset
-  alias Ecto.Query
+  # alias Ecto.Query
 
   alias Sally.Host, as: Schema
   alias Sally.Host.ChangeControl
@@ -99,13 +99,17 @@ defmodule Sally.Host do
 
   def deauthorize(name), do: authorize(name, false)
 
+  def find_by(opts) when is_list(opts), do: Repo.get_by(Schema, opts)
+
   def find_by_ident(ident), do: Repo.get_by(Schema, ident: ident)
   def find_by_name(name), do: Repo.get_by(Schema, name: name)
 
   def idents_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
     like_string = IO.iodata_to_binary([pattern, "%"])
 
-    Query.from(x in Schema,
+    from(x in Schema,
       where: like(x.ident, ^like_string),
       order_by: x.ident,
       select: x.ident
@@ -118,18 +122,46 @@ defmodule Sally.Host do
   end
 
   def latest(opts) do
-    age = opts[:age] || [hours: -1]
-    before = Timex.now() |> Timex.shift(age)
+    import Ecto.Query, only: [from: 2]
 
-    q = Query.from(x in Schema, where: x.inserted_at >= ^before, order_by: [desc: x.inserted_at], limit: 1)
+    {want_schema, opts_rest} = Keyword.pop(opts, :schema, false)
+    {age_opts, _opts_rest} = Keyword.pop(opts_rest, :age, hours: -1)
 
-    host = Repo.one(q)
+    before = Timex.now() |> Timex.shift(age_opts)
 
-    cond do
-      is_nil(host) -> nil
-      opts[:schema] == true -> host
-      true -> host.ident
-    end
+    from(x in Schema,
+      where: x.inserted_at >= ^before,
+      order_by: [desc: x.inserted_at],
+      limit: 1
+    )
+    |> Repo.one()
+    |> then(fn result ->
+      case result do
+        %Schema{} = x when want_schema == true -> x
+        %Schema{ident: ident} -> ident
+        _ -> :none
+      end
+    end)
+
+    # host = Repo.one(q)
+
+    # cond do
+    #   is_nil(host) -> nil
+    #   opts[:schema] == true -> host
+    #   true -> host.ident
+    # end
+  end
+
+  def live(opts \\ []) when is_list(opts) do
+    import Ecto.Query, only: [from: 2]
+
+    {utc_now, opts_rest} = Keyword.pop(opts, :utc_now, DateTime.utc_now())
+    {recent_opts, _opts_rest} = Keyword.pop(opts_rest, :recent, minutes: -1)
+
+    since_dt = utc_now |> Timex.shift(recent_opts)
+
+    from(x in Schema, where: x.last_seen_at >= ^since_dt, order_by: [asc: x.name])
+    |> Repo.all()
   end
 
   defp profiles_path do
@@ -137,7 +169,9 @@ defmodule Sally.Host do
   end
 
   def unnamed do
-    Query.from(x in Schema, where: x.ident == x.name, order_by: [desc: x.last_start_at]) |> Repo.all()
+    import Ecto.Query, only: [from: 2]
+
+    from(x in Schema, where: x.ident == x.name, order_by: [desc: x.last_start_at]) |> Repo.all()
   end
 
   def rename(opts) when is_list(opts) do

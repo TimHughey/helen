@@ -2,6 +2,7 @@ defmodule Sally.DispatchAid do
   use Should
 
   alias Sally.Dispatch
+  alias Sally.HostAid
 
   def add(%{dispatch_add: opts} = ctx) when is_list(opts) do
     fields = [
@@ -13,9 +14,11 @@ defmodule Sally.DispatchAid do
     ]
 
     case struct(Dispatch, fields) do
-      %Dispatch{subsystem: "mut", category: "cmdack"} = x -> add_cmdack(x, ctx)
+      %Dispatch{subsystem: "host", category: "boot"} = x -> add_host(x, ctx, :boot)
+      %Dispatch{subsystem: "host", category: "startup"} = x -> add_host(x, ctx, :startup)
       %Dispatch{subsystem: "immut", category: "celsius"} = x -> add_immutable(x, ctx)
       %Dispatch{subsystem: "immut", category: "relhum"} = x -> add_immutable(x, ctx)
+      %Dispatch{subsystem: "mut", category: "cmdack"} = x -> add_mutable_cmdack(x, ctx)
       %Dispatch{subsystem: "mut", category: "status"} = x -> add_mutable(x, ctx)
       %Dispatch{} -> :ok
     end
@@ -24,11 +27,25 @@ defmodule Sally.DispatchAid do
 
   def add(_), do: :ok
 
-  def add_cmdack(base, %{dispatch_add: opts} = ctx) do
-    refid = ctx.command.refid
-    fields = [filter_extra: [refid], data: opts[:data] || %{}]
+  # (2 of x) create a Dispatch for a host boot messgge
+  def add_host(base, %{dispatch_add: opts} = ctx, :boot) do
+    host_ident = if ctx[:host], do: ctx.host.ident, else: Sally.HostAid.unique(:ident)
+    host_profile = if ctx[:host], do: ctx.host.profile, else: "generic"
 
-    %{dispatch: add_known_host(base, ctx) |> struct(fields)}
+    [
+      ident: host_ident,
+      payload: HostAid.make_payload(:startup, opts),
+      filter_extra: [host_profile]
+    ]
+    |> then(fn fields -> %{dispatch: struct(base, fields)} end)
+  end
+
+  # (1 of x) create a Dispatch for a host startup
+  def add_host(base, %{dispatch_add: opts} = ctx, :startup) do
+    host_ident = if ctx[:host], do: ctx.host.ident, else: Sally.HostAid.unique(:ident)
+
+    [ident: host_ident, payload: HostAid.make_payload(:startup, opts)]
+    |> then(fn fields -> %{dispatch: struct(base, fields)} end)
   end
 
   def add_immutable(base, %{dispatch_add: opts} = ctx) do
@@ -52,7 +69,12 @@ defmodule Sally.DispatchAid do
     %{dispatch: add_known_host(base, ctx) |> struct(fields)}
   end
 
-  def add_mutable(_), do: :ok
+  def add_mutable_cmdack(base, %{dispatch_add: opts} = ctx) do
+    refid = ctx.command.refid
+    fields = [filter_extra: [refid], data: opts[:data] || %{}]
+
+    %{dispatch: add_known_host(base, ctx) |> struct(fields)}
+  end
 
   ##
   ## Test Assistance
@@ -84,10 +106,9 @@ defmodule Sally.DispatchAid do
 
   defp add_known_host(base, ctx), do: struct(base, ident: ctx.host.ident, host: ctx.host)
 
-  # defp add_subsystem(base, x), do: struct(base, subsystem: x)
   defp make_pins(count, cmd), do: for(pin <- 0..(count - 1), do: [pin, cmd])
 
-  defp preprocess(%Dispatch{} = x), do: Dispatch.preprocess(x)
+  defp preprocess(%{dispatch: %Dispatch{} = x}), do: %{dispatch: Dispatch.preprocess(x)}
   defp preprocess(any), do: any
 
   defp recv_at(opts), do: opts[:recv_at] || DateTime.utc_now()

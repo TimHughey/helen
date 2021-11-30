@@ -31,6 +31,37 @@ defmodule Sally.HostAid do
 
   def add(_ctx), do: :ok
 
+  def make_payload(:boot, opts) do
+    start_at = opts[:start_at] || DateTime.utc_now()
+    mtime = DateTime.to_unix(start_at, :millisecond) - 3
+
+    %{
+      mtime: mtime,
+      elapsed_ms: 5981,
+      tasks: 12,
+      stack: %{size: 4096, highwater: 1024}
+    }
+    # NOTE: must use iodata: false since we're simulating in bound data
+    |> Msgpax.pack!(iodata: false)
+  end
+
+  def make_payload(:startup, opts) do
+    start_at = opts[:start_at] || DateTime.utc_now()
+    mtime = DateTime.to_unix(start_at, :millisecond) - 3
+
+    %{
+      mtime: mtime,
+      firmware_vsn: "00.00.00",
+      idf_vsn: "v4.3.1",
+      app_sha: "01abcdef",
+      build_date: "Jul 1 2021",
+      build_time: "13:23",
+      reset_reason: "power on"
+    }
+    # NOTE: must use iodata: false since we're simulating in bound data
+    |> Msgpax.pack!(iodata: false)
+  end
+
   def setup(%{host_setup: opts, host: %Host{} = host}) do
     name = opts[:name] || unique(:name)
     profile = opts[:profile] || "generic"

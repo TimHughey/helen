@@ -15,6 +15,12 @@ defmodule Sally.HostTest do
 
   setup [:host_add, :host_setup]
 
+  describe "Sally.host_ota_" do
+    test "_all/2 invokes an OTA for live hosts with default opts", %{host: _} do
+      Sally.host_ota_live() |> Should.Be.List.of_structs(Sally.Host.Instruct)
+    end
+  end
+
   test "Sally.host_retire/1 retires an existing host", %{host: host} do
     host = Sally.host_retire(host.name) |> Should.Be.Ok.tuple_with_struct(Host)
 
@@ -48,6 +54,12 @@ defmodule Sally.HostTest do
 
     test "when opts are invalid" do
       Sally.host_rename([]) |> Should.Be.Tuple.with_rc(:bad_args)
+    end
+  end
+
+  describe "Sally.Host.live/1" do
+    test "returns a list of %Host{} with default opts", %{host: _host} do
+      Host.live() |> Should.Be.List.of_schemas(Host)
     end
   end
 end

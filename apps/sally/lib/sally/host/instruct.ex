@@ -27,7 +27,7 @@ defmodule Sally.Host.Instruct do
   defstruct client_id: @client_id,
             ident: nil,
             name: nil,
-            subsystem: nil,
+            subsystem: "host",
             mtime: :populate_when_sent,
             data: %{},
             filters: [],
@@ -40,9 +40,10 @@ defmodule Sally.Host.Instruct do
   ## Public API
   ##
   def send(opts) when is_list(opts) do
-    opts_map = Enum.into(opts, %{})
-
-    Map.merge(%Instruct{}, opts_map) |> send()
+    struct(Instruct, opts) |> send()
+    # opts_map = Enum.into(opts, %{})
+    #
+    # Map.merge(%Instruct{}, opts_map) |> send()
   end
 
   def send(%Instruct{} = msg) do

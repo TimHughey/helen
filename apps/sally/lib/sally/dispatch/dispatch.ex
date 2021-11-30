@@ -19,12 +19,12 @@ defmodule Sally.Dispatch do
             recv_at: nil,
             log: [],
             routed: :no,
-            host: nil,
+            host: :not_loaded,
             results: %{},
             seen_list: [],
             final_at: nil,
             valid?: false,
-            invalid_reason: "metadata not checked"
+            invalid_reason: "not processed"
 
   @type env() :: String.t()
   @type host_ident() :: String.t()
@@ -135,7 +135,7 @@ defmodule Sally.Dispatch do
       # prune data fields already consumed
       data = Map.drop(data, [:mtime, :log])
 
-      %Dispatch{m | data: data, log: log, invalid_reason: nil}
+      %Dispatch{m | data: data, log: log, invalid_reason: "none"}
     else
       %Dispatch{valid?: false} = x -> x
     end

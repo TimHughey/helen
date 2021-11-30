@@ -269,8 +269,14 @@ defmodule Sally do
   #   end
   # end
 
-  def host_ota(name, opts \\ []) do
+  # def host_ota(name_or_all, opts \\ [])
+
+  def host_ota(name, opts \\ []) when is_binary(name) do
     Host.Firmware.ota(name, opts)
+  end
+
+  def host_ota_live(opts \\ []) do
+    Host.Firmware.ota(:live, opts)
   end
 
   def host_profile(hostname, profile_name) do

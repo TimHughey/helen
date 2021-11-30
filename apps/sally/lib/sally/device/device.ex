@@ -4,12 +4,9 @@ defmodule Sally.Device do
   """
 
   require Logger
-
   use Ecto.Schema
-  require Ecto.Query
 
   alias Ecto.Changeset
-  alias Ecto.Query
 
   alias __MODULE__, as: Schema
   alias Sally.{DevAlias, Host, Repo}
@@ -112,9 +109,11 @@ defmodule Sally.Device do
   # end
 
   def idents_begin_with(pattern) when is_binary(pattern) do
+    import Ecto.Query, only: [from: 2]
+
     like_string = "#{pattern}%"
 
-    Ecto.Query.from(x in Schema,
+    from(x in Schema,
       where: like(x.ident, ^like_string),
       order_by: x.ident,
       select: x.ident
@@ -138,17 +137,25 @@ defmodule Sally.Device do
   # end
 
   def latest(opts) do
+    import Ecto.Query, only: [from: 2]
+
     age = opts[:age] || [hours: -1]
     schema = if opts[:schema] == true, do: true, else: false
     before = Timex.now() |> Timex.shift(age)
 
-    q = Query.from(x in Schema, where: x.inserted_at >= ^before, order_by: [desc: x.inserted_at], limit: 1)
-
-    case Repo.all(q) do
-      [] -> nil
-      [%Schema{} = x] when schema == true -> x
-      [%Schema{ident: ident}] -> ident
-    end
+    from(x in Schema,
+      where: x.inserted_at >= ^before,
+      order_by: [desc: x.inserted_at],
+      limit: 1
+    )
+    |> Repo.one()
+    |> then(fn result ->
+      case result do
+        %Schema{} = x when schema == true -> x
+        %Schema{ident: ident} -> ident
+        _ -> :none
+      end
+    end)
   end
 
   def load_aliases(device) do
@@ -182,20 +189,25 @@ defmodule Sally.Device do
   end
 
   def pio_aliased?(%Schema{pios: pios} = device, pio) when pio < pios do
-    aliased? = fn
-      %Schema{aliases: []} -> false
-      %Schema{aliases: x} when is_list(x) -> true
-    end
+    import Ecto.Query, only: [from: 2]
 
     device
     |> Repo.reload()
-    |> Repo.preload(aliases: Ecto.Query.from(a in DevAlias, where: a.pio == ^pio))
-    |> aliased?.()
+    |> Repo.preload(aliases: from(a in DevAlias, where: a.pio == ^pio))
+    |> then(fn
+      %Schema{aliases: []} -> false
+      %Schema{aliases: x} when is_list(x) -> true
+    end)
   end
 
   def pios(%Schema{pios: pios}), do: pios
 
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
+
+  def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
+    %Schema{id: id}
+    |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
+  end
 
   def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
 
@@ -205,11 +217,6 @@ defmodule Sally.Device do
       x when is_integer(x) -> Repo.get(Schema, x) |> type()
       x when is_nil(x) -> :unknown
     end
-  end
-
-  def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
-    %Schema{id: id}
-    |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
   end
 
   defp determine_family(ident) do

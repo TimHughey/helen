@@ -31,7 +31,7 @@ defmodule SallyHostHandlerTest do
     tested = [:host] ++ tested
     assert x.ident == ctx.host_ident, fail
     tested = [:ident] ++ tested
-    refute x.invalid_reason, fail
+    assert x.invalid_reason == "none", fail
     tested = [:invalid_reason] ++ tested
     Should.Be.struct(x.sent_at, DateTime)
     tested = [:sent_at] ++ tested

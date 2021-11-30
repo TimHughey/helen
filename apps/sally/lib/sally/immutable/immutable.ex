@@ -23,11 +23,10 @@ defmodule Sally.Immutable do
       Query.from(dp in Datapoint,
         where: dp.reading_at >= ago(^since_ms, "millisecond"),
         group_by: [:dev_alias_id, :reading_at],
-        select: %{temp_c: avg(dp.temp_c), relhum: avg(dp.relhum)},
-        limit: 1
+        select: %{temp_c: avg(dp.temp_c), relhum: avg(dp.relhum)}
       )
 
-    dev_alias = Repo.get_by(DevAlias, name: name) |> Repo.preload(datapoints: avg_vals_query, device: [])
+    dev_alias = DevAlias.find(name) |> Repo.preload(datapoints: avg_vals_query, device: [])
 
     cond do
       is_nil(dev_alias) -> ImmutableStatus.not_found(name)

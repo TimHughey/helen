@@ -125,6 +125,7 @@ defmodule SallyDevAliasTest do
     end
   end
 
+  @tag skip: true
   @tag device_add: [auto: :mcp23008], devalias_add: [count: 5], command_add: [count: 100]
   test "Sally.DevAlias.explain/2", ctx do
     %DevAlias{name: name} = ctx.dev_alias |> List.first()
