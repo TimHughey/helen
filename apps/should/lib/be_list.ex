@@ -48,6 +48,35 @@ defmodule Should.Be.List do
   end
 
   @doc """
+  Asserts when `list` contains one or more `structs`
+
+  ```
+  list = Should.Be.NonEmpty.list(x)
+
+  for item <- list do
+    Should.Be.struct(item, struct)
+  end
+
+  # return validated list
+  list
+  ```
+
+  """
+  @doc since: "0.6.12"
+  defmacro of_structs(x, struct) do
+    quote location: :keep, bind_quoted: [x: x, struct: struct] do
+      list = Should.Be.NonEmpty.list(x)
+
+      for item <- list do
+        Should.Be.struct(item, struct)
+      end
+
+      # return validated list
+      list
+    end
+  end
+
+  @doc """
   Asserts when `x` is `List` and `Should.Contain.kv_pairs/2`
 
   ```
