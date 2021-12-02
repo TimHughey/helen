@@ -48,6 +48,25 @@ defmodule Sally.Datapoint do
 
   def columns(:cast), do: columns(:all)
 
+  def preload_avg(dev_alias_or_nil, since_ms) do
+    import Ecto.Query, only: [from: 2, subquery: 1]
+
+    # select the datapoints within the requested range
+    inner_query =
+      from(dp in Schema,
+        where: dp.reading_at >= ago(^since_ms, "millisecond")
+      )
+
+    # preload the averge of the datapoints selected by inner_query for this DevAlias
+    Repo.preload(dev_alias_or_nil,
+      datapoints:
+        from(dp in subquery(inner_query),
+          group_by: [:dev_alias_id, :reading_at],
+          select: %{temp_c: avg(dp.temp_c), relhum: avg(dp.relhum)}
+        )
+    )
+  end
+
   def purge(%DevAlias{datapoints: datapoints}, :all, batch_size \\ 10) do
     all_ids = Enum.map(datapoints, fn %Schema{id: id} -> id end)
     batches = Enum.chunk_every(all_ids, batch_size)

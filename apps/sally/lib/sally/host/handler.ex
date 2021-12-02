@@ -49,40 +49,39 @@ defmodule Sally.Host.Handler do
     stack_hw = msg.data[:stack]["highwater"] || 1
     stack_used = (100.0 - stack_hw / stack_size * 100.0) |> Float.round(2)
 
-    %Betty.Metric{
+    # NOTE: return: msg signals msg should be passthrough
+    [
+      return: msg,
       measurement: "host",
-      tags: %{ident: msg.host.ident, name: msg.host.name},
-      fields: %{
+      tags: [ident: msg.host.ident, name: msg.host.name],
+      fields: [
         boot_elapsed_ms: msg.data[:elapsed_ms] || 0,
         tasks: msg.data[:tasks] || 0,
         stack_size: stack_size,
         stack_high_water: stack_used,
         stack_used: stack_used
-      }
-    }
-    |> Betty.write_metric()
-
-    msg
+      ]
+    ]
+    |> Betty.write()
   end
 
   @impl true
   def post_process(%Dispatch{category: "run"} = msg) do
     Logger.debug(inspect(msg.data, pretty: true))
 
-    %Betty.Metric{
+    [
+      return: msg,
       measurement: "host",
-      tags: %{ident: msg.host.ident, name: msg.host.name},
-      fields: %{
+      tags: [ident: msg.host.ident, name: msg.host.name],
+      fields: [
         ap_primary_channel: msg.data[:ap]["pri_chan"] || 0,
         ap_rssi: msg.data[:ap]["rssi"] || 0,
         heap_min: msg.data.heap["min"],
         heap_max_alloc: msg.data.heap["max_alloc"],
         heap_free: msg.data.heap["free"]
-      }
-    }
-    |> Betty.write_metric()
-
-    msg
+      ]
+    ]
+    |> Betty.write()
   end
 
   # Dispatches for different categories define specific changes to the Host record

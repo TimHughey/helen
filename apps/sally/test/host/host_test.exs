@@ -15,8 +15,8 @@ defmodule Sally.HostTest do
 
   setup [:host_add, :host_setup]
 
-  describe "Sally.host_ota_" do
-    test "_all/2 invokes an OTA for live hosts with default opts", %{host: _} do
+  describe "Sally.host_ota_live/1" do
+    test "invokes an OTA for live hosts with default opts", %{host: _} do
       Sally.host_ota_live() |> Should.Be.List.of_structs(Sally.Host.Instruct)
     end
   end

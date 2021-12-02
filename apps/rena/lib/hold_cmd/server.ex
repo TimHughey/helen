@@ -68,7 +68,17 @@ defmodule Rena.HoldCmd.Server do
   end
 
   @impl true
-  def handle_info({Broom, %TrackerEntry{} = _te}, s) do
+  def handle_info({Broom, %TrackerEntry{acked: true}}, s) do
+    {:ok, s.hold_cmd.cmd}
+    |> State.update_last_exec(s)
+    |> State.update_last_notify_at()
+    |> noreply()
+  end
+
+  @impl true
+  def handle_info({Broom, %TrackerEntry{}}, s) do
+    # tracked commands are logged prior to receipt of the TrackerEntry,
+    # no need to log further
     noreply(s)
   end
 

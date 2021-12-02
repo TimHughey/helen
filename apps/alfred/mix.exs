@@ -61,7 +61,7 @@ defmodule Alfred.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/support", "test/shared"]
+  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/shared", "test/status"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp preferred_cli_env do

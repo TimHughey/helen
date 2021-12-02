@@ -88,16 +88,16 @@ defmodule Sally.Mutable.Handler do
 
   def write_ack_metrics([%DevAlias{} | _] = seen_list, te, msg) do
     for %DevAlias{} = dev_alias <- seen_list do
-      %Betty.Metric{
+      [
         measurement: "command",
-        tags: %{module: __MODULE__, name: dev_alias.name, cmd: te.cmd},
-        fields: %{
+        tags: [module: __MODULE__, name: dev_alias.name, cmd: te.cmd],
+        fields: [
           cmd_roundtrip_us: DateTime.diff(te.acked_at, te.sent_at, :microsecond),
           cmd_total_us: DateTime.diff(te.released_at, te.sent_at, :microsecond),
           release_us: DateTime.diff(te.released_at, msg.recv_at, :microsecond)
-        }
-      }
-      |> Betty.write_metric()
+        ]
+      ]
+      |> Betty.write()
     end
   end
 

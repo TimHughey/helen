@@ -4,7 +4,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
   @moduletag rena: true, rena_holdcmd_server: true
 
-  alias Alfred.{ExecCmd, ExecResult}
+  alias Alfred.ExecCmd
   alias Alfred.Notify.{Memo, Ticket}
   alias Rena.HoldCmd.{Server, ServerTest, State}
 
@@ -95,7 +95,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
       Server.handle_info({Alfred, memo}, state)
       |> Should.Be.Tuple.noreply_with_struct(State)
-      |> Should.Be.Struct.with_all_key_value(State, last_exec: :no_change)
+      |> Should.Be.Struct.with_all_key_value(State, last_exec: {:no_change, "on"})
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
     end
 
@@ -115,9 +115,7 @@ defmodule Rena.HoldCmd.ServerTest do
         |> Should.Be.Tuple.noreply_with_struct(State)
 
       # verify the ExecCmd resulted in an actual command
-      Should.Be.Struct.with_key_struct(new_state, State, :last_exec, ExecResult)
-      |> Should.Be.Struct.with_key(ExecResult, :refid)
-      |> Should.Be.binary()
+      Should.Be.Struct.with_all_key_value(new_state, State, last_exec: {:pending, "on"})
 
       # ensure Alfred.execute/2 was invoked
       receive do

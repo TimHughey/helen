@@ -257,20 +257,18 @@ defmodule Sally do
   ## Opts
   1. 'age: Timex.shift_opts()'  now shifted shift opts to set threshold past DateTime
   2. `schema: boolean()` device identifier to move aliases from
+
+  See `Sally.host_ota/2` for additional options.
   """
   @doc since: "0.5.9"
   def host_latest(opts \\ [schema: false, age: [hours: -1]]), do: Host.latest(opts)
 
-  # def host_name(ident, new_name) do
-  #   case Host.find_by_ident(ident) do
-  #     %Host{name: name} when name == new_name -> :no_change
-  #     %Host{} = x -> Host.changeset(x, %{name: new_name}, [:name]) |> Repo.update()
-  #     _ -> :not_found
-  #   end
-  # end
+  @doc """
+  Initiate an OTA for specific host name
 
-  # def host_ota(name_or_all, opts \\ [])
-
+  * `file:` the firmware file, defaults to `latest.bin`
+  * `valid_ms:`  milliseconds to wait before marking OTA valid, defaults to `60_000`
+  """
   def host_ota(name, opts \\ []) when is_binary(name) do
     Host.Firmware.ota(name, opts)
   end

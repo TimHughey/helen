@@ -1,6 +1,7 @@
 defmodule Alfred.ImmutableStatus do
   alias __MODULE__, as: Status
 
+  @derive [Alfred.Status]
   defstruct name: nil,
             good?: false,
             found?: true,
@@ -11,7 +12,8 @@ defmodule Alfred.ImmutableStatus do
 
   @type datapoints :: %{optional(:temp_c) => float, optional(:temp_c) => float, optional(:temp_f) => float}
   @type status_error() :: :none | :unresponsive | :unknown_value
-  @type t :: %__MODULE__{
+
+  @type t :: %Status{
           name: String.t(),
           good?: boolean(),
           found?: boolean(),

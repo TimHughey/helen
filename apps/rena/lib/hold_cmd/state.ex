@@ -14,7 +14,7 @@ defmodule Rena.HoldCmd.State do
             last_notify_at: :none
 
   @type hold_cmd() :: %ExecCmd{} | nil
-  @type last_exec() :: :none | :failed | DateTime.t() | ExecCmd.t()
+  @type last_exec() :: :none | :failed | {:no_change, String.t()} | {:pending, String.t()}
   @type ticket() :: :none | :paused | Ticket.t()
   @type t :: %State{
           alfred: module(),
@@ -67,6 +67,7 @@ defmodule Rena.HoldCmd.State do
   # (2 of 2) handle pipelining
   def update_last_exec(%State{} = s, what) do
     case what do
+      x when is_tuple(x) -> x
       x when is_atom(x) -> x
       %DateTime{} = at -> at
       %ExecResult{} = er -> er

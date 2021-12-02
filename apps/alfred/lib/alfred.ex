@@ -12,11 +12,6 @@ defmodule Alfred do
   alias Alfred.Notify
   alias Alfred.Notify.Ticket
 
-  # is a name available (aka unknown)
-  # def available?(name), do: not Names.exists?(name)
-
-  # defdelegate delete(name), to: Names
-
   @doc """
   Execute an `Alfred.ExecCmd` for a known name
 

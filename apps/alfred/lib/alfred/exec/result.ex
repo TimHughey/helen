@@ -63,6 +63,23 @@ defmodule Alfred.ExecResult do
   end
 
   def invalid(%ExecCmd{name: name, invalid_reason: x}), do: %ExecResult{name: name, rc: {:invalid, x}}
+
+  @doc "Log a `Betty.app_error/1` for an ExecResult"
+  @doc since: "0.5.20"
+  def log_failure(%ExecResult{} = er, opts) do
+    module = opts[:module] || opts[:server_name] || ExecResult
+
+    tags = [module: module, execute: true]
+
+    case er do
+      %ExecResult{rc: {:ttl_expired, _}} -> [rc: :ttl_expired] ++ tags
+      %ExecResult{rc: rc} -> [rc: rc] ++ tags
+    end
+    |> Betty.app_error_v2()
+
+    er.rc
+  end
+
   def not_found(%MutableStatus{name: name}), do: %ExecResult{name: name, cmd: "unknown", rc: :not_found}
   def no_change(%ExecCmd{name: name, cmd: cmd}), do: %ExecResult{name: name, cmd: cmd, rc: :ok}
 

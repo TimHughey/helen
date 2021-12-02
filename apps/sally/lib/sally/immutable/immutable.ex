@@ -1,11 +1,11 @@
 defmodule Sally.Immutable do
   require Logger
-  require Ecto.Query
+  # require Ecto.Query
 
   alias __MODULE__
   alias Alfred.ImmutableStatus
   alias Sally.{Datapoint, DevAlias}
-  alias Sally.Repo
+  # alias Sally.Repo
 
   @type ttl_ms() :: 50..600_000
   @type since_ms() :: pos_integer()
@@ -14,20 +14,9 @@ defmodule Sally.Immutable do
   @since_ms_default 1000 * 60 * 5
   @spec status(String.t(), Immutable.opts()) :: ImmutableStatus.t()
   def status(name, opts) when is_binary(name) and is_list(opts) do
-    alias Ecto.Query
-
     since_ms = opts[:since_ms] || @since_ms_default
-    # since_dt = DateTime.utc_now() |> DateTime.add(since_ms * -1, :millisecond)
 
-    avg_vals_query =
-      Query.from(dp in Datapoint,
-        where: dp.reading_at >= ago(^since_ms, "millisecond"),
-        group_by: [:dev_alias_id, :reading_at],
-        select: %{temp_c: avg(dp.temp_c), relhum: avg(dp.relhum)},
-        limit: 1
-      )
-
-    dev_alias = DevAlias.find(name) |> Repo.preload(datapoints: avg_vals_query, device: [])
+    dev_alias = DevAlias.find(name) |> Datapoint.preload_avg(since_ms)
 
     cond do
       is_nil(dev_alias) -> ImmutableStatus.not_found(name)
@@ -49,9 +38,9 @@ defmodule Sally.Immutable do
     end
   end
 
-  # (1 of 2) no datapoints for the dev alias
-  defp good?(%DevAlias{datapoints: []}), do: false
+  # (1 of 2) single datapount returned by Datapoint.query_preload_avg/1
   defp good?(%DevAlias{datapoints: [values_map]}) when is_map(values_map), do: true
+  defp good?(_), do: false
 
   defp ttl_expired?(dev_alias, opts) do
     ttl_ms = opts[:ttl_ms] || dev_alias.ttl_ms

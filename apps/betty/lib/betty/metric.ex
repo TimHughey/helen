@@ -10,92 +10,63 @@ defmodule Betty.Metric do
           timestamp: nil | pos_integer()
         }
 
-  def into_map(%Metric{} = mm) do
-    %Metric{
-      mm
-      | fields: map_values(mm.fields),
-        tags: map_values(mm.tags),
-        timestamp: mm.timestamp || System.os_time(:nanosecond)
-    }
-    |> Map.from_struct()
-  end
+  def new(fields) when is_list(fields), do: struct(Metric, fields)
 
   def new(measurement, fields, tags) do
-    %Metric{measurement: measurement, fields: Enum.into(fields, %{}), tags: Enum.into(tags, %{})}
+    [measurement: measurement, fields: fields, tags: tags]
+    |> new()
   end
 
+  @doc """
+  Finalize and write the Metric to `Instream`
+
+  """
   def write(%Metric{} = m) do
     alias Betty.Connection
 
-    metric = %Metric{
-      m
-      | fields: map_fields(m.fields),
-        tags: map_tags(m.tags),
-        timestamp: m.timestamp || System.os_time(:nanosecond)
-    }
+    # rationalize field and tag values into maps
+    fields = map_fields(m.fields)
+    tags = map_tags(m.tags)
 
-    # instream supports multiple points per write so wrap this single metric in a list
-    points_map = %{points: metric |> Map.from_struct() |> List.wrap()}
+    # ensure timestamp
+    tstamp = m.timestamp || System.os_time(:nanosecond)
+
+    # opts for instream
     instream_opts = [precision: :nanosecond, async: true]
 
-    # now write the point to the timeseries database
-    {Connection.write(points_map, instream_opts), points_map}
+    # assemble the final Metric
+    final_metric = struct(m, fields: fields, tags: tags, timestamp: tstamp)
+
+    # return the result of writing the points and the final metrics map as tuple
+    rc = to_points(final_metric) |> Connection.write(instream_opts)
+
+    {rc, final_metric}
   end
 
-  def record(measurement, tags = [_ | _], fields = [_ | _]) when is_binary(measurement) do
-    new(measurement, fields, tags) |> write()
-  end
+  # NOTE: fields must always be a numeric value
+  defp map_fields(x) when is_struct(x), do: Map.from_struct(x)
 
-  def record(_, _), do: :bad_args
-
-  # tags or fields common mappings
-  defp map_common(field_or_tag) do
-    case field_or_tag do
-      {key, mod} when key in [:mod, :module] and is_atom(mod) -> {key, mod_to_string(mod)}
-      {key, val} when is_atom(val) -> {key, to_string(val)}
-      {key, val} when is_float(val) -> {key, Float.round(val, 3)}
-      {key, val} -> {key, val}
-    end
-  end
-
-  # field mappings
-  defp map_fields(fields) do
-    for {key, value} <- fields, into: %{} do
-      case {key, value} do
-        {key, true} -> {key, 1}
-        {key, false} -> {key, 0}
-        {key, "on"} when key == :cmd -> {key, 1}
-        {key, "off"} when key == :cmd -> {key, -1}
-        key_val -> map_common(key_val)
-      end
-    end
-  end
-
-  # tag mappings
-  defp map_tags(tags) do
-    for {key, value} <- tags, into: %{} do
-      case {key, value} do
-        {key, true} -> {key, "true"}
-        {key, false} -> {key, "false"}
-        key_val -> map_common(key_val)
-      end
-    end
-  end
-
-  # (1 of 2) convert structs to maps, then map values
-  defp map_values(field_or_tag_struct) when is_struct(field_or_tag_struct) do
-    Map.from_struct(field_or_tag_struct) |> map_values
-  end
-
-  # (2 of 2) received a map, good to go
-  defp map_values(field_or_tag_map) when is_map(field_or_tag_map) do
-    for field_or_tag <- field_or_tag_map, into: %{} do
-      case field_or_tag do
+  defp map_fields(kv_list) do
+    for kv <- kv_list do
+      case kv do
         {k, true} -> {k, 1}
         {k, false} -> {k, -1}
-        {k, mod} when k in [:mod, :module] and is_atom(mod) -> {k, mod_to_string(mod)}
-        {k, val} when is_atom(val) -> {k, to_string(val)}
-        {k, val} when is_float(val) -> {k, Float.round(val, 3)}
+        {k, v} when is_float(v) -> {k, Float.round(v, 3)}
+        kv -> kv
+      end
+    end
+    |> Enum.filter(fn {_, v} -> is_number(v) end)
+  end
+
+  # NOTE: tags can be a mix of numbers and strings
+  defp map_tags(x) when is_struct(x), do: Map.from_struct(x)
+
+  defp map_tags(kv_list) do
+    for kv <- kv_list, into: %{} do
+      case kv do
+        {:module, mod} when is_atom(mod) -> {:module, mod_to_string(mod)}
+        {k, v} when is_nil(v) -> {k, "nil"}
+        {k, v} when is_atom(v) -> {k, to_string(v)}
         kv -> kv
       end
     end
@@ -103,4 +74,8 @@ defmodule Betty.Metric do
 
   # remove Elixir from module names
   defp mod_to_string(mod), do: Module.split(mod) |> Enum.join(".")
+
+  defp to_points(%Metric{} = m) do
+    %{points: m |> Map.from_struct() |> List.wrap()}
+  end
 end

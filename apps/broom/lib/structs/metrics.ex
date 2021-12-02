@@ -9,15 +9,13 @@ defmodule Broom.Metrics do
 
   @interval_default_ms 300_000
 
-  defstruct interval_ms: @interval_default_ms, last_at: :never, rc: :never, timer: :never
+  defstruct interval_ms: @interval_default_ms, last_at: :never, timer: :never
 
   @type last_at() :: DateTime.t() | :never
-  @type metrics_rc() :: :never | tuple()
   @type metrics_timer() :: :never | :unscheduled | reference()
   @type t :: %__MODULE__{
           interval_ms: pos_integer(),
           last_at: last_at(),
-          rc: metrics_rc(),
           timer: metrics_timer()
         }
 
@@ -26,9 +24,10 @@ defmodule Broom.Metrics do
   end
 
   def report(%Metrics{} = m, mod, %Counts{} = c) do
-    mm = %Betty.Metric{measurement: "broom", fields: c, tags: %{mod: mod}}
+    [measurement: "broom", fields: c, tags: [module: mod]]
+    |> Betty.write()
 
-    %Metrics{m | last_at: DateTime.utc_now(), rc: Betty.write_metric(mm), timer: :unscheduled}
+    %Metrics{m | last_at: DateTime.utc_now(), timer: :unscheduled}
     |> schedule()
   end
 

@@ -4,9 +4,6 @@ defmodule Sally.Command do
   require Logger
 
   use Ecto.Schema
-  # require Ecto.Query
-  # alias Ecto.Query
-  # mport Ecto.Query, only: [from: 2]
 
   alias __MODULE__, as: Schema
   alias Sally.{DevAlias, Repo}
