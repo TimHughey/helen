@@ -442,6 +442,8 @@ defmodule Should do
   defmacro pretty_puts(x) do
     quote bind_quoted: [x: x] do
       prettyi(x) |> IO.puts()
+
+      x
     end
   end
 

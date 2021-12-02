@@ -38,6 +38,39 @@ defmodule Should.Contain do
   end
 
   @doc """
+  Asserts when `Enum` contains `keys`
+
+  ```
+  # ensure x is an enumberable
+  x = if(is_struct(x), do: Map.from_struct(x), else: x)
+
+  for want_key <- want_keys do
+    found? = Enum.any?(x, fn {k, _v} -> k == want_key end)
+    assert found?, Should.msg(x, "should contain key", want_key)
+  end
+
+  # return verified enumerable
+  x
+  ```
+
+  """
+  @doc since: "0.6.19"
+  defmacro keys(x, want_keys) do
+    quote location: :keep, bind_quoted: [x: x, want_keys: want_keys] do
+      # ensure x is an enumberable
+      x = if(is_struct(x), do: Map.from_struct(x), else: x)
+
+      for want_key <- want_keys do
+        found? = Enum.any?(x, fn {k, _v} -> k == want_key end)
+        assert found?, Should.msg(x, "should contain key", want_key)
+      end
+
+      # return verified enumerable
+      x
+    end
+  end
+
+  @doc """
   Asserts when `Enum` contains key/value pairs
 
   ```
