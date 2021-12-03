@@ -15,7 +15,7 @@ defmodule Rena.SetPt.ServerTest do
 
   setup_all do
     # base ctx
-    alfred = Rena.Alfred
+    alfred = AlfredSim
     server_name = ServerTest
     start_args = [id: ServerTest]
     base = %{alfred: alfred, server_name: server_name, start_args: start_args}
@@ -145,7 +145,7 @@ defmodule Rena.SetPt.ServerTest do
   @sensors_opts for temp_f <- [11.0, 11.1, 11.2, 6.2], do: [temp_f: temp_f]
   def state_add(%{state_add: opts} = ctx) do
     fields = [
-      alfred: Rena.Alfred,
+      alfred: AlfredSim,
       server_name: ServerTest,
       equipment: ctx.equipment,
       sensors: %{sensors_add: @sensors_opts} |> sensors_add() |> Map.get(:sensors),

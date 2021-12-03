@@ -26,7 +26,7 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [cmd: "off"]
     @tag result_opts: [lt_low: 3]
     test "active cmd when low value and inactive", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
 
       check_exec_cmd(ctx.equipment, "on", :activate, res)
     end
@@ -34,7 +34,7 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [cmd: "on"]
     @tag result_opts: [gt_high: 1, gt_mid: 2]
     test "inactive cmd when high value and active", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
 
       check_exec_cmd(ctx.equipment, "off", :deactivate, res)
     end
@@ -42,7 +42,7 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [cmd: "on"]
     @tag result_opts: [gt_mid: 2]
     test "datapoint error when only two datapoints", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
 
       should_be_tuple_with_size(res, 2)
       {rc, struct} = res
@@ -53,7 +53,7 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [cmd: "on"]
     @tag result_opts: [lt_mid: 2, gt_mid: 1]
     test "no change when result below mid range value and active", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
 
       should_be_equal(res, {:no_change, :active})
     end
@@ -61,7 +61,7 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [rc: :error, cmd: "unknown"]
     @tag result_opts: [lt_low: 3]
     test "equipment error tuple with MutableStatus not good", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: Rena.Alfred)
+      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
 
       should_be_tuple_with_size(res, 2)
 
@@ -162,6 +162,6 @@ defmodule Rena.SetPt.CmdTest do
 
   defp setup_opts(ctx) do
     opts = ctx[:setup_opts] || []
-    %{opts: [alfred: Rena.Alfred, server_name: Rena.SetPt.ServerTest] ++ opts}
+    %{opts: [alfred: AlfredSim, server_name: Rena.SetPt.ServerTest] ++ opts}
   end
 end

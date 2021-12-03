@@ -55,7 +55,7 @@ defmodule Rena.Sensor.SensorTest do
     test "creates accurate summary", %{range_add: range, sensors: sensors} do
       alias Rena.Sensor.Result
 
-      res = Sensor.range_compare(sensors, range, alfred: Rena.Alfred)
+      res = Sensor.range_compare(sensors, range, alfred: AlfredSim)
       good = %Result{gt_mid: 1, gt_high: 1, invalid: 1, lt_low: 1, lt_mid: 1, valid: 4, total: 5}
       should_be_equal(res, good)
     end

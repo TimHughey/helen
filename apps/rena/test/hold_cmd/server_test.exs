@@ -13,7 +13,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
   setup_all do
     # base ctx
-    alfred = Rena.Alfred
+    alfred = AlfredSim
     server_name = ServerTest
     start_args = [id: ServerTest]
     base = %{alfred: alfred, server_name: server_name, start_args: start_args}
