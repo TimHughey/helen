@@ -1,6 +1,10 @@
 defmodule Sally.DevAlias do
   @moduledoc """
-  Database implementation of Sally.PulseWidth Aliases
+  Database schema definition and functions for the logical representation of
+  a specific `Sally.Device` pio.
+
+  All actions (e.g. reading current value, changing state_ on a physical `Sally.Device`
+  require a `Sally.DevAlias`
   """
   require Logger
 

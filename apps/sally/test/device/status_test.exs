@@ -1,7 +1,7 @@
 defmodule SallyStatusTest do
   use ExUnit.Case, async: true
   use Should
-  use Sally.TestAids
+  use Sally.TestAid
 
   @moduletag sally: true, sally_status: true
 

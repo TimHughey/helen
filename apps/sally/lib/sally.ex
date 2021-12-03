@@ -103,7 +103,7 @@ defmodule Sally do
 
   If the `:to` name already exists, `{:name_taken, to_name}` is returned.
 
-  If the passed iist of opts isn't valid, `{:bad_args, ots}` is returned.
+  If the passed iist of opts isn't valid, `{:bad_args, opts}` is returned.
 
   """
   @doc since: "0.5.9"

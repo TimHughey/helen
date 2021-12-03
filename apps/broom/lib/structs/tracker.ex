@@ -16,7 +16,7 @@ defmodule Broom.Tracker do
             prune_older_than_ms: nil,
             prune_timer: nil
 
-  @type tracked_refs() :: %{required(Types.refid()) => Entry.t(refid: Types.refid())}
+  @type tracked_refs() :: %{required(Types.refid()) => Entry.t()}
   @type t :: %__MODULE__{
           refs: tracked_refs(),
           released: [String.t(), ...],

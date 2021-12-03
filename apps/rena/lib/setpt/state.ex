@@ -33,7 +33,7 @@ defmodule Rena.SetPt.State do
           last_exec: last_exec(),
           last_notify_at: nil | DateTime.t(),
           last_transition: DateTime.t(),
-          timezone: Timex.time_zone()
+          timezone: Calendar.time_zone()
         }
 
   def allow_transition?(%State{last_transition: last, transition_min_ms: ms}, opts \\ []) do

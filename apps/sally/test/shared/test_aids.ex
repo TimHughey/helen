@@ -1,4 +1,4 @@
-defmodule Sally.TestAids do
+defmodule Sally.TestAid do
   defmacro __using__(_) do
     quote location: :keep do
       alias Sally.CommandAid
@@ -23,7 +23,7 @@ defmodule Sally.TestAids do
       def host_add(ctx), do: HostAid.add(ctx)
       def host_setup(ctx), do: HostAid.setup(ctx)
 
-      # def multiple_add(ctx, add_list), do: Sally.TestAids.multiple_add(ctx, add_list)
+      # def multiple_add(ctx, add_list), do: Sally.TestAid.multiple_add(ctx, add_list)
     end
   end
 

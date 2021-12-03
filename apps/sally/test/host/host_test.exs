@@ -2,7 +2,7 @@ defmodule Sally.HostTest do
   # NOTE:  don't use async: true due to testing Sally.host_setup(:unnamed)
   use ExUnit.Case
   use Should
-  use Sally.TestAids
+  use Sally.TestAid
 
   alias Sally.Host
 

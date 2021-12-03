@@ -1,6 +1,6 @@
 defmodule Sally.Datapoint do
   @moduledoc """
-  Database functionality for Sensor DataPoint
+  Database schema definition and functions for Datapoints associated to `Sally.DevAlias`
   """
 
   require Logger

@@ -23,26 +23,47 @@ defmodule Helen.MixProject do
       ## Docs
       name: "Helen",
       source_url: "https://github.com/timhughey/helen",
-      homepage_url: "http://www.wisslanding.com",
-      docs: [
-        # The main page in the docs
-        main: "readme",
-        # logo: "path/to/logo.png",
-        extras: ["README.md"],
-        groups_for_modules: [],
-        nest_modules_by_prefix: []
-      ]
+      homepage_url: "http://www.wisslanding.com/helen/doc",
+      docs: docs()
     ]
   end
 
   # Dependencies listed here are available only for this
   # project and cannot be accessed from applications inside
   # the apps folder.
-  #
-  # Run "mix help deps" for examples and options.
   defp deps do
     [
       {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp docs do
+    [
+      # The main page in the docs
+      main: "readme",
+      # logo: "path/to/logo.png",
+      extras: ["README.md"],
+      groups_for_modules: [
+        Alfred: ~r/^Alfred$|Alfred.Status$/,
+        "Alfred Immutables": ~r/^Alfred\.[I].*(?<!Aid)$/,
+        "Alfred Mutables": ~r/^Alfred\.[EM].*(?<!Aid)$/,
+        "Alfred Names": ~r/Alfred\.(Just|Names|Known|Seen).*(?<!Aid)$/,
+        "Alfred Notify": ~r/^Alfred\.Notify.*$/,
+        "Alfred Test Aids": ~r/^AlfredSim$|^Alfred.*Aid$/,
+        "Alfred Testing Mockups": ~r/^Alfred\.Test.*$/,
+        Betty: ~r/Betty.*$/,
+        Broom: ~r/^Broom.*$/,
+        Illumination: ~r/^Illumination.*$|^(Front|Green).*$/,
+        "Legacy Database": ~r/^LegacyDb.*$/,
+        Rena: ~r/^Rena.*$/,
+        Sally: ~r/^Sally$|^Sally\..*(?<!Manual)(?<!Aid)$/,
+        "Sally Test Aids": ~r/Sally\.(?:Test.*|.*Aid)$/,
+        Should: ~r/^Should.*$/,
+        Solar: ~r/^(Solar|Zenith)/,
+        Types: ~r/.*Types$/
+      ],
+      nest_modules_by_prefix: [],
+      api_reference: false
     ]
   end
 
@@ -72,4 +93,11 @@ defmodule Helen.MixProject do
       farm: :permanent
     ]
   end
+
+  # defp doc_groups do
+  #   doc_group(:alfred) ++ doc_group(:alfred)
+  # end
+  #
+  # defp doc_group(:alfred), do: [Alfred: ~r/Alfred/]
+  # defp doc_group(:sally), do: [Sally: ~r/Sally/]
 end

@@ -1,7 +1,7 @@
 defmodule Sally.ImmutableHandlerTest do
   use ExUnit.Case, async: true
   use Should
-  use Sally.TestAids
+  use Sally.TestAid
 
   @moduletag sally: true, sally_immutable_handler: true
 

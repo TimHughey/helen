@@ -4,7 +4,7 @@ defmodule Should.Be.Ok do
   """
 
   @doc """
-  Asserts when `x` is `{:ok, map`}` then returns the `map`
+  Asserts when `x` is `{:ok, map}` then returns the `map`
 
   ```
   {rc, map} = Should.Be.Tuple.with_size(x, 2)
@@ -25,7 +25,7 @@ defmodule Should.Be.Ok do
   end
 
   @doc """
-  Asserts when `x` is `{:ok, pid`}` then returns pid
+  Asserts when `x` is `{:ok, pid}` then returns pid
 
   ```
   {rc, pid} = Should.Be.Tuple.with_size(x, 2)

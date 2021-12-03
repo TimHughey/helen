@@ -2,7 +2,7 @@ defmodule SallyDevAliasTest do
   # can not use async: true due to indirect use of Sally.device_latest/1
   use ExUnit.Case
   use Should
-  use Sally.TestAids
+  use Sally.TestAid
 
   @moduletag sally: true, sally_dev_alias: true
 

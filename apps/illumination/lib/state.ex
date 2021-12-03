@@ -21,7 +21,7 @@ defmodule Illumination.State do
           cmds: map(),
           result: Schedule.Result.t(),
           last_notify_at: DateTime.t(),
-          timezone: Timex.time_zone()
+          timezone: Calendar.time_zone()
         }
 
   # NOTE: state is passed first for use in pipeline
