@@ -54,15 +54,18 @@ defmodule Sally.Datapoint do
     # select the datapoints within the requested range
     inner_query =
       from(dp in Schema,
-        where: dp.reading_at >= ago(^since_ms, "millisecond")
+        where: dp.reading_at >= ago(^since_ms, "millisecond"),
+        order_by: [desc: :reading_at]
       )
 
     # preload the averge of the datapoints selected by inner_query for this DevAlias
     Repo.preload(dev_alias_or_nil,
       datapoints:
         from(dp in subquery(inner_query),
+          order_by: [:dev_alias_id],
           group_by: [:dev_alias_id, :reading_at],
-          select: %{temp_c: avg(dp.temp_c), relhum: avg(dp.relhum)}
+          select: %{temp_c: avg(dp.temp_c), temp_f: avg(dp.temp_c * 1.8 + 32), relhum: avg(dp.relhum)},
+          limit: 1
         )
     )
   end

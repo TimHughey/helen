@@ -69,10 +69,10 @@ defmodule Alfred.ImmutableStatus do
   # (2 of 2) something is wrong with this status
   def finalize(%Status{} = x), do: x
 
-  def good(%_{datapoints: [values_map]} = x) do
+  def good(%_{datapoints: [data]} = x) do
     %Status{
       name: x.name,
-      datapoints: values_map,
+      datapoints: Enum.into(data, %{}) |> Enum.reject(fn {_k, v} -> is_nil(v) end),
       status_at: x.device.last_seen_at
     }
   end

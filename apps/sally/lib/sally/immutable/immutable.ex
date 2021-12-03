@@ -5,7 +5,6 @@ defmodule Sally.Immutable do
   alias __MODULE__
   alias Alfred.ImmutableStatus
   alias Sally.{Datapoint, DevAlias}
-  # alias Sally.Repo
 
   @type ttl_ms() :: 50..600_000
   @type since_ms() :: pos_integer()
@@ -21,25 +20,14 @@ defmodule Sally.Immutable do
     cond do
       is_nil(dev_alias) -> ImmutableStatus.not_found(name)
       ttl_expired?(dev_alias, opts) -> ImmutableStatus.ttl_expired(dev_alias)
-      good?(dev_alias) -> ImmutableStatus.good(dev_alias) |> add_tempf()
+      good?(dev_alias) -> ImmutableStatus.good(dev_alias)
       :unmatched -> ImmutableStatus.unknown_status(dev_alias)
     end
     |> ImmutableStatus.finalize()
   end
 
-  defp add_tempf(%ImmutableStatus{datapoints: %{temp_c: temp_c}} = status) do
-    case temp_c do
-      x when is_number(x) ->
-        temp_f = (x * 9 / 5 + 32) |> Float.round(3)
-        ImmutableStatus.add_datapoint(status, :temp_f, temp_f)
-
-      _ ->
-        status
-    end
-  end
-
-  # (1 of 2) single datapount returned by Datapoint.query_preload_avg/1
-  defp good?(%DevAlias{datapoints: [values_map]}) when is_map(values_map), do: true
+  # (1 of 2) single map of data
+  defp good?(%DevAlias{datapoints: [x]}) when is_map(x), do: true
   defp good?(_), do: false
 
   defp ttl_expired?(dev_alias, opts) do

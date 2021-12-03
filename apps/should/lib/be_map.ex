@@ -99,7 +99,7 @@ defmodule Should.Be.Map do
   defmacro with_size(map, size) do
     quote location: :keep, bind_quoted: [map: map, size: size] do
       assert Should.Be.Map.check(map)
-      refute map_size(map) == size, Should.msg(map, "should be size", size)
+      assert map_size(map) == size, Should.msg(map, "should be size", size)
     end
   end
 
