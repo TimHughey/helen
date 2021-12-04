@@ -50,19 +50,16 @@ defmodule Rena.HoldCmd.ServerTest do
   describe "Rena.HoldCmd.Server.handle_call/3" do
     @tag state_add: [alfred: Alfred]
     test "processes :pause message", %{state: state} do
-      reply = Server.handle_call(:pause, self(), state)
-
-      new_state = Should.Be.Tuple.reply_ok(reply, State)
-
-      Should.Be.Struct.with_all_key_value(new_state, State, ticket: :paused)
+      Server.handle_call(:pause, self(), state)
+      |> Should.Be.Reply.ok()
+      |> Should.Be.Struct.with_all_key_value(State, ticket: :paused)
     end
 
     @tag state_add: [alfred: Alfred]
     test "processes :resume message", %{state: state} do
-      reply = Server.handle_call(:resume, self(), state)
-
-      new_state = Should.Be.Tuple.reply_ok(reply, State)
-      Should.Be.Struct.with_key_struct(new_state, State, :ticket, Ticket)
+      Server.handle_call(:resume, self(), state)
+      |> Should.Be.Reply.ok()
+      |> Should.Be.Struct.with_key_struct(State, :ticket, Ticket)
     end
   end
 
@@ -77,7 +74,7 @@ defmodule Rena.HoldCmd.ServerTest do
       memo = %Memo{name: ctx.equipment, missing?: true}
 
       Server.handle_info({Alfred, memo}, state)
-      |> Should.Be.Tuple.noreply(State)
+      |> Should.Be.NoReply.with_state()
       |> Should.Be.Struct.with_all_key_value(State, last_exec: :none)
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
     end
@@ -94,7 +91,7 @@ defmodule Rena.HoldCmd.ServerTest do
       memo = %Memo{name: ctx.equipment, missing?: false}
 
       Server.handle_info({Alfred, memo}, state)
-      |> Should.Be.Tuple.noreply(State)
+      |> Should.Be.NoReply.with_state()
       |> Should.Be.Struct.with_all_key_value(State, last_exec: {:no_change, "on"})
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
     end
@@ -112,7 +109,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
       new_state =
         Server.handle_info({Alfred, memo}, state)
-        |> Should.Be.Tuple.noreply(State)
+        |> Should.Be.NoReply.with_state()
 
       # verify the ExecCmd resulted in an actual command
       Should.Be.Struct.with_all_key_value(new_state, State, last_exec: {:pending, "on"})
