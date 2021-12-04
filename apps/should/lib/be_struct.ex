@@ -119,4 +119,32 @@ defmodule Should.Be.Struct do
       x
     end
   end
+
+  @doc """
+  Asserts when `x` is a `struct` ending with `suffix`
+
+  ```
+  assert is_struct(x), Should.msg(x, "should be a struct")
+
+  suffix = x.__struct__ |> Module.split() |> List.last() |> then(fn x -> Module.concat(x) end)
+
+  assert suffix == want_suffix, Should.msg(x, "struct should have module suffix", want_suffix)
+
+  # return the struct
+  x
+  ```
+  """
+  @doc since: "0.6.22"
+  defmacro with_suffix(x, want_suffix) do
+    quote location: :keep, bind_quoted: [x: x, want_suffix: want_suffix] do
+      assert is_struct(x), Should.msg(x, "should be a struct")
+
+      suffix = x.__struct__ |> Module.split() |> List.last() |> then(fn x -> Module.concat([x]) end)
+
+      assert suffix == want_suffix, Should.msg(x, "struct should have module suffix", want_suffix)
+
+      # return the struct
+      x
+    end
+  end
 end
