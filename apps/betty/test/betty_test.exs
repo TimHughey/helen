@@ -82,7 +82,7 @@ defmodule BettyTest do
   describe "Betty.app_error_v2/2" do
     test "handles a well-formed tags list" do
       tags = [module: __MODULE__, rc: :error]
-      rc = Betty.app_error_v2(tags)
+      rc = Betty.app_error_v2(tags, return: :rc)
 
       Should.Be.asserted(fn -> rc == :error end)
     end
