@@ -37,12 +37,52 @@ defmodule Alfred.ExecCmd do
           invalid_reason: nil | String.t()
         }
 
+  def add(%ExecCmd{} = ec, opts) when is_list(opts) do
+    for opt <- opts, reduce: ec do
+      acc ->
+        case opt do
+          :notify -> add_notify(acc)
+          :force -> add_force(acc)
+          _ -> acc
+        end
+    end
+    |> validate()
+  end
+
+  @doc """
+  Set `force: true` in command opts
+  """
+  @doc since: "0.2.6"
+  def add_force(%ExecCmd{} = ec) do
+    %ExecCmd{ec | cmd_opts: Keyword.put(ec.cmd_opts, :force, true)}
+  end
+
+  @doc """
+  Set name for `ExecCmd`
+  """
+  @doc since: "0.2.6"
+  def add_name(%ExecCmd{} = ec, name) when is_binary(name) do
+    struct(ec, name: name)
+  end
+
+  @doc """
+  Set `notify_when_released: true` in command opts
+  """
+  @doc since: "0.2.6"
   def add_notify(%ExecCmd{cmd_opts: opts} = ec) do
     struct(ec, cmd_opts: Keyword.put(opts, :notify_when_released, true))
   end
 
   def add_type(%ExecCmd{cmd_params: params} = ec, type) when is_binary(type) do
     struct(ec, params: Map.put(params, :type, type))
+  end
+
+  @doc """
+  Merge `cmd_opts` into existing command opts
+  """
+  @doc since: "0.2.6"
+  def merge_cmd_opts(%ExecCmd{cmd_opts: cmd_opts} = ec, opts) do
+    %ExecCmd{ec | cmd_opts: Keyword.merge(cmd_opts, opts)}
   end
 
   @allowed_keys [:name, :cmd, :cmd_params, :cmd_opts, :pub_opts]

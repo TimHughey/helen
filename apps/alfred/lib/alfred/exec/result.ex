@@ -75,9 +75,7 @@ defmodule Alfred.ExecResult do
       %ExecResult{rc: {:ttl_expired, _}} -> [rc: :ttl_expired] ++ tags
       %ExecResult{rc: rc} -> [rc: rc] ++ tags
     end
-    |> Betty.app_error_v2()
-
-    er.rc
+    |> Betty.app_error_v2(return: :rc)
   end
 
   def not_found(%MutableStatus{name: name}), do: %ExecResult{name: name, cmd: "unknown", rc: :not_found}
