@@ -52,7 +52,7 @@ defmodule Rena.HoldCmd.ServerTest do
     test "processes :pause message", %{state: state} do
       reply = Server.handle_call(:pause, self(), state)
 
-      new_state = Should.Be.Tuple.reply_ok_with_struct(reply, State)
+      new_state = Should.Be.Tuple.reply_ok(reply, State)
 
       Should.Be.Struct.with_all_key_value(new_state, State, ticket: :paused)
     end
@@ -61,7 +61,7 @@ defmodule Rena.HoldCmd.ServerTest do
     test "processes :resume message", %{state: state} do
       reply = Server.handle_call(:resume, self(), state)
 
-      new_state = Should.Be.Tuple.reply_ok_with_struct(reply, State)
+      new_state = Should.Be.Tuple.reply_ok(reply, State)
       Should.Be.Struct.with_key_struct(new_state, State, :ticket, Ticket)
     end
   end
@@ -77,7 +77,7 @@ defmodule Rena.HoldCmd.ServerTest do
       memo = %Memo{name: ctx.equipment, missing?: true}
 
       Server.handle_info({Alfred, memo}, state)
-      |> Should.Be.Tuple.noreply_with_struct(State)
+      |> Should.Be.Tuple.noreply(State)
       |> Should.Be.Struct.with_all_key_value(State, last_exec: :none)
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
     end
@@ -94,7 +94,7 @@ defmodule Rena.HoldCmd.ServerTest do
       memo = %Memo{name: ctx.equipment, missing?: false}
 
       Server.handle_info({Alfred, memo}, state)
-      |> Should.Be.Tuple.noreply_with_struct(State)
+      |> Should.Be.Tuple.noreply(State)
       |> Should.Be.Struct.with_all_key_value(State, last_exec: {:no_change, "on"})
       |> Should.Be.Struct.with_key_struct(State, :last_notify_at, DateTime)
     end
@@ -112,7 +112,7 @@ defmodule Rena.HoldCmd.ServerTest do
 
       new_state =
         Server.handle_info({Alfred, memo}, state)
-        |> Should.Be.Tuple.noreply_with_struct(State)
+        |> Should.Be.Tuple.noreply(State)
 
       # verify the ExecCmd resulted in an actual command
       Should.Be.Struct.with_all_key_value(new_state, State, last_exec: {:pending, "on"})
