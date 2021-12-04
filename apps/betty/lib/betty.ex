@@ -45,7 +45,7 @@ defmodule Betty do
 
   """
   @doc since: "0.2.6"
-  def app_error_v2(tags, opts \\ [return: :rc])
+  def app_error_v2(tags, opts \\ [passthrough: :ok])
       when is_list(tags)
       when is_list(opts) do
     alias Betty.AppError
@@ -56,10 +56,11 @@ defmodule Betty do
 
     AppError.record(module, tags_rest)
 
-    # return the value of :rc or as specified in opts
-    return_key = opts[:return]
+    # decide what to return
+    {return, opts_rest} = Keyword.pop(opts, :return, false)
+    {passthrough, _} = Keyword.pop(opts_rest, :passthrough, :ok)
 
-    tags_rest[return_key] || :no_return
+    if return, do: tags[return], else: passthrough
   end
 
   @doc """
