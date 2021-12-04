@@ -75,6 +75,27 @@ defmodule Should.Be do
   end
 
   @doc """
+  Asserts when `x` is equal to `y`
+
+  ```
+  assert x == y, Should.msg(x, "should be equal", y)
+
+  # return equals
+  x
+  ```
+
+  """
+  @doc since: "0.6.21"
+  defmacro equal(x, y) do
+    quote location: :keep, bind_quoted: [x: x, y: y] do
+      assert x == y, Should.msg(x, "should be equal", y)
+
+      # return equals
+      x
+    end
+  end
+
+  @doc """
   Asserts when `x` is a list
 
   ```

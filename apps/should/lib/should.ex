@@ -3,7 +3,7 @@ defmodule Should do
     quote do
       import Should
       require Should.Be
-      require Should.Be.{Invalid, List, Map, Ok, Schema, Struct, Tuple}
+      require Should.Be.{DateTime, Invalid, List, Map, Ok, Schema, Struct, Tuple}
       require Should.Be.NonEmpty
       require Should.Contain
     end
