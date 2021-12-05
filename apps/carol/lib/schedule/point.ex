@@ -1,4 +1,4 @@
-defmodule Illumination.Schedule.Point do
+defmodule Carol.Schedule.Point do
   alias __MODULE__
   alias Alfred.ExecCmd
 

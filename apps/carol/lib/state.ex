@@ -1,11 +1,11 @@
-defmodule Illumination.State do
+defmodule Carol.State do
   alias __MODULE__
 
   alias Alfred.ExecCmd
   alias Alfred.Notify.Ticket
 
-  alias Illumination.Schedule
-  alias Illumination.Schedule.Result
+  alias Carol.Schedule
+  alias Carol.Schedule.Result
 
   @cmd_inactive %ExecCmd{cmd: "off"} |> ExecCmd.add([:notify])
 

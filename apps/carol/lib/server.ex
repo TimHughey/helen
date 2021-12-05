@@ -1,4 +1,4 @@
-defmodule Illumination.Server do
+defmodule Carol.Server do
   require Logger
   use GenServer
 
@@ -6,8 +6,8 @@ defmodule Illumination.Server do
   alias Alfred.{ExecCmd, ExecResult}
   alias Alfred.Notify.Memo
   alias Broom.TrackerEntry
-  alias Illumination.{Schedule, State}
-  alias Illumination.Schedule.Result
+  alias Carol.{Schedule, State}
+  alias Carol.Schedule.Result
 
   @impl true
   def init(args) do

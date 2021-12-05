@@ -1,9 +1,9 @@
-defmodule Illumination.Schedule.Result do
+defmodule Carol.Schedule.Result do
   alias __MODULE__
   alias Alfred.ExecCmd
 
-  alias Illumination.Schedule
-  # alias Illumination.Schedule.Point
+  alias Carol.Schedule
+  # alias Carol.Schedule.Point
 
   defstruct schedule: nil,
             exec: nil,

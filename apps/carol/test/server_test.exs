@@ -1,11 +1,11 @@
-defmodule IlluminationServerTest do
+defmodule CarolServerTest do
   use ExUnit.Case, async: true
   use Should
 
   alias Alfred.ExecCmd
 
-  alias Illumination.Schedule.Result
-  alias Illumination.{Server, State}
+  alias Carol.Schedule.Result
+  alias Carol.{Server, State}
 
   @moduletag illumination: true, illumination_server: true
 
@@ -15,7 +15,7 @@ defmodule IlluminationServerTest do
 
   setup [:equipment_add, :schedule_add, :state_add, :memo_add, :start_args_add]
 
-  describe "Illumination.Server starts supervised" do
+  describe "Carol.Server starts supervised" do
     @tag equipment_add: [], start_args_add: []
     test "without schedules", ctx do
       ctx.start_args
@@ -35,7 +35,7 @@ defmodule IlluminationServerTest do
     end
   end
 
-  describe "Illumination.Server.handle_call/3" do
+  describe "Carol.Server.handle_call/3" do
     @tag equipment_add: [cmd: "off"], schedule_add: [:typical]
     @tag state_add: [schedule: true]
     test "processes :restart message", ctx do
@@ -44,7 +44,7 @@ defmodule IlluminationServerTest do
     end
   end
 
-  describe "Illumination.Server.call/2" do
+  describe "Carol.Server.call/2" do
     @tag equipment_add: [], schedule_add: [:typical], start_args_add: [:schedules]
     test "calls server with message", ctx do
       start_supervised({Server, ctx.start_args})
@@ -57,7 +57,7 @@ defmodule IlluminationServerTest do
     end
   end
 
-  describe "Illumination.Server.handle_continue/2" do
+  describe "Carol.Server.handle_continue/2" do
     @tag equipment_add: [], schedule_add: [:typical]
     @tag state_add: [bootstrap: true, raw: true]
     test "returns proper noreply", ctx do
@@ -68,12 +68,12 @@ defmodule IlluminationServerTest do
     end
   end
 
-  describe "Illumination.Server.handle_info/2 handles" do
+  describe "Carol.Server.handle_info/2 handles" do
     @tag equipment_add: [cmd: "on"], schedule_add: [:typical]
     @tag state_add: [bootstrap: true], memo_add: []
     test "first Memo", ctx do
       new_state =
-        Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+        Carol.Server.handle_info(ctx.notify_msg, ctx.state)
         |> Should.Be.NoReply.with_state()
 
       Should.Be.struct(new_state.result, Result)
@@ -93,7 +93,7 @@ defmodule IlluminationServerTest do
     @tag state_add: [schedule: true], memo_add: []
     test "Memo matching equipment status", ctx do
       new_state =
-        Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+        Carol.Server.handle_info(ctx.notify_msg, ctx.state)
         |> Should.Be.NoReply.with_state()
 
       Should.Be.DateTime.greater(new_state.last_notify_at, ctx.memo_before_dt)
@@ -102,7 +102,7 @@ defmodule IlluminationServerTest do
     @tag equipment_add: [rc: :pending], schedule_add: [:typical]
     @tag state_add: [schedule: true], memo_add: []
     test "Memo when equipment is pending", ctx do
-      Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+      Carol.Server.handle_info(ctx.notify_msg, ctx.state)
       |> Should.Be.NoReply.with_state()
     end
 
@@ -110,7 +110,7 @@ defmodule IlluminationServerTest do
     @tag state_add: [schedule: true], memo_add: [missing?: true]
     test "Memo when equipment is missing", ctx do
       new_state =
-        Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+        Carol.Server.handle_info(ctx.notify_msg, ctx.state)
         |> Should.Be.NoReply.with_state()
 
       Should.Be.DateTime.greater(new_state.last_notify_at, ctx.memo_before_dt)
@@ -120,7 +120,7 @@ defmodule IlluminationServerTest do
     @tag equipment_add: [cmd: "on"], schedule_add: [:typical]
     @tag state_add: [schedule: true], memo_add: []
     test "Memo when cmd is mismatched", ctx do
-      Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+      Carol.Server.handle_info(ctx.notify_msg, ctx.state)
       |> Should.Be.NoReply.stop(:normal)
     end
 
@@ -129,15 +129,15 @@ defmodule IlluminationServerTest do
     # test "TrackerEntry with matching reference", ctx do
     #   broom_msg = {Broom, }
     #
-    #   Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+    #   Carol.Server.handle_info(ctx.notify_msg, ctx.state)
     #   |> Should.Be.NoReply.stop(:normal)
     # end
   end
 
   def equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
   def memo_add(ctx), do: Alfred.NotifyAid.memo_add(ctx)
-  def schedule_add(ctx), do: Illumination.ScheduleAid.add(ctx)
-  def state_add(ctx), do: Illumination.StateAid.add(ctx)
+  def schedule_add(ctx), do: Carol.ScheduleAid.add(ctx)
+  def state_add(ctx), do: Carol.StateAid.add(ctx)
 
   def start_args_add(%{start_args_add: opts} = ctx) when is_list(opts) do
     want_keys = opts ++ [:alfred, :equipment]

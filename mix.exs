@@ -53,7 +53,8 @@ defmodule Helen.MixProject do
         "Alfred Testing Mockups": ~r/^Alfred\.Test.*$/,
         Betty: ~r/Betty.*$/,
         Broom: ~r/^Broom.*$/,
-        Illumination: ~r/^Illumination.*$|^(Front|Green).*$/,
+        Carol: ~r/^Carol$/,
+        "Carol Schedule": ~r/^Carol.Schedule.*$/,
         "Legacy Database": ~r/^LegacyDb.*$/,
         Rena: ~r/^Rena.*$/,
         Sally: ~r/^Sally$|^Sally\..*(?<!Manual)(?<!Aid)$/,
@@ -88,7 +89,6 @@ defmodule Helen.MixProject do
       betty: :permanent,
       broom: :permanent,
       sally: :permanent,
-      illumination: :permanent,
       legacy_db: :permanent,
       farm: :permanent
     ]

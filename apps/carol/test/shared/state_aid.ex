@@ -1,8 +1,6 @@
-defmodule Illumination.StateAid do
+defmodule Carol.StateAid do
   alias Alfred.ExecCmd
-  alias Alfred.Notify.Ticket
-  alias Illumination.{Schedule, Server, State}
-  alias Illumination.Schedule.{Point, Result}
+  alias Carol.{Server, State}
 
   @doc """
   Add %State{} to testing context

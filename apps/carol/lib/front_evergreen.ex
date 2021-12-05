@@ -1,13 +1,13 @@
-defmodule FrontRedMaple do
-  use Illumination, shutdown: 10_000
+defmodule FrontEvergreen do
+  use Carol, shutdown: 10_000
 
   def start_args do
-    alias Illumination.Schedule
-    alias Illumination.Schedule.Point
+    alias Carol.Schedule
+    alias Carol.Schedule.Point
 
     [
       module: __MODULE__,
-      equipment: "front red maple pwm",
+      equipment: "front evergreen pwm",
       schedules: [
         %Schedule{
           id: "early evening",

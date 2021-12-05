@@ -1,4 +1,4 @@
-defmodule Illumination do
+defmodule Carol do
   require Logger
 
   defmacro __using__(use_opts) do
@@ -10,7 +10,7 @@ defmodule Illumination do
 
         all_args = [use_opts: use_rest, module: module, start_args: start_args]
 
-        Supervisor.child_spec({Illumination.Server, all_args}, [id: module] ++ child_args)
+        Supervisor.child_spec({Carol.Server, all_args}, [id: module] ++ child_args)
       end
 
       def info do

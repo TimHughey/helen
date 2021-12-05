@@ -1,9 +1,9 @@
-defmodule Illumination.Schedule do
+defmodule Carol.Schedule do
   use Timex
 
   alias __MODULE__
   alias Alfred.ExecCmd
-  alias Illumination.Schedule.{Point, Result}
+  alias Carol.Schedule.{Point, Result}
 
   defstruct id: nil, start: %Point{}, finish: %Point{}
 

@@ -1,19 +1,19 @@
-defmodule IlluminationScheduleTest do
+defmodule CarolScheduleTest do
   use ExUnit.Case, async: true
   use Should
 
   @moduletag illumination: true, illumination_schedule: true
 
   alias Alfred.ExecCmd
-  alias Illumination.Schedule
-  alias Illumination.Schedule.Point
-  alias Illumination.Schedule.Result
+  alias Carol.Schedule
+  alias Carol.Schedule.Point
+  alias Carol.Schedule.Result
 
   @tz "America/New_York"
 
   setup [:equipment_add, :schedule_add]
 
-  describe "Illumination.Schedule.calc_point/2" do
+  describe "Carol.Schedule.calc_point/2" do
     test "handles overnight" do
       schedule =
         %Schedule{
@@ -64,7 +64,7 @@ defmodule IlluminationScheduleTest do
   end
 
   @tag schedule_add: [{18, 0}, {17, 0}, {1, 0}]
-  test "Illumination.Schedule.sort/1 works", %{schedule: unsorted} do
+  test "Carol.Schedule.sort/1 works", %{schedule: unsorted} do
     sorted = Schedule.sort(unsorted)
 
     hours = for schedule <- sorted, do: schedule.start.at.hour
@@ -72,7 +72,7 @@ defmodule IlluminationScheduleTest do
     assert hours == [1, 17, 18]
   end
 
-  describe "Illumination.Schedule.find_active_and_next/2" do
+  describe "Carol.Schedule.find_active_and_next/2" do
     @tag schedule_add: ["sunrise", "sunset", "end of day"]
     test "finds schedules", ctx do
       opts = fn dt -> [datetime: dt, timezone: @tz] end
@@ -106,7 +106,7 @@ defmodule IlluminationScheduleTest do
     end
   end
 
-  describe "Illumination.Schedule.effectuate/2" do
+  describe "Carol.Schedule.effectuate/2" do
     @tag equipment_add: [cmd: "off"]
     @tag schedule_add: [
            {"active", "sunrise", %ExecCmd{cmd: "fade", cmd_params: %{type: "random"}}},
@@ -165,7 +165,7 @@ defmodule IlluminationScheduleTest do
     end
   end
 
-  describe "Illumination.Schedule.handle_cmd_ack/3" do
+  describe "Carol.Schedule.handle_cmd_ack/3" do
     test "creates finish timer" do
       run_ms = 60_000
       start_at = event_shifted("sunset", 0)
@@ -183,7 +183,7 @@ defmodule IlluminationScheduleTest do
   end
 
   def equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
-  def schedule_add(ctx), do: Illumination.ScheduleAid.add(ctx)
+  def schedule_add(ctx), do: Carol.ScheduleAid.add(ctx)
 
   defp event_shifted(sunref, shift_ms) do
     Solar.event(sunref, timezone: @tz)

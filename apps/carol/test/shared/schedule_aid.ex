@@ -1,8 +1,8 @@
-defmodule Illumination.ScheduleAid do
+defmodule Carol.ScheduleAid do
   alias Alfred.ExecCmd
 
-  alias Illumination.Schedule
-  alias Illumination.Schedule.Point
+  alias Carol.Schedule
+  alias Carol.Schedule.Point
 
   @typical [
     {"early", "fixed 00:01:01", %ExecCmd{cmd: "on", cmd_opts: [echo: true]}},

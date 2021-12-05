@@ -1,9 +1,9 @@
 defmodule Greenhouse do
-  use Illumination, shutdown: 10_000
+  use Carol, shutdown: 10_000
 
   def start_args do
-    alias Illumination.Schedule
-    alias Illumination.Schedule.Point
+    alias Carol.Schedule
+    alias Carol.Schedule.Point
 
     [
       module: __MODULE__,

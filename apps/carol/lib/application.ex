@@ -1,4 +1,4 @@
-defmodule Illumination.Application do
+defmodule Carol.Application do
   @moduledoc false
 
   require Logger
@@ -16,7 +16,7 @@ defmodule Illumination.Application do
 
     opts = [
       strategy: :one_for_one,
-      name: Illumination.Supervisor,
+      name: Carol.Supervisor,
       max_restarts: 40,
       max_seconds: 10
     ]
