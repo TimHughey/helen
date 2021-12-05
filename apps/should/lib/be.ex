@@ -148,6 +148,26 @@ defmodule Should.Be do
   end
 
   @doc """
+  Asserts when `x` is module, then returns `x`
+
+  ```
+  assert to_string(x) =~ "Elixir", Should.msg(x, "should be a module")
+
+  # return the verified module
+  x
+  ```
+  """
+  @doc since: "0.6.23"
+  defmacro module(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert to_string(x) =~ "Elixir", Should.msg(x, "should be a module")
+
+      # return the verified module
+      x
+    end
+  end
+
+  @doc """
   Asserts when `x` is `:ok`
 
   ```
