@@ -1,65 +1,3 @@
-defmodule Illumination.Schedule.Point do
-  alias __MODULE__
-
-  defstruct sunref: nil, offset_ms: 0, at: nil, cmd: "off"
-
-  @type t :: %Point{
-          sunref: String.t(),
-          offset_ms: integer(),
-          at: DateTime.t(),
-          cmd: String.t()
-        }
-
-  def calc_at(%Point{} = pt, opts \\ []) when is_list(opts) do
-    tz = opts[:timezone]
-    datetime = opts[:datetime]
-
-    at = Solar.event(pt.sunref, datetime: datetime, timezone: tz)
-
-    %Point{pt | at: Timex.shift(at, milliseconds: pt.offset_ms)}
-  end
-end
-
-defmodule Illumination.Schedule.Result do
-  alias __MODULE__
-  alias Illumination.Schedule
-  alias Illumination.Schedule.Point
-
-  defstruct schedule: nil,
-            exec: nil,
-            queue_timer: nil,
-            run_timer: nil,
-            action: :none
-
-  @type actions :: :activated | :queued | :live | :finished
-
-  @type t :: %Result{
-          schedule: Schedule.t(),
-          exec: Alfred.ExecResult.t(),
-          queue_timer: reference(),
-          run_timer: reference(),
-          action: actions()
-        }
-
-  # (1 of 2)
-  def cancel_timers_if_needed(%Result{} = result) do
-    if result.queue_timer, do: Process.cancel_timer(result.queue_timer)
-    if result.run_timer, do: Process.cancel_timer(result.run_timer)
-
-    %Result{result | queue_timer: nil, run_timer: nil}
-  end
-
-  # (2 of 2)
-  def cancel_timers_if_needed(passthrough), do: passthrough
-
-  def expected_cmd(result) do
-    case result do
-      %Result{action: action} when action in [:live, :activated] -> result.schedule.start.cmd
-      _ -> "off"
-    end
-  end
-end
-
 defmodule Illumination.Schedule do
   use Timex
 
@@ -75,22 +13,19 @@ defmodule Illumination.Schedule do
           finish: Point.t()
         }
 
+  @spec activate(Schedule.t(), opts :: list()) :: Result.t()
   def activate(%Schedule{} = schedule, opts) do
-    alfred = opts[:alfred] || Alfred
-    cmds = opts[:cmds] || %{}
+    {alfred, opts_rest} = Keyword.pop(opts, :alfred, Alfred)
+    {equipment, opts_rest} = Keyword.pop(opts_rest, :equipment, "equipment missing")
+    {cmd_opts, _} = Keyword.pop(opts_rest, :cmd_opts, [])
 
-    cmd = schedule.start.cmd
-    cmd_params = cmds[cmd] || %{}
-    cmd_opts = [force: true, notify_when_released: true]
+    ec = schedule.start.cmd
 
-    ec = %ExecCmd{
-      name: opts[:equipment],
-      cmd: cmd,
-      cmd_params: Enum.into(cmd_params, %{}),
-      cmd_opts: cmd_opts
-    }
+    final_ec = ExecCmd.add_name(ec, equipment) |> ExecCmd.merge_cmd_opts(cmd_opts)
 
-    %Result{exec: alfred.execute(ec), schedule: schedule, action: :activated}
+    exec_result = alfred.execute(final_ec)
+
+    %Result{exec: exec_result, schedule: schedule, action: :activated}
 
     # NOTE: see handle_cmd_ack/3 for logic that creates the finish timer
   end
@@ -118,15 +53,17 @@ defmodule Illumination.Schedule do
   end
 
   def calc_point(%Schedule{} = s, opts) when is_list(opts) do
-    timezone = opts[:timezone]
-    start_dt = opts[:datetime]
-    finish_dt = if opts[:overnight], do: Timex.shift(start_dt, days: 1), else: start_dt
+    {calc_opts, opts_rest} = Keyword.split(opts, [:timezone])
+    {start_dt, opts_rest} = Keyword.pop(opts_rest, :datetime)
+    {overnight?, _} = Keyword.pop(opts_rest, :overnight, false)
 
-    start_pt = Point.calc_at(s.start, timezone: timezone, datetime: start_dt)
-    finish_pt = Point.calc_at(s.finish, timezone: timezone, datetime: finish_dt)
+    finish_dt = if overnight?, do: Timex.shift(start_dt, days: 1), else: start_dt
+
+    start_pt = Point.calc_at(s.start, [datetime: start_dt] ++ calc_opts)
+    finish_pt = Point.calc_at(s.finish, [datetime: finish_dt] ++ calc_opts)
 
     if Timex.before?(finish_pt.at, start_pt.at) do
-      calc_point(s, opts ++ [overnight: true])
+      calc_point(s, [overnight: true] ++ opts)
     else
       %Schedule{s | start: start_pt, finish: finish_pt}
     end
@@ -143,9 +80,6 @@ defmodule Illumination.Schedule do
       {_, %Schedule{} = x} -> queue(x, opts)
     end
   end
-
-  def ensure_non_negative(x) when x <= 0, do: 0
-  def ensure_non_negative(x), do: x
 
   def find_active_and_next([], _opts), do: []
 
@@ -179,12 +113,13 @@ defmodule Illumination.Schedule do
   end
 
   def queue(%Schedule{} = schedule, opts) do
-    alfred = opts[:alfred]
-    datetime = opts[:datetime]
-    equipment = opts[:equipment]
+    {alfred, opts_rest} = Keyword.pop(opts, :alfred, Alfred)
+    {datetime, opts_rest} = Keyword.pop(opts_rest, :datetime)
+    {cmd_inactive, opts_rest} = Keyword.pop(opts_rest, :cmd_inactive)
+    {cmd_opts, _} = Keyword.pop(opts_rest, :cmd_opts, [])
 
-    # when a scheduled is queued ensure the equipment is off
-    %ExecCmd{name: equipment, cmd: "off"} |> alfred.execute()
+    # when a schedule is queued ensure the equipment is inactive
+    cmd_inactive |> ExecCmd.merge_cmd_opts(cmd_opts) |> alfred.execute()
 
     ms = Timex.diff(schedule.start.at, datetime, :milliseconds)
 
@@ -197,4 +132,11 @@ defmodule Illumination.Schedule do
   def sort([%Schedule{} | _] = schedules) do
     Enum.sort(schedules, fn lhs, rhs -> Timex.compare(lhs.start.at, rhs.start.at) <= 0 end)
   end
+
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
+
+  defp ensure_non_negative(x) when x <= 0, do: 0
+  defp ensure_non_negative(x), do: x
 end

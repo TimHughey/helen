@@ -4,7 +4,7 @@ defmodule Illumination.MixProject do
   def project do
     [
       app: :illumination,
-      version: "0.1.14",
+      version: "0.2.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -40,7 +40,7 @@ defmodule Illumination.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/reference_impl"]
+  defp elixirc_paths(:test), do: ["lib", "test/reference_impl", "test/shared"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp preferred_cli_env do

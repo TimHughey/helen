@@ -93,11 +93,4 @@ defmodule Helen.MixProject do
       farm: :permanent
     ]
   end
-
-  # defp doc_groups do
-  #   doc_group(:alfred) ++ doc_group(:alfred)
-  # end
-  #
-  # defp doc_group(:alfred), do: [Alfred: ~r/Alfred/]
-  # defp doc_group(:sally), do: [Sally: ~r/Sally/]
 end

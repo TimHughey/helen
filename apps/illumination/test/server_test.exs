@@ -1,249 +1,152 @@
 defmodule IlluminationServerTest do
-  # NOTE: do not use async to avoid conflicts with starting supervised
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Should
 
-  alias Alfred.Notify.{Memo, Ticket}
+  alias Alfred.ExecCmd
 
-  @moduletag illumination: true, illumination_server_test: true
+  alias Illumination.Schedule.Result
+  alias Illumination.{Server, State}
 
-  setup [:setup_basic_schedule]
+  @moduletag illumination: true, illumination_server: true
 
-  test "Illuminaton.child_spec/2 creates correct spec map" do
-    spec = Illumination.RefImpl.child_spec(config: true)
-
-    should_contain(spec, [{:id, Illumination.RefImpl}])
-    should_contain(spec, [{:restart, :transient}])
-    should_contain(spec, [{:shutdown, 10_000}])
-    should_contain_key(spec, :start)
-    should_be_tuple(spec.start)
-    assert tuple_size(spec.start) == 3, "start should be tuple with 3 elements"
-
-    {server_module, func, init_args} = spec.start
-    should_be_equal(server_module, Illumination.Server)
-    should_be_equal(func, :start_link)
-
-    init_args = List.flatten(init_args)
-    should_be_non_empty_list(init_args)
-
-    should_contain(init_args, [{:use_opts, []}])
-    should_contain(init_args, [{:module, Illumination.RefImpl}])
-    should_contain(init_args, [{:start_args, [config: true]}])
+  setup_all do
+    {:ok, %{alfred: AlfredSim, server_name: __MODULE__}}
   end
 
-  test "Illumination.Server can be queried for info and restarted" do
-    start_args = [alfred: AlfredFound, equipment: "test_equip"]
-    start_res = start_supervised({Illumination.RefImpl, start_args})
-
-    should_be_ok_tuple_with_pid(start_res)
-
-    info = Illumination.RefImpl.info()
-    assert is_nil(info), "info should be nil"
-
-    initial_pid = GenServer.whereis(Illumination.RefImpl)
-
-    res = Illumination.RefImpl.restart()
-    should_be_tuple_with_size(res, 2)
-    {rc, restarting_pid} = res
-
-    should_be_equal(rc, :restarting)
-    should_be_equal(initial_pid, restarting_pid)
-
-    stop_res = stop_supervised(Illumination.RefImpl)
-    should_be_equal(stop_res, :ok)
-  end
+  setup [:equipment_add, :schedule_add, :state_add, :memo_add, :start_args_add]
 
   describe "Illumination.Server starts supervised" do
-    test "without schedules" do
-      start_args = [alfred: AlfredFound, equipment: "test_equip"]
-      start_res = start_supervised({Illumination.RefImpl, start_args})
-
-      should_be_ok_tuple_with_pid(start_res)
-
-      state = :sys.get_state(Illumination.RefImpl)
-      should_be_struct(state, Illumination.State)
-      should_be_equal(state.alfred, AlfredFound)
-
-      stop_res = stop_supervised(Illumination.RefImpl)
-      should_be_equal(stop_res, :ok)
+    @tag equipment_add: [], start_args_add: []
+    test "without schedules", ctx do
+      ctx.start_args
+      |> Server.child_spec()
+      |> then(fn spec -> start_supervised(Server, spec) end)
+      |> Should.Be.Ok.tuple_with_pid()
+      |> Should.Be.Server.with_state()
+      |> Should.Contain.kv_pairs(server_name: ctx.server_name, result: nil, schedules: [])
     end
 
-    @tag basic_schedule: true
-    test "with equipment and schedules", %{schedules: schedules} do
-      start_args = [alfred: AlfredFound, equipment: "test_equip", schedules: schedules]
-      start_res = start_supervised({Illumination.RefImpl, start_args})
+    @tag equipment_add: [], schedule_add: [:typical], start_args_add: [:schedules]
+    test "with schedules", ctx do
+      start_supervised({Server, ctx.start_args})
+      |> Should.Be.Ok.tuple_with_pid()
+      |> Should.Be.Server.with_state()
+      |> Should.Contain.kv_pairs(server_name: ctx.server_name, result: nil)
+    end
+  end
 
-      should_be_ok_tuple_with_pid(start_res)
+  describe "Illumination.Server.handle_call/3" do
+    @tag equipment_add: [cmd: "off"], schedule_add: [:typical]
+    @tag state_add: [schedule: true]
+    test "processes :restart message", ctx do
+      Server.handle_call(:restart, self(), ctx.state)
+      |> Should.Be.Reply.stop_normal(:restarting)
+    end
+  end
 
-      state = :sys.get_state(Illumination.RefImpl)
-      should_be_struct(state, Illumination.State)
-      should_be_equal(state.alfred, AlfredFound)
-      assert is_nil(state.result), "state result should be nil"
+  describe "Illumination.Server.call/2" do
+    @tag equipment_add: [], schedule_add: [:typical], start_args_add: [:schedules]
+    test "calls server with message", ctx do
+      start_supervised({Server, ctx.start_args})
+      |> Should.Be.Ok.tuple_with_pid()
+      |> Should.Be.Server.with_state()
+      |> Should.Contain.kv_pairs(server_name: ctx.server_name, result: nil)
 
-      stop_res = stop_supervised(Illumination.RefImpl)
-      should_be_equal(stop_res, :ok)
+      Server.call(:restart, ctx.server_name)
+      |> Should.Be.equal(:restarting)
+    end
+  end
+
+  describe "Illumination.Server.handle_continue/2" do
+    @tag equipment_add: [], schedule_add: [:typical]
+    @tag state_add: [bootstrap: true, raw: true]
+    test "returns proper noreply", ctx do
+      state = Should.Be.NoReply.with_state(ctx.state)
+
+      want_kv = [alfred: AlfredSim, equipment: ctx.equipment]
+      Should.Be.Struct.with_all_key_value(state, State, want_kv)
     end
   end
 
   describe "Illumination.Server.handle_info/2 handles" do
-    @tag basic_schedule: true
-    test "first Memo", %{schedules: schedules} do
-      alias Illumination.Schedule
-      alias Illumination.Schedule.{Point, Result}
-      alias Illumination.State
+    @tag equipment_add: [cmd: "on"], schedule_add: [:typical]
+    @tag state_add: [bootstrap: true], memo_add: []
+    test "first Memo", ctx do
+      new_state =
+        Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+        |> Should.Be.NoReply.with_state()
 
-      start_at = DateTime.utc_now()
+      Should.Be.struct(new_state.result, Result)
+      Should.Be.DateTime.greater(new_state.last_notify_at, ctx.memo_before_dt)
 
-      equipment = "test_equipment"
-      ref = make_ref()
-
-      initial_state = %State{
-        alfred: AlfredSendExecMsg,
-        equipment: %Ticket{name: equipment, ref: ref},
-        schedules: schedules,
-        result: nil
-      }
-
-      reply = Illumination.Server.handle_continue(:bootstrap, initial_state)
-      should_be_noreply_tuple_with_state(reply, State)
-
-      {:noreply, state} = reply
-
-      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
-      notify_msg = {Alfred, notify_memo}
-
-      reply = Illumination.Server.handle_info(notify_msg, state)
-
-      should_be_noreply_tuple_with_state(reply, State)
-      {:noreply, state} = reply
-
-      assert DateTime.compare(state.last_notify_at, start_at) == :gt
-      should_be_struct(state.result, Result)
+      Should.Be.equal(new_state.result.action, :queued)
 
       receive do
-        %Alfred.ExecCmd{} -> assert true
-        error -> refute true, "should have received ExecCmd:\n#{inspect(error, pretty: true)}"
+        {:echo, %ExecCmd{}} -> assert true
+        error -> refute true, Should.msg(error, "should have received ExecCmd")
       after
         100 -> refute true, "should have received the ExecCmd"
       end
     end
 
-    test "Memo matching equipment status" do
-      alias Illumination.Schedule
-      alias Illumination.Schedule.{Point, Result}
-      alias Illumination.State
+    @tag equipment_add: [cmd: "off"], schedule_add: [:typical]
+    @tag state_add: [schedule: true], memo_add: []
+    test "Memo matching equipment status", ctx do
+      new_state =
+        Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+        |> Should.Be.NoReply.with_state()
 
-      equipment = "test_equipment"
-      ref = make_ref()
-
-      state = %State{
-        alfred: AlfredAlwaysOn,
-        equipment: %Ticket{name: equipment, ref: ref},
-        result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}
-      }
-
-      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
-      notify_msg = {Alfred, notify_memo}
-
-      res = Illumination.Server.handle_info(notify_msg, state)
-
-      should_be_noreply_tuple_with_state(res, State)
+      Should.Be.DateTime.greater(new_state.last_notify_at, ctx.memo_before_dt)
     end
 
-    test "Memo when equipment is missing" do
-      alias Illumination.Schedule
-      alias Illumination.Schedule.{Point, Result}
-      alias Illumination.State
-
-      equipment = "test_equipment"
-      ref = make_ref()
-
-      state = %State{
-        module: Illumination.RefImpl,
-        alfred: AlfredAlwaysPending,
-        equipment: %Ticket{name: equipment, ref: ref},
-        result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live},
-        last_notify_at: DateTime.utc_now()
-      }
-
-      notify_memo = %Memo{ref: ref, name: equipment, missing?: true}
-      notify_msg = {Alfred, notify_memo}
-
-      res = Illumination.Server.handle_info(notify_msg, state)
-
-      should_be_noreply_tuple_with_state(res, State)
-      {:noreply, new_state} = res
-      should_be_datetime_greater_than(new_state.last_notify_at, state.last_notify_at)
+    @tag equipment_add: [rc: :pending], schedule_add: [:typical]
+    @tag state_add: [schedule: true], memo_add: []
+    test "Memo when equipment is pending", ctx do
+      Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+      |> Should.Be.NoReply.with_state()
     end
 
-    test "Memo when equipment cmd is pending" do
-      alias Illumination.Schedule
-      alias Illumination.Schedule.{Point, Result}
-      alias Illumination.State
+    @tag equipment_add: [rc: :pending], schedule_add: [:typical]
+    @tag state_add: [schedule: true], memo_add: [missing?: true]
+    test "Memo when equipment is missing", ctx do
+      new_state =
+        Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+        |> Should.Be.NoReply.with_state()
 
-      equipment = "test_equipment"
-      ref = make_ref()
-
-      state = %State{
-        module: Illumination.RefImpl,
-        alfred: AlfredAlwaysPending,
-        equipment: %Ticket{name: equipment, ref: ref},
-        result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live},
-        last_notify_at: DateTime.utc_now()
-      }
-
-      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
-      notify_msg = {Alfred, notify_memo}
-
-      res = Illumination.Server.handle_info(notify_msg, state)
-
-      should_be_noreply_tuple_with_state(res, State)
-      {:noreply, new_state} = res
-      should_be_equal(state.last_notify_at, new_state.last_notify_at)
+      Should.Be.DateTime.greater(new_state.last_notify_at, ctx.memo_before_dt)
     end
 
     @tag capture_log: true
-    test "Memo when cmd is mismatched" do
-      alias Illumination.Schedule
-      alias Illumination.Schedule.{Point, Result}
-      alias Illumination.State
-
-      equipment = "test_equipment"
-      ref = make_ref()
-
-      state = %State{
-        alfred: AlfredAlwaysOff,
-        equipment: %Ticket{name: equipment, ref: ref},
-        result: %Result{schedule: %Schedule{start: %Point{cmd: "on"}}, action: :live}
-      }
-
-      notify_memo = %Memo{ref: ref, name: equipment, missing?: false}
-      notify_msg = {Alfred, notify_memo}
-
-      res = Illumination.Server.handle_info(notify_msg, state)
-      should_be_tuple_with_size(res, 3)
+    @tag equipment_add: [cmd: "on"], schedule_add: [:typical]
+    @tag state_add: [schedule: true], memo_add: []
+    test "Memo when cmd is mismatched", ctx do
+      Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+      |> Should.Be.NoReply.stop(:normal)
     end
+
+    # @tag equipment_add: [cmd: "on"], schedule_add: [:typical]
+    # @tag state_add: [schedule: true], memo_add: []
+    # test "TrackerEntry with matching reference", ctx do
+    #   broom_msg = {Broom, }
+    #
+    #   Illumination.Server.handle_info(ctx.notify_msg, ctx.state)
+    #   |> Should.Be.NoReply.stop(:normal)
+    # end
   end
 
-  def setup_basic_schedule(%{basic_schedule: true} = ctx) do
-    alias Illumination.Schedule
-    alias Illumination.Schedule.Point
+  def equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
+  def memo_add(ctx), do: Alfred.NotifyAid.memo_add(ctx)
+  def schedule_add(ctx), do: Illumination.ScheduleAid.add(ctx)
+  def state_add(ctx), do: Illumination.StateAid.add(ctx)
 
-    schedules = [
-      %Schedule{
-        id: "sunrise",
-        start: %Point{sunref: "sunrise", cmd: "on"},
-        finish: %Point{sunref: "sunrise", offset_ms: 300_000}
-      },
-      %Schedule{
-        id: "sunset",
-        start: %Point{sunref: "sunset", cmd: "on"},
-        finish: %Point{sunref: "sunset", offset_ms: 300_000}
-      }
-    ]
+  def start_args_add(%{start_args_add: opts} = ctx) when is_list(opts) do
+    want_keys = opts ++ [:alfred, :equipment]
 
-    Map.put(ctx, :schedules, schedules)
+    Map.take(ctx, want_keys)
+    |> Enum.into([])
+    |> Keyword.merge(id: ctx.server_name)
+    |> then(fn start_args -> %{start_args: start_args} end)
   end
 
-  def setup_basic_schedule(ctx), do: ctx
+  def start_args_add(_), do: :ok
 end

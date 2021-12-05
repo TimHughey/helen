@@ -8,10 +8,10 @@ defmodule Illumination.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Greenhouse, Greenhouse.start_args()},
-      {FrontChandelier, FrontChandelier.start_args()},
-      {FrontRedMaple, FrontRedMaple.start_args()},
-      {FrontEvergreen, FrontEvergreen.start_args()}
+      # {Greenhouse, Greenhouse.start_args()},
+      # {FrontChandelier, FrontChandelier.start_args()},
+      # {FrontRedMaple, FrontRedMaple.start_args()},
+      # {FrontEvergreen, FrontEvergreen.start_args()}
     ]
 
     opts = [

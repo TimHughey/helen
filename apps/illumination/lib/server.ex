@@ -2,62 +2,60 @@ defmodule Illumination.Server do
   require Logger
   use GenServer
 
-  alias Alfred.Notify.{Memo, Ticket}
+  alias __MODULE__
+  alias Alfred.{ExecCmd, ExecResult}
+  alias Alfred.Notify.Memo
+  alias Broom.TrackerEntry
   alias Illumination.{Schedule, State}
   alias Illumination.Schedule.Result
 
   @impl true
   def init(args) do
-    state = %State{}
+    if args[:server_name] do
+      Process.register(self(), args[:server_name])
+      {:ok, State.new(args), {:continue, :bootstrap}}
+    else
+      {:stop, :missing_server_name}
+    end
+  end
 
-    initial_state = %State{
-      alfred: args[:alfred] || state.alfred,
-      module: args[:module] || __MODULE__,
-      equipment: args[:equipment] || state.equipment,
-      schedules: args[:schedules] || state.schedules,
-      cmds: args[:cmds] || state.cmds,
-      timezone: args[:timezone] || state.timezone
-    }
+  def call(msg, server) when is_pid(server) or is_atom(server) do
+    GenServer.call(server, msg)
+  rescue
+    _ -> {:no_server, server}
+  catch
+    :exit, _ -> {:no_server, server}
+  end
 
-    {:ok, initial_state, {:continue, :bootstrap}}
+  def child_spec(opts) do
+    {id, opts_rest} = Keyword.pop(opts, :id)
+    {restart, opts_rest} = Keyword.pop(opts_rest, :restart, :permanent)
+
+    final_opts = Keyword.put(opts_rest, :server_name, id)
+
+    %{id: id, start: {Server, :start_link, [final_opts]}, restart: restart}
   end
 
   def start_link(start_args) do
-    {module, args_rest} = Keyword.pop(start_args, :module)
-    {start_args, _args_rest} = Keyword.pop(args_rest, :start_args)
-
-    server_opts = [name: module]
-
-    GenServer.start_link(Illumination.Server, start_args, server_opts)
+    GenServer.start_link(Server, start_args)
   end
 
   @impl true
   def handle_call(:restart, _from, %State{} = s) do
-    {:stop, :normal, {:restarting, self()}, s}
+    {:stop, :normal, :restarting, s}
   end
 
   @impl true
   def handle_continue(:bootstrap, %State{} = s) do
-    # important to calculate initial schedules some of which may be outdated depending on the
-    # time of day the server is started.  subsequent schedule calculations will refresh
-    # the out of date schedules.
+    # some schedules could be expired depending on the time of day the server is started
+    # so perform an intiial calculation
     sched_opts = [timezone: s.timezone, datetime: Timex.now(s.timezone)]
-    initial_schedules = Schedule.calc_points(s.schedules, sched_opts)
 
-    # register for equipment notifications
-    register_result = s.alfred.notify_register(name: s.equipment, frequency: :all, link: true)
-
-    case register_result do
-      {:ok, ticket} ->
-        # save the schedules and the notification ticket
-        [schedules: initial_schedules]
-        |> State.save_schedules_and_result(s)
-        |> State.save_equipment(ticket)
-        |> noreply()
-
-      {:no_server, _} ->
-        {:stop, :normal, s}
-    end
+    s.schedules
+    |> Schedule.calc_points(sched_opts)
+    |> State.save_schedules(s)
+    |> State.start_notifies()
+    |> noreply()
 
     # NOTE: at this point the server is running and no further actions occur until an
     #       equipment notification is received
@@ -69,12 +67,19 @@ defmodule Illumination.Server do
   end
 
   @impl true
+  def handle_info({Broom, %TrackerEntry{cmd: "off"}}, %State{} = s) do
+    # ignore release of "off" cmds
+
+    noreply(s)
+  end
+
+  @impl true
   def handle_info(
-        {Broom, %Broom.TrackerEntry{refid: ref, acked_at: acked_at}},
-        %State{result: %Result{schedule: schedule, exec: %Alfred.ExecResult{refid: ref}}} = s
+        {Broom, %TrackerEntry{refid: ref} = te},
+        %State{result: %Result{exec: %ExecResult{refid: ref}}} = s
       ) do
-    [result: Schedule.handle_cmd_ack(schedule, acked_at, timezone: s.timezone)]
-    |> State.save_schedules_and_result(s)
+    Schedule.handle_cmd_ack(s.result.schedule, te.acked_at, timezone: s.timezone)
+    |> State.save_result(s)
     |> noreply()
   end
 
@@ -89,10 +94,10 @@ defmodule Illumination.Server do
 
     sched_opts = [
       alfred: s.alfred,
-      equipment: s.equipment.name,
+      equipment: s.equipment,
       timezone: s.timezone,
       datetime: Timex.now(s.timezone),
-      cmds: s.cmds
+      cmd_inactive: s.cmd_inactive
     ]
 
     latest_schedules = Schedule.calc_points(s.schedules, sched_opts)
@@ -107,7 +112,8 @@ defmodule Illumination.Server do
   # (1 of 3) handle equipment missing messages
   @impl true
   def handle_info({Alfred, %Memo{missing?: true} = memo}, %State{} = s) do
-    Betty.app_error(s, equipment: memo.name, missing: true)
+    [server_name: s.server_name, equipment: memo.name, missing: true]
+    |> Betty.app_error_v2(passthrough: s)
     |> State.update_last_notify_at()
     |> noreply()
   end
@@ -121,47 +127,30 @@ defmodule Illumination.Server do
   # (3 of 3) handle subsequent notifications (result != nil) comparing the equipment status
   # to the expected cmd (based on previous execute result)
   @impl true
-  def handle_info(
-        {Alfred, %Memo{ref: ref} = memo},
-        %State{equipment: %Ticket{ref: ref}, result: result} = s
-      ) do
+  def handle_info({Alfred, %Memo{} = memo}, %State{} = s) do
     alias Alfred.MutableStatus, as: MutStatus
 
-    expected_cmd = Result.expected_cmd(result)
+    %ExecCmd{cmd: expected_cmd} = Result.expected_cmd(s.result)
     status = s.alfred.status(memo.name)
 
     case status do
       # skip check when cmd is pending and don't update last notify
       %MutStatus{pending?: true} = _x ->
-        noreply(s)
+        s
 
       # do nothing when expected cmd matches status cmd
       %MutStatus{good?: true, cmd: cmd} when cmd == expected_cmd ->
-        State.update_last_notify_at(s) |> noreply()
+        State.update_last_notify_at(s)
 
       # anything else attempt to correct the mismatch by restarting
       %MutStatus{cmd: cmd, name: name} ->
-        tags = [cmd_mismatch: true, equipment: name, cmd: cmd]
-        {:stop, :normal, Betty.app_error(s, tags)}
+        [server_name: s.server_name, cmd_mismatch: true, equipment: name, cmd: cmd]
+        |> then(fn tags -> Betty.app_error_v2(tags, passthrough: s) end)
+        |> then(fn state -> {:stop, :normal, state} end)
     end
+    |> noreply()
   end
 
-  # defp log_cmd_mismatch(%State{result: result} = s, status) do
-  #   %Result{queue_timer: qtimer, run_timer: rtimer} = result
-  #   qt_ms = if is_reference(qtimer), do: Process.read_timer(qtimer), else: :unset
-  #   rt_ms = if is_reference(rtimer), do: Process.read_timer(rtimer), else: :unset
-  #
-  #   [
-  #     "\n",
-  #     "queue_timer_ms(#{qt_ms}) run_timer_ms(#{rt_ms})",
-  #     "\n",
-  #     "#{inspect(status, pretty: true)}",
-  #     "\n",
-  #     "#{inspect(s, pretty: true)}"
-  #   ]
-  #   |> IO.iodata_to_binary()
-  #   |> Logger.warn()
-  # end
-
   defp noreply(%State{} = s), do: {:noreply, s}
+  defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}
 end
