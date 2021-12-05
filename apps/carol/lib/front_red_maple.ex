@@ -1,6 +1,4 @@
 defmodule FrontRedMaple do
-  use Carol, shutdown: 10_000
-
   def start_args do
     alias Carol.Schedule
     alias Carol.Schedule.Point
