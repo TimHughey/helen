@@ -56,6 +56,7 @@ defmodule Helen.MixProject do
         Carol: ~r/^Carol$/,
         "Carol Schedule": ~r/^Carol.Schedule.*$/,
         "Legacy Database": ~r/^LegacyDb.*$/,
+        Glow: ~r/^Glow.*/,
         Rena: ~r/^Rena.*$/,
         Sally: ~r/^Sally$|^Sally\..*(?<!Manual)(?<!Aid)$/,
         "Sally Test Aids": ~r/Sally\.(?:Test.*|.*Aid)$/,
