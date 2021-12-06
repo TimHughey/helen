@@ -89,8 +89,8 @@ defmodule Sally.MixProject do
       {:broom, in_umbrella: true},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
-      {:should, in_umbrella: true, only: :test, runtime: false},
-      {:excoveralls, "~> 0.10", only: :test}
+      {:excoveralls, "~> 0.10", only: :test},
+      {:should, in_umbrella: true, only: :test, runtime: false}
     ]
   end
 
