@@ -79,6 +79,34 @@ defmodule Should.Be.Struct do
   end
 
   @doc """
+  Asserts when `x` is struct of `named` and has `keys` then returns map of `keys`
+
+  ```
+  struct = Should.Be.struct(x, named)
+
+  # create a map of the wanted keys
+  for key <- keys, into: %{} do
+    {key, Should.Be.struct(x, named, key)}
+  end
+
+  # returns map of wanted keys
+  ```
+  """
+  @doc since: "0.6.24"
+  defmacro with_keys(x, named, keys) do
+    quote location: :keep, bind_quoted: [x: x, named: named, keys: keys] do
+      struct = Should.Be.struct(x, named)
+
+      # create a map of the wanted keys
+      for key <- keys, into: %{} do
+        {key, Should.Be.Struct.with_key(x, named, key)}
+      end
+
+      # returns map of wanted keys
+    end
+  end
+
+  @doc """
   Asserts when `x` is a `struct` with `key` of a struct `want_struct`
 
   ```
