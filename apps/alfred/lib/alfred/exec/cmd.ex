@@ -37,41 +37,48 @@ defmodule Alfred.ExecCmd do
           invalid_reason: nil | String.t()
         }
 
+  @doc since: "0.2.7"
+  @add_accepted [:echo, :force, :notify]
   def add(%ExecCmd{} = ec, opts) when is_list(opts) do
-    for opt <- opts, reduce: ec do
-      acc ->
-        case opt do
-          :notify -> add_notify(acc)
-          :force -> add_force(acc)
-          _ -> acc
+    for {key, val} when is_atom(key) <- opts, reduce: ec do
+      ec_acc ->
+        case {key, val} do
+          {:cmd, cmd} -> struct(ec_acc, cmd: cmd)
+          {:name, name} -> struct(ec_acc, name: name)
+          {key, true} when key in @add_accepted -> add_cmd_opt(ec_acc, key)
+          _ -> ec_acc
         end
     end
     |> validate()
   end
 
   @doc """
+  Add a generic `key: true` to cmd_opts
+  """
+  @doc since: "0.2.6"
+  def add_cmd_opt(%ExecCmd{} = ec, key) when is_atom(key) do
+    %ExecCmd{ec | cmd_opts: Keyword.put(ec.cmd_opts, key, true)}
+  end
+
+  @doc """
   Set `force: true` in command opts
   """
   @doc since: "0.2.6"
-  def add_force(%ExecCmd{} = ec) do
-    %ExecCmd{ec | cmd_opts: Keyword.put(ec.cmd_opts, :force, true)}
-  end
+  def add_force(%ExecCmd{} = ec), do: add_cmd_opt(ec, :force)
 
   @doc """
   Set name for `ExecCmd`
   """
   @doc since: "0.2.6"
-  def add_name(%ExecCmd{} = ec, name) when is_binary(name) do
-    struct(ec, name: name)
+  def add_name(%ExecCmd{} = ec, name, opts \\ []) when is_binary(name) and is_list(opts) do
+    struct(ec, name: name) |> add(opts)
   end
 
   @doc """
   Set `notify_when_released: true` in command opts
   """
   @doc since: "0.2.6"
-  def add_notify(%ExecCmd{cmd_opts: opts} = ec) do
-    struct(ec, cmd_opts: Keyword.put(opts, :notify_when_released, true))
-  end
+  def add_notify(%ExecCmd{} = ec), do: add_cmd_opt(ec, :notify_when_released)
 
   def add_type(%ExecCmd{cmd_params: params} = ec, type) when is_binary(type) do
     struct(ec, params: Map.put(params, :type, type))
