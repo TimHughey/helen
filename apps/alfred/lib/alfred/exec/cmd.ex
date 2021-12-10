@@ -38,13 +38,14 @@ defmodule Alfred.ExecCmd do
         }
 
   @doc since: "0.2.7"
-  @add_accepted [:echo, :force, :notify]
+  @add_accepted [:echo, :force, :notify_when_released]
   def add(%ExecCmd{} = ec, opts) when is_list(opts) do
     for {key, val} when is_atom(key) <- opts, reduce: ec do
       ec_acc ->
         case {key, val} do
           {:cmd, cmd} -> struct(ec_acc, cmd: cmd)
           {:name, name} -> struct(ec_acc, name: name)
+          {:notify, true} -> add_cmd_opt(ec_acc, :notify_when_released)
           {key, true} when key in @add_accepted -> add_cmd_opt(ec_acc, key)
           _ -> ec_acc
         end
