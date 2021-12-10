@@ -7,17 +7,19 @@ defmodule Should.Be.Struct do
   Asserts when is struct and struct name matches
 
   ```
-  assert is_struct(x), Should.msg(x, "should be a struct")
-  assert x.__struct__ == want_struct, Should.msg(x, "should be struct", want_struct)
+  assert is_struct(x, want_struct), Should.msg(x, "should be a", want_struct)
+
+  # return struct
+  x
   ```
 
   """
   @doc since: "0.6.12"
   defmacro named(x, want_struct) do
     quote location: :keep, bind_quoted: [x: x, want_struct: want_struct] do
-      assert is_struct(x), Should.msg(x, "should be a struct")
-      assert x.__struct__ == want_struct, Should.msg(x, "should be struct", want_struct)
+      assert is_struct(x, want_struct), Should.msg(x, "should be a", want_struct)
 
+      # return struct
       x
     end
   end

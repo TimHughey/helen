@@ -88,11 +88,14 @@ defmodule Should.Be.Map do
   end
 
   @doc """
-  Refutes `map` size is `size`
+  Refutes `map` size is `size`, returns map
 
   ```
   assert Should.Be.Map.check(map)
-  refute map_size(map, size), Should.msg(map, "should be size", size)
+  assert map_size(map) == size, Should.msg(map, "should be size", size)
+
+  # return map
+  map
   ```
   """
   @doc since: "0.6.12"
@@ -100,15 +103,21 @@ defmodule Should.Be.Map do
     quote location: :keep, bind_quoted: [map: map, size: size] do
       assert Should.Be.Map.check(map)
       assert map_size(map) == size, Should.msg(map, "should be size", size)
+
+      # return map
+      map
     end
   end
 
   @doc """
-  Refutes `map` has `key`
+  Refutes `map` has `key`, returns map
 
   ```
   assert Should.Be.Map.check(map)
   refute is_map_key(map, key), Should.msg(map, "should not have key", key)
+
+  # return map
+  map
   ```
   """
   @doc since: "0.6.12"
@@ -116,6 +125,9 @@ defmodule Should.Be.Map do
     quote location: :keep, bind_quoted: [map: map, key: key] do
       assert Should.Be.Map.check(map)
       refute is_map_key(map, key), Should.msg(map, "should not have key", key)
+
+      # return map
+      map
     end
   end
 end

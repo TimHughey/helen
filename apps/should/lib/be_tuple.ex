@@ -23,6 +23,88 @@ defmodule Should.Be.Tuple do
   end
 
   @doc """
+  Asserts when `x` is a `tuple` of `size `and each `element` is of `type`, returns `x`
+
+  ```
+  Should.Be.List.with_length(types, size)
+  Should.Be.Tuple.with_size(x, size)
+
+  vals = Tuple.to_list(x)
+  type_vals = Enum.zip(types, vals)
+
+  for {type, val} <- type_vals do
+    case type do
+      :atom -> Should.Be.atom(val)
+      :binary -> Should.Be.binary(val)
+      :map -> Should.Be.map(val)
+      :reference -> Should.Be.reference(val)
+    end
+  end
+
+  # return validated tuple
+  x
+  ```
+  """
+  @doc since: "0.6.25"
+  defmacro of_types(x, size, types) do
+    quote location: :keep, bind_quoted: [x: x, size: size, types: types] do
+      Should.Be.List.with_length(types, size)
+      Should.Be.Tuple.with_size(x, size)
+
+      vals = Tuple.to_list(x)
+      type_vals = Enum.zip(types, vals)
+
+      for {type, val} <- type_vals do
+        case type do
+          :atom -> Should.Be.atom(val)
+          :binary -> Should.Be.binary(val)
+          :map -> Should.Be.map(val)
+          :reference -> Should.Be.reference(val)
+        end
+      end
+
+      # return validated tuple
+      x
+    end
+  end
+
+  @doc """
+  Asserts when `x` is a `{rc, map}`, returns `x`
+
+  ```
+  Should.Be.Tuple.with_size(x, 2)
+  elem(x, 0) |> Should.Be.equal(rc)
+  elem(x, 1) |> Should.Be.map()
+  ```
+  """
+  @doc since: "0.6.25"
+  defmacro rc_and_map(x, rc) do
+    quote location: :keep, bind_quoted: [x: x, rc: rc] do
+      Should.Be.Tuple.with_size(x, 2)
+      elem(x, 0) |> Should.Be.equal(rc)
+      elem(x, 1) |> Should.Be.map()
+    end
+  end
+
+  @doc """
+  Asserts when `x` is `{rc, val}`, returns `x`
+
+  ```
+  Should.Be.Tuple.with_size(x, 2)
+  elem(x, 0) |> Should.Be.equal(rc)
+  elem(x, 1) |> Should.Be.equal(val)
+  ```
+  """
+  @doc since: "0.6.25"
+  defmacro rc_and_val(x, rc, val) do
+    quote location: :keep, bind_quoted: [x: x, rc: rc, val: val] do
+      Should.Be.Tuple.with_size(x, 2)
+      elem(x, 0) |> Should.Be.equal(rc)
+      elem(x, 1) |> Should.Be.equal(val)
+    end
+  end
+
+  @doc """
   Asserts when `x` is a `{rc, val}` tuple and returns val
 
   ```

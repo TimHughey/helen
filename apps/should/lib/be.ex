@@ -25,6 +25,27 @@ defmodule Should.Be do
   end
 
   @doc """
+  Asserts when `x` is an atom
+
+  ```
+  assert is_atom, Should.msg(x, "should be an atom")
+
+  # return the atom
+  x
+  ```
+
+  """
+  @doc since: "0.6.25"
+  defmacro atom(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert is_atom(x), Should.msg(x, "should be an atom")
+
+      # return the atom
+      x
+    end
+  end
+
+  @doc """
   Asserts `x` when `x` is a function returns true or `x` is true then returns `x`
 
   ```
@@ -205,6 +226,25 @@ defmodule Should.Be do
   end
 
   @doc """
+  Asserts when `x` is a reference, then returns the reference
+
+  ```
+  assert is_map(x), Should.msg(x, "should be a map")
+  # return the verified map
+  x
+  ```
+  """
+  @doc since: "0.6.25"
+  defmacro reference(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert is_reference(x), Should.msg(x, "should be a reference")
+
+      # return the reference
+      x
+    end
+  end
+
+  @doc """
   Asserts when `x` is a schema of `want`
 
   ```
@@ -234,8 +274,7 @@ defmodule Should.Be do
   Asserts when `x` is a struct with name `named` then returns verified struct
 
   ```
-  assert is_struct(x), Should.msg(x, "should be a struct")
-  assert x.__struct__ == named, Should.msg(x, "should be struct", named)
+  assert is_struct(x, named), Should.msg(x, "should be a", named)
 
   # return verified struct
   x
@@ -244,8 +283,7 @@ defmodule Should.Be do
   @doc since: "0.2.6"
   defmacro struct(x, named) do
     quote location: :keep, bind_quoted: [x: x, named: named] do
-      assert is_struct(x), Should.msg(x, "should be a struct")
-      assert x.__struct__ == named, Should.msg(x, "should be struct", named)
+      assert is_struct(x, named), Should.msg(x, "should be a", named)
 
       # return verified struct
       x
