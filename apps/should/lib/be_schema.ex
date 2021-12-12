@@ -31,7 +31,7 @@ defmodule Should.Be.Schema do
   ```
   Should.Be.Schema.named(x, want_schema)
 
-  assert Should.Be.List.check(kv_pairs) or Should.Be.Map.check(kv_pairs)
+  assert Should.Be.list(kv_pairs) or Should.Be.map(kv_pairs)
 
   as_map = Map.from_struct(x)
 
@@ -44,7 +44,9 @@ defmodule Should.Be.Schema do
     quote location: :keep, bind_quoted: [x: x, want_schema: want_schema, kv_pairs: kv_pairs] do
       Should.Be.Schema.named(x, want_schema)
 
-      assert Should.Be.List.check(kv_pairs) or Should.Be.Map.check(kv_pairs)
+      list_or_map = is_list(kv_pairs) or is_map(kv_pairs)
+
+      assert list_or_map, Should.msg(kv_pairs, "should be a list or map")
 
       Should.Contain.kv_pairs(x, kv_pairs)
     end

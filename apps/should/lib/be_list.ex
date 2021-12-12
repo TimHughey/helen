@@ -188,13 +188,15 @@ defmodule Should.Be.List do
 
   """
   @doc since: "0.6.12"
-  defmacro with_length(x, length) do
-    quote location: :keep, bind_quoted: [x: x, length: length] do
+  defmacro with_length(x, length, opts \\ [unwrap: true]) do
+    quote location: :keep, bind_quoted: [x: x, length: length, opts: opts] do
       list = Should.Be.list(x)
       assert length(x) == length, Should.msg(x, "should be length", length)
 
+      unwrap = opts[:unwrap]
+
       # for single entry lists return the entry, else the whole list
-      if length == 1, do: List.first(x), else: x
+      if length == 1 and unwrap, do: List.first(x), else: x
     end
   end
 end

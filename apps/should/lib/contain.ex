@@ -90,6 +90,8 @@ defmodule Should.Contain do
   @doc since: "0.6.12"
   defmacro kv_pairs(x, kv_pairs) do
     quote location: :keep, bind_quoted: [x: x, kv_pairs: kv_pairs] do
+      Should.Be.list(kv_pairs)
+
       # ensure x is an enumberable
       x = if(is_struct(x), do: Map.from_struct(x), else: x)
 

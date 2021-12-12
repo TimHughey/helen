@@ -4,21 +4,24 @@ defmodule Should.Be.Tuple do
   """
 
   @doc """
-  Asserts when `x` is a tuple then returns `x`
+  Asserts when the tuple `x` equals `vals` list, returns `x`
 
   ```
-  assert is_tuple(x), Should.msg(x, "should be tuple")
+  Should.Be.Tuple.with_size(x, length(vals))
 
-  x
+  vals_tuple = List.to_tuple(vals)
+
+  Should.Be.equal(x, vals_tuple)
   ```
-
   """
-  @doc since: "0.6.12"
-  defmacro check(x) do
-    quote location: :keep, bind_quoted: [x: x] do
-      assert is_tuple(x), Should.msg(x, "should be tuple")
+  @doc since: "0.2.27"
+  defmacro all_vals(x, vals) do
+    quote location: :keep, bind_quoted: [x: x, vals: vals] do
+      Should.Be.Tuple.with_size(x, length(vals))
 
-      x
+      vals_tuple = List.to_tuple(vals)
+
+      Should.Be.equal(x, vals_tuple)
     end
   end
 

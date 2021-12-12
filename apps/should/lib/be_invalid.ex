@@ -13,7 +13,7 @@ defmodule Should.Be.Invalid do
   @doc since: "0.6.12"
   defmacro tuple_with_binary(tuple, binaries) do
     quote location: :keep, bind_quoted: [tuple: tuple, binaries: binaries] do
-      Should.Be.List.check(binaries)
+      Should.Be.list(binaries)
 
       reason = Should.Be.Tuple.with_rc(tuple, :invalid)
       Should.Contain.binaries(reason, binaries)
