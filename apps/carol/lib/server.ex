@@ -175,7 +175,7 @@ defmodule Carol.Server do
 
   # GenServer reply helpers
 
-  defp continue(%State{} = s, term), do: {:noreply, s, {:continue, term}}
+  defp continue(term, %State{} = s), do: {:noreply, s, {:continue, term}}
   # defp continue_id(type, id, %State{} = s), do: {:noreply, s, {:continue, {type, id}}}
   defp noreply(%State{} = s), do: {:noreply, s}
   defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}
