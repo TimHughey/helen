@@ -42,6 +42,7 @@ defmodule Glow.MixProject do
       {:carol, in_umbrella: true},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
+      {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
       {:should, in_umbrella: true, only: :test}
     ]
   end
@@ -49,7 +50,7 @@ defmodule Glow.MixProject do
   defp docs do
     [
       # The main page in the docs
-      main: "Glow",
+      main: "readme",
       # logo: "path/to/logo.png",
       extras: ["README.md"],
       nest_modules_by_prefix: [],

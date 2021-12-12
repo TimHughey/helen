@@ -1,19 +1,27 @@
 defmodule Glow.Instance.Greenhouse do
-  def start_args do
-    alias Carol.Schedule
-    alias Carol.Schedule.Point
+  alias Carol.{Point, Program}
 
-    [
-      module: __MODULE__,
+  def init_args(add_args) when is_list(add_args) do
+    args = [
       equipment: "greenhouse alpha power",
-      schedules: [
-        %Schedule{
-          id: "daylight",
-          start: %Point{sunref: "astro rise", cmd: "on"},
-          finish: %Point{sunref: "astro rise", offset_ms: 16 * 60 * 60 * 1000}
-        }
-      ],
+      programs: programs(),
       timezone: "America/New_York"
+    ]
+
+    Keyword.merge(args, add_args)
+  end
+
+  defp program(id, start_opts, finish_opts) do
+    [Point.new_start(start_opts), Point.new_finish(finish_opts)]
+    |> Program.new(id: id)
+  end
+
+  defp programs do
+    [
+      program("Daylight", [sunref: "astro rise"],
+        sunref: "astro rise",
+        offset_ms: 16 * 60 * 60 * 1000
+      )
     ]
   end
 end
