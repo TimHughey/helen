@@ -7,16 +7,16 @@ defmodule Glow.Instance.FrontChandelier do
     Keyword.merge(args, add_args)
   end
 
-  @cmd_opts_common [type: "random", primes: 35, min: 256, step_ms: 55, priority: 7]
+  @cmd_params_common [type: "random", primes: 35, min: 256, step_ms: 55, priority: 7]
 
   defp fade_bright do
-    cmd_opts = Keyword.merge(@cmd_opts_common, max: 768, step: 13)
-    [cmd: "fade bright", cmd_opts: cmd_opts]
+    cmd_params = Keyword.merge(@cmd_params_common, max: 768, step: 13)
+    [cmd: "fade bright", cmd_params: cmd_params]
   end
 
   defp fade_dim do
-    cmd_opts = Keyword.merge(@cmd_opts_common, max: 2048, step: 31)
-    [cmd: "fade dim", cmd_opts: cmd_opts]
+    cmd_params = Keyword.merge(@cmd_params_common, max: 2048, step: 31)
+    [cmd: "fade dim", cmd_params: cmd_params]
   end
 
   defp program(id, start_opts, finish_opts) do
