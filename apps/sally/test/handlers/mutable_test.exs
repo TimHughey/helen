@@ -25,7 +25,7 @@ defmodule Sally.MutableHandlerTest do
       db_rc = Handler.db_actions(dispatch)
       db_results = Should.Be.Tuple.with_rc(db_rc, :ok)
 
-      Should.Be.Map.check(db_results)
+      Should.Be.map(db_results)
 
       want_keys = [:aliases, :aligned_0, :device, :seen_list]
       verified_map = Should.Be.Map.with_keys(db_results, want_keys)
@@ -45,7 +45,7 @@ defmodule Sally.MutableHandlerTest do
       db_rc = Handler.db_actions(dispatch)
       db_results = Should.Be.Tuple.with_rc(db_rc, :ok)
 
-      Should.Be.Map.check(db_results)
+      Should.Be.map(db_results)
 
       want_keys = [:aliases, :device, :seen_list]
       verified_map = Should.Be.Map.with_keys(db_results, want_keys)

@@ -20,10 +20,11 @@ defmodule Sally.DevAliasJustSawTest do
       results = Should.Be.Tuple.with_rc(db_result, :ok)
 
       map = Should.Be.Map.with_keys(results, [:seen_list])
-      seen_list = Should.Be.List.with_length(map.seen_list, count)
+      seen_list = Should.Be.List.with_length(map.seen_list, count, unwrap: false)
 
       for dev_alias <- seen_list do
         Should.Be.Schema.named(dev_alias, DevAlias)
+
         Should.Be.match(dev_alias.updated_at, seen_at)
       end
     end

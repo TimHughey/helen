@@ -22,7 +22,8 @@ defmodule SallyDatapointTest do
     test "calculates average of :temp_c, :temp_f, :relhum", ctx do
       dev_alias = Datapoint.preload_avg(ctx.dev_alias, 1000) |> Should.Be.struct(DevAlias)
 
-      [datapoints] = Should.Be.List.with_length(dev_alias.datapoints, 1)
+      # NOTE: Should.Be.List.with_length/2 automatically unwraps single item lists
+      datapoints = Should.Be.List.with_length(dev_alias.datapoints, 1)
       Should.Be.Map.with_size(datapoints, 3)
     end
 
