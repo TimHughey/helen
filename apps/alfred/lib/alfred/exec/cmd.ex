@@ -38,19 +38,25 @@ defmodule Alfred.ExecCmd do
         }
 
   @doc since: "0.2.7"
-  @add_accepted [:echo, :force, :notify_when_released]
+  @ack_types [:immediate, :host]
+  @add_accepted [:ack, :echo, :force, :notify_when_released]
   def add(%ExecCmd{} = ec, opts) when is_list(opts) do
     for {key, val} when is_atom(key) <- opts, reduce: ec do
       ec_acc ->
         case {key, val} do
-          {:cmd, cmd} -> struct(ec_acc, cmd: cmd)
-          {:name, name} -> struct(ec_acc, name: name)
+          {:ack, x} when x in @ack_types -> add_ack(ec, x)
+          {:cmd, x} -> struct(ec_acc, cmd: x)
+          {:name, x} when is_binary(x) -> struct(ec_acc, name: x)
           {:notify, true} -> add_cmd_opt(ec_acc, :notify_when_released)
           {key, true} when key in @add_accepted -> add_cmd_opt(ec_acc, key)
           _ -> ec_acc
         end
     end
     |> validate()
+  end
+
+  def add_ack(%ExecCmd{} = ec, type) when type in @ack_types do
+    %ExecCmd{ec | cmd_opts: Keyword.put(ec.cmd_opts, :ack, type)}
   end
 
   @doc """
@@ -93,13 +99,13 @@ defmodule Alfred.ExecCmd do
     %ExecCmd{ec | cmd_opts: Keyword.merge(cmd_opts, opts)}
   end
 
-  @allowed_keys [:name, :cmd, :cmd_params, :cmd_opts, :pub_opts]
+  @new_keys [:name, :cmd, :cmd_params, :cmd_opts, :pub_opts]
   def new(opts) when is_list(opts) do
-    {allowed, opts_rest} = Keyword.split(opts, @allowed_keys)
+    {base_opts, opts_rest} = Keyword.split(opts, @new_keys)
 
-    if opts_rest != [], do: Logger.warn("unrecognized opts: #{inspect(opts_rest)}")
+    struct(ExecCmd, base_opts) |> add(opts_rest)
 
-    struct(ExecCmd, allowed) |> validate()
+    # struct(ExecCmd, allowed) |> validate()
   end
 
   def validate(%ExecCmd{} = ec) do

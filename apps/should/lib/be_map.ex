@@ -3,17 +3,33 @@ defmodule Should.Be.Map do
   Collection of macros for validating `Map` in `ExUnit.Case` tests
   """
 
+  # @doc """
+  # Asserts when `x` is `Map`
+  #
+  # ```
+  # assert is_map(x), Should.msg(x, "should be a map")
+  # ```
+  # """
+  # @doc since: "0.6.12"
+  # defmacro check(x) do
+  #   quote location: :keep, bind_quoted: [x: x] do
+  #     assert is_map(x), Should.msg(x, "should be a map")
+  #   end
+  # end
+
   @doc """
-  Asserts when `x` is `Map`
+  Asserts when `x` is empty `Map`
 
   ```
-  assert is_map(x), Should.msg(x, "should be a map")
+  Should.Be.map(x)
+  assert map_size(x) == 0, Should.msg(x, "should be size zero")
   ```
   """
-  @doc since: "0.6.12"
-  defmacro check(x) do
+  @doc since: "0.6.26"
+  defmacro empty(x) do
     quote location: :keep, bind_quoted: [x: x] do
-      assert is_map(x), Should.msg(x, "should be a map")
+      Should.Be.map(x)
+      assert map_size(x) == 0, Should.msg(x, "should be empty")
     end
   end
 
@@ -39,7 +55,7 @@ defmodule Should.Be.Map do
   Asserts `map` has `key`
 
   ```
-  assert Should.Be.Map.check(map)
+  assert Should.Be.map(map)
   assert is_map_key(map, key), Should.msg(map, "should have key", key)
 
   # return the value at the map key
@@ -49,7 +65,7 @@ defmodule Should.Be.Map do
   @doc since: "0.6.12"
   defmacro with_key(map, key) do
     quote location: :keep, bind_quoted: [map: map, key: key] do
-      assert Should.Be.Map.check(map)
+      assert Should.Be.map(map)
       assert is_map_key(map, key), Should.msg(map, "should have key", key)
 
       # return the value at the map key
@@ -91,7 +107,7 @@ defmodule Should.Be.Map do
   Refutes `map` size is `size`, returns map
 
   ```
-  assert Should.Be.Map.check(map)
+  assert Should.Be.map(map)
   assert map_size(map) == size, Should.msg(map, "should be size", size)
 
   # return map
@@ -101,7 +117,7 @@ defmodule Should.Be.Map do
   @doc since: "0.6.12"
   defmacro with_size(map, size) do
     quote location: :keep, bind_quoted: [map: map, size: size] do
-      assert Should.Be.Map.check(map)
+      assert Should.Be.map(map)
       assert map_size(map) == size, Should.msg(map, "should be size", size)
 
       # return map
@@ -113,7 +129,7 @@ defmodule Should.Be.Map do
   Refutes `map` has `key`, returns map
 
   ```
-  assert Should.Be.Map.check(map)
+  assert Should.Be.map(map)
   refute is_map_key(map, key), Should.msg(map, "should not have key", key)
 
   # return map
@@ -123,7 +139,7 @@ defmodule Should.Be.Map do
   @doc since: "0.6.12"
   defmacro without_key(map, key) do
     quote location: :keep, bind_quoted: [map: map, key: key] do
-      assert Should.Be.Map.check(map)
+      assert Should.Be.map(map)
       refute is_map_key(map, key), Should.msg(map, "should not have key", key)
 
       # return map

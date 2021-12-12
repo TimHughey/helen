@@ -10,7 +10,6 @@ defmodule Alfred.ExecCmdTest do
   setup [:name_add]
 
   describe "Alfred.ExecCmd.new/2" do
-    @tag skip: true
     @tag name_add: [type: :mut]
     test "creates an ExecCmd from a list of opts", ctx do
       [name: ctx.name, cmd: "special", cmd_params: [type: "fixed", percent: 25]]
@@ -18,10 +17,9 @@ defmodule Alfred.ExecCmdTest do
       |> Should.Be.struct(ExecCmd)
     end
 
-    @tag skip: true
     @tag name_add: [type: :mut, cmd: "on"]
     test "create a name", ctx do
-      ctx.name |> pretty_puts()
+      ctx.name |> Should.Be.binary()
     end
   end
 end

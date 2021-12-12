@@ -6,7 +6,7 @@ defmodule Should do
       require Should.Be.{DateTime, Integer, Invalid}
       require Should.Be.{List, Map, NonEmpty, NoReply}
       require Should.Be.{Ok, Reply}
-      require Should.Be.{Schema, Server, Struct, Tuple}
+      require Should.Be.{Schema, Server, State, Struct, Tuple}
       require Should.Contain
     end
   end
@@ -440,38 +440,6 @@ defmodule Should do
     end
   end
 
-  @doc "Pretty inspects the passed value and outputs the result"
-  defmacro pretty_puts(x) do
-    quote bind_quoted: [x: x] do
-      prettyi(x) |> IO.puts()
-
-      x
-    end
-  end
-
-  @doc """
-  Creates a combined binary of macro and text
-
-  `[Macro.to_string(lhs), text] |> Enum.join(" ")`
-  """
-  defmacro msg(lhs, text) do
-    quote bind_quoted: [lhs: lhs, text: text] do
-      [Macro.to_string(lhs), text] |> Enum.join(" ")
-    end
-  end
-
-  @doc """
-  Creates a combined binary consisting of lhs macro rhs
-
-  `[Macro.to_string(lhs), text, Macro.to_string(rhs)] |> Enum.join(" ")`
-
-  """
-  defmacro msg(lhs, text, rhs) do
-    quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
-      [Macro.to_string(lhs), text, Macro.to_string(rhs)] |> Enum.join(" ")
-    end
-  end
-
   @doc """
   Converts the passed macro to a string
 
@@ -485,11 +453,81 @@ defmodule Should do
     end
   end
 
+  @doc """
+  Creates a combined binary of macro and text
+
+  `[Macro.to_string(lhs), text] |> Enum.join(" ")`
+  """
+  defmacro msg(lhs, text) do
+    quote bind_quoted: [lhs: lhs, text: text] do
+      lhs_bin = Macro.to_string(lhs)
+      [lhs_bin, text] |> Enum.join("\n")
+    end
+  end
+
+  @doc """
+  Creates a combined binary consisting of lhs macro rhs
+
+  `[Macro.to_string(lhs), text, Macro.to_string(rhs)] |> Enum.join(" ")`
+
+  """
+  defmacro msg(lhs, text, rhs) do
+    quote location: :keep, bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
+      lhs_bin = Macro.to_string(lhs)
+      rhs_bin = Macro.to_string(rhs)
+      [lhs_bin, text, rhs_bin] |> Enum.join("\n")
+    end
+  end
+
   @doc "Pretty inspects the passed value"
   def prettyi(x), do: inspect(x, pretty: true)
 
   @doc "Creates combined binary of msg and the pretty inspection of x"
   def pretty(msg, x) when is_binary(msg) do
     [msg, "\n", prettyi(x)] |> IO.iodata_to_binary()
+  end
+
+  @doc "Pretty inspects the passed value and outputs the result"
+  defmacro pretty_puts(x) do
+    quote bind_quoted: [x: x] do
+      ["\n", prettyi(x)] |> IO.puts()
+
+      x
+    end
+  end
+
+  def pretty_puts_x(x, opts \\ []) when is_map(x) or is_struct(x) do
+    struct = struct_name(x)
+    map = Map.from_struct(x)
+    opts_map = Enum.into(opts, %{})
+
+    case opts_map do
+      %{only: keys} -> Map.take(map, keys)
+      %{exclude: keys} -> Map.drop(map, keys)
+      _ -> map
+    end
+    |> clean_map(opts_map)
+    |> then(fn x -> ["\n", struct, inspect(x, pretty: true)] |> IO.puts() end)
+    |> then(fn :ok -> x end)
+  end
+
+  defp clean_map(x, opts_map) do
+    drop_these = Map.take(opts_map, [:structs, :maps, :lists])
+
+    for {what, false} <- drop_these, reduce: x do
+      acc ->
+        case what do
+          :structs -> Enum.reject(acc, fn {_k, val} -> is_struct(val) end)
+          :maps -> Enum.reject(acc, fn {_k, val} -> is_map(val) end)
+          :lists -> Enum.reject(acc, fn {_k, val} -> is_list(val) end)
+        end
+    end
+  end
+
+  defp struct_name(x) do
+    case x do
+      x when is_struct(x) -> ["STRUCT: ", Module.split(x.__struct__), "\n"]
+      _x -> []
+    end
   end
 end

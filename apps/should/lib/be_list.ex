@@ -3,18 +3,34 @@ defmodule Should.Be.List do
   Collection of macros for validating `List` in `ExUnit.Case` tests
   """
 
+  # @doc """
+  # Asserts when is `List`
+  #
+  # ```
+  # assert is_list(x), Should.msg(x, "should be a list")
+  # ```
+  #
+  # """
+  # @doc since: "0.6.12"
+  # defmacro check(x) do
+  #   quote location: :keep, bind_quoted: [x: x] do
+  #     assert is_list(x), Should.msg(x, "should be a list")
+  #   end
+  # end
+
   @doc """
-  Asserts when is `List`
+  Asserts when `x` is empty `List`
 
   ```
-  assert is_list(x), Should.msg(x, "should be a list")
+  Should.Be.list(x)
+  assert length(x) == 0, Should.msg(x, "should be empty")
   ```
-
   """
-  @doc since: "0.6.12"
-  defmacro check(x) do
+  @doc since: "0.6.26"
+  defmacro empty(x) do
     quote location: :keep, bind_quoted: [x: x] do
-      assert is_list(x), Should.msg(x, "should be a list")
+      Should.Be.list(x)
+      assert length(x) == 0, Should.msg(x, "should be empty")
     end
   end
 
@@ -163,11 +179,11 @@ defmodule Should.Be.List do
   Asserts when `x` is `List` is `length`
 
   ```
-  list =  Should.Be.list(c)
+  list = Should.Be.list(x)
   assert length(x) == length, Should.msg(x, "should be length", length)
 
-  # return list
-  list
+  # for single entry lists return the entry, else the whole list
+  if(length == 1), do: List.first(x), else: x
   ```
 
   """
@@ -177,8 +193,8 @@ defmodule Should.Be.List do
       list = Should.Be.list(x)
       assert length(x) == length, Should.msg(x, "should be length", length)
 
-      # return list
-      list
+      # for single entry lists return the entry, else the whole list
+      if length == 1, do: List.first(x), else: x
     end
   end
 end

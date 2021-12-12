@@ -109,7 +109,7 @@ defmodule Should.Be do
   @doc since: "0.6.21"
   defmacro equal(x, y) do
     quote location: :keep, bind_quoted: [x: x, y: y] do
-      assert x == y, Should.msg(x, "should be equal", y)
+      assert x === y, Should.msg(x, "should be equal", y)
 
       # return equals
       x
@@ -286,6 +286,36 @@ defmodule Should.Be do
       assert is_struct(x, named), Should.msg(x, "should be a", named)
 
       # return verified struct
+      x
+    end
+  end
+
+  @doc """
+  Asserts when `x` is `type`, returns x
+
+  ```
+  case type do
+    :atom -> Should.Be.atom(x)
+    :binary -> Should.Be.binary(x)
+    :list -> Should.Be.list(x)
+    :map -> Should.Be.map(x)
+    :struct -> Should.Be.struct()
+  end
+  ```
+  """
+  @doc since: "0.2.26"
+  defmacro type(x, type) do
+    quote location: :keep, bind_quoted: [x: x, type: type] do
+      case type do
+        nil -> assert is_nil(x), Should.msg(x, "should be nil")
+        :atom -> Should.Be.atom(x)
+        :binary -> Should.Be.binary(x)
+        :list -> Should.Be.list(x)
+        :map -> Should.Be.map(x)
+        :struct -> Should.Be.struct()
+      end
+
+      # return x
       x
     end
   end

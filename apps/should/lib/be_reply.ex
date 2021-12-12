@@ -6,6 +6,7 @@ defmodule Should.Be.Reply do
   @doc """
   Asserts when `x` is` {:reply, :ok, struct}`, returns `struct`
 
+  ```
   {reply, rc, struct} = Should.Be.Tuple.with_size(x, 3)
   Should.Be.equal(reply, :reply)
   Should.Be.equal(rc, :ok)
@@ -64,6 +65,35 @@ defmodule Should.Be.Reply do
       Should.Be.equal(reply, :reply)
       Should.Be.equal(rc, want_rc)
       Should.Be.Struct.with_suffix(struct, State)
+    end
+  end
+
+  @doc """
+  Asserts when `x` is `{:reply, res, struct}`, `struct` is `State`, returns `{res, struct}`
+
+  ```
+  {reply, res, struct} = Should.Be.Tuple.with_size(x, 3)
+  Should.Be.equal(reply, :reply)
+
+  # returns the reply result and State
+  {res, Should.Be.Struct.with_suffix(struct, State)}
+  ```
+
+  """
+  @doc since: "0.6.26"
+  defmacro with_state(x) do
+    quote bind_quoted: [x: x] do
+      {msg_type, res, state} = Should.Be.Tuple.with_size(x, 3)
+      Should.Be.equal(msg_type, :reply)
+
+      assert is_struct(state), Should.msg(state, "should be a struct")
+
+      suffix = state.__struct__ |> Module.split() |> List.last()
+
+      assert suffix == "State", Should.msg(state, "struct should have suffix State")
+
+      # returns the reply result and State
+      {res, state}
     end
   end
 end

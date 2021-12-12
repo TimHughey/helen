@@ -31,6 +31,12 @@ defmodule Alfred.KnownName do
     end
   end
 
+  @doc since: "0.2.9"
+
+  def new(opts) when is_list(opts) do
+    struct(KnownName, opts) |> validate()
+  end
+
   def unknown(name) do
     %KnownName{name: name, missing?: true, valid?: false} |> validate()
   end
