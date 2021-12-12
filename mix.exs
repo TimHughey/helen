@@ -89,6 +89,7 @@ defmodule Helen.MixProject do
       alfred: :permanent,
       betty: :permanent,
       broom: :permanent,
+      glow: :permanent,
       sally: :permanent,
       legacy_db: :permanent,
       farm: :permanent
