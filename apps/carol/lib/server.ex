@@ -136,7 +136,9 @@ defmodule Carol.Server do
   @impl true
   def handle_info({Alfred, _memo}, %State{} = s) do
     # NOTE: reuse :prgrams to ensure equipment cmd is proper
-    continue(:programs, s)
+    s
+    |> State.update_notify_at()
+    |> continue(:programs)
   end
 
   @impl true
@@ -176,6 +178,7 @@ defmodule Carol.Server do
   # GenServer reply helpers
 
   defp continue(term, %State{} = s), do: {:noreply, s, {:continue, term}}
+  defp continue(%State{} = s, term), do: {:noreply, s, {:continue, term}}
   # defp continue_id(type, id, %State{} = s), do: {:noreply, s, {:continue, {type, id}}}
   defp noreply(%State{} = s), do: {:noreply, s}
   defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}
