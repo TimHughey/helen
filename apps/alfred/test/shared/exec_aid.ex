@@ -4,10 +4,11 @@ defmodule Alfred.ExecAid do
   def execute(cmd, opts \\ [])
 
   def execute(%ExecCmd{} = ec, _opts) do
-    cmd_opts = ec.cmd_opts
-    echo = if(cmd_opts[:echo] == true, do: true, else: false)
-
+    # when testing always echo unless explictly set to false
+    echo = Keyword.get(ec.cmd_opts, :echo, true)
     if echo, do: Process.send(self(), {:echo, ec}, [])
+
+    cmd_opts = ec.cmd_opts
 
     notify = cmd_opts[:notify_when_released] == true
     fields = [name: ec.name, will_notify_when_released: notify]
