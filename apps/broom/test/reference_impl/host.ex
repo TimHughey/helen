@@ -1,4 +1,5 @@
 defmodule Broom.Host do
+  @moduledoc false
   require Logger
 
   use Ecto.Schema

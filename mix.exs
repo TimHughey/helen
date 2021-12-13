@@ -3,7 +3,7 @@ defmodule Helen.MixProject do
 
   use Mix.Project
 
-  @vsn "2.1.13"
+  @vsn "2.1.14"
 
   def project do
     [
@@ -50,22 +50,28 @@ defmodule Helen.MixProject do
         "Alfred Names": ~r/Alfred\.(Just|Names|Known|Seen).*(?<!Aid)$/,
         "Alfred Notify": ~r/^Alfred\.Notify.*$/,
         "Alfred Test Aids": ~r/^AlfredSim$|^Alfred.*Aid$/,
-        "Alfred Testing Mockups": ~r/^Alfred\.Test.*$/,
+        "Alfred Test Mockups": ~r/^Alfred\.Test.*$/,
         Betty: ~r/Betty.*$/,
         Broom: ~r/^Broom.*$/,
-        Carol: ~r/^Carol$/,
-        "Carol Schedule": ~r/^Carol.Schedule.*$/,
+        Carol: ~r/^Carol.*$/,
+        Farm: ~r/^Farm.*$/,
         "Legacy Database": ~r/^LegacyDb.*$/,
-        Glow: ~r/^Glow.*/,
-        Rena: ~r/^Rena.*$/,
+        Glow: ~r/^Glow$|^Glow.Instance$/,
+        "Glow Instances": ~r/^Glow.Instance.*$/,
+        Rena: ~r/^Rena*$/,
+        "Rena Hold Cmd": ~r/^Rena.HoldCmd.*$/,
+        "Rena Sensor": ~r/^Rena.Sensor.*$/,
+        "Rena Set Point": ~r/^Rena.SetPt.*$/,
+        "Rena Test Aids": ~r/^Rena.*Aid$/,
         Sally: ~r/^Sally$|^Sally\..*(?<!Manual)(?<!Aid)$/,
         "Sally Test Aids": ~r/Sally\.(?:Test.*|.*Aid)$/,
         Should: ~r/^Should.*$/,
         Solar: ~r/^(Solar|Zenith)/,
         Types: ~r/.*Types$/
       ],
+      ignore_apps: [:legacy_db],
       nest_modules_by_prefix: [],
-      api_reference: false
+      api_reference: true
     ]
   end
 

@@ -19,7 +19,7 @@ defmodule Alfred.MixProject do
       ## Docs
       name: "Alfred",
       source_url: "https://github.com/timhughey/helen",
-      homepage_url: "http://www.wisslanding.com",
+      homepage_url: "http://www.wisslanding.com/helen/doc",
       docs: [
         # The main page in the docs
         main: "Alfred",

@@ -23,7 +23,7 @@ defmodule Carol.MixProject do
       ## Docs
       name: "Carol",
       source_url: "https://github.com/timhughey/helen",
-      homepage_url: "http://www.wisslanding.com",
+      homepage_url: "http://www.wisslanding.com/helen/doc",
       docs: docs()
     ]
   end

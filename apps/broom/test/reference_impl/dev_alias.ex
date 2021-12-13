@@ -1,7 +1,5 @@
 defmodule Broom.DevAlias do
-  @moduledoc """
-  Database implementation of Broom.PulseWidth Aliases
-  """
+  @moduledoc false
   require Logger
 
   use Ecto.Schema

@@ -1,7 +1,5 @@
 defmodule Broom.Device do
-  @moduledoc """
-  Database implementation of Broom.PulseWidth devices
-  """
+  @moduledoc false
 
   require Logger
 

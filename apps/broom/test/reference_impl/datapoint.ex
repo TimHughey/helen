@@ -1,7 +1,5 @@
 defmodule Broom.Datapoint do
-  @moduledoc """
-  Database functionality for Sensor DataPoint
-  """
+  @moduledoc false
 
   require Logger
 

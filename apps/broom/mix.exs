@@ -15,7 +15,22 @@ defmodule Broom.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: preferred_cli_env(),
-      aliases: aliases()
+      aliases: aliases(),
+
+      ## Docs
+      name: "Broom",
+      source_url: "https://github.com/timhughey/helen",
+      homepage_url: "http://www.wisslanding.com/helen/doc",
+      docs: [
+        # The main page in the docs
+        main: "readme",
+        # logo: "path/to/logo.png",
+        extras: ["README.md"],
+        groups_for_modules: [
+          Track: [~r/Track/]
+        ],
+        nest_modules_by_prefix: [Broom]
+      ]
     ]
   end
 
@@ -79,6 +94,7 @@ defmodule Broom.MixProject do
       {:should, in_umbrella: true, only: :test, runtime: false},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
+      {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false},
       {:postgrex, ">= 0.0.0", only: :test}
     ]
   end

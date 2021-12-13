@@ -4,7 +4,7 @@ defmodule Glow.MixProject do
   def project do
     [
       app: :glow,
-      version: "0.1.1",
+      version: "0.1.2",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -23,7 +23,7 @@ defmodule Glow.MixProject do
       ## Docs
       name: "Glow",
       source_url: "https://github.com/timhughey/helen",
-      homepage_url: "http://www.wisslanding.com",
+      homepage_url: "http://www.wisslanding.com/helen/doc",
       docs: docs()
     ]
   end

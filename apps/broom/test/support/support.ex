@@ -1,4 +1,6 @@
 defmodule Broom.Test.Support do
+  @moduledoc false
+
   def add_dev_alias(%Broom.Device{} = device, opts) do
     Broom.DevAlias.create(device, opts)
   end
