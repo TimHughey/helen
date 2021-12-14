@@ -1,6 +1,6 @@
 # Carol
 
-Control equipment based on a program list of `Solar` events.
+Control equipment based on daily `Solar` events or fixed times
 
 ## Installation
 

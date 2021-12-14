@@ -57,17 +57,10 @@ defmodule Glow.Instance do
     |> List.last()
     |> then(fn mixed_case -> Regex.scan(~r/[A-Z][a-z]+/, mixed_case) end)
     |> Enum.join(" ")
-
-    # case id do
-    #   "FrontEvergreen" -> "Evergreen"
-    #   "FrontChandelier" -> "Chandelier"
-    #   "FrontRedMaple" -> "Red Maple"
-    #   x -> x
-    # end
   end
 
   @doc """
-  Summary
+  Creates Instance server Start Args
 
   ```
   code
@@ -82,16 +75,4 @@ defmodule Glow.Instance do
 
     [id: id, init_args_fn: init_args_fn]
   end
-
-  # @doc since: "0.1.0"
-  # defmacro start_args(instance) when is_atom(instance) do
-  #   quote location: :keep, bind_quoted: [instance: instance] do
-  #     alias Glow.Instance
-  #
-  #     id = Instance.id(instance)
-  #     init_args_fn = &Instance.module(instance).init_args/1
-  #
-  #     [id: id, init_args_fn: init_args_fn]
-  #   end
-  # end
 end
