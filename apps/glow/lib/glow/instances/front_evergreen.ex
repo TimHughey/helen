@@ -1,4 +1,4 @@
-defmodule Glow.Instance.FrontEvergreen do
+defmodule Glow.FrontEvergreen do
   alias Carol.{Point, Program}
 
   @equipment "front evergreen pwm"

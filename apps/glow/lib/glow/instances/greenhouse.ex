@@ -1,4 +1,4 @@
-defmodule Glow.Instance.Greenhouse do
+defmodule Glow.Greenhouse do
   alias Carol.{Point, Program}
 
   def init_args(add_args) when is_list(add_args) do

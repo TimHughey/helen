@@ -6,20 +6,30 @@ defmodule Glow.InstanceTest do
 
   alias Glow.Instance
 
-  describe "Glow.Instance" do
-    test "id/1 creates proper id" do
+  describe "Glow.Instance.id/1" do
+    test "reates proper id" do
       Instance.id(:greenhouse) |> Should.Be.module()
     end
+  end
 
-    test "module/1 creates proper module" do
+  describe "Glow.Instance.module/1" do
+    test "creates proper module" do
       Instance.module(:greenhouse) |> Should.Be.module()
     end
+  end
 
-    test "start_args/1 returns args for an instance" do
+  describe "Glow.Instance.start_args/1" do
+    test "returns args for an instance" do
       require Glow.Instance
 
       Instance.start_args(:front_chandelier)
       |> Should.Be.List.with_all_key_value(id: Glow.FrontChandelier)
+    end
+  end
+
+  describe "Glow.Instance.display_name/1" do
+    test "parses module name into humanized" do
+      Instance.id(:front_chandelier) |> Instance.display_name()
     end
   end
 end

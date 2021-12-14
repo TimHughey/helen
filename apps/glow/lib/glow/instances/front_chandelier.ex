@@ -1,4 +1,4 @@
-defmodule Glow.Instance.FrontChandelier do
+defmodule Glow.FrontChandelier do
   alias Carol.{Point, Program}
 
   @equipment "front chandelier pwm"
@@ -10,15 +10,15 @@ defmodule Glow.Instance.FrontChandelier do
     Keyword.merge(args, add_args)
   end
 
-  @cmd_params_common [type: "random", primes: 35, min: 256, step_ms: 60, priority: 7]
+  @cmd_params_common [type: "random", primes: 35, min: 256, step_ms: 33, priority: 7]
 
   defp fade_bright do
-    cmd_params = Keyword.merge(@cmd_params_common, max: 1024, step: 27)
+    cmd_params = Keyword.merge(@cmd_params_common, max: 1024, step: 23)
     [cmd: "fade bright", cmd_params: cmd_params]
   end
 
   defp fade_dim do
-    cmd_params = Keyword.merge(@cmd_params_common, max: 384, step: 13)
+    cmd_params = Keyword.merge(@cmd_params_common, max: 768, step: 13)
     [cmd: "fade dim", cmd_params: cmd_params]
   end
 

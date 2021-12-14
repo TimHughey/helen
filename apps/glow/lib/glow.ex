@@ -14,7 +14,7 @@ defmodule Glow do
     selected = IO.gets("\nInstance? ") |> String.trim() |> String.to_integer()
     instance = Enum.at(instances, selected - 1)
 
-    :sys.get_state(instance) |> inspect(pretty: true) |> IO.puts()
+    :sys.get_state(instance)
   end
 
   def children do

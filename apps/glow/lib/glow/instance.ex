@@ -36,11 +36,12 @@ defmodule Glow.Instance do
   """
   @doc since: "0.1.0"
   @spec module(atom()) :: module()
-  def module(instance) when is_atom(instance) do
-    suffix = to_string(instance) |> Macro.camelize()
-
-    ["Glow", "Instance", suffix] |> Module.concat()
-  end
+  def module(instance) when is_atom(instance), do: id(instance)
+  #   id(instance)
+  #   suffix = to_string(instance) |> Macro.camelize()
+  #
+  #   ["Glow", "Instance", suffix] |> Module.concat()
+  # end
 
   @doc """
   Short name of an instance
@@ -51,14 +52,18 @@ defmodule Glow.Instance do
   """
   @doc since: "0.1.0"
   def display_name(instance) when is_atom(instance) do
-    id = Module.split(instance) |> List.last()
+    instance
+    |> Module.split()
+    |> List.last()
+    |> then(fn mixed_case -> Regex.scan(~r/[A-Z][a-z]+/, mixed_case) end)
+    |> Enum.join(" ")
 
-    case id do
-      "FrontEvergreen" -> "Evergreen"
-      "FrontChandelier" -> "Chandelier"
-      "FrontRedMaple" -> "Red Maple"
-      x -> x
-    end
+    # case id do
+    #   "FrontEvergreen" -> "Evergreen"
+    #   "FrontChandelier" -> "Chandelier"
+    #   "FrontRedMaple" -> "Red Maple"
+    #   x -> x
+    # end
   end
 
   @doc """

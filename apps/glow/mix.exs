@@ -4,7 +4,7 @@ defmodule Glow.MixProject do
   def project do
     [
       app: :glow,
-      version: "0.1.2",
+      version: "0.1.3",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -54,7 +54,10 @@ defmodule Glow.MixProject do
       # logo: "path/to/logo.png",
       extras: ["README.md"],
       nest_modules_by_prefix: [],
-      groups_for_modules: []
+      groups_for_modules: [
+        Glow: [~r/^Glow$|^Glow.Instance$/],
+        "Glow Instances": [~r/Front|Green/]
+      ]
     ]
   end
 
