@@ -18,7 +18,7 @@ defmodule Glow.FrontChandelier do
   end
 
   defp fade_dim do
-    cmd_params = Keyword.merge(@cmd_params_common, max: 640, step: 13, step_ms: 20)
+    cmd_params = Keyword.merge(@cmd_params_common, min: 128, step: 33, step_ms: 55)
     [cmd: "fade dim", cmd_params: cmd_params]
   end
 
