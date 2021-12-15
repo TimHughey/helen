@@ -98,4 +98,21 @@ defmodule Alfred.ExecResult do
 
     %ExecResult{name: name, rc: rc}
   end
+
+  @doc """
+  Convert an `ExecResult` to a sratus binary
+
+  """
+  @doc since: "0.2.10"
+  def to_binary(%ExecResult{} = er, _opts \\ []) do
+    case er do
+      %ExecResult{rc: :ok} -> ["{#{er.cmd}}", "OK"]
+      %ExecResult{rc: :pending} -> ["@#{er.refid}", "{#{er.cmd}}", "PENDING"]
+      %ExecResult{rc: :not_found} -> ["NOT_FOUND"]
+      %ExecResult{rc: {:ttl_expired, ms}} -> ["+#{ms}ms", "TTL_EXPIRED"]
+      %ExecResult{rc: :invalid} -> ["INVALID"]
+    end
+    |> then(fn details -> ["[#{er.name}]" | details] end)
+    |> then(fn final -> Enum.reverse(final) |> Enum.join(" ") end)
+  end
 end
