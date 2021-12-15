@@ -46,8 +46,8 @@ defmodule Carol.Program do
 
     cond do
       srt_at == :none and fin_at == :none -> need_at(calc_ctrl)
-      Timex.after?(dt, srt_at) and Timex.after?(dt, fin_at) -> stale(calc_ctrl)
       Timex.before?(fin_at, srt_at) -> overnight(calc_ctrl)
+      Timex.after?(dt, srt_at) and Timex.after?(dt, fin_at) -> stale(calc_ctrl)
       true -> %{action: :ok}
     end
     |> Map.merge(calc_ctrl)
