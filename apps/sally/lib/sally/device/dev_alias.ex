@@ -223,16 +223,24 @@ defmodule Sally.DevAlias do
   def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
     import Ecto.Query, only: [from: 2]
 
-    cmd_query = Command.query_preload_latest_cmd()
+    # cmd_query = Command.query_preload_latest_cmd()
 
+    # NOTE: do not preload cmds here to avoid database performance hit
     all_query =
       from(a in Schema,
         where: [device_id: ^device.id],
-        order_by: [asc: a.pio],
-        preload: [cmds: ^cmd_query]
+        order_by: [asc: a.pio]
+        #  preload: [cmds: ^cmd_query]
       )
 
-    {:ok, all_query |> repo.all()}
+    # NOTE: rather, preload each DevAlias separately for max performance
+    for %Schema{} = schema <- repo.all(all_query) do
+      cmd_q = Command.query_preload_latest_cmd(schema.id)
+      repo.preload(schema, cmds: cmd_q)
+    end
+    |> then(fn dev_aliases -> {:ok, dev_aliases} end)
+
+    #  {:ok, all_query |> repo.all()}
   end
 
   defp load_command_ids(schema_or_nil) do
