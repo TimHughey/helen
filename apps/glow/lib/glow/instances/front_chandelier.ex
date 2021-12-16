@@ -10,7 +10,7 @@ defmodule Glow.FrontChandelier do
     Keyword.merge(args, add_args)
   end
 
-  @cmd_params_common [type: "random", primes: 35, min: 384, step_ms: 33, priority: 7]
+  @cmd_params_common [type: "random", primes: 35, min: 384, step: 33, step_ms: 33, priority: 7]
 
   defp fade_bright do
     cmd_params = Keyword.merge(@cmd_params_common, max: 1024, step: 23)
@@ -18,7 +18,7 @@ defmodule Glow.FrontChandelier do
   end
 
   defp fade_dim do
-    cmd_params = Keyword.merge(@cmd_params_common, min: 128, step: 33, step_ms: 55)
+    cmd_params = Keyword.merge(@cmd_params_common, min: 128, max: 512, step_ms: 55)
     [cmd: "fade dim", cmd_params: cmd_params]
   end
 

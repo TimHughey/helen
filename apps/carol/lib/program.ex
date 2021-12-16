@@ -69,6 +69,12 @@ defmodule Carol.Program do
     analyze(accumulator, opts)
   end
 
+  @doc """
+  Analyze a list of `Program`s
+
+  `Carol.Program.analyze/2` is invoked for each `Program` in the list
+  """
+  @doc since: "0.2.1"
   def analyze_all([%Program{} | _] = programs, opts) do
     for %Program{} = program <- programs do
       analyze(program, opts)
@@ -77,6 +83,24 @@ defmodule Carol.Program do
   end
 
   def analyze_all(what, _opts) when what == :none or what == [], do: []
+
+  @doc """
+  Adjust the command params for a `Program`
+  """
+  @doc since: "0.2.5"
+  def adjust_cmd_params(programs, opts) do
+    {id, opts_rest} = Keyword.pop(opts, :id)
+    {params, _opts_rest} = Keyword.pop(opts_rest, :cmd_params)
+
+    for prg <- programs, reduce: [] do
+      acc ->
+        case prg do
+          %Program{id: ^id} -> %Program{prg | start: Point.cmd_params(prg.start, params)}
+          _ -> prg
+        end
+        |> then(fn prg -> [prg | acc] end)
+    end
+  end
 
   @doc """
   Calculate the pair of start/finish
@@ -94,6 +118,13 @@ defmodule Carol.Program do
       acc -> Point.calc_at(point, opts) |> save_point(acc)
     end
     |> then(fn acc -> %{calc_ctrl | accumulator: acc} end)
+  end
+
+  def cmd(programs, id, opts) when is_binary(id) do
+    programs
+    |> find(id, opts)
+    |> start_point()
+    |> Point.cmd(opts[:equipment])
   end
 
   def cmd(programs, what, opts) when what in [:active, :next] do

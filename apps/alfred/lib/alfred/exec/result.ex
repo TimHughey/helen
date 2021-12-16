@@ -65,18 +65,35 @@ defmodule Alfred.ExecResult do
   def invalid(%ExecCmd{name: name, invalid_reason: x}), do: %ExecResult{name: name, rc: {:invalid, x}}
 
   @doc "Log a `Betty.app_error/1` for an ExecResult"
-  @doc since: "0.5.20"
+  @doc since: "0.2.10"
   def log_failure(%ExecResult{} = er, opts) do
-    module = opts[:module] || opts[:server_name] || ExecResult
+    opts = Keyword.put_new(opts, :name, er.name)
+    {mod_or_server, opts_rest} = Keyword.split(opts, [:module, :server_name, :name])
 
-    tags = [module: module, execute: true]
+    # ensure at least the identifier :module is in tags
+    tags = if(mod_or_server == [], do: [module: ExecResult], else: mod_or_server) ++ [execute: true]
 
     case er do
-      %ExecResult{rc: {:ttl_expired, _}} -> [rc: :ttl_expired] ++ tags
-      %ExecResult{rc: rc} -> [rc: rc] ++ tags
+      %ExecResult{rc: {:ttl_expired, _}} -> {:rc, :ttl_expired}
+      %ExecResult{rc: rc} -> {:rc, rc}
     end
-    |> Betty.app_error_v2(return: :rc)
+    # create a tuple for pipeline
+    |> then(fn tag -> {er, [tag | tags]} end)
+    # send the tags off to Bettu
+    |> tap(fn {_er, tags} -> Betty.app_error_v2(tags, opts_rest) end)
+    # return the original ExecResult
+    |> then(fn {er, _} -> er end)
   end
+
+  @doc """
+  Log `ExecResult` failure depending on value of `:rc` field
+
+  When `:rc` is anything other than `:ok` or `:pending` an error row is inserted into
+  the operational timeseries database via `Alfred.ExecCmd.log_failure/2`.
+  """
+  @doc since: "0.2.10"
+  def log_failure_if_needed(%ExecResult{rc: rc} = er, _opts) when rc in [:ok, :pending], do: er
+  def log_failure_if_needed(%ExecResult{} = er, opts), do: log_failure(er, opts)
 
   def not_found(%MutableStatus{name: name}), do: %ExecResult{name: name, cmd: "unknown", rc: :not_found}
   def no_change(%ExecCmd{name: name, cmd: cmd}), do: %ExecResult{name: name, cmd: cmd, rc: :ok}

@@ -86,8 +86,28 @@ defmodule Carol.Server do
   # GenServer handlers
 
   @impl true
+  def handle_call({:adjust, :cmd_params, params}, _from, %State{} = s) do
+    s.programs
+    |> Program.adjust_cmd_params(params)
+    |> State.save_programs(s)
+    |> State.refresh_programs()
+    |> continue(:ok, :programs)
+  end
+
+  @impl true
   def handle_call(:restart, _from, %State{} = s) do
     {:stop, :normal, :restarting, s}
+  end
+
+  @impl true
+  def handle_call(msg, _from, %State{} = s) when is_map(msg) do
+    opts = [equipment: s.equipment]
+
+    case msg do
+      %{program: id, cmd: true, params: true} ->
+        Program.cmd(s.programs, id, opts) |> Map.from_struct() |> Map.get(:cmd_params) |> Enum.into([])
+    end
+    |> reply(s)
   end
 
   @impl true
@@ -102,12 +122,6 @@ defmodule Carol.Server do
     # NOTE: at this point the server is running and no further actions
     # occur until an equipment notification is received
   end
-
-  # @impl true
-  # @id_msgs [:start_id, :finish_id]
-  # def handle_continue({id_msg, id}, %State{} = s) when id_msg in @id_msgs and is_binary(id) do
-  #   continue(s, :programs)
-  # end
 
   @impl true
   def handle_continue(:programs, %State{} = s) do
@@ -148,7 +162,7 @@ defmodule Carol.Server do
     #  * unmatched refids
 
     case {te, er} do
-      {%{refid: refid}, %{refid: refid}} -> te.cmd
+      {%{refid: refid}, %{refid: refid}} -> Alfred.ExecResult.to_binary(er)
       {_, %{refid: refid}} -> {:unexpected_refid, refid}
     end
     |> State.save_cmd(s)
@@ -179,7 +193,9 @@ defmodule Carol.Server do
 
   defp continue(term, %State{} = s), do: {:noreply, s, {:continue, term}}
   defp continue(%State{} = s, term), do: {:noreply, s, {:continue, term}}
+  defp continue(%State{} = s, rc, term), do: {:reply, rc, s, {:continue, term}}
   # defp continue_id(type, id, %State{} = s), do: {:noreply, s, {:continue, {type, id}}}
   defp noreply(%State{} = s), do: {:noreply, s}
   defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}
+  defp reply(rc, %State{} = s), do: {:reply, rc, s}
 end

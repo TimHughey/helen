@@ -21,7 +21,10 @@ defmodule CarolProgramTest do
         |> Program.analyze(ctx.opts)
         |> Should.Be.struct(Program)
 
-      Should.Be.DateTime.greater(program.start.at, ref_dt)
+      if(is_nil(ctx[:dont_check][:start_at])) do
+        Should.Be.DateTime.greater(program.start.at, ref_dt)
+      end
+
       Should.Be.DateTime.greater(program.finish.at, ref_dt)
       Should.Be.DateTime.greater(program.finish.at, program.start.at)
 
@@ -58,13 +61,15 @@ defmodule CarolProgramTest do
       assert_program(ctx)
     end
 
-    @tag program_add: :stale
+    @tag program_add: :past
     test "adjusts stale start/finish to the next day", ctx do
       assert_program(ctx)
     end
 
+    # NOTE: :overnight program uses Solar.events so don't check
+    # the start time against the reference datatime
     @tag program_add: :overnight
-    test "adjusts finish to next day when before start", ctx do
+    test "handles overnight", ctx do
       assert_program(ctx)
     end
   end

@@ -167,6 +167,19 @@ defmodule Carol.Point do
     #  ExecCmd.add_name(point.cmd, equipment)
   end
 
+  @doc """
+  Adjusts the `Point` command params
+  """
+  @doc since: "0.2.5"
+  def cmd_params(%Point{cmd: :default} = pt, _params), do: pt
+
+  def cmd_params(%Point{cmd: cmd} = pt, params) do
+    case cmd do
+      cmd_opts when is_list(cmd_opts) -> %Point{pt | cmd: ExecCmd.new(cmd_opts)} |> cmd_params(params)
+      %ExecCmd{} = ec -> %Point{pt | cmd: ExecCmd.params_adjust(ec, params)}
+    end
+  end
+
   @doc since: "0.2.1"
   def fixed_event(%Point{} = pt, opts) do
     {ref_dt, opts_rest} = Keyword.pop(opts, :datetime)

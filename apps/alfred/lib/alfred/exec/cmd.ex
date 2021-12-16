@@ -108,10 +108,29 @@ defmodule Alfred.ExecCmd do
     # struct(ExecCmd, allowed) |> validate()
   end
 
+  @doc """
+  Adjust the cmd params for an existing `ExecCmd`
+  """
+  @doc since: "0.2.11"
+  def params_adjust(%ExecCmd{} = ec, params) when is_list(params) do
+    adjusted = Map.merge(ec.cmd_params, Enum.into(params, %{}))
+
+    %ExecCmd{ec | cmd: next_cmd_version(ec.cmd), cmd_params: adjusted}
+    |> validate()
+  end
+
+  @doc """
+  Validate the `cmd`
+  """
+
+  @doc since: "0.2.6"
+  def validate(%ExecCmd{cmd_params: params} = ec) when is_list(params) do
+    %ExecCmd{ec | cmd_params: Enum.into(params, %{})} |> validate()
+  end
+
   def validate(%ExecCmd{} = ec) do
     case ec do
       %ExecCmd{cmd: c} when c in ["on", "off"] -> valid(ec)
-      %ExecCmd{cmd_params: x} when is_list(x) -> struct(ec, cmd_params: Enum.into(x, %{})) |> validate()
       %ExecCmd{cmd: c, cmd_params: %{type: t}} when is_binary(c) and is_binary(t) -> valid(ec)
       %ExecCmd{cmd: c} when is_binary(c) -> invalid(ec, "custom cmds must include type")
       _ -> invalid(ec, "cmd must be a binary")
@@ -121,6 +140,25 @@ defmodule Alfred.ExecCmd do
   ##
   ## Private
   ##
+
+  # @cmd_vers_regex ~r/(?: v(?<version>\d{3}$))|(?<cmd>[[:print:]]+)/
+  @cmd_split ~r/(?: v(?=\d{3}$))/
+  defp next_cmd_version(cmd) when is_binary(cmd) do
+    with [cmd, version] <- Regex.split(@cmd_split, cmd),
+         num when is_integer(num) <- String.to_integer(version),
+         next_version <- Integer.to_string(num + 1) |> String.pad_leading(3, "0") do
+      [cmd, "v#{next_version}"]
+    else
+      _ -> [cmd, "v001"]
+    end
+    |> Enum.join(" ")
+
+    # case Regex.split(@cmd_split, cmd) do
+    #   [cmd, version] -> [cmd, "v#{String.to_integer(version) + 1}"]
+    #   [cmd] -> [cmd, "v001"]
+    # end
+    # |> Enum.join(" ")
+  end
 
   defp invalid(%ExecCmd{} = ec, reason), do: %ExecCmd{ec | valid: :no, invalid_reason: reason}
   defp valid(%ExecCmd{} = ec), do: %ExecCmd{ec | valid: :yes}

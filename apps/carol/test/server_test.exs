@@ -153,7 +153,8 @@ defmodule CarolServerTest do
 
       Server.handle_info({Broom, te}, new_state)
       |> Should.Be.NoReply.with_state()
-      |> Should.Be.Struct.with_all_key_value(State, cmd_live: "on")
+      |> Should.Be.Struct.with_key(State, :cmd_live)
+      |> Should.Contain.binaries(["PENDING", "on"])
     end
   end
 

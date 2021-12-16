@@ -1,7 +1,7 @@
 defmodule Carol.State do
   alias __MODULE__
 
-  alias Alfred.{ExecCmd, ExecResult}
+  alias Alfred.ExecResult
   alias Alfred.Notify.Ticket
 
   alias Carol.{Playlist, Program}
@@ -45,6 +45,8 @@ defmodule Carol.State do
   end
 
   def save_cmd(cmd, %State{} = s), do: struct(s, cmd_live: cmd)
+
+  def save_programs(programs, %State{} = s), do: struct(s, programs: programs)
 
   def save_exec_result(%ExecResult{} = er, %State{} = s) do
     [exec_result: er, cmd_live: er.cmd] |> update(s)

@@ -45,4 +45,24 @@ defmodule Alfred.ExecResultTest do
       |> Should.Contain.binaries(["INVALID", ctx.name])
     end
   end
+
+  describe "Alfred.ExecResult.log_failure_if_needed/2" do
+    test "handles an ExecResult with :rc in [:ok, :pending]" do
+      %ExecResult{name: "foo", rc: :ok, cmd: "on"}
+      |> ExecResult.log_failure_if_needed(module: __MODULE__)
+      |> Should.Be.Struct.with_all_key_value(ExecResult, rc: :ok, cmd: "on", name: "foo")
+    end
+
+    test "handles an ExecResult with ttl_expired" do
+      %ExecResult{name: "foo", rc: {:ttl_expired, 49_152}, cmd: "on"}
+      |> ExecResult.log_failure_if_needed(module: __MODULE__)
+      |> Should.Be.Struct.with_all_key_value(ExecResult, rc: {:ttl_expired, 49_152}, cmd: "on", name: "foo")
+    end
+
+    test "handles an ExecResult with rc: :not_found" do
+      %ExecResult{name: "foo", rc: :not_found}
+      |> ExecResult.log_failure_if_needed(module: __MODULE__)
+      |> Should.Be.Struct.with_all_key_value(ExecResult, rc: :not_found, name: "foo")
+    end
+  end
 end

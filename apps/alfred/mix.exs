@@ -4,7 +4,7 @@ defmodule Alfred.MixProject do
   def project do
     [
       app: :alfred,
-      version: "0.2.10",
+      version: "0.2.11",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
