@@ -64,6 +64,31 @@ defmodule Should.Be.List do
   end
 
   @doc """
+  Asserts when `list` contains one or more `tuples` of 'want_size'
+
+  ```
+  for item <- Should.Be.NonEmpty.list(x) do
+    Should.Be.Tuple.with_size(item, want_size)
+  end
+
+  # return validated list
+  x
+  ```
+
+  """
+  @doc since: "0.6.28"
+  defmacro of_tuples_with_size(x, want_size) do
+    quote location: :keep, bind_quoted: [x: x, want_size: want_size] do
+      for item <- Should.Be.NonEmpty.list(x) do
+        Should.Be.Tuple.with_size(item, want_size)
+      end
+
+      # return validated list
+      x
+    end
+  end
+
+  @doc """
   Asserts when `list` contains one or more `structs`
 
   ```

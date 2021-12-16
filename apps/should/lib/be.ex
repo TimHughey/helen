@@ -313,6 +313,7 @@ defmodule Should.Be do
         :list -> Should.Be.list(x)
         :map -> Should.Be.map(x)
         :struct -> Should.Be.struct()
+        :tuple -> assert is_tuple(x), Should.msg(x, "should be tuple")
       end
 
       # return x

@@ -242,7 +242,7 @@ defmodule Should.Be.Tuple do
   @doc since: "0.6.12"
   defmacro with_size(x, size) do
     quote location: :keep, bind_quoted: [x: x, size: size] do
-      assert is_tuple(x), Should.msg(x, "should be a tuple")
+      Should.Be.type(x, :tuple)
       assert tuple_size(x) == size, Should.msg(x, "should be size #{size}")
     end
 
