@@ -41,14 +41,17 @@ defmodule Carol.Program do
     srt_at = program.start.at
     fin_at = program.finish.at
 
-    # must include the original opts for subsequent analyze
+    # must include the original opts for next analyze
     calc_ctrl = %{accumulator: program, opts: opts}
 
     cond do
-      srt_at == :none and fin_at == :none -> need_at(calc_ctrl)
+      srt_at == :none and fin_at == :none -> %{action: :calc}
       # NOTE: must check overnight before stale
-      Timex.before?(fin_at, srt_at) and Timex.day(fin_at) == Timex.day(srt_at) -> overnight(calc_ctrl)
+      # overnight/1 clears fin_at and increments the ref dt to the next day
+      Timex.before?(fin_at, srt_at) and same_day?(srt_at, fin_at) -> overnight(calc_ctrl)
+      # are both the start and finish in the past?
       Timex.after?(dt, srt_at) and Timex.after?(dt, fin_at) -> stale(calc_ctrl)
+      # all conditions are met, break from recursion
       true -> %{action: :ok}
     end
     |> Map.merge(calc_ctrl)
@@ -293,8 +296,6 @@ defmodule Carol.Program do
 
   defp less_than?(lhs, rhs), do: Point.less_than?(lhs.start, rhs.start)
 
-  defp need_at(_calc_ctrl), do: %{action: :calc}
-
   defp next?(program, opts) do
     dt = opts[:datetime]
 
@@ -315,6 +316,8 @@ defmodule Carol.Program do
     start_at = accumulator.start.at
     %{action: :calc, clear: [:finish], calc_opts: next_day(start_at, opts)}
   end
+
+  defp same_day?(dt1, dt2), do: Timex.day(dt1) == Timex.day(dt2)
 
   defp save_point(%Point{} = pt, %Program{} = x) do
     struct(x, [{Point.type(pt), pt}])
