@@ -100,6 +100,11 @@ defmodule Carol.Server do
   end
 
   @impl true
+  def handle_call(:state, _from, %State{} = s) do
+    Map.from_struct(s) |> reply(s)
+  end
+
+  @impl true
   def handle_call(msg, _from, %State{} = s) when is_map(msg) do
     opts = [equipment: s.equipment]
 

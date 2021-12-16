@@ -10,16 +10,26 @@ defmodule Glow.FrontChandelier do
     Keyword.merge(args, add_args)
   end
 
-  @cmd_params_common [type: "random", primes: 35, min: 384, step: 33, step_ms: 33, priority: 7]
+  @cmd_params_common [type: "random", priority: 7]
+
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
+
+  defp assemble_cmd_opts(cmd_params, cmd_name) do
+    @cmd_params_common
+    |> Keyword.merge(cmd_params)
+    |> then(fn final_params -> [cmd: cmd_name, cmd_params: final_params] end)
+  end
 
   defp fade_bright do
-    cmd_params = Keyword.merge(@cmd_params_common, max: 1024, step: 23)
-    [cmd: "fade bright", cmd_params: cmd_params]
+    [min: 384, max: 1024, primes: 8, step: 33, step_ms: 33]
+    |> assemble_cmd_opts("fade bright")
   end
 
   defp fade_dim do
-    cmd_params = Keyword.merge(@cmd_params_common, min: 128, max: 512, step_ms: 55)
-    [cmd: "fade dim", cmd_params: cmd_params]
+    [min: 175, max: 512, primes: 8, step: 5, step_ms: 40]
+    |> assemble_cmd_opts("fade dim")
   end
 
   defp program(id, start_opts, finish_opts) do

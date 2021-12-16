@@ -3,7 +3,6 @@ defmodule Glow do
   Documentation for `Glow`.
   """
 
-  alias Carol.{Program, State}
   alias Glow.Instance
 
   @doc """
@@ -11,11 +10,7 @@ defmodule Glow do
   """
   @doc since: "0.1.6"
   def cmd(child_pattern, program_id) do
-    case child_search(child_pattern) do
-      [] -> {:unknown_child, child_pattern}
-      [child] -> Carol.program(child, id: program_id, params: true)
-      multiple -> {:multiple_children, multiple}
-    end
+    call(child_pattern, :program, id: program_id, params: true)
   end
 
   @doc """
@@ -26,11 +21,15 @@ defmodule Glow do
     opts = [id: program_id, cmd_params: params]
     msg = {:adjust, :cmd_params, opts}
 
-    case child_search(child_pattern) do
-      [] -> {:unknown_child, child_pattern}
-      [child] -> Carol.Server.call(child, msg)
-      multiple -> {:multiple_children, multiple}
-    end
+    call(child_pattern, :call, msg)
+  end
+
+  @doc """
+  List of available instance display names
+  """
+  @doc since: "0.1.7"
+  def instances do
+    for child <- children(), do: Instance.display_name(child)
   end
 
   @doc since: "0.1.0"
@@ -45,17 +44,18 @@ defmodule Glow do
     :sys.get_state(instance)
   end
 
+  @doc since: "0.1.7"
+  def state(child_pattern, want_keys \\ [:playlist]) do
+    call(child_pattern, :state, List.wrap(want_keys))
+  end
+
+  @doc since: "0.1.2"
   def children do
     for {id, _, _, _} <- Supervisor.which_children(Glow.Supervisor), do: id
   end
 
+  @doc false
   def child_search(like) when is_binary(like) do
-    # like = String.downcase(like)
-    # names = Enum.map(children(), fn x -> Instance.display-name(x) |> String.downcase())
-    # names = for(child <- children(), do: Instance.display_name(child) |> String.downcase())
-    #
-    # Enum.filter(names, fn name -> String.contains?(name, like) end)
-
     like = String.downcase(like)
 
     for child <- children(), reduce: [] do
@@ -77,6 +77,18 @@ defmodule Glow do
         ["   ", Integer.to_string(acc), ". ", name] |> IO.puts()
 
         acc + 1
+    end
+  end
+
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
+
+  defp call(child_pattern, func, msg) when is_atom(func) do
+    case child_search(child_pattern) do
+      [] -> {:unknown_child, child_pattern}
+      [child] -> apply(Carol, func, [child, msg])
+      multiple -> {:multiple_children, multiple}
     end
   end
 end
