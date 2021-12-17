@@ -96,6 +96,27 @@ defmodule Should.Be do
   end
 
   @doc """
+  Asserts when `x` is a `DateTime`, returns x
+
+  ```
+  assert is_struct(x, DateTime), Should.msg(x, "should be a DateTime")
+
+  # return verified datetime
+  x
+  ```
+
+  """
+  @doc since: "0.6.31"
+  defmacro datetime(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert is_struct(x, DateTime), Should.msg(x, "should be a DateTime")
+
+      # return verified datetime
+      x
+    end
+  end
+
+  @doc """
   Asserts when `x` is equal to `y`
 
   ```
