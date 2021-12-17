@@ -4,7 +4,7 @@ defmodule CarolServerTest do
 
   alias Alfred.{ExecCmd, ExecResult}
 
-  alias Carol.{Server, State}
+  alias Carol.{Program, Server, State}
 
   @moduletag carol: true, carol_server: true
 
@@ -56,6 +56,39 @@ defmodule CarolServerTest do
       |> Should.Be.Server.with_state()
       |> tap(fn state -> Should.Contain.kv_pairs(state, server_name: ctx.server_name) end)
       |> Should.Contain.kv_pairs(server_name: ctx.server_name)
+    end
+  end
+
+  describe "Carol.Server runs" do
+    @tag equipment_add: [], program_add: :live_short
+    @tag start_args_add: [want: [:programs]]
+    test "short live program", ctx do
+      pid = start_supervised({Server, ctx.start_args}) |> Should.Be.Ok.tuple_with_pid()
+
+      Process.sleep(50)
+
+      GenServer.call(pid, :state)
+      |> Should.Be.Map.with_key(:programs)
+      |> Should.Be.List.of_structs(Program)
+    end
+  end
+
+  describe "Carol.Server operations" do
+    @tag equipment_add: [], program_add: :future_programs
+    @tag start_args_add: [want: [:programs]]
+    test "can be paused and resumed", ctx do
+      pid = start_supervised({Server, ctx.start_args}) |> Should.Be.Ok.tuple_with_pid()
+
+      GenServer.call(pid, :pause) |> Should.Be.equal(:pause)
+
+      GenServer.call(pid, :state)
+      |> Should.Be.Map.with_all_key_value(ticket: :pause)
+
+      GenServer.call(pid, :resume) |> Should.Be.struct(Alfred.Notify.Ticket)
+
+      GenServer.call(pid, :state)
+      |> Should.Be.Map.with_key(:ticket)
+      |> Should.Be.struct(Alfred.Notify.Ticket)
     end
   end
 
@@ -124,6 +157,24 @@ defmodule CarolServerTest do
     test "keeps previous cmd when next cmd will start within 1000ms", ctx do
       ctx.new_state
       |> Should.Be.Struct.with_all_key_value(State, exec_result: :keep)
+    end
+  end
+
+  describe "Carol.Server.handle_info/2 {type, id}" do
+    @tag equipment_add: [cmd: "off"], program_add: :live_short
+    @tag state_add: [bootstrap: true]
+    @tag handle_add: [continue: :programs]
+    test "finishes a program", ctx do
+      # pass some time to ensure Program is finished
+      Process.sleep(50)
+
+      # NOTE: :live_short creates a list of one Program
+      [%Program{id: id}] = ctx.programs
+
+      Carol.Server.handle_info({:finish_id, id}, ctx.state)
+      |> Should.Be.NoReply.continue_term(:programs)
+
+      # pretty_puts(new_state)
     end
   end
 

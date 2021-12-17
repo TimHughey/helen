@@ -46,8 +46,6 @@ defmodule Carol.Program do
 
     cond do
       srt_at == :none and fin_at == :none -> %{action: :calc}
-      # do nothing when srt_at and fin_at are the same day and before ref dt
-      pending?(dt, srt_at, fin_at) -> %{action: :ok}
       # NOTE: must check overnight before stale
       # overnight/1 clears fin_at and increments the ref dt to the next day
       Timex.before?(fin_at, srt_at) and same_day?(srt_at, fin_at) -> overnight(calc_ctrl)
@@ -197,6 +195,15 @@ defmodule Carol.Program do
     find(prgs, fn prg, _opts -> prg.id == id end)
   end
 
+  def finish(prgs, id) do
+    for program <- prgs do
+      case program do
+        %Program{id: ^id} -> clear_points(program)
+        _ -> program
+      end
+    end
+  end
+
   @doc """
   Creates a list of computed values for each `Program` in the list
 
@@ -272,10 +279,17 @@ defmodule Carol.Program do
   ## PRIVATE
   ## PRIVATE
 
+  defp apply_fields(fields, program), do: struct(program, fields)
+
   defp active?(program, opts) do
     dt = opts[:datetime]
 
     Timex.between?(dt, program.start.at, program.finish.at, inclusive: :start)
+  end
+
+  defp clear_points(%Program{start: start, finish: finish} = program) do
+    [start: Point.clear_at(start), finish: Point.clear_at(finish)]
+    |> apply_fields(program)
   end
 
   defp clear_at(%{accumulator: accumulator, clear: clear_keys} = calc_ctrl) do
@@ -319,9 +333,9 @@ defmodule Carol.Program do
     %{action: :calc, clear: [:finish], calc_opts: next_day(start_at, opts)}
   end
 
-  defp pending?(ref_dt, srt_at, fin_at) do
-    Timex.before?(srt_at, ref_dt) and Timex.before?(fin_at, ref_dt) and same_day?(srt_at, fin_at)
-  end
+  # defp pending?(ref_dt, srt_at, fin_at) do
+  #   Timex.before?(srt_at, ref_dt) and Timex.before?(fin_at, ref_dt) and same_day?(srt_at, fin_at)
+  # end
 
   defp same_day?(dt1, dt2), do: Timex.day(dt1) == Timex.day(dt2)
 

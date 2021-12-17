@@ -7,17 +7,21 @@ defmodule Carol.ProgramAid do
   @cmd_on %ExecCmd{cmd: "on"} |> ExecCmd.add(@cmd_opts)
 
   @point_base [cmd: @cmd_on]
-  @civil_set "civil twilight set"
-  @civil_rise "civil twilight rise"
+  # @civil_set "civil twilight set"
+  # @civil_rise "civil twilight rise"
+  @day_begin "beginning of day"
+  @day_end "end of day"
 
   @single [:future, :live, :overnight, :past, :stale]
   @multi [:future_programs, :live_programs, :live_quick_programs, :programs]
+  @special [:live_short]
   def add(%{program_add: what, opts: opts, ref_dt: ref_dt}) do
     opts = [{:ref_dt, ref_dt} | opts]
 
     case what do
       x when x in @single -> add_one(x, opts)
       x when x in @multi -> add_multi(x, opts)
+      x when x in @special -> add_special(x, opts)
     end
     |> wrap_program()
   end
@@ -52,8 +56,7 @@ defmodule Carol.ProgramAid do
     for type <- [:future, :overnight, :stale], do: add_one(type, opts)
   end
 
-  # add one program
-  # returns: %{program: %Program{}}
+  @spec add_one(atom(), list) :: Program.t()
 
   def add_one(:future, _opts) do
     [start: make_fixed(:future, hours: 1), finish: make_fixed(:future, hours: 2)]
@@ -69,7 +72,7 @@ defmodule Carol.ProgramAid do
   end
 
   def add_one(:overnight, _opts) do
-    [start: @civil_set, finish: @civil_rise]
+    [start: @day_end, finish: @day_begin]
     |> make_program(id: "Overnight")
   end
 
@@ -81,6 +84,11 @@ defmodule Carol.ProgramAid do
   def add_one(:stale, _opts) do
     [start: make_fixed(:past, hours: 6), finish: make_fixed(:past, hours: 7)]
     |> make_program(id: "Stale")
+  end
+
+  def add_special(:live_short, opts) do
+    add_one(:live, opts ++ [finish_shift: [milliseconds: 50]])
+    |> List.wrap()
   end
 
   ## PRIVATE

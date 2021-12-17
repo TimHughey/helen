@@ -95,6 +95,15 @@ defmodule Carol.Server do
   end
 
   @impl true
+  def handle_call(action, _from, %State{} = s) when action in [:pause, :resume] do
+    case action do
+      :pause -> State.stop_notifies(s)
+      :resume -> State.start_notifies(s)
+    end
+    |> then(fn new_state -> reply(new_state.ticket, new_state) end)
+  end
+
+  @impl true
   def handle_call(:restart, _from, %State{} = s) do
     {:stop, :normal, :restarting, s}
   end
@@ -138,10 +147,19 @@ defmodule Carol.Server do
   end
 
   @impl true
+  def handle_info({_type, _id}, %State{ticket: :pause} = s) do
+    # NOTE: quietly ignore start/finish messages when paused
+    noreply(s)
+  end
+
+  @impl true
   @info_types [:finish_id, :start_id]
-  def handle_info({type, _id}, %State{} = s) when type in @info_types do
-    # NOTE: no special handling for starting or finishing an id
-    continue(:programs, s)
+  def handle_info({type, id}, %State{} = s) when type in @info_types do
+    case type do
+      :finish_id -> Program.finish(s.programs, id) |> State.save_programs(s)
+      :start_id -> s
+    end
+    |> continue(:programs)
   end
 
   @impl true
@@ -173,6 +191,9 @@ defmodule Carol.Server do
     |> State.save_cmd(s)
     |> noreply()
   end
+
+  @impl true
+  def handle_info({:echo, _}, %State{} = s), do: noreply(s)
 
   ## PRIVATE
   ## PRIVATE

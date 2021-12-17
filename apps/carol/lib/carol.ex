@@ -1,6 +1,6 @@
 defmodule Carol do
   @moduledoc """
-  Carol API
+  Carol API for controlling a server instance
   """
 
   @doc """
@@ -10,6 +10,17 @@ defmodule Carol do
   def call(server, msg) when is_atom(server) do
     Carol.Server.call(server, msg)
   end
+
+  # NOTE: pause/2, restart/2 and resume/2 accept a second argument to
+  # maintain consistency with other functions
+
+  @doc """
+  Pause the server
+
+  Pauses the server by unregistering for equipment notifies
+  """
+  @doc since: "0.2.8"
+  def pause(server, _opts), do: Carol.call(server, :pause)
 
   @doc """
   Return the `Program` from a `Carol` instance
@@ -27,6 +38,22 @@ defmodule Carol do
     end
     |> then(fn msg -> Carol.call(server, msg) end)
   end
+
+  @doc """
+  Restart the server
+
+  Exits with `{:stop, :normal, state}`, then restarted by Supervisor
+  """
+  @doc since: "0.2.8"
+  def restart(server, _opts), do: Carol.call(server, :restart)
+
+  @doc """
+  Resume the server
+
+  Resumes the server by registering for equipment notifies
+  """
+  @doc since: "0.2.8"
+  def resume(server, _opts), do: Carol.call(server, :resume)
 
   @doc """
   Return the `State` of a `Carol` server instance

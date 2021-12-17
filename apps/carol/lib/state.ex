@@ -68,16 +68,6 @@ defmodule Carol.State do
     end
   end
 
-  # def save_programs(programs, s) do
-  #   [programs: programs] |> save_programs_and_playlist(s)
-  # end
-  #
-  # def save_programs_and_playlist(to_save, s) when is_list(to_save) do
-  #   to_save
-  #   |> Keyword.take([:programs, :playlist])
-  #   |> then(fn save_opts -> struct(s, save_opts) end)
-  # end
-
   def sched_opts(%State{} = s) do
     s
     |> Map.take([:alfred, :timezone])
@@ -96,6 +86,14 @@ defmodule Carol.State do
         s
     end
   end
+
+  def stop_notifies(%State{ticket: %Ticket{}} = s) do
+    s.alfred.notify_unregister(s.ticket)
+
+    save_ticket(:pause, s)
+  end
+
+  def stop_notifies(s), do: s
 
   def update_notify_at(s), do: struct(s, notify_at: Timex.now(s.timezone))
 
