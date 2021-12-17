@@ -41,6 +41,35 @@ defmodule Should.Be.List do
   list = Should.Be.NonEmpty.list(x)
 
   for item <- list do
+    Should.Be.binary(item)
+  end
+
+  # return validated list
+  list
+  ```
+
+  """
+  @doc since: "0.6.29"
+  defmacro of_binaries(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      list = Should.Be.NonEmpty.list(x)
+
+      for item <- list do
+        Should.Be.binary(item)
+      end
+
+      # return validated list
+      list
+    end
+  end
+
+  @doc """
+  Asserts when `list` contains one or more `schemas`
+
+  ```
+  list = Should.Be.NonEmpty.list(x)
+
+  for item <- list do
     Should.Be.schema(item, schema)
   end
 
