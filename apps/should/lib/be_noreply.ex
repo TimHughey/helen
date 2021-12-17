@@ -4,6 +4,31 @@ defmodule Should.Be.NoReply do
   """
 
   @doc """
+  Asserts when `x` is` {:noreply, state, {:continue. term}`, returns `state`
+
+  ```
+  {reply, struct, continue_tuple} = Should.Be.Tuple.with_size(x, 3)
+
+  Should.Be.Tuple.with_size(continue_tuple, 2)
+  Should.Be.equal(continue_tuple, {:continue, term})
+  Should.Be.equal(reply, :noreply)
+  Should.Be.Struct.with_suffix(struct, State)
+  ```
+
+  """
+  @doc since: "0.6.30"
+  defmacro continue_term(x, term) do
+    quote location: :keep, bind_quoted: [x: x, term: term] do
+      {reply, struct, continue_tuple} = Should.Be.Tuple.with_size(x, 3)
+
+      Should.Be.Tuple.with_size(continue_tuple, 2)
+      Should.Be.equal(continue_tuple, {:continue, term})
+      Should.Be.equal(reply, :noreply)
+      Should.Be.Struct.with_suffix(struct, State)
+    end
+  end
+
+  @doc """
   Asserts when `x` is` {:stop, reason, struct}`, returns `struct`
 
   ```
