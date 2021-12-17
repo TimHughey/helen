@@ -46,6 +46,8 @@ defmodule Carol.Program do
 
     cond do
       srt_at == :none and fin_at == :none -> %{action: :calc}
+      # do nothing when srt_at and fin_at are the same day and before ref dt
+      pending?(dt, srt_at, fin_at) -> %{action: :ok}
       # NOTE: must check overnight before stale
       # overnight/1 clears fin_at and increments the ref dt to the next day
       Timex.before?(fin_at, srt_at) and same_day?(srt_at, fin_at) -> overnight(calc_ctrl)
@@ -315,6 +317,10 @@ defmodule Carol.Program do
   defp overnight(%{accumulator: accumulator, opts: opts}) do
     start_at = accumulator.start.at
     %{action: :calc, clear: [:finish], calc_opts: next_day(start_at, opts)}
+  end
+
+  defp pending?(ref_dt, srt_at, fin_at) do
+    Timex.before?(srt_at, ref_dt) and Timex.before?(fin_at, ref_dt) and same_day?(srt_at, fin_at)
   end
 
   defp same_day?(dt1, dt2), do: Timex.day(dt1) == Timex.day(dt2)
