@@ -32,16 +32,14 @@ defmodule Glow do
     for child <- children(), do: Instance.display_name(child)
   end
 
-  @doc since: "0.1.0"
-  def state do
-    instances = children()
-
-    puts_child_list("Get State")
-
-    selected = IO.gets("\nInstance? ") |> String.trim() |> String.to_integer()
-    instance = Enum.at(instances, selected - 1)
-
-    :sys.get_state(instance)
+  @doc """
+  Operational actions
+  """
+  @doc since: "0.1.8"
+  @ops_actions [:pause, :resume, :restart]
+  def ops(child_pattern, action) when action in @ops_actions do
+    # NOTE: must include empty opts for call/3
+    call(child_pattern, action, [])
   end
 
   @doc since: "0.1.7"
@@ -63,20 +61,6 @@ defmodule Glow do
         name = Instance.display_name(child) |> String.downcase()
 
         if String.contains?(name, like), do: [child | acc], else: acc
-    end
-  end
-
-  @doc false
-  def puts_child_list(heading) do
-    [heading, "\n"] |> IO.puts()
-
-    display_names = for x <- children(), do: Instance.display_name(x)
-
-    for name <- display_names, reduce: 1 do
-      acc ->
-        ["   ", Integer.to_string(acc), ". ", name] |> IO.puts()
-
-        acc + 1
     end
   end
 

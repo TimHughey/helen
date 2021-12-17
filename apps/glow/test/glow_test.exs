@@ -46,17 +46,10 @@ defmodule GlowTest do
     end
   end
 
-  describe "Glow.put_child_list/1" do
-    @tag skip: true
-    test "outputs child list" do
-      Glow.puts_child_list("HEADING")
-    end
-  end
-
-  describe "Glow.state/0" do
-    @tag skip: true
-    test "prompts for a selection then gets state" do
-      Glow.state()
+  describe "Glow.opts/2" do
+    test "handles :pause" do
+      Glow.ops("ever", :pause)
+      |> Should.Be.equal(:pause)
     end
   end
 
