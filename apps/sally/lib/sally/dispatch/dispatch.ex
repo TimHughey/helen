@@ -3,9 +3,6 @@ defmodule Sally.Dispatch do
 
   alias __MODULE__
   alias Sally.{Host, Immutable, Mutable}
-  # alias Sally.TypesI
-
-  @msg_mtime_variance_ms Application.compile_env!(:sally, [Sally.Message.Handler, :msg_mtime_variance_ms])
 
   # @derive {Inspect, only: [:valid?, :subsystem, :category]}
   defstruct env: nil,
@@ -177,6 +174,9 @@ defmodule Sally.Dispatch do
     end
   end
 
+  @variance_opt [Sally.Message.Handle, :mtime_variance_ms]
+  @variance_ms Application.compile_env(:sally, @variance_opt, 10_000)
+
   defp check_sent_time(%Dispatch{data: data} = m) do
     recv_at = m.recv_at || DateTime.utc_now()
     sent_at = DateTime.from_unix!(data[:mtime] || 0, :millisecond)
@@ -186,9 +186,9 @@ defmodule Sally.Dispatch do
 
     cond do
       DateTime.compare(sent_at, DateTime.from_unix!(0)) == :eq -> invalid(m, "mtime is missing")
-      ms_diff < @msg_mtime_variance_ms * -1 -> invalid(m, "data is from the future #{ms_diff * -1}ms")
+      ms_diff < @variance_ms * -1 -> invalid(m, "data is from the future #{ms_diff * -1}ms")
       ms_diff < 0 -> %Dispatch{m | sent_at: m.recv_at}
-      ms_diff >= @msg_mtime_variance_ms -> invalid(m, "data is #{ms_diff} old")
+      ms_diff >= @variance_ms -> invalid(m, "data is #{ms_diff} old")
       true -> m
     end
   end

@@ -2,10 +2,7 @@ defmodule Sally.Host do
   require Logger
 
   use Ecto.Schema
-  # require Ecto.Query
-
   alias Ecto.Changeset
-  # alias Ecto.Query
 
   alias Sally.Host, as: Schema
   alias Sally.Host.ChangeControl
