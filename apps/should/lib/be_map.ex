@@ -45,7 +45,7 @@ defmodule Should.Be.Map do
 
   for {key, type} <- types do
     val = Map.get(x, key)
-    Should.Be.type(val, type, val, "key #{inspect(key)}")
+    Should.Be.type(val, type, val, "key \#{inspect(key)}")
   end
 
   # return x
