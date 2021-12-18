@@ -266,6 +266,35 @@ defmodule Should.Be do
   end
 
   @doc """
+  Asserts `x` when `x` is a function returns false or `x` is false then returns `x`
+
+  ```
+  if is_function(x) do
+    assert x.(), Should.msg(x, "should be asserted")
+  else
+    assert x, Should.msg(x, "should be asserted")
+  end
+
+  # return asserted
+  x
+  ```
+
+  """
+  @doc since: "0.6.23"
+  defmacro refuted(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      if is_function(x) do
+        refute x.(), Should.msg(x, "should be refuted")
+      else
+        refute x, Should.msg(x, "should be refuted")
+      end
+
+      # return asserted
+      x
+    end
+  end
+
+  @doc """
   Asserts when `x` is a schema of `want`
 
   ```
@@ -283,10 +312,30 @@ defmodule Should.Be do
     quote location: :keep, bind_quoted: [x: x, named: named] do
       alias Ecto.Schema.Metadata
 
-      meta = Should.Be.Struct.with_key(x, named, :__meta__)
-      Should.Be.Struct.with_key_value(meta, Metadata, :schema, named)
+      Should.Be.Struct.with_key(x, named, :__meta__)
+      |> Should.Be.Struct.with_key_value(Metadata, :schema, named)
 
       # return verified schema
+      x
+    end
+  end
+
+  @doc """
+  Asserts when `x` is a struct, then returns struct
+
+  ```
+  assert is_struct(x, named), Should.msg(x, "should be a", named)
+
+  # return verified struct
+  x
+  ```
+  """
+  @doc since: "0.2.32"
+  defmacro struct(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      assert is_struct(x), Should.msg(x, "should be a struct")
+
+      # return verified struct
       x
     end
   end
@@ -325,16 +374,47 @@ defmodule Should.Be do
   ```
   """
   @doc since: "0.2.26"
-  defmacro type(x, type) do
-    quote location: :keep, bind_quoted: [x: x, type: type] do
+  defmacro type(x, type, rhs \\ [], extra \\ []) do
+    quote location: :keep, bind_quoted: [x: x, type: type, rhs: rhs, extra: extra] do
       case type do
-        nil -> assert is_nil(x), Should.msg(x, "should be nil")
-        :atom -> Should.Be.atom(x)
-        :binary -> Should.Be.binary(x)
-        :list -> Should.Be.list(x)
-        :map -> Should.Be.map(x)
-        :struct -> Should.Be.struct()
-        :tuple -> assert is_tuple(x), Should.msg(x, "should be tuple")
+        nil ->
+          assert is_nil(x), Should.msgt(nil, x, rhs, extra)
+
+        :atom = t ->
+          assert is_atom(x), Should.msgt(t, x, rhs, extra)
+
+        :binary = t ->
+          assert is_binary(x), Should.msgt(t, x, rhs, extra)
+
+        :datetime = t ->
+          assert is_struct(x, DateTime), Should.msgt(t, x, rhs, extra)
+
+        :integer = t ->
+          assert is_integer(x), Should.msgt(t, x, rhs, extra)
+
+        :list = t ->
+          assert is_list(x), Should.msgt(t, x, rhs, extra)
+
+        :map = t ->
+          assert is_map(x), Should.msgt(t, x, rhs, extra)
+
+        :struct = t ->
+          assert is_struct(x), Should.msgt(t, x, rhs, extra)
+
+        {:struct, name} = t ->
+          assert is_struct(x, name), Should.msgt(t, x, rhs, extra)
+
+        :tuple = t ->
+          assert is_tuple(x), Should.msgt(t, x, rhs, extra)
+
+        {:tuple, size} = t ->
+          assert is_tuple(x) and tuple_size(x) == size, Should.msgt(t, x, rhs, extra)
+
+        :reference = t ->
+          assert is_reference(x), Should.msgt(t, x, rhs, extra)
+
+        type ->
+          refute true, "UNKNOWN type #{inspect(type)} #{inspect(x)}"
       end
 
       # return x

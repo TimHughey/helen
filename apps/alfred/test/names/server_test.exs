@@ -11,7 +11,7 @@ defmodule Alfred.NamesServerTest do
   setup_all do
     res = start_supervised({Alfred.Names.Server, [names_server: __MODULE__]})
 
-    pid = should_be_ok_tuple_with_pid(res)
+    pid = Should.Be.Ok.tuple_with_pid(res)
     call_opts = [names_server: __MODULE__]
 
     %{pid: pid, server_name: __MODULE__, call_opts: call_opts, state: %State{}}

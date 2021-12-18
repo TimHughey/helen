@@ -118,6 +118,37 @@ defmodule Should.Be.List do
   end
 
   @doc """
+  Asserts when `x` consists of 'type', returns 'x'
+
+  ```
+  for item <- Should.Be.NonEmpty.list(x), reduce: 0 do
+    index ->
+      Should.Be.type(item, type, x, "index \#{index}")
+
+      index + 1
+  end
+
+  # return validated list
+  x
+  ```
+
+  """
+  @doc since: "0.6.23"
+  defmacro of_type(x, type) do
+    quote location: :keep, bind_quoted: [x: x, type: type] do
+      for item <- Should.Be.NonEmpty.list(x), reduce: 0 do
+        index ->
+          Should.Be.type(item, type, x, "index #{index}")
+
+          index + 1
+      end
+
+      # return validated list
+      x
+    end
+  end
+
+  @doc """
   Asserts when `list` contains one or more `structs`
 
   ```

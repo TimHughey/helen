@@ -8,12 +8,13 @@ defmodule Alfred.NamesStateTest do
   alias Alfred.Names.State
   alias Alfred.NamesAid
 
-  defmacro should_be_state_with_name(state, name) do
+  defmacro assert_state_includes_name(state, name) do
     quote location: :keep, bind_quoted: [state: state, name: name] do
-      should_be_struct(state, State)
+      Should.Be.State.with_key(state, :known)
+      |> then(fn {state, _} -> State.lookup(name, state) end)
+      |> Should.Be.struct(KnownName)
 
-      found_kn = State.lookup(name, state)
-      should_be_struct(found_kn, KnownName)
+      # returns known name
     end
   end
 
@@ -28,7 +29,7 @@ defmodule Alfred.NamesStateTest do
     test "handles adding one KnownName", %{state: state, known_name: kn} do
       res = State.add_or_update_known(kn, state)
 
-      should_be_state_with_name(res, kn.name)
+      assert_state_includes_name(res, kn.name)
     end
 
     test "handles adding multiple KnownName", %{state: state} do
@@ -38,7 +39,7 @@ defmodule Alfred.NamesStateTest do
       res = State.add_or_update_known(multiple, state)
 
       for %KnownName{name: name} <- multiple do
-        should_be_state_with_name(res, name)
+        assert_state_includes_name(res, name)
       end
     end
 
@@ -46,24 +47,22 @@ defmodule Alfred.NamesStateTest do
     test "handles invalid KnownName", %{state: state, known_name: kn} do
       kn = %KnownName{kn | valid?: false}
 
-      new_state = State.add_or_update_known(kn, state)
-
-      should_be_struct(new_state, State)
-      should_be_empty_map(new_state.known)
+      State.add_or_update_known(kn, state)
+      |> Should.Be.State.with_key(:known)
+      # NOTE: Should.Be.StatE.WITH_key/2 returns tuple of {state, key_value}
+      |> then(fn {_state, known} -> Should.Be.map(known) end)
     end
   end
 
   @tag make_known_name: []
   test "Alfred.Names.State.delete_known/2 removes a name", %{state: state, known_name: kn} do
     new_state = State.add_or_update_known(kn, state)
-    should_be_state_with_name(new_state, kn.name)
+    assert_state_includes_name(new_state, kn.name)
 
-    res = State.delete_known(kn.name, new_state)
-
-    unknown = State.lookup(kn.name, res)
-
-    should_be_struct(unknown, KnownName)
-    should_be_equal(unknown.valid?, false)
+    State.delete_known(kn.name, new_state)
+    |> Should.Be.State.with_key(:known)
+    |> then(fn {state, _} -> State.lookup(kn.name, state) end)
+    |> Should.Be.Struct.with_all_key_value(KnownName, valid?: false)
   end
 
   def make_known_name(%{make_known_name: opts}) do
@@ -74,11 +73,9 @@ defmodule Alfred.NamesStateTest do
     ttl = opts[:ttl_ms] || 30_000
     miss? = if(is_nil(opts[:missing]), do: false, else: opts[:missing])
 
-    kn =
-      %KnownName{name: name, callback: cb, mutable?: mut?, seen_at: at, ttl_ms: ttl, missing?: miss?}
-      |> KnownName.validate()
-
-    %{known_name: kn}
+    %KnownName{name: name, callback: cb, mutable?: mut?, seen_at: at, ttl_ms: ttl, missing?: miss?}
+    |> KnownName.validate()
+    |> then(fn kn -> %{known_name: kn} end)
   end
 
   def make_known_name(ctx), do: ctx

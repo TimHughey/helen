@@ -26,9 +26,8 @@ defmodule BroomTest do
   end
 
   test "can Broom create a child_spec for the using module", ctx do
-    spec = ctx.impl_mod.child_spec(initial: :test)
-    Should.Be.NonEmpty.map(spec)
-    should_contain(spec, id: ctx.impl_mod)
+    ctx.impl_mod.child_spec(initial: :test)
+    |> Should.Be.Map.with_all_key_value(id: ctx.impl_mod)
   end
 
   test "can Broom get counts", ctx do
@@ -38,11 +37,8 @@ defmodule BroomTest do
   end
 
   test "can Broom reset counts", ctx do
-    res = Broom.via_mod_counts_reset(ctx.impl_mod, [:orphaned, :tracked, :not_a_count])
-    should_be_tuple(res)
-    fail = pretty("should be {:reset, %Counts{}}", res)
-    assert :reset == elem(res, 0), fail
-    assert %Broom.Counts{} = elem(res, 1), fail
+    Broom.via_mod_counts_reset(ctx.impl_mod, [:orphaned, :tracked, :not_a_count])
+    |> Should.Be.Tuple.rc_and_struct(:reset, Broom.Counts)
   end
 
   @tag skip: false
@@ -284,22 +280,18 @@ defmodule BroomTest do
   defp create_cmd(ctx) do
     cmd_opts = ctx[:cmd_opts] || []
 
-    added_cmd = Broom.Command.add(ctx.dev_alias, make_cmd_binary(ctx), cmd_opts)
-
-    should_be_schema(added_cmd, Broom.Command)
-
-    %{ctx | added_cmd: added_cmd}
+    Broom.Command.add(ctx.dev_alias, make_cmd_binary(ctx), cmd_opts)
+    |> Should.Be.schema(Broom.Command)
+    |> then(fn schema -> Map.put(ctx, :added_cmd, schema) end)
   end
 
-  defp create_alias(ctx) when is_map_key(ctx, :dev_alias_opts) do
-    default_opts = [decription: "default", ttl_ms: 3000]
-    dev_alias_opts = Keyword.merge(ctx.dev_alias_opts, default_opts)
-
-    dev_alias = Support.add_dev_alias(ctx.device, dev_alias_opts)
-
-    should_be_struct(dev_alias, Broom.DevAlias)
-
-    %{ctx | dev_alias: dev_alias, alias_name: dev_alias.name}
+  @dev_alias_defaults [decription: "default", ttl_ms: 3000]
+  defp create_alias(%{dev_alias_opts: opts, device: device} = ctx) do
+    opts
+    |> Keyword.merge(@dev_alias_defaults)
+    |> then(fn dev_alias_opts -> Support.add_dev_alias(device, dev_alias_opts) end)
+    |> Should.Be.schema(Broom.DevAlias)
+    |> then(fn schema -> Map.merge(ctx, %{dev_alias: schema, alias_name: schema.name}) end)
   end
 
   defp create_alias(ctx), do: ctx
@@ -311,18 +303,17 @@ defmodule BroomTest do
     # now = ctx[:dev_last_seen_at] || DateTime.utc_now()
     device_opts = [ident: ident, family: "i2c", mutable: true, pios: pios]
 
-    device = Support.add_device(ctx.host, device_opts)
-    should_be_schema(device, Broom.Device)
-
-    %{ctx | device: device}
+    Support.add_device(ctx.host, device_opts)
+    |> Should.Be.schema(Broom.Device)
+    |> then(fn schema -> Map.put(ctx, :device, schema) end)
   end
 
   defp create_host(ctx) do
     host_opts = [host: "broom.testhost", name: "Broom Test Host"]
-    host = Support.add_host(host_opts)
-    should_be_schema(host, Broom.Host)
 
-    %{ctx | host: host}
+    Support.add_host(host_opts)
+    |> Should.Be.schema(Broom.Host)
+    |> then(fn schema -> Map.put(ctx, :host, schema) end)
   end
 
   defp create_wrapped(ctx) do
@@ -355,7 +346,7 @@ defmodule BroomTest do
 
     te_rc = Broom.Execute.track(ctx.added_cmd, track_opts)
 
-    should_be_ok_tuple(te_rc)
+    Should.Be.Ok.tuple(te_rc)
 
     %{ctx | tracker_entry: elem(te_rc, 1)}
   end

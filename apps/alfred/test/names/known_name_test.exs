@@ -7,13 +7,22 @@ defmodule Alfred.KnownNameTest do
   alias Alfred.KnownName
   alias Alfred.NamesAid
 
-  defmacro should_be_missing(res, bool) do
-    quote location: :keep, bind_quoted: [res: res, bool: bool] do
-      should_be_struct(res, KnownName)
-      fail = "valid? should be true"
-      assert res.valid? == true, fail
-      fail = "missing? should be #{inspect(bool)}"
-      assert res.missing? == bool, fail
+  defmacro assert_known_name(x, check) do
+    quote location: :keep, bind_quoted: [x: x, check: check] do
+      cond do
+        is_atom(check) ->
+          Should.Be.Struct.with_all_key_value(x, KnownName, valid?: check == :valid)
+
+        is_list(check) ->
+          Should.Be.Struct.with_all_key_value(x, KnownName, check)
+      end
+    end
+  end
+
+  defmacro assert_missing(x, bool) do
+    quote location: :keep, bind_quoted: [x: x, bool: bool] do
+      want_kv = [valid?: true, missing?: bool]
+      Should.Be.Struct.with_all_key_value(x, KnownName, want_kv)
     end
   end
 
@@ -21,9 +30,9 @@ defmodule Alfred.KnownNameTest do
 
   describe "Alfred.KnownName.validate/1" do
     test "verifies a default KnownName is invalid" do
-      res = %KnownName{} |> KnownName.validate()
-      should_be_struct(res, KnownName)
-      should_be_equal(res.valid?, false)
+      %KnownName{}
+      |> KnownName.validate()
+      |> assert_known_name(:not_valid)
     end
 
     test "detects valid callbacks" do
@@ -32,51 +41,47 @@ defmodule Alfred.KnownNameTest do
       callbacks = [{:server, __MODULE__.Server}, {:module, __MODULE__}, func]
 
       for cb <- callbacks do
-        res = %KnownName{callback: cb} |> KnownName.validate()
-        should_be_struct(res, KnownName)
-        should_be_equal(res.valid?, true)
+        %KnownName{callback: cb}
+        |> KnownName.validate()
+        |> assert_known_name(:valid)
       end
     end
 
     test "detects invalid seen_at" do
-      kn = %KnownName{callback: {:module, __MODULE__}, seen_at: {:error, :datetime}}
-      res = KnownName.validate(kn)
-      should_be_struct(res, KnownName)
-      should_be_equal(res.valid?, false)
+      %KnownName{callback: {:module, __MODULE__}, seen_at: {:error, :datetime}}
+      |> KnownName.validate()
+      |> assert_known_name(:not_valid)
     end
 
     test "detects invalid ttl_ms" do
-      kn = %KnownName{callback: {:module, __MODULE__}, ttl_ms: 0}
-      res = KnownName.validate(kn)
-      should_be_struct(res, KnownName)
-      should_be_equal(res.valid?, false)
+      %KnownName{callback: {:module, __MODULE__}, ttl_ms: 0}
+      |> KnownName.validate()
+      |> assert_known_name(:not_valid)
     end
   end
 
   describe "Alfred.KnownName.detect_missing/2" do
     @tag make_known_name: [seen_at: -1, ttl_ms: 1]
     test "handles unspecified utc now", %{known_name: kn} do
-      res = KnownName.detect_missing(kn)
-      should_be_missing(res, true)
+      KnownName.detect_missing(kn)
+      |> assert_missing(true)
     end
 
     @tag make_known_name: [seen_at: -1, ttl_ms: 1]
     test "handle specified utc now", %{known_name: kn} do
       utc_now = DateTime.utc_now()
-      res = KnownName.detect_missing(kn, utc_now)
-      should_be_missing(res, true)
+
+      KnownName.detect_missing(kn, utc_now)
+      |> assert_missing(true)
     end
   end
 
   describe "Alfred.KnownName.unknown/1" do
     test "creates an invalid KnownName" do
       name = NamesAid.unique("knownname")
-      res = KnownName.unknown(name)
 
-      should_be_struct(res, KnownName)
-      should_be_equal(res.name, name)
-      should_be_equal(res.valid?, false)
-      should_be_equal(res.missing?, true)
+      KnownName.unknown(name)
+      |> assert_known_name(name: name, valid?: false, missing?: true)
     end
   end
 

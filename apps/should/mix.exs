@@ -4,7 +4,7 @@ defmodule Should.MixProject do
   def project do
     [
       app: :should,
-      version: "0.6.31",
+      version: "0.6.32",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",

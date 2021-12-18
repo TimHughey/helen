@@ -25,6 +25,33 @@ defmodule Should.Be.Struct do
   end
 
   @doc """
+  Asserts when `x` is a `struct` named `want_struct` and has `keys` of `types`, returns x
+
+  ```
+  assert is_struct(x, want_struct), Should.msg(x, "should be a", want_struct)
+
+  Map.from_struct(x)
+  |> Should.Be.Map.of_key_types(x, want_types)
+
+  # return struct
+  x
+  ```
+
+  """
+  @doc since: "0.6.32"
+  defmacro of_key_types(x, want_struct, want_types) do
+    quote location: :keep, bind_quoted: [x: x, want_struct: want_struct, want_types: want_types] do
+      assert is_struct(x, want_struct), Should.msg(x, "should be a", want_struct)
+
+      Map.from_struct(x)
+      |> Should.Be.Map.of_key_types(want_types)
+
+      # return struct
+      x
+    end
+  end
+
+  @doc """
   Asserts when `named/2` and contains all `Keyword` or `Map`
 
   ```

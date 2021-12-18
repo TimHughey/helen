@@ -42,32 +42,25 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [cmd: "on"]
     @tag result_opts: [gt_mid: 2]
     test "datapoint error when only two datapoints", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
-
-      should_be_tuple_with_size(res, 2)
-      {rc, struct} = res
-      should_be_equal(rc, :datapoint_error)
-      should_be_struct(struct, Result)
+      ctx.equipment
+      |> Cmd.make(ctx.result, alfred: AlfredSim)
+      |> Should.Be.Tuple.rc_and_struct(:datapoint_error, Result)
     end
 
     @tag equipment_add: [cmd: "on"]
     @tag result_opts: [lt_mid: 2, gt_mid: 1]
     test "no change when result below mid range value and active", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
-
-      should_be_equal(res, {:no_change, :active})
+      ctx.equipment
+      |> Cmd.make(ctx.result, alfred: AlfredSim)
+      |> Should.Be.match({:no_change, :active})
     end
 
     @tag equipment_add: [rc: :error, cmd: "unknown"]
     @tag result_opts: [lt_low: 3]
     test "equipment error tuple with MutableStatus not good", ctx do
-      res = Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
-
-      should_be_tuple_with_size(res, 2)
-
-      {rc, mut_status} = res
-      should_be_equal(rc, :equipment_error)
-      should_be_struct(mut_status, MutStatus)
+      ctx.equipment
+      |> Cmd.make(ctx.result, alfred: AlfredSim)
+      |> Should.Be.Tuple.rc_and_struct(:equipment_error, MutStatus)
     end
   end
 
@@ -75,28 +68,28 @@ defmodule Rena.SetPt.CmdTest do
     setup [:setup_opts]
 
     test "handles datapoint errors", %{opts: opts} do
-      res = Cmd.effectuate({:datapoint_error, :foo}, opts)
-      should_be_equal(res, :failed)
+      Cmd.effectuate({:datapoint_error, :foo}, opts)
+      |> Should.Be.equal(:failed)
     end
 
     test "handles general error", %{opts: opts} do
-      res = Cmd.effectuate({:error, :foo}, opts)
-      should_be_equal(res, :failed)
+      Cmd.effectuate({:error, :foo}, opts)
+      |> Should.Be.equal(:failed)
     end
 
     test "handles equipment ttl expired", %{opts: opts} do
-      res = Cmd.effectuate({:equipment_error, %MutStatus{name: "bad equipment", ttl_expired?: true}}, opts)
-      should_be_equal(res, :failed)
+      Cmd.effectuate({:equipment_error, %MutStatus{name: "bad equipment", ttl_expired?: true}}, opts)
+      |> Should.Be.equal(:failed)
     end
 
     test "handles equipment error", %{opts: opts} do
-      res = Cmd.effectuate({:equipment_error, %MutStatus{name: "bad equipment", error: :unknown}}, opts)
-      should_be_equal(res, :failed)
+      Cmd.effectuate({:equipment_error, %MutStatus{name: "bad equipment", error: :unknown}}, opts)
+      |> Should.Be.equal(:failed)
     end
 
     test "handles no change", %{opts: opts} do
-      res = Cmd.effectuate({:no_change, :foo}, opts)
-      should_be_equal(res, :no_change)
+      Cmd.effectuate({:no_change, :foo}, opts)
+      |> Should.Be.equal(:no_change)
     end
   end
 
@@ -105,32 +98,26 @@ defmodule Rena.SetPt.CmdTest do
 
     @tag equipment_add: [cmd: "on"]
     test "handles equipment status :ok", ctx do
-      ec = %ExecCmd{name: ctx.equipment, cmd: "on"}
-      res = Cmd.execute(ec, ctx.opts)
-
-      should_be_ok_tuple_with_struct(res, ExecResult)
-      {_rc, exec_result} = res
-      should_be_equal(exec_result.rc, :ok)
+      %ExecCmd{name: ctx.equipment, cmd: "on"}
+      |> Cmd.execute(ctx.opts)
+      |> Should.Be.Ok.tuple()
+      |> Should.Be.Struct.with_all_key_value(ExecResult, rc: :ok)
     end
 
     @tag equipment_add: [pending: true, cmd: "on"]
     test "handles equipment status is :pending", ctx do
-      ec = %ExecCmd{name: ctx.equipment, cmd: "on"}
-      res = Cmd.execute(ec, ctx.opts)
-
-      should_be_ok_tuple_with_struct(res, ExecResult)
-      {_rc, exec_result} = res
-      should_be_equal(exec_result.rc, :pending)
+      %ExecCmd{name: ctx.equipment, cmd: "on"}
+      |> Cmd.execute(ctx.opts)
+      |> Should.Be.Ok.tuple()
+      |> Should.Be.Struct.with_all_key_value(ExecResult, rc: :pending)
     end
 
     @tag equipment_add: [expired_ms: 10_000]
     test "handles when equipment status is :ttl_expired", ctx do
-      ec = %ExecCmd{name: ctx.equipment, cmd: "on"}
-      res = Cmd.execute(ec, ctx.opts)
-
-      should_be_failed_tuple_with_struct(res, ExecResult)
-      {_rc, exec_result} = res
-      should_be_equal(exec_result.rc, {:ttl_expired, 10_000})
+      %ExecCmd{name: ctx.equipment, cmd: "on"}
+      |> Cmd.execute(ctx.opts)
+      |> Should.Be.Tuple.with_rc(:failed)
+      |> Should.Be.Struct.with_all_key_value(ExecResult, rc: {:ttl_expired, 10_000})
     end
   end
 

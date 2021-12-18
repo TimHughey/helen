@@ -57,16 +57,16 @@ defmodule Rena.SetPt.ServerTest do
   describe "Rena.SetPt.Server.handle_info/2 processes Notify" do
     @tag equipment_add: [], state_add: []
     test "missing messages", %{state: state} do
-      res = Server.handle_info({Alfred, %Memo{name: state.equipment, missing?: true}}, state)
-
-      should_be_noreply_tuple_with_state(res, State)
+      {Alfred, %Memo{name: state.equipment, missing?: true}}
+      |> Server.handle_info(state)
+      |> Should.Be.NoReply.with_state()
     end
 
     @tag equipment_add: [], state_add: []
     test "normal messages", %{state: state} do
-      res = Server.handle_info({Alfred, %Memo{name: state.equipment, missing?: false}}, state)
-
-      should_be_noreply_tuple_with_state(res, State)
+      {Alfred, %Memo{name: state.equipment, missing?: false}}
+      |> Server.handle_info(state)
+      |> Should.Be.NoReply.with_state()
     end
   end
 
@@ -78,12 +78,10 @@ defmodule Rena.SetPt.ServerTest do
       te = %TrackerEntry{refid: refid, acked: true, acked_at: acked_at}
       er = %ExecResult{refid: refid}
 
-      res = Server.handle_info({Broom, te}, %State{state | last_exec: er})
-      should_be_noreply_tuple_with_state(res, State)
-
-      {:noreply, new_state} = res
-
-      should_be_equal(new_state.last_exec, acked_at)
+      Server.handle_info({Broom, te}, %State{state | last_exec: er})
+      |> Should.Be.NoReply.with_state()
+      |> Should.Be.State.with_key(:last_exec)
+      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, acked_at) end)
     end
 
     @tag equipment_add: [], state_add: []
@@ -92,12 +90,10 @@ defmodule Rena.SetPt.ServerTest do
       te = %TrackerEntry{refid: refid, acked: false}
       er = %ExecResult{refid: refid}
 
-      res = Server.handle_info({Broom, te}, %State{state | last_exec: er})
-      should_be_noreply_tuple_with_state(res, State)
-
-      {:noreply, new_state} = res
-
-      should_be_equal(new_state.last_exec, :failed)
+      Server.handle_info({Broom, te}, %State{state | last_exec: er})
+      |> Should.Be.NoReply.with_state()
+      |> Should.Be.State.with_key(:last_exec)
+      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, :failed) end)
     end
 
     @tag equipment_add: [], state_add: []
@@ -105,12 +101,10 @@ defmodule Rena.SetPt.ServerTest do
       te = %TrackerEntry{refid: "123456", acked: true}
       er = %ExecResult{refid: "7890"}
 
-      res = Server.handle_info({Broom, te}, %State{state | last_exec: er})
-      should_be_noreply_tuple_with_state(res, State)
-
-      {:noreply, new_state} = res
-
-      should_be_equal(new_state.last_exec, :failed)
+      Server.handle_info({Broom, te}, %State{state | last_exec: er})
+      |> Should.Be.NoReply.with_state()
+      |> Should.Be.State.with_key(:last_exec)
+      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, :failed) end)
     end
 
     @tag equipment_add: [], state_add: []
@@ -118,12 +112,10 @@ defmodule Rena.SetPt.ServerTest do
     test "when State last_exec is not an ExecResult", %{state: state} do
       te = %TrackerEntry{refid: "123456", acked: true}
 
-      res = Server.handle_info({Broom, te}, state)
-      should_be_noreply_tuple_with_state(res, State)
-
-      {:noreply, new_state} = res
-
-      should_be_equal(new_state.last_exec, :none)
+      Server.handle_info({Broom, te}, state)
+      |> Should.Be.NoReply.with_state()
+      |> Should.Be.State.with_key(:last_exec)
+      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, :none) end)
     end
   end
 
@@ -144,7 +136,7 @@ defmodule Rena.SetPt.ServerTest do
 
   @sensors_opts for temp_f <- [11.0, 11.1, 11.2, 6.2], do: [temp_f: temp_f]
   def state_add(%{state_add: opts} = ctx) do
-    fields = [
+    [
       alfred: AlfredSim,
       server_name: ServerTest,
       equipment: ctx.equipment,
@@ -152,8 +144,7 @@ defmodule Rena.SetPt.ServerTest do
       sensor_range: opts[:range] || %Sensor.Range{low: 1.0, high: 11.0, unit: :temp_f},
       last_exec: opts[:last_exec] || :none
     ]
-
-    %{state: struct(State, fields)}
+    |> then(fn fields -> %{state: struct(State, fields)} end)
   end
 
   def state_add(_), do: :ok

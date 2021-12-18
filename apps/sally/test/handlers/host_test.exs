@@ -27,7 +27,7 @@ defmodule SallyHostHandlerTest do
     tested = [:category] ++ tested
     assert map_size(x.data) == 0, fail
     tested = [:data] ++ tested
-    should_be_schema(x.host, Host)
+    Should.Be.schema(x.host, Host)
     tested = [:host] ++ tested
     assert x.ident == ctx.host_ident, fail
     tested = [:ident] ++ tested

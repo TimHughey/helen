@@ -57,17 +57,38 @@ defmodule Should.Be.Tuple do
       vals = Tuple.to_list(x)
       type_vals = Enum.zip(types, vals)
 
-      for {type, val} <- type_vals do
-        case type do
-          :atom -> Should.Be.atom(val)
-          :binary -> Should.Be.binary(val)
-          :map -> Should.Be.map(val)
-          :reference -> Should.Be.reference(val)
-        end
+      for {type, val} <- type_vals, reduce: 0 do
+        element ->
+          Should.Be.type(val, type, x, "element #{element}")
+
+          element + 1
       end
 
       # return validated tuple
       x
+    end
+  end
+
+  @doc """
+  Asserts when `x` is a `{rc, binary}` tuple and returns binary
+
+  ```
+  {rc, val} = Should.Be.Tuple.with_size(x, 2)
+  assert rc == want_rc, Should.msg(rc, "should be", want_rc)
+  Should.Contain.binaries(val, want_binary)
+
+  val
+  ```
+
+  """
+  @doc since: "0.6.23"
+  defmacro rc_and_binaries(x, want_rc, want_binary) do
+    quote location: :keep, bind_quoted: [x: x, want_rc: want_rc, want_binary: want_binary] do
+      {rc, val} = Should.Be.Tuple.with_size(x, 2)
+      assert rc == want_rc, Should.msg(rc, "should be", want_rc)
+      Should.Contain.binaries(val, want_binary)
+
+      val
     end
   end
 
@@ -86,6 +107,31 @@ defmodule Should.Be.Tuple do
       Should.Be.Tuple.with_size(x, 2)
       elem(x, 0) |> Should.Be.equal(rc)
       elem(x, 1) |> Should.Be.map()
+    end
+  end
+
+  @doc """
+  Asserts when `x` is a `{rc, struct}` tuple and returns struct
+
+  ```
+  {rc, struct} = Should.Be.Tuple.with_size(x, 2)
+  assert rc == want_rc, Should.msg(rc, "should be", want_rc)
+  Should.Be.struct(struct, want_struct)
+
+  # return the struct
+  struct
+  ```
+
+  """
+  @doc since: "0.6.23"
+  defmacro rc_and_struct(x, want_rc, want_struct) do
+    quote location: :keep, bind_quoted: [x: x, want_rc: want_rc, want_struct: want_struct] do
+      {rc, struct} = Should.Be.Tuple.with_size(x, 2)
+      assert rc == want_rc, Should.msg(rc, "should be", want_rc)
+      Should.Be.struct(struct, want_struct)
+
+      # return the struct
+      struct
     end
   end
 

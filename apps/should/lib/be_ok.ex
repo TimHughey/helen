@@ -4,6 +4,30 @@ defmodule Should.Be.Ok do
   """
 
   @doc """
+  Asserts when `x` is `{:ok, term}` then returns the `term`
+
+  ```
+  {rc, term} = Should.Be.Tuple.with_size(x, 2)
+  assert rc == :ok, Should.msg(rc, "should be equal to", :ok)
+
+  # return term
+  term
+
+  ```
+
+  """
+  @doc since: "0.6.19"
+  defmacro tuple(x) do
+    quote location: :keep, bind_quoted: [x: x] do
+      {rc, term} = Should.Be.Tuple.with_size(x, 2)
+      assert rc == :ok, Should.msg(rc, "should be equal to", :ok)
+
+      # return term
+      term
+    end
+  end
+
+  @doc """
   Asserts when `x` is `{:ok, map}` then returns the `map`
 
   ```

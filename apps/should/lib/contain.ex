@@ -74,7 +74,7 @@ defmodule Should.Contain do
   Asserts when `Enum` contains key/value pairs
 
   ```
-  # ensure x is an enumberable
+  # ensure x is an enumerable
   x = if(is_struct(x), do: Map.from_struct(x), else: x)
 
   for kv <- kv_pairs do
@@ -102,6 +102,41 @@ defmodule Should.Contain do
 
       # return verified enumerable
       x
+    end
+  end
+
+  @doc """
+  Asserts when `Enum` (or `struct`) contains `what`
+
+  ```
+  assert is_list(x) or is_struct(x) or is_map(x), Should.msg(x, "should be enumerable")
+
+  check = if(is_struct(x), do: Map.to_struct(x), else: x)
+
+  assert Enum.find(check, false, fn
+           {v, _} -> v == what
+           {_k, v} -> v == what
+           v -> v == what
+         end),
+         msg(check, "should contain value", what)
+  ```
+
+  """
+  @doc since: "0.6.23"
+
+  defmacro value(x, what) do
+    quote bind_quoted: [x: x, what: what] do
+      assert is_list(x) or is_struct(x) or is_map(x), Should.msg(x, "should be enumerable")
+
+      check = if(is_struct(x), do: Map.from_struct(x), else: x)
+
+      assert Enum.find(check, false, fn
+               {^what, _} -> true
+               {_k, ^what} -> true
+               ^what -> true
+               _ -> false
+             end),
+             msg(check, "should contain value", what)
     end
   end
 end

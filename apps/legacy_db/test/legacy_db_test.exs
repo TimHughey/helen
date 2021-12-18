@@ -2,15 +2,22 @@ defmodule LegacyDbTest do
   use ExUnit.Case, async: true
   use Should
 
+  @pwm_alias LegacyDb.PulseWidth.Alias
+  @pwm_device LegacyDb.PulseWidth.Device
+  @sensor_alias LegacyDb.Sensor.Alias
+  @sensor_device LegacyDb.Sensor.Device
+  @switch_alias LegacyDb.Switch.Alias
+  @switch_device LegacyDb.Switch.Device
+
   test "legacy db sensor" do
     import Ecto.Query, only: [from: 1]
 
-    devs = from(s in LegacyDb.Sensor.Device) |> LegacyDb.Repo.all()
+    devs = from(s in @sensor_device) |> LegacyDb.Repo.all()
 
     assert is_list(devs)
     refute devs == []
 
-    aliases = from(s in LegacyDb.Sensor.Alias) |> LegacyDb.Repo.all()
+    aliases = from(s in @sensor_alias) |> LegacyDb.Repo.all()
 
     assert is_list(aliases)
     refute aliases == []
@@ -19,12 +26,12 @@ defmodule LegacyDbTest do
   test "legacy db switch devices" do
     import Ecto.Query, only: [from: 1]
 
-    devs = from(s in LegacyDb.Switch.Device) |> LegacyDb.Repo.all()
+    devs = from(s in @switch_device) |> LegacyDb.Repo.all()
 
     assert is_list(devs)
     refute devs == []
 
-    aliases = from(s in LegacyDb.Switch.Alias) |> LegacyDb.Repo.all()
+    aliases = from(s in @switch_alias) |> LegacyDb.Repo.all()
 
     assert is_list(aliases)
     refute aliases == []
@@ -33,12 +40,12 @@ defmodule LegacyDbTest do
   test "legacy db pwm" do
     import Ecto.Query, only: [from: 1]
 
-    devs = from(s in LegacyDb.PulseWidth.Device) |> LegacyDb.Repo.all()
+    devs = from(s in @pwm_device) |> LegacyDb.Repo.all()
 
     assert is_list(devs)
     refute devs == []
 
-    aliases = from(s in LegacyDb.PulseWidth.Alias) |> LegacyDb.Repo.all()
+    aliases = from(s in @pwm_alias) |> LegacyDb.Repo.all()
 
     assert is_list(aliases)
     refute aliases == []
@@ -59,40 +66,32 @@ defmodule LegacyDbTest do
   end
 
   test "pwm all aliases" do
-    res = LegacyDb.all_pwm_aliases()
-    should_be_non_empty_list(res)
-
-    for pwm_alias <- res do
-      should_be_struct(pwm_alias, LegacyDb.PulseWidth.Alias)
-    end
+    LegacyDb.all_pwm_aliases()
+    |> Should.Be.List.of_type(:map)
   end
 
   test "pwm all alias names" do
-    res = LegacyDb.all_pwm_names()
-    should_be_non_empty_list(res)
+    LegacyDb.all_pwm_names()
+    |> Should.Be.List.of_type(:binary)
   end
 
   test "pwm lookup alias details" do
-    res = LegacyDb.pwm_alias("front leds porch")
-    Should.Be.NonEmpty.map(res)
-    should_contain_key(res, :name)
+    LegacyDb.pwm_alias("front leds porch")
+    |> Should.Be.Map.with_key(:name)
   end
 
   test "sensor lookup alias details" do
-    res = LegacyDb.sensor_alias("display_tank")
-    Should.Be.NonEmpty.map(res)
-    should_contain_key(res, :host)
+    LegacyDb.sensor_alias("display_tank")
+    |> Should.Be.Map.with_key(:name)
   end
 
   test "switch lookup alias details" do
-    res = LegacyDb.switch_alias("display tank heater")
-    Should.Be.NonEmpty.map(res)
-    should_contain_key(res, :pio)
+    LegacyDb.switch_alias("display tank heater")
+    |> Should.Be.Map.with_key(:name)
   end
 
   test "ds sensor lookup by device name" do
-    res = LegacyDb.ds_sensor("ds.280cd73a1a1901")
-    Should.Be.NonEmpty.map(res)
-    should_contain_value(res, "lab window west")
+    LegacyDb.ds_sensor("ds.280cd73a1a1901")
+    |> Should.Contain.value("lab window west")
   end
 end
