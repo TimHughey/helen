@@ -25,15 +25,51 @@ defmodule BroomTest do
     ctx
   end
 
+  # defmacro assert_tracker_entry(te, want_kv) do
+  #   quote location: :keep, bind_quoted: [te: te, want_kv: want_kv] do
+  #
+  #     want_dt = [:acked_at, :released_at, :sent_at, :tracked_at]
+  #     want_types = [dev_alias_id: :integer, ]
+  #     want_true = [:acked, :released]
+  #
+  #
+  #     # systematically confirm all %TrackerEntry fields are properly set
+  #     assert te.acked, fail
+  #     assert %DateTime{} = te.acked_at, fail
+  #     assert is_integer(te.dev_alias_id), fail
+  #     assert te.dev_alias_id > 0, fail
+  #     assert te.cmd == "ack", fail
+  #     assert te.module == Broom.Execute, fail
+  #     assert is_pid(te.notify_pid), fail
+  #     assert Process.alive?(te.notify_pid), fail
+  #     assert te.track_timeout_ms == 2, fail
+  #     assert te.orphaned == false, fail
+  #     # NOTE: data type of refid may change in the future, only check for nil
+  #     refute is_nil(te.refid), fail
+  #     assert te.released, fail
+  #     assert %DateTime{} = te.released_at, fail
+  #     assert te.schema == Broom.Command, fail
+  #     assert is_number(te.schema_id), fail
+  #     assert te.schema_id > 0, fail
+  #     assert %DateTime{} = te.sent_at, fail
+  #     assert is_nil(te.timer), fail
+  #     assert %DateTime{} = te.tracked_at, fail
+  #
+  #     # valid *_at fields describe processing sequence
+  #     assert DateTime.compare(te.sent_at, te.tracked_at) == :lt, fail
+  #     assert DateTime.compare(te.acked_at, te.released_at) == :lt, fail
+  #
+  #   end
+  # end
+
   test "can Broom create a child_spec for the using module", ctx do
     ctx.impl_mod.child_spec(initial: :test)
     |> Should.Be.Map.with_all_key_value(id: ctx.impl_mod)
   end
 
   test "can Broom get counts", ctx do
-    res = Broom.via_mod_counts(ctx.impl_mod)
-    fail = pretty("should be = %Counts{}", res)
-    assert %Broom.Counts{} = res, fail
+    Broom.via_mod_counts(ctx.impl_mod)
+    |> Should.Be.struct(Broom.Counts)
   end
 
   test "can Broom reset counts", ctx do
@@ -44,10 +80,9 @@ defmodule BroomTest do
   @tag skip: false
   @tag dump_state: false
   test "can Broom get server state", ctx do
-    state = server_state(ctx)
-
-    fail = pretty("result should be %Broom.State{}", state)
-    assert %Broom.State{} = state, fail
+    ctx
+    |> server_state()
+    |> Should.Be.State.with_key(:tracker)
 
     dump_state(ctx)
   end
@@ -259,18 +294,19 @@ defmodule BroomTest do
     @tag cmd_disposition: :orphan
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 0]
     test "can Broom change the metrics reporting interval", ctx do
-      res = Broom.via_mod_change_metrics_interval(ctx.impl_mod, "PT0.01S")
-
-      fail = "change_metrics_interval should return {:ok, new_interval}: #{inspect(res)}"
-      assert {:ok, %Broom.MetricsOpts{interval: "PT0.01S"}} == res, fail
+      ctx.impl_mod
+      |> Broom.via_mod_change_metrics_interval("PT0.01S")
+      |> Should.Be.equal({:ok, %Broom.MetricsOpts{interval: "PT0.01S"}})
 
       Process.sleep(300)
 
-      alias Broom.{Metrics, State}
-      %State{metrics: %Metrics{} = metrics} = :sys.get_state(ctx.impl_mod)
+      alias Broom.Metrics
 
-      fail = pretty("interval_ms should be 10", metrics)
-      assert metrics.interval_ms == 10, fail
+      ctx.impl_mod
+      |> :sys.get_state()
+      |> Should.Be.State.with_key(:metrics)
+      |> then(fn {_, metrics} -> Should.Be.Struct.with_key(metrics, Metrics, :interval_ms) end)
+      |> then(fn interval_ms -> Should.Be.equal(interval_ms, 10) end)
 
       dump_state(ctx) |> dump_tracked_refs()
     end

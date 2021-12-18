@@ -109,7 +109,7 @@ defmodule Alfred.NotifyServerTest do
 
       regs_after = Server.call(:registrations, call_opts) |> map_size()
 
-      assert regs_after < regs_before, msg(regs_before, "should be less than", regs_after)
+      assert regs_after < regs_before, Should.msg(regs_before, "should be less than", regs_after)
     end
 
     @tag register_name: [missing_ms: 10]

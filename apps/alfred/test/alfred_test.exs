@@ -160,7 +160,7 @@ defmodule AlfredTest do
       known = Alfred.names_known(details: true) |> Should.Be.List.of_structs(KnownName)
 
       found? = Enum.any?(known, fn %KnownName{} = kn -> kn.name == name end)
-      assert found?, msg(known, "should contain a KnownName for", name)
+      assert found?, Should.msg(known, "should contain a KnownName for", name)
     end
 
     @tag name_add: [type: :mut, rc: :ok, cmd: "on"]

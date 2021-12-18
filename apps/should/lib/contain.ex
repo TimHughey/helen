@@ -136,7 +136,7 @@ defmodule Should.Contain do
                ^what -> true
                _ -> false
              end),
-             msg(check, "should contain value", what)
+             Should.msg(check, "should contain value", what)
     end
   end
 end

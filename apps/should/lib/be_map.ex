@@ -39,18 +39,13 @@ defmodule Should.Be.Map do
   ```
   Should.Be.NonEmpty.list(types)
 
+  assert Keyword.keyword?(types), Should.msg(types, "types should be a Keyword list")
+
+  Should.Be.Map.with_keys(x, Keyword.keys(types))
+
   for {key, type} <- types do
-    case type do
-      nil -> assert is_nil(x), Should.msg(key, "should be nil")
-      :atom -> assert is_atom(x), Should.msg(key, "should be atom")
-      :binary -> assert is_binary(x), Should.msg(key, "should be binary")
-      :list -> assert is_list(x), Should.msg(key, "should be a list")
-      :map -> assert is_map(x), Should.msg(key, "should be a map")
-      :struct -> assert is_struct(x), Should.msg(key, "should be a struct")
-      {:struct, named} -> assert is_struct(x, named), Should.msg(key, "should be struct", named)
-      :tuple -> assert is_tuple(x), Should.msg(key, "should be a tuple")
-      :reference -> assert is_reference(x), Should.msg(key, "should be a reference")
-    end
+    val = Map.get(x, key)
+    Should.Be.type(val, type, val, "key #{inspect(key)}")
   end
 
   # return x
@@ -62,26 +57,13 @@ defmodule Should.Be.Map do
     quote location: :keep, bind_quoted: [x: x, types: types] do
       Should.Be.NonEmpty.list(types)
 
-      assert Keyword.keyword?(types), Should.msg(types, "should be a Keyword list")
+      assert Keyword.keyword?(types), Should.msg(types, "types should be a Keyword list")
 
       Should.Be.Map.with_keys(x, Keyword.keys(types))
 
       for {key, type} <- types do
         val = Map.get(x, key)
-
-        case type do
-          nil -> assert is_nil(val), Should.msg(key, "should be nil", val)
-          :atom -> assert is_atom(val), Should.msg(key, "should be an atom", val)
-          :binary -> assert is_binary(val), Should.msg(key, "should be a binary", val)
-          :datetime -> assert is_struct(val, DateTime), Should.msg(key, "should be a DateTime", val)
-          :integer -> assert is_integer(val), Should.msg(key, "should be an integer", val)
-          :list -> assert is_list(val), Should.msg(key, "should be a list", val)
-          :map -> assert is_map(val), Should.msg(key, "should be a map", val)
-          :struct -> assert is_struct(val), Should.msg(key, "should be a struct", val)
-          {:struct, named} -> assert is_struct(val, named), Should.msg(key, "should be struct named", named)
-          :tuple -> assert is_tuple(val), Should.msg(key, "should be a tuple", val)
-          :reference -> assert is_reference(val), Should.msg(key, "should be a reference", val)
-        end
+        Should.Be.type(val, type, val, "key #{inspect(key)}")
       end
 
       # return x

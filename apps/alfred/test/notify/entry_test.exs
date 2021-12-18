@@ -25,7 +25,7 @@ defmodule Alfred.NotifyEntryTest do
         missing?: opts[:missing?]
       }
 
-      assert_received {Alfred, ^expected_memo}, msg(expected_memo, "not received")
+      assert_received {Alfred, ^expected_memo}, Should.msg(expected_memo, "not received")
     end
   end
 
