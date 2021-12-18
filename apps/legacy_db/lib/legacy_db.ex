@@ -86,7 +86,7 @@ defmodule LegacyDb do
   end
 
   defp all_alias_names(schema) do
-    Query.from(x in schema, select: [x.name]) |> Repo.all()
+    Query.from(x in schema, select: x.name) |> Repo.all()
   end
 
   defp make_alias_details(alias_schema) do
