@@ -63,19 +63,13 @@ defmodule Carol.Server do
   def child_spec(opts) do
     # :id is for the Supervisor so remove it from opts
     {id, opts_rest} = Keyword.pop(opts, :id)
-
-    # GenServer restart and shutdown are also important to the Supervisor
-    {server_opts, opts_rest} = Keyword.split(opts_rest, [:restart, :shutdown])
+    {restart, opts_rest} = Keyword.pop(opts_rest, :restart, :permanent)
 
     # init/1 requires server_name, add to opts
-    final_opts = Keyword.put(opts_rest, :server_name, id)
-
-    # make server_opts a map so it can be merged into the final child spec
-    server_opts_map = Enum.into(server_opts, %{})
+    final_opts = [{:server_name, id} | opts_rest]
 
     # build the final child_spec map
-    # See Supervisor.
-    %{id: id, start: {Server, :start_link, [final_opts]}} |> Map.merge(server_opts_map)
+    %{id: id, start: {Server, :start_link, [final_opts]}, restart: restart}
   end
 
   @doc false

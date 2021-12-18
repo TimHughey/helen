@@ -9,20 +9,34 @@ defmodule Rena.HoldCmd.Server do
 
   @impl true
   def init(args) when is_list(args) or is_map(args) do
-    if args[:server_name] do
-      Process.register(self(), args[:server_name])
-      {:ok, State.new(args), {:continue, :bootstrap}}
+    init_args_fn = args[:init_args_fn]
+    server_name = args[:server_name]
+
+    if server_name do
+      Process.register(self(), server_name)
+
+      # NOTE:
+      # 1. init_args_fn, when available, is the sole provider of args so
+      #    we must add server_name to the returned args
+      #
+      # 2. otherwise simply use the args passed in
+
+      if(init_args_fn, do: init_args_fn.(server_name: server_name), else: args)
+      |> then(fn final_args -> {:ok, State.new(final_args), {:continue, :bootstrap}} end)
     else
       {:stop, :missing_server_name}
     end
   end
 
   def child_spec(opts) do
+    # :id is for the Supervisor so remove it from opts
     {id, opts_rest} = Keyword.pop(opts, :id)
     {restart, opts_rest} = Keyword.pop(opts_rest, :restart, :permanent)
 
-    final_opts = [server_name: id] ++ opts_rest
+    # init/1 requires server_name, add to opts
+    final_opts = [{:server_name, id} | opts_rest]
 
+    # build the final child_spec map
     %{id: id, start: {Server, :start_link, [final_opts]}, restart: restart}
   end
 
