@@ -10,16 +10,19 @@ defmodule Glow.FrontEvergreen do
     Keyword.merge(args, add_args)
   end
 
-  @cmd_params_common [type: "random", primes: 35, min: 256, step_ms: 55, priority: 7]
+  @cmd_params_common [type: "random", priority: 7, primes: 8, step: 12, step_ms: 40]
 
-  defp fade_bright do
-    cmd_params = Keyword.merge(@cmd_params_common, max: 3072, step: 27)
-    [cmd: "fade dim", cmd_params: cmd_params]
-  end
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
 
-  defp fade_dim do
-    cmd_params = Keyword.merge(@cmd_params_common, max: 1024, step: 13)
-    [cmd: "fade bright", cmd_params: cmd_params]
+  defp cmd(what) do
+    case what do
+      :evening -> [min: 384, max: 3072]
+      :overnight -> [min: 175, max: 2560]
+    end
+    |> then(fn cmd_params -> Keyword.merge(@cmd_params_common, cmd_params) end)
+    |> then(fn final_params -> [cmd: Atom.to_string(what), cmd_params: final_params] end)
   end
 
   defp program(id, start_opts, finish_opts) do
@@ -29,8 +32,8 @@ defmodule Glow.FrontEvergreen do
 
   defp programs do
     [
-      program("Early Evening", [cmd: fade_bright(), sunref: "sunset"], sunref: "astro set"),
-      program("Overnight", [cmd: fade_dim(), sunref: "astro set"], sunref: "civil rise")
+      program("Early Evening", [cmd: cmd(:evening), sunref: "sunset"], sunref: "astro set"),
+      program("Overnight", [cmd: cmd(:overnight), sunref: "astro set"], sunref: "civil rise")
     ]
   end
 end
