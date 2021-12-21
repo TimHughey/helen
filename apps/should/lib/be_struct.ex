@@ -31,7 +31,7 @@ defmodule Should.Be.Struct do
   assert is_struct(x, want_struct), Should.msg(x, "should be a", want_struct)
 
   Map.from_struct(x)
-  |> Should.Be.Map.of_key_types(x, want_types)
+  |> Should.Be.Map.of_key_types(want_types)
 
   # return struct
   x
@@ -40,7 +40,7 @@ defmodule Should.Be.Struct do
   """
   @doc since: "0.6.32"
   defmacro of_key_types(x, want_struct, want_types) do
-    quote location: :keep, bind_quoted: [x: x, want_struct: want_struct, want_types: want_types] do
+    quote bind_quoted: [x: x, want_struct: want_struct, want_types: want_types] do
       assert is_struct(x, want_struct), Should.msg(x, "should be a", want_struct)
 
       Map.from_struct(x)
