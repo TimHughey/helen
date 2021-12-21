@@ -28,16 +28,13 @@ defmodule Solar.Opts do
     make_type(type) |> make_zenith(type) |> make_location(location_opts)
   end
 
-  defp make_location(%Opts{} = opts, location_opts) do
-    timezone = location_opts[:timezone] || opts.timezone
+  defp make_location(%Opts{} = opts, loc_opts) do
+    timezone = Keyword.get(loc_opts, :timezone, "America/New_York")
 
-    %Opts{
-      opts
-      | latitude: location_opts[:latitude] || opts.latitude,
-        longitude: location_opts[:longitude] || opts.longitude,
-        timezone: timezone,
-        datetime: location_opts[:datetime] || Timex.now(timezone)
-    }
+    {ref_dt, loc_opts} = Keyword.pop(loc_opts, :ref_dt, Timex.now(timezone))
+    loc_opts = Keyword.put_new(loc_opts, :datetime, ref_dt)
+
+    struct(opts, loc_opts)
   end
 
   defp make_type(type) do
