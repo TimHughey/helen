@@ -28,8 +28,8 @@ defmodule Carol.Episode do
     for %Episode{} = episode <- episodes do
       calc_at(episode, sched_opts)
     end
-    |> analyze_episodes(sched_opts)
     |> sort(:ascending)
+    |> analyze_episodes(sched_opts)
   end
 
   # (2 of 3) nominal operation, one or more episodes

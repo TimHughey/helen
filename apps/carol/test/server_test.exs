@@ -75,11 +75,7 @@ defmodule CarolServerTest do
     @tag start_supervised_add: []
     test "live plus multiple short episodes", %{server_name: server_name} do
       for x when x <= 500 <- 1..500, reduce: :query_active do
-        "Future 11" = active_id ->
-          active_id
-
-        # race condition at startup if Now 1 is active
-        "Future 12" = active_id ->
+        active_id when active_id in ["Future 10", "Future 11"] ->
           active_id
 
         _ ->
@@ -87,7 +83,7 @@ defmodule CarolServerTest do
 
           Carol.active_episode(server_name)
       end
-      |> Should.Be.equal("Future 11")
+      |> Should.Be.equal("Future 10")
     end
   end
 
