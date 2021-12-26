@@ -133,6 +133,7 @@ defmodule Carol.Episode do
   @doc since: "0.3.0"
   def new_from_episode_list([_ | _rest] = episodes, defaults) do
     Enum.map(episodes, fn episode_args -> new(episode_args, defaults) end)
+    |> sort(:ascending)
   end
 
   def new_from_episode_list(_, _defaults), do: []
