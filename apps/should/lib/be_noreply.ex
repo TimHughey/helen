@@ -69,6 +69,31 @@ defmodule Should.Be.NoReply do
   end
 
   @doc """
+  Asserts when `x` is` {:noreply, %State{}, timeout}`, returns `state`
+
+  ```
+  {reply, struct, timeout} = Should.Be.Tuple.with_size(x, 3)
+  Should.Be.equal(reply, :noreply)
+  state = Should.Be.Struct.with_suffix(struct, State)
+  assert is_integer(timeout), Should.msg(timeout, "should be an integer timeout")
+
+  state
+  ```
+
+  """
+  @doc since: "0.6.34"
+  defmacro with_state(x, :timeout) do
+    quote bind_quoted: [x: x] do
+      {reply, struct, timeout} = Should.Be.Tuple.with_size(x, 3)
+      Should.Be.equal(reply, :noreply)
+      state = Should.Be.Struct.with_suffix(struct, State)
+      assert is_integer(timeout), Should.msg(timeout, "should be an integer timeout")
+
+      state
+    end
+  end
+
+  @doc """
   Asserts when `x` is` {:noreply, struct}`, returns `struct`
 
   ```

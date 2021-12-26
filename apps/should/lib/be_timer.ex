@@ -4,7 +4,7 @@ defmodule Should.Be.Timer do
   """
 
   @doc """
-  Asserts when `ref` is a `timer` with `remaining ms' near `want_ms`
+  Asserts when `ref` is a `timer` with `remaining ms` near `want_ms`
 
   > Use `delta` to control allowed difference
 

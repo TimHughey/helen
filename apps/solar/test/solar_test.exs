@@ -65,4 +65,11 @@ defmodule SolarTest do
       assert future_day.day == res.day
     end
   end
+
+  describe "Solar.event_opts/1" do
+    test "returns a list of available binary events" do
+      Solar.event_opts(:binaries)
+      |> Should.Be.List.of_binaries()
+    end
+  end
 end

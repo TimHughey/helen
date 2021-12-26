@@ -363,14 +363,54 @@ defmodule Should.Be do
   @doc """
   Asserts when `x` is `type`, returns x
 
+  ## Arguments
+  1. `rhs` - message to the right of failed assertion message
+  2. `extra` - additional detail for failed assertion message
+
   ```
   case type do
-    :atom -> Should.Be.atom(x)
-    :binary -> Should.Be.binary(x)
-    :list -> Should.Be.list(x)
-    :map -> Should.Be.map(x)
-    :struct -> Should.Be.struct()
+    nil ->
+      assert is_nil(x), Should.msgt(nil, x, rhs, extra)
+
+    :atom = t ->
+      assert is_atom(x), Should.msgt(t, x, rhs, extra)
+
+    :binary = t ->
+      assert is_binary(x), Should.msgt(t, x, rhs, extra)
+
+    :datetime = t ->
+      assert is_struct(x, DateTime), Should.msgt(t, x, rhs, extra)
+
+    :integer = t ->
+      assert is_integer(x), Should.msgt(t, x, rhs, extra)
+
+    :list = t ->
+      assert is_list(x), Should.msgt(t, x, rhs, extra)
+
+    :map = t ->
+      assert is_map(x), Should.msgt(t, x, rhs, extra)
+
+    :struct = t ->
+      assert is_struct(x), Should.msgt(t, x, rhs, extra)
+
+    {:struct, name} = t ->
+      assert is_struct(x, name), Should.msgt(t, x, rhs, extra)
+
+    :tuple = t ->
+      assert is_tuple(x), Should.msgt(t, x, rhs, extra)
+
+    {:tuple, size} = t ->
+      assert is_tuple(x) and tuple_size(x) == size, Should.msgt(t, x, rhs, extra)
+
+    :reference = t ->
+      assert is_reference(x), Should.msgt(t, x, rhs, extra)
+
+    type ->
+      refute true, "UNKNOWN type \#{inspect(type)} \#{inspect(x)}"
   end
+
+  # return x
+  x
   ```
   """
   @doc since: "0.2.26"

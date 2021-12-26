@@ -2,25 +2,19 @@ defmodule CarolServerTest do
   use ExUnit.Case, async: true
   use Should
 
-  alias Alfred.{ExecCmd, ExecResult}
-
-  alias Carol.{Program, Server, State}
-
   @moduletag carol: true, carol_server: true
 
-  setup_all do
-    {:ok, %{alfred: AlfredSim, server_name: __MODULE__}}
-  end
-
-  setup [:opts_add, :equipment_add, :program_add, :state_add]
-  setup [:memo_add, :start_args_add, :handle_add]
+  setup [:equipment_add, :opts_add, :episodes_add, :state_add]
+  setup [:memo_add, :start_args_add, :start_supervised_add, :handle_add]
+  setup [:missing_opts_add]
+  setup [:ctx_puts]
 
   defmacro assert_cmd_echoed(ctx, cmd) do
     quote location: :keep, bind_quoted: [ctx: ctx, cmd: cmd] do
       equipment = Should.Be.Map.with_key(ctx, :equipment)
 
       receive do
-        {:echo, %ExecCmd{} = ec} -> Should.Be.Struct.with_all_key_value(ec, ExecCmd, cmd: cmd)
+        {:echo, %Alfred.ExecCmd{} = ec} -> Should.Be.Struct.with_all_key_value(ec, Alfred.ExecCmd, cmd: cmd)
       after
         100 -> assert false, Should.msg(:timeout, "should have received ExecCmd")
       end
@@ -28,186 +22,236 @@ defmodule CarolServerTest do
   end
 
   describe "Carol.Server starts supervised" do
-    @tag equipment_add: [], start_args_add: []
-    test "without programs", ctx do
-      ctx.start_args
-      |> Server.child_spec()
-      |> then(fn spec -> start_supervised(Server, spec) end)
+    @tag start_args_add: {:app, :carol, CarolNoEpisodes, :first_instance}
+    test "with empty config", ctx do
+      want_kv = [episodes: [], equipment: "first instance pwm", server_name: ctx.server_name]
+
+      ctx.child_spec
+      |> start_supervised()
       |> Should.Be.Ok.tuple_with_pid()
       |> Should.Be.Server.with_state()
-      |> tap(fn state -> Should.Contain.kv_pairs(state, server_name: ctx.server_name) end)
+      |> Should.Contain.kv_pairs(want_kv)
     end
 
-    @tag equipment_add: [], program_add: :future_programs
-    @tag start_args_add: [want: [:programs]]
-    test "with programs", ctx do
-      start_supervised({Server, ctx.start_args})
+    @tag start_args_add: {:app, :carol, CarolTest, :front_chandelier}
+    test "with epsiodes", ctx do
+      want_kv = [cmd_live: :none, exec_result: :none, notify_at: :none, server_name: ctx.server_name]
+
+      ctx.child_spec
+      |> start_supervised()
       |> Should.Be.Ok.tuple_with_pid()
       |> Should.Be.Server.with_state()
-      |> Should.Contain.kv_pairs(server_name: ctx.server_name)
-      |> tap(fn state -> Should.Be.List.with_length(state.programs, 2) end)
+      |> Should.Contain.kv_pairs(want_kv)
+      |> tap(fn state -> Should.Be.List.with_length(state.episodes, 3) end)
+      |> tap(fn state -> Should.Be.Struct.named(state.ticket, Alfred.Notify.Ticket) end)
     end
 
-    @tag equipment_add: [], programs_add: :future_programs
-    @tag start_args_add: [init_args_fn: true, want: [:programs]]
-    test "using an init args function", ctx do
-      start_supervised({Server, ctx.start_args})
+    @tag start_args_add: {:app, :carol, CarolWithEpisodes, :first_instance}
+    test "with episodes (alt)", ctx do
+      server = ctx.server_name
+
+      want_kv = [cmd_live: :none, exec_result: :none, notify_at: :none, server_name: server]
+      want_keys = Keyword.keys(want_kv)
+
+      ctx.child_spec
+      |> start_supervised()
       |> Should.Be.Ok.tuple_with_pid()
       |> Should.Be.Server.with_state()
-      |> tap(fn state -> Should.Contain.kv_pairs(state, server_name: ctx.server_name) end)
-      |> Should.Contain.kv_pairs(server_name: ctx.server_name)
+
+      # validate state and indirectly test Carol.state/2
+      Carol.state(server, want_keys) |> Should.Contain.kv_pairs(want_kv)
+      Carol.state(server, []) |> Should.Be.NonEmpty.list()
+      Carol.state(server, :episodes) |> Should.Be.List.with_length(3)
+      Carol.state(server, :ticket) |> Should.Be.Map.with_keys([:name, :ref, :opts])
     end
   end
 
   describe "Carol.Server runs" do
-    @tag equipment_add: [], program_add: :live_short
-    @tag start_args_add: [want: [:programs]]
-    test "short live program", ctx do
-      pid = start_supervised({Server, ctx.start_args}) |> Should.Be.Ok.tuple_with_pid()
+    # NOTE: to not run this test use: mix test --exclude long
+    @tag long: true
+    @tag equipment_add: [cmd: "off"]
+    @tag episodes_add: {:short, [future: 12, now: 1, past: 1]}
+    @tag start_args_add: {:new_app, :carol, __MODULE__, :short_episodes}
+    @tag start_supervised_add: []
+    test "live plus multiple short episodes", %{server_name: server_name} do
+      for x when x <= 500 <- 1..500, reduce: :query_active do
+        "Future 11" = active_id ->
+          active_id
 
-      Process.sleep(50)
+        # race condition at startup if Now 1 is active
+        "Future 12" = active_id ->
+          active_id
 
-      GenServer.call(pid, :state)
-      |> Should.Be.Map.with_key(:programs)
-      |> Should.Be.List.of_structs(Program)
+        _ ->
+          Process.sleep(10)
+
+          Carol.active_episode(server_name)
+      end
+      |> Should.Be.equal("Future 11")
     end
   end
 
   describe "Carol.Server operations" do
-    @tag equipment_add: [], program_add: :future_programs
-    @tag start_args_add: [want: [:programs]]
-    test "can be paused and resumed", ctx do
-      pid = start_supervised({Server, ctx.start_args}) |> Should.Be.Ok.tuple_with_pid()
+    @tag start_args_add: {:app, :carol, CarolWithEpisodes, :first_instance}
+    @tag start_supervised_add: []
+    test "can be paused, resumed and restarted", ctx do
+      pid = ctx.server_pid
+      server_name = ctx.server_name
 
-      GenServer.call(pid, :pause) |> Should.Be.equal(:pause)
+      Carol.pause(pid, []) |> Should.Be.equal(:pause)
+      Carol.state(pid, :ticket) |> Should.Be.equal(:pause)
 
-      GenServer.call(pid, :state)
-      |> Should.Be.Map.with_all_key_value(ticket: :pause)
+      Carol.resume(pid, :resume) |> Should.Be.ok()
+      Carol.state(pid, :ticket) |> Should.Contain.keys([:ref, :name])
 
-      GenServer.call(pid, :resume) |> Should.Be.struct(Alfred.Notify.Ticket)
+      Carol.restart(pid, []) |> Should.Be.equal(:restarting)
 
-      GenServer.call(pid, :state)
-      |> Should.Be.Map.with_key(:ticket)
-      |> Should.Be.struct(Alfred.Notify.Ticket)
+      Process.sleep(100)
+      new_pid = GenServer.whereis(server_name) |> Should.Be.pid()
+      refute new_pid == pid, Should.msg(new_pid, "new pid should be different", pid)
+      Carol.active_episode(new_pid) |> Should.Be.binary()
     end
   end
 
   describe "Carol.Server.handle_call/3" do
-    @tag equipment_add: [cmd: "off"], program_add: :future_programs
+    @tag equipment_add: [cmd: "off"]
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
     test "processes :restart message", ctx do
-      Server.handle_call(:restart, self(), ctx.state)
+      Carol.Server.handle_call(:restart, self(), ctx.state)
       |> Should.Be.Reply.stop_normal(:restarting)
     end
   end
 
-  describe "Carol.Server.call/2" do
-    @tag equipment_add: [], program_add: :future_programs
-    @tag start_args_add: [:programs]
-    test "calls server with message", ctx do
-      start_supervised({Server, ctx.start_args})
-      |> Should.Be.Ok.tuple_with_pid()
-      |> Should.Be.Server.with_state()
-      |> Should.Contain.kv_pairs(server_name: ctx.server_name)
-
-      Server.call(ctx.server_name, :restart)
-      |> Should.Be.equal(:restarting)
-    end
-  end
-
-  describe "Carol.Server.handle_continue/2 :bootstap" do
-    @tag equipment_add: [], program_add: :future_programs
+  #
+  # describe "Carol.Server.call/2" do
+  #   @tag equipment_add: [], program_add: :future_programs
+  #   @tag start_args_add: [:programs]
+  #   @tag skip: true
+  #   test "calls server with message", ctx do
+  #     start_supervised({Server, ctx.start_args})
+  #     |> Should.Be.Ok.tuple_with_pid()
+  #     |> Should.Be.Server.with_state()
+  #     |> Should.Contain.kv_pairs(server_name: ctx.server_name)
+  #
+  #     Server.call(ctx.server_name, :restart)
+  #     |> Should.Be.equal(:restarting)
+  #   end
+  # end
+  #
+  describe "Carol.Server.handle_continue/2 :bootstrap" do
+    @tag equipment_add: []
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true, raw: true]
-    test "returns proper noreply", ctx do
-      state = Should.Be.NoReply.with_state(ctx.state)
+    test "handles successful start notifies", ctx do
+      # first call, starts notifies recurses to check result
+      new_state = Should.Be.NoReply.continue_term(ctx.state, :bootstrap)
 
-      want_kv = [alfred: AlfredSim, equipment: ctx.equipment]
-      Should.Be.Struct.with_all_key_value(state, State, want_kv)
+      # second call, vslidates ticket is %Ticket{}
+      Carol.Server.handle_continue(:bootstrap, new_state)
+      |> Should.Be.NoReply.with_state(:timeout)
+      |> Should.Contain.types(ticket: {:struct, Alfred.Notify.Ticket})
+    end
+
+    @tag equipment_add: []
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
+    @tag state_add: []
+    test "retries failed start notifies", ctx do
+      # simulate start notifies failure
+      new_state = Carol.State.save_ticket({:no_server, Module}, ctx.state)
+
+      Carol.Server.handle_continue(:bootstrap, new_state)
+      |> Should.Be.NoReply.continue_term(:bootstrap)
     end
   end
 
-  describe "Carol.Server.handle_continue/2 :programs" do
-    @tag equipment_add: [cmd: "off"], program_add: :live_programs
+  describe "Carol.Server.handle_continue/2 :tick" do
+    @tag equipment_add: []
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
-    @tag handle_add: [continue: :programs]
     test "executes a cmd when a program is live", ctx do
-      %State{exec_result: er, cmd_live: cmd_live} = ctx.new_state
-
-      Should.Be.Struct.with_all_key_value(er, ExecResult, cmd: "on")
-      Should.Be.equal(cmd_live, "on")
+      Carol.Server.handle_continue(:tick, ctx.state)
+      |> Should.Be.NoReply.with_state(:timeout)
+      |> Should.Contain.kv_pairs(cmd_live: "on")
+      |> tap(fn state -> Should.Contain.kv_pairs(state.exec_result, cmd: "on") end)
 
       assert_cmd_echoed(ctx, "on")
-    end
-
-    @tag equipment_add: [cmd: "on"], program_add: :future_programs
-    @tag state_add: [bootstrap: true]
-    @tag handle_add: [continue: :programs]
-    test "executes a cmd 'off' when all programs are in the future", ctx do
-      %State{exec_result: er, cmd_live: cmd_live} = ctx.new_state
-
-      Should.Be.Struct.with_all_key_value(er, ExecResult, cmd: "off")
-      Should.Be.equal(cmd_live, "off")
-
-      assert_cmd_echoed(ctx, "off")
-    end
-
-    @tag equipment_add: [cmd: "on"], program_add: :live_quick_programs
-    @tag state_add: [bootstrap: true]
-    @tag handle_add: [continue: :programs]
-    test "keeps previous cmd when next cmd will start within 1000ms", ctx do
-      ctx.new_state
-      |> Should.Be.Struct.with_all_key_value(State, exec_result: :keep)
-    end
-  end
-
-  describe "Carol.Server.handle_info/2 {type, id}" do
-    @tag equipment_add: [cmd: "off"], program_add: :live_short
-    @tag state_add: [bootstrap: true]
-    @tag handle_add: [continue: :programs]
-    test "finishes a program", ctx do
-      # pass some time to ensure Program is finished
-      Process.sleep(50)
-
-      # NOTE: :live_short creates a list of one Program
-      [%Program{id: id}] = ctx.programs
-
-      Carol.Server.handle_info({:finish_id, id}, ctx.state)
-      |> Should.Be.NoReply.continue_term(:programs)
-
-      # pretty_puts(new_state)
     end
   end
 
   describe "Carol.Server.handle_info/2 handles Alfred" do
-    @tag equipment_add: [cmd: "oof"], program_add: :live_programs
+    @tag equipment_add: []
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true], memo_add: [missing?: true]
-    @tag handle_add: [func: &Server.handle_info/2, msg: :notify_msg]
-    test "TrackerEntry with matching refid", ctx do
-      ctx.new_state
-      |> Should.Be.Struct.with_key(State, :notify_at)
-      |> Should.Be.DateTime.greater(ctx.memo_before_dt)
+    test "missing Memo", ctx do
+      Carol.Server.handle_info({Alfred, ctx.memo}, ctx.state)
+      |> Should.Be.NoReply.with_state(:timeout)
+    end
+
+    @tag equipment_add: []
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
+    @tag state_add: [bootstrap: true], memo_add: []
+    test "nominal Memo", ctx do
+      Carol.Server.handle_info({Alfred, ctx.memo}, ctx.state)
+      |> Should.Be.NoReply.continue_term(:tick)
     end
   end
 
   describe "Carol.Server.handle_info/2 handles Broom" do
-    # NOTE: no longer needed, :programs and :playlist are calculated in bootstrap
-
-    @tag equipment_add: [cmd: "on", rc: :pending], program_add: :live_programs
+    @tag equipment_add: [cmd: "on", rc: :pending]
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
     test "TrackerEntry with matching refid", ctx do
+      # NOTE: handle_continue/2 call required to trigger execute
       new_state =
-        Server.handle_continue(:programs, ctx.state)
-        |> Should.Be.NoReply.with_state()
+        Carol.Server.handle_continue(:tick, ctx.state)
+        |> Should.Be.NoReply.with_state(:timeout)
 
-      %State{exec_result: er} = new_state
+      er = new_state.exec_result
       te = %Broom.TrackerEntry{cmd: er.cmd, refid: er.refid}
 
-      Server.handle_info({Broom, te}, new_state)
-      |> Should.Be.NoReply.with_state()
-      |> Should.Be.Struct.with_key(State, :cmd_live)
+      Carol.Server.handle_info({Broom, te}, new_state)
+      |> Should.Be.NoReply.with_state(:timeout)
+      |> Should.Contain.key(:cmd_live, :value)
       |> Should.Contain.binaries(["PENDING", "on"])
     end
   end
+
+  def episodes_summary(%{episodes: episodes, ref_dt: ref_dt} = ctx) do
+    episodes_summary(episodes, ref_dt)
+
+    ctx
+  end
+
+  def episodes_summary(%{episodes: episodes}, ref_dt) do
+    episodes_summary(episodes, ref_dt)
+
+    episodes
+  end
+
+  def episodes_summary(episodes, ref_dt) do
+    for e <- episodes do
+      diff = Timex.diff(e.at, ref_dt, :milliseconds)
+
+      {e.id, diff}
+    end
+    |> pretty_puts()
+
+    episodes
+  end
+
+  defp ctx_puts(%{ctx_puts: what} = ctx) do
+    ctx = Map.delete(ctx, :ctx_puts)
+
+    case what do
+      [] -> pretty_puts(ctx)
+      :keys -> Map.keys(ctx) |> Enum.sort() |> pretty_puts()
+    end
+
+    ctx
+  end
+
+  defp ctx_puts(_), do: :ok
 
   defp equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
 
@@ -225,8 +269,24 @@ defmodule CarolServerTest do
   defp handle_add(_ctx), do: :ok
 
   defp memo_add(ctx), do: Alfred.NotifyAid.memo_add(ctx)
+
+  defp missing_opts_add(ctx) do
+    Map.put_new(ctx, :server_name, __MODULE__)
+  end
+
   defp opts_add(ctx), do: Carol.OptsAid.add(ctx)
-  defp program_add(ctx), do: Carol.ProgramAid.add(ctx)
+  defp episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
   defp start_args_add(ctx), do: Carol.StartArgsAid.add(ctx)
+
+  defp start_supervised_add(%{start_supervised_add: _} = ctx) do
+    case ctx do
+      %{child_spec: child_spec} -> start_supervised(child_spec) |> Should.Be.Ok.tuple_with_pid()
+      _ -> :no_child_spec
+    end
+    |> then(fn pid -> %{server_pid: pid} end)
+  end
+
+  defp start_supervised_add(_x), do: :ok
+
   defp state_add(ctx), do: Carol.StateAid.add(ctx)
 end

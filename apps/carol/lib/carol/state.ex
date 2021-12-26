@@ -1,112 +1,166 @@
 defmodule Carol.State do
   alias __MODULE__
+  require Logger
 
-  alias Alfred.ExecResult
-  alias Alfred.Notify.Ticket
-
-  alias Carol.{Playlist, Program}
-
-  defstruct alfred: Alfred,
-            server_name: :none,
+  defstruct server_name: :none,
             equipment: :none,
-            programs: [],
-            playlist: :none,
+            episodes: [],
             cmd_live: :none,
             ticket: :none,
             exec_result: :none,
-            notify_at: :none,
-            timezone: "America/New_York"
+            notify_at: :none
 
   @type t :: %State{
-          alfred: module(),
           server_name: :none | module(),
           equipment: String.t(),
-          programs: [Program.t(), ...],
-          playlist: map(),
+          episodes: [] | [Carol.Episode.t(), ...],
           cmd_live: :none | String.t(),
-          ticket: Ticket.t(),
-          exec_result: %ExecResult{},
-          notify_at: DateTime.t(),
-          timezone: Calendar.time_zone()
+          ticket: Alfred.Notify.Ticket.t(),
+          exec_result: %Alfred.ExecResult{},
+          notify_at: DateTime.t()
         }
 
-  @allowed_args [:alfred, :server_name, :equipment, :programs]
+  @doc false
+  def add_equipment_to_opts(opts, %State{equipment: equipment}) when is_list(opts) do
+    [List.to_tuple([:equipment, equipment]) | opts]
+  end
+
+  @doc false
+  def alfred, do: Process.get(:opts) |> Keyword.get(:alfred)
+
+  @doc since: "0.3.0"
   def new(args) do
-    {final_args, _} = Keyword.split(args, @allowed_args)
+    {opts, rest} = pop_and_put_opts(args)
+    {equipment, rest} = pop_equipment(rest)
+    {defaults, rest} = Keyword.pop(rest, :defaults, [])
+    {episodes, rest} = Keyword.pop(rest, :episodes, [])
+    {wrap?, rest} = Keyword.pop(rest, :wrap_ok, false)
 
-    struct(State, final_args)
+    log_unknown_args(rest)
+
+    # NOTE: defaults are only applicable to episodes
+    episodes = Carol.Episode.new_from_episode_list(episodes, defaults)
+
+    [equipment: equipment, episodes: episodes, server_name: opts[:server_name]]
+    |> then(fn fields -> struct(State, fields) end)
+    |> wrap_ok_if_requested(wrap?)
   end
 
-  def refresh_programs(%State{} = s) do
-    opts = sched_opts(s)
-
-    %State{s | programs: Program.analyze_all(s.programs, opts)}
-    |> refresh_playlist(opts)
-  end
-
-  def save_cmd(cmd, %State{} = s), do: struct(s, cmd_live: cmd)
-
-  def save_programs(programs, %State{} = s), do: struct(s, programs: programs)
-
-  def save_exec_result(%ExecResult{} = er, %State{} = s) do
-    [exec_result: er, cmd_live: er.cmd] |> update(s)
-  end
-
-  def save_exec_result(term, %State{} = s) do
-    case term do
-      :keep -> [exec_result: term]
-      _ -> [exec_result: term, cmd_live: :none]
-    end
+  @doc false
+  def refresh_episodes(%State{} = s) do
+    [episodes: Carol.Episode.analyze_episodes(s.episodes, sched_opts())]
     |> update(s)
   end
 
+  @doc false
+  def save_cmd(cmd, %State{} = s), do: [cmd_live: cmd] |> update(s)
+
+  # @doc false
+  # def save_episodes(episodes, %State{} = s), do: update([episodes: episodes], s)
+
+  @doc false
+  def save_exec_result(%Alfred.ExecResult{} = er, %State{} = s) do
+    [exec_result: er, cmd_live: er.cmd] |> update(s)
+  end
+
+  @doc false
   def save_ticket(ticket_rc, %State{} = s) do
     case ticket_rc do
-      x when is_atom(x) -> %State{s | ticket: x}
-      {:ok, x} -> %State{s | ticket: x}
-      {:no_server, _} -> {:stop, :normal, s}
+      x when is_atom(x) -> x
+      {:ok, x} -> x
+      x -> {:failed, x}
     end
+    |> then(fn ticket -> struct(s, ticket: ticket) end)
   end
 
-  def sched_opts(%State{} = s) do
-    s
-    |> Map.take([:alfred, :timezone])
-    |> Enum.into([])
-    |> Keyword.put(:datetime, Timex.now(s.timezone))
+  @doc since: "0.3.0"
+  def sched_opts do
+    opts = Process.get(:opts)
+    tz = opts[:timezone]
+
+    [List.to_tuple([:ref_dt, Timex.now(tz)]) | opts]
   end
 
-  def start_notifies(%State{ticket: ticket} = s) do
+  @doc since: "0.3.0"
+  def start_notifies(%State{ticket: ticket} = state) do
     case ticket do
       x when x in [:none, :pause] ->
-        [name: s.equipment, frequency: :all, link: true]
-        |> s.alfred.notify_register()
-        |> save_ticket(s)
+        [name: state.equipment, frequency: :all, link: true]
+        |> alfred().notify_register()
+        |> save_ticket(state)
 
-      %Ticket{} ->
-        s
+      x when is_struct(x) ->
+        state
     end
   end
 
-  def stop_notifies(%State{ticket: %Ticket{}} = s) do
-    s.alfred.notify_unregister(s.ticket)
+  @doc since: "0.3.0"
+  def stop_notifies(%State{ticket: ticket} = state) do
+    case ticket do
+      x when is_struct(x) ->
+        alfred().notify_unregister(ticket)
+        :pause
 
-    save_ticket(:pause, s)
+      x when is_atom(x) ->
+        x
+    end
+    |> save_ticket(state)
   end
 
-  def stop_notifies(s), do: s
+  @doc since: "0.3.0"
+  def timeout(%State{} = s), do: Carol.Episode.ms_until_next_episode(s.episodes, sched_opts())
 
-  def update_notify_at(s), do: struct(s, notify_at: Timex.now(s.timezone))
+  @doc since: "0.3.0"
+  def update_notify_at(s) do
+    tz = Keyword.get(sched_opts(), :timezone)
 
-  ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
-
-  defp refresh_playlist(%State{programs: programs} = s, opts) do
-    new_plist = Program.flatten(programs, opts) |> Playlist.refresh(s.playlist)
-
-    [playlist: new_plist]
-    |> then(fn fields -> struct(s, fields) end)
+    struct(s, notify_at: Timex.now(tz))
   end
 
-  defp update(fields, s), do: struct(s, fields)
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
+
+  def atom_to_equipment(instance) do
+    base = to_string(instance) |> String.replace("_", " ")
+
+    [base, "pwm"] |> Enum.join(" ")
+  end
+
+  defp log_unknown_args([]), do: []
+
+  defp log_unknown_args(rest) do
+    ["extra args: ", Keyword.keys(rest) |> inspect()]
+    |> Logger.warn()
+
+    rest
+  end
+
+  defp pop_and_put_opts(args) do
+    {opts, rest} = Keyword.pop(args, :opts, [])
+    {alfred, rest} = Keyword.pop(rest, :alfred, Alfred)
+    {server_name, rest} = Keyword.pop(rest, :id)
+
+    [[alfred: alfred, server_name: server_name] | opts]
+    |> List.flatten()
+    |> tap(fn opts_all -> Process.put(:opts, opts_all) end)
+    |> then(fn opts_all -> {opts_all, rest} end)
+  end
+
+  defp pop_equipment(args) do
+    {equipment, rest} = Keyword.pop(args, :equipment)
+    {instance, rest} = Keyword.pop(rest, :instance)
+
+    case equipment do
+      x when is_binary(x) -> equipment
+      x when is_atom(x) -> atom_to_equipment(instance)
+    end
+    |> then(fn equipment -> {equipment, rest} end)
+  end
+
+  defp update(fields, %State{} = s) when is_list(fields) or is_map(fields), do: struct(s, fields)
+
+  defp wrap_ok_if_requested(%State{} = state, wrap?) do
+    (wrap? && {:ok, state}) || state
+  end
 end

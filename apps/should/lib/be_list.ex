@@ -226,7 +226,7 @@ defmodule Should.Be.List do
 
       {wanted, _} = Keyword.split(list, [key])
 
-      Should.Be.NonEmpty.list(wanted)
+      refute wanted == [], Should.msg(x, "should contain key", key)
 
       # return a list of the wanted key/value
       wanted

@@ -39,7 +39,7 @@ defmodule Alfred.ExecCmd do
 
   @doc since: "0.2.7"
   @ack_types [:immediate, :host]
-  @add_accepted [:ack, :echo, :force, :notify_when_released]
+  @add_accepted [:ack, :echo, :force, :notify, :notify_when_released]
   def add(%ExecCmd{} = ec, opts) when is_list(opts) do
     for {key, val} when is_atom(key) <- opts, reduce: ec do
       ec_acc ->
@@ -91,6 +91,16 @@ defmodule Alfred.ExecCmd do
     struct(ec, params: Map.put(params, :type, type))
   end
 
+  @doc since: "0.2.12"
+  def from_args(args) when is_list(args) do
+    Alfred.ExecCmd.Args.auto(args)
+    |> new()
+    |> validate()
+  end
+
+  @doc since: "0.2.12"
+  def cmd_args, do: [:cmd, :cmd_defaults, :cmd_opts, :cmd_params, :name, :pub_opts]
+
   @doc """
   Merge `cmd_opts` into existing command opts
   """
@@ -104,8 +114,6 @@ defmodule Alfred.ExecCmd do
     {base_opts, opts_rest} = Keyword.split(opts, @new_keys)
 
     struct(ExecCmd, base_opts) |> add(opts_rest)
-
-    # struct(ExecCmd, allowed) |> validate()
   end
 
   @doc """
@@ -115,9 +123,19 @@ defmodule Alfred.ExecCmd do
   def params_adjust(%ExecCmd{} = ec, params) when is_list(params) do
     adjusted = Map.merge(ec.cmd_params, Enum.into(params, %{}))
 
-    %ExecCmd{ec | cmd: next_cmd_version(ec.cmd), cmd_params: adjusted}
+    %ExecCmd{ec | cmd: version_cmd(ec.cmd), cmd_params: adjusted}
     |> validate()
   end
+
+  @doc since: "0.2.12"
+  def to_args(%ExecCmd{} = ec, as_tuple \\ false) do
+    args = Map.take(ec, cmd_args()) |> Enum.into([])
+
+    (as_tuple && {args, ec}) || args
+  end
+
+  @doc since: "0.2.12"
+  defdelegate version_cmd(cmd_or_args), to: Alfred.ExecCmd.Args
 
   @doc """
   Validate the `cmd`
@@ -128,8 +146,13 @@ defmodule Alfred.ExecCmd do
     %ExecCmd{ec | cmd_params: Enum.into(params, %{})} |> validate()
   end
 
+  def validate(%ExecCmd{cmd: cmd} = ec) when is_atom(cmd) do
+    %ExecCmd{ec | cmd: Atom.to_string(cmd)} |> validate()
+  end
+
   def validate(%ExecCmd{} = ec) do
     case ec do
+      %ExecCmd{name: "default"} -> invalid(ec, "name is not set")
       %ExecCmd{cmd: c} when c in ["on", "off"] -> valid(ec)
       %ExecCmd{cmd: c, cmd_params: %{type: t}} when is_binary(c) and is_binary(t) -> valid(ec)
       %ExecCmd{cmd: c} when is_binary(c) -> invalid(ec, "custom cmds must include type")
@@ -142,23 +165,6 @@ defmodule Alfred.ExecCmd do
   ##
 
   # @cmd_vers_regex ~r/(?: v(?<version>\d{3}$))|(?<cmd>[[:print:]]+)/
-  @cmd_split ~r/(?: v(?=\d{3}$))/
-  defp next_cmd_version(cmd) when is_binary(cmd) do
-    with [cmd, version] <- Regex.split(@cmd_split, cmd),
-         num when is_integer(num) <- String.to_integer(version),
-         next_version <- Integer.to_string(num + 1) |> String.pad_leading(3, "0") do
-      [cmd, "v#{next_version}"]
-    else
-      _ -> [cmd, "v001"]
-    end
-    |> Enum.join(" ")
-
-    # case Regex.split(@cmd_split, cmd) do
-    #   [cmd, version] -> [cmd, "v#{String.to_integer(version) + 1}"]
-    #   [cmd] -> [cmd, "v001"]
-    # end
-    # |> Enum.join(" ")
-  end
 
   defp invalid(%ExecCmd{} = ec, reason), do: %ExecCmd{ec | valid: :no, invalid_reason: reason}
   defp valid(%ExecCmd{} = ec), do: %ExecCmd{ec | valid: :yes}

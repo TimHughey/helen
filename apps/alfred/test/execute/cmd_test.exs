@@ -44,4 +44,101 @@ defmodule Alfred.ExecCmdTest do
       |> Should.Contain.kv_pairs(min: 1, max: 128, type: "random")
     end
   end
+
+  describe "Alfred.ExecCmd.Args.auto/1" do
+    test "creates args from :id, :equipment, :params, :opts" do
+      params = [type: "random", min: 0, max: 256]
+      opts = [ack: :immediate]
+
+      base = [cmd: "Overnight", name: "equip name"]
+      cmd_params = [cmd_params: [max: 256, min: 0, type: "random"]]
+      cmd_opts = [cmd_opts: [ack: :immediate]]
+      want_kv = base ++ cmd_params ++ cmd_opts
+
+      [id: "Overnight", params: params, equipment: "equip name", opts: opts]
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Be.List.with_all_key_value(want_kv)
+    end
+
+    test "creates args from cmd: :off, :name" do
+      [cmd: :off, name: "equip name"]
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Be.List.with_all_key_value(cmd: "off", name: "equip name")
+    end
+
+    test "honors defaults" do
+      defaults = [opts: [ack: :immediate], params: [min: 0]]
+      want_opts = [ack: :immediate]
+      want_params = [min: 0, type: "random"]
+      want_kv = [cmd: "special", cmd_opts: want_opts, cmd_params: want_params, name: "equip name"]
+
+      [cmd: "special", defaults: defaults, name: "equip name", params: [type: "random"]]
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Be.List.with_all_key_value(want_kv)
+    end
+
+    test "prunes spurious args" do
+      defaults = [opts: [ack: :immediate], params: [min: 0]]
+      want_match = [cmd: "on", cmd_opts: [ack: :immediate], name: "equip name"]
+
+      [cmd: "on", defaults: defaults, name: "equip name", params: [type: "random"]]
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Be.match(want_match)
+    end
+
+    test "keeps original arg when defaults contains cmd" do
+      defaults = [cmd: "off", opts: [ack: :immediate], params: [min: 0]]
+      want_opts = [ack: :immediate]
+      want_params = [min: 0, type: "random"]
+      want_kv = [cmd: "special", cmd_opts: want_opts, cmd_params: want_params, name: "equip name"]
+
+      [cmd: "special", defaults: defaults, name: "equip name", params: [type: "random"]]
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Be.List.with_all_key_value(want_kv)
+    end
+  end
+
+  describe "Alfred.ExecCmd.version_cmd/1" do
+    test "handles args list with unversioned cmd" do
+      [cmd: "special"]
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.List.with_all_key_value(cmd: "special v001")
+    end
+
+    test "handles args list with versioned cmd" do
+      [cmd: "special v001"]
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.List.with_all_key_value(cmd: "special v002")
+    end
+
+    test "handles args list with atom cmd" do
+      [cmd: :off]
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.List.with_all_key_value(cmd: :off)
+    end
+
+    test "handles args list with 'off' cmd" do
+      [cmd: "off"]
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.List.with_all_key_value(cmd: "off")
+    end
+
+    test "handles args list without cmd" do
+      [name: "name"]
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.List.with_all_key_value(name: "name")
+    end
+
+    test "handles binary cmd" do
+      "special"
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.equal("special v001")
+    end
+
+    test "handles atom cmd" do
+      :on
+      |> Alfred.ExecCmd.version_cmd()
+      |> Should.Be.equal(:on)
+    end
+  end
 end

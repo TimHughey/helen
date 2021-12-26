@@ -69,14 +69,20 @@ defmodule Should.Be.Reply do
   end
 
   @doc """
-  Asserts when `x` is `{:reply, res, struct}`, `struct` is `State`, returns `{res, struct}`
+  Asserts when `x` is `{:reply, res, State}`, returns `{res, struct}`
 
   ```
-  {reply, res, struct} = Should.Be.Tuple.with_size(x, 3)
-  Should.Be.equal(reply, :reply)
+  {msg_type, res, state} = Should.Be.Tuple.with_size(x, 3)
+  Should.Be.equal(msg_type, :reply)
+
+  assert is_struct(state), Should.msg(state, "should be a struct")
+
+  suffix = state.__struct__ |> Module.split() |> List.last()
+
+  assert suffix == "State", Should.msg(state, "struct should have suffix State")
 
   # returns the reply result and State
-  {res, Should.Be.Struct.with_suffix(struct, State)}
+  {res, state}
   ```
 
   """
@@ -91,6 +97,43 @@ defmodule Should.Be.Reply do
       suffix = state.__struct__ |> Module.split() |> List.last()
 
       assert suffix == "State", Should.msg(state, "struct should have suffix State")
+
+      # returns the reply result and State
+      {res, state}
+    end
+  end
+
+  @doc """
+  Asserts when `x` is `{:reply, res, State, timeout}`, returns `{res, struct}`
+
+  ```
+  {msg_type, res, state, timeout} = Should.Be.Tuple.with_size(x, 4)
+  Should.Be.equal(msg_type, :reply)
+
+  assert is_struct(state), Should.msg(state, "should be a struct")
+
+  suffix = state.__struct__ |> Module.split() |> List.last()
+
+  assert suffix == "State", Should.msg(state, "struct should have suffix State")
+  assert is_integer(timeout), Should.msg(timeout, "should be a timeout")
+
+  # returns the reply result and State
+  {res, state}
+  ```
+
+  """
+  @doc since: "0.6.34"
+  defmacro with_state(x, :timeout) do
+    quote bind_quoted: [x: x] do
+      {msg_type, res, state, timeout} = Should.Be.Tuple.with_size(x, 4)
+      Should.Be.equal(msg_type, :reply)
+
+      assert is_struct(state), Should.msg(state, "should be a struct")
+
+      suffix = state.__struct__ |> Module.split() |> List.last()
+
+      assert suffix == "State", Should.msg(state, "struct should have suffix State")
+      assert is_integer(timeout), Should.msg(timeout, "should be a timeout")
 
       # returns the reply result and State
       {res, state}

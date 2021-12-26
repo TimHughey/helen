@@ -1,7 +1,4 @@
 defmodule Carol.StateAid do
-  alias Alfred.ExecCmd
-  alias Carol.{Server, State}
-
   @doc """
   Add %State{} to testing context
 
@@ -20,17 +17,17 @@ defmodule Carol.StateAid do
 
     new_state =
       [
+        opts: [timezone: "America/New_York"],
         alfred: alfred,
-        server_name: server_name,
+        id: server_name,
         equipment: equipment,
-        cmd_inactive: %ExecCmd{cmd: "off", cmd_opts: [echo: true]},
-        programs: ctx[:programs] || :none
+        episodes: ctx[:episodes] || :none
       ]
-      |> State.new()
+      |> Carol.State.new()
 
     case Enum.into(opts, %{}) do
-      %{bootstrap: true} ->
-        Server.handle_continue(:bootstrap, new_state)
+      %{bootstrap: true} -> Carol.Server.handle_continue(:bootstrap, new_state)
+      _ -> new_state
     end
     |> rationalize(opts)
     |> then(fn state -> %{state: state} end)
@@ -40,8 +37,9 @@ defmodule Carol.StateAid do
 
   def rationalize(result, opts) do
     cond do
-      opts[:raw] == true -> result
-      true -> elem(result, 1)
+      opts[:raw] == true and is_tuple(result) -> result
+      is_tuple(result) and tuple_size(result) > 0 -> elem(result, 1)
+      true -> result
     end
   end
 end

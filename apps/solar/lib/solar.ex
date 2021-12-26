@@ -52,4 +52,14 @@ defmodule Solar do
   def event(type, opts) when is_binary(type) and is_list(opts) do
     Solar.Opts.new(type, opts) |> Solar.Events.event()
   end
+
+  def event_opts(:binaries) do
+    base = ["beginning of day", "end of day", "noon", "sunrise", "sunset"]
+    types = ["astro", "civil", "nautical", "sun"]
+
+    for type <- types, zenith <- ["rise", "set"], reduce: base do
+      acc -> ["#{type} #{zenith}" | acc]
+    end
+    |> Enum.sort()
+  end
 end
