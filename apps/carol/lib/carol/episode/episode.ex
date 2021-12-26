@@ -29,6 +29,7 @@ defmodule Carol.Episode do
       calc_at(episode, sched_opts)
     end
     |> analyze_episodes(sched_opts)
+    |> sort(:ascending)
   end
 
   # (2 of 3) nominal operation, one or more episodes
@@ -133,7 +134,6 @@ defmodule Carol.Episode do
   @doc since: "0.3.0"
   def new_from_episode_list([_ | _rest] = episodes, defaults) do
     Enum.map(episodes, fn episode_args -> new(episode_args, defaults) end)
-    |> sort(:ascending)
   end
 
   def new_from_episode_list(_, _defaults), do: []
