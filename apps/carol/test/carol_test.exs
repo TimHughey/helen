@@ -54,6 +54,9 @@ defmodule CarolTest do
       capture_io(fn ->
         UseCarol.Beta.status("first") |> Should.Be.ok()
       end)
+
+      UseCarol.Beta.pause("first") |> Should.Be.equal(:pause)
+      UseCarol.Beta.resume(:first) |> Should.Be.equal(:ok)
     end
   end
 

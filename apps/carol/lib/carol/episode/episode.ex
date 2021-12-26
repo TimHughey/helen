@@ -103,7 +103,10 @@ defmodule Carol.Episode do
     |> finalize_execute_args()
   end
 
-  defp finalize_execute_args(%Episode{execute: execute, defaults: defaults}) do
+  defp finalize_execute_args(%Episode{id: id, execute: execute, defaults: defaults}) do
+    execute = Keyword.put_new(execute, :cmd, id)
+    defaults = defaults[:execute] || []
+
     if(defaults != [], do: [defaults: defaults], else: [])
     |> Keyword.merge(execute)
   end

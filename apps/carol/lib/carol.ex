@@ -14,6 +14,11 @@ defmodule Carol do
 
       @otp_app otp_app
 
+      def active_id(instance), do: call_fuzzy(instance, :active_id)
+
+      @doc false
+      def call_fuzzy(instance, msg), do: which_children() |> Carol.call_fuzzy(instance, msg)
+
       def config do
         {:ok, config} = Carol.Supervisor.runtime_config(@otp_app, __MODULE__, [])
         config
@@ -35,6 +40,10 @@ defmodule Carol do
         Keyword.get(config(), :instances, []) |> Keyword.keys() |> Enum.sort()
       end
 
+      def pause(instance, opts \\ []) when is_list(opts), do: call_fuzzy(instance, {:pause, opts})
+      def restart(instance), do: call_fuzzy(instance, :restart)
+      def resume(instance, opts \\ []) when is_list(opts), do: call_fuzzy(instance, {:resume, opts})
+
       def start_link(opts \\ []) do
         Carol.Supervisor.start_link({@otp_app, __MODULE__}, opts)
       end
@@ -50,8 +59,30 @@ defmodule Carol do
     end
   end
 
+  @type call_fuzzy_rc() :: term() | {:no_server, atom() | binary()} | {:multiple_matches, list()}
+  @type instance() :: atom() | String.t()
+  @type ok_failed() :: :ok | :failed
+  @type opts() :: list()
+  @type start_args() :: list()
+
+  @callback active_id(instance()) :: String.t() | call_fuzzy_rc()
   @callback config :: list()
   @callback instances :: list()
+  @callback pause(instance()) :: :pause | ok_failed() | call_fuzzy_rc()
+  @callback pause(instance(), opts()) :: :pause | ok_failed() | call_fuzzy_rc()
+  @callback restart(instance()) :: :restarting | call_fuzzy_rc()
+  @callback resume(instance()) :: ok_failed() | call_fuzzy_rc()
+  @callback pause(instance(), opts()) :: ok_failed() | call_fuzzy_rc()
+  @callback start_link(start_args()) :: {:ok, pid()}
+  @callback status(instance()) :: list() | call_fuzzy_rc()
+
+  @doc """
+  Active episode id
+
+  Returns
+  """
+  @doc since: "0.3.0"
+  def active_episode(server), do: Carol.call(server, :active_id)
 
   @doc """
   Safely call a `Carol` server instance
@@ -80,14 +111,6 @@ defmodule Carol do
   """
   @doc since: "0.2.8"
   def pause(server, _opts), do: Carol.call(server, :pause)
-
-  @doc """
-  Active episode id
-
-  Returns
-  """
-  @doc since: "0.3.0"
-  def active_episode(server), do: Carol.call(server, :active_id)
 
   @doc """
   Restart the server
@@ -161,6 +184,8 @@ defmodule Carol do
   end
 
   defp find_instance_fuzzy(children, instance) do
+    instance = to_string(instance)
+
     for {id, pid, :worker, _} <- children, reduce: [] do
       acc ->
         case Carol.Instance.match_fuzzy(id, instance) do

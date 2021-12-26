@@ -62,19 +62,17 @@ defmodule Carol.Server do
   # end
 
   @impl true
-  def handle_call(action, _from, %State{} = s) when action in [:pause, :resume] do
-    new_state =
-      case action do
-        :pause -> State.stop_notifies(s)
-        :resume -> State.start_notifies(s)
-      end
-
-    case new_state.ticket do
-      x when is_atom(x) -> x
-      x when is_struct(x) -> :ok
-      _ -> :failed
+  def handle_call({action, _opts} = msg, _from, %State{} = s) when action in [:pause, :resume] do
+    case msg do
+      {:pause, _opts} -> State.stop_notifies(s)
+      {:resume, _opts} -> State.start_notifies(s)
     end
-    |> reply(new_state)
+    |> reply(action)
+  end
+
+  @impl true
+  def handle_call(action, from, %State{} = s) when action in [:pause, :resume] do
+    handle_call({action, []}, from, s)
   end
 
   @impl true
@@ -212,5 +210,15 @@ defmodule Carol.Server do
   defp continue(%State{} = s, term), do: {:noreply, s, {:continue, term}}
 
   defp noreply(%State{} = s, :timeout), do: {:noreply, s, State.timeout(s)}
+
+  defp reply(%{ticket: ticket} = new_state, action) when action in [:pause, :resume] do
+    case ticket do
+      x when is_atom(x) -> x
+      x when is_struct(x) -> :ok
+      _ -> :failed
+    end
+    |> reply(new_state)
+  end
+
   defp reply(rc, %State{} = s), do: {:reply, rc, s, State.timeout(s)}
 end
