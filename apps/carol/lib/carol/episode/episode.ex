@@ -244,14 +244,12 @@ defmodule Carol.Episode do
   end
 
   # move any episode in the past to the future but don't touch active
-  defp futurize(%Episode{id: active_id} = active, [%Episode{} | _] = episodes, opts) do
+  defp futurize(%Episode{} = active, episodes, opts) when is_list(episodes) do
     # NOTE: the episode list passed in may include the active episode
     # so we must exclude it from being futurized.
-    for %Episode{id: id} = episode when id != active_id <- episodes do
-      futurize(episode, opts)
+    for %Episode{} = episode <- episodes, reduce: [active] do
+      acc -> [futurize(episode, opts) | acc]
     end
-    # add the active episode to the final list
-    |> then(fn episodes -> [active | episodes] end)
     |> sort(:ascending)
   end
 
