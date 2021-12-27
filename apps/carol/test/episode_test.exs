@@ -8,32 +8,71 @@ defmodule CarolEpisodeTest do
 
   setup [:opts_add, :episodes_add]
 
-  defmacro assert_episodes(ctx, want_order) do
-    quote bind_quoted: [ctx: ctx, want_order: want_order] do
-      ctx
-      #  |> episodes_summary()
-      |> Should.Be.Map.with_key(:episodes)
-      |> Should.Be.NonEmpty.list()
-      |> Should.Be.List.of_type({:struct, Carol.Episode})
-
-      new_episodes = Carol.Episode.analyze_episodes(ctx.episodes, ctx.opts)
-
-      Should.Be.List.of_type(new_episodes, {:struct, Carol.Episode})
-
-      # episodes_summary(new_episodes, ctx.ref_dt)
-
-      if want_order != [] do
-        Enum.map(new_episodes, fn e -> e.id end)
-        |> Should.Be.equal(want_order)
-      end
-
-      new_episodes
+  defmacro assert_active(episode, ref_dt) do
+    quote bind_quoted: [episode: episode, ref_dt: ref_dt] do
+      before? = Timex.compare(episode.at, ref_dt) <= 0
+      assert before?, Should.msg(episode, "active should be less than or equal to ref_dt", ref_dt)
     end
   end
 
+  defmacro assert_rest(active, rest, ref_dt) do
+    quote bind_quoted: [active: active, rest: rest, ref_dt: ref_dt] do
+      for episode <- rest, reduce: active do
+        previous ->
+          after? = Timex.compare(episode.at, previous.at) >= 0
+          assert after?, Should.msg(episode, "episode should be greater than previous", previous)
+
+          episode
+      end
+    end
+  end
+
+  defmacro assert_episodes(ctx) do
+    quote bind_quoted: [ctx: ctx] do
+      episode_count = episode_count(ctx)
+
+      episodes =
+        ctx.episodes
+        |> Should.Be.List.with_length(episode_count, unwrap: false)
+        |> Should.Be.List.of_type({:struct, Carol.Episode})
+
+      cond do
+        episode_count >= 2 ->
+          [active | rest] = episodes
+          assert_active(active, ctx.ref_dt)
+          assert_rest(active, rest, ctx.ref_dt)
+
+        episode_count == 1 ->
+          [active] = episodes
+          assert_active(active, ctx.ref_dt)
+
+        # empty episode list
+        true ->
+          assert true
+      end
+
+      episodes
+    end
+  end
+
+  defp episode_count(%{episodes_add: {_, []}}), do: 1
+
+  defp episode_count(%{episodes_add: {_, add_opts}}) do
+    for what <- add_opts, reduce: 0 do
+      acc ->
+        case what do
+          {key, count} when key in [:future, :now, :past] -> acc + count
+          {:count, count} -> count
+          _ -> acc
+        end
+    end
+  end
+
+  defp episode_count(_), do: 0
+
   describe "Sally.Episode.new/1" do
     test "creates valid Episode with a Solar sun ref" do
-      [event: "astro rise", calc: :later]
+      [event: "astro rise"]
       |> Carol.Episode.new()
       |> Should.Be.Struct.of_key_types(Carol.Episode, event: :binary, at: :atom)
     end
@@ -51,63 +90,38 @@ defmodule CarolEpisodeTest do
 
   describe "Sally.Episode.analyze_episodes/2" do
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    test "creates new episode list with active first, stale episodes refreshed", ctx do
-      want_order = ["Now 1", "Future 1", "Future 2", "Future 3", "Past 3", "Past 2", "Past 1"]
+    test "handle list of past, now and future episodes", ctx do
+      assert_episodes(ctx)
+    end
 
-      ctx
-      |> assert_episodes(want_order)
-      |> List.first()
-      |> Should.Be.Struct.with_all_key_value(Carol.Episode, id: "Now 1")
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3, overnight: 1]}
+    test "handle list of past, now, overnight and future episodes", ctx do
+      assert_episodes(ctx)
     end
 
     @tag episodes_add: {:future, [count: 10, minutes: 1]}
     test "handles list of only future episides", ctx do
-      want_order = ["Future 10"] ++ Enum.map(1..9, fn x -> "Future #{x}" end)
-
-      ctx
-      |> assert_episodes(want_order)
-      |> Should.Be.List.with_length(10)
-      |> List.first()
-      |> Should.Be.Struct.with_all_key_value(Carol.Episode, id: "Future 10")
+      assert_episodes(ctx)
     end
 
     @tag episodes_add: {:past, [count: 10, minutes: 1]}
     test "handles list of only past episides", ctx do
-      num_order = [1] ++ Enum.to_list(10..2)
-      want_order = Enum.map(num_order, fn x -> "Past #{x}" end)
-
-      ctx
-      |> assert_episodes(want_order)
-      |> Should.Be.List.with_length(10)
-      |> List.first()
-      |> Should.Be.Struct.with_all_key_value(Carol.Episode, id: "Past 1")
+      assert_episodes(ctx)
     end
 
     @tag episodes_add: {:single_future, []}
     test "handles single future episode", ctx do
-      episodes = ctx |> assert_episodes(["Future 1"])
-
-      # to be active the past episode is move to the past
-      List.first(episodes).at
-      |> Should.Be.DateTime.less(ctx.ref_dt)
+      assert_episodes(ctx)
     end
 
     @tag episodes_add: {:single_now, []}
     test "handles single now episode", ctx do
-      episodes = ctx |> assert_episodes(["Now 1"])
-
-      # to be active the past episode is move to the past
-      List.first(episodes).at
-      |> Should.Be.DateTime.compare_in(ctx.ref_dt, [:lt, :eq])
+      assert_episodes(ctx)
     end
 
     @tag episodes_add: {:single_past, []}
     test "handles single past episode", ctx do
-      episodes = ctx |> assert_episodes(["Past 1"])
-
-      # to be active the past episode is move to the past
-      List.first(episodes).at
-      |> Should.Be.DateTime.less(ctx.ref_dt)
+      assert_episodes(ctx)
     end
 
     test "handles empty list", ctx do
@@ -124,20 +138,14 @@ defmodule CarolEpisodeTest do
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "handles mixed episode list", ctx do
-      want_order = ["Now 1", "Future 1", "Future 2", "Future 3", "Past 3", "Past 2", "Past 1"]
-
-      ctx
-      |> assert_episodes(want_order)
+      assert_episodes(ctx)
       |> Carol.Episode.ms_until_next_episode(ctx.opts)
       |> Should.Be.equal(2000)
     end
 
     @tag episodes_add: {:future, [count: 10, minutes: 1]}
     test "handles list of only future episodes", ctx do
-      want_order = ["Future 10"] ++ Enum.map(1..9, fn x -> "Future #{x}" end)
-
-      assert_episodes(ctx, want_order)
-      |> tap(fn [x | _] -> Should.Contain.kv_pairs(x, id: "Future 10") end)
+      assert_episodes(ctx)
       |> Carol.Episode.ms_until_next_episode(ctx.opts)
       |> Should.Be.equal(60_000)
     end
@@ -146,7 +154,7 @@ defmodule CarolEpisodeTest do
   describe "Sally.Episode misc" do
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "put_execute/2 updates :execute for the given id", ctx do
-      episodes = ctx |> assert_episodes([])
+      episodes = assert_episodes(ctx)
 
       {"Future 2", [cmd: "updated", params: [type: "random"]]}
       |> Carol.Episode.put_execute(episodes)
@@ -157,7 +165,7 @@ defmodule CarolEpisodeTest do
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns active execute args", ctx do
-      episodes = ctx |> assert_episodes([])
+      episodes = assert_episodes(ctx)
 
       Carol.Episode.execute_args(:active, episodes)
       |> Should.Contain.key(:cmd)
@@ -165,15 +173,15 @@ defmodule CarolEpisodeTest do
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns execute args for known id", ctx do
-      episodes = ctx |> assert_episodes([])
+      episodes = assert_episodes(ctx)
 
-      Carol.Episode.execute_args("Past 3", episodes)
+      Carol.Episode.execute_args("Past -3", episodes)
       |> Should.Contain.key(:cmd)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns empty list for unknown id", ctx do
-      episodes = ctx |> assert_episodes([])
+      episodes = assert_episodes(ctx)
 
       Carol.Episode.execute_args("Unknown", episodes)
       |> Should.Be.List.empty()
@@ -183,9 +191,8 @@ defmodule CarolEpisodeTest do
   describe "Sally.Episode.status_from_list/2" do
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "creates list of status maps", ctx do
-      episodes = assert_episodes(ctx, [])
-
-      Carol.Episode.status_from_list(episodes, ctx.opts ++ [format: :humanized])
+      assert_episodes(ctx)
+      |> Carol.Episode.status_from_list(ctx.opts ++ [format: :humanized])
       |> Should.Be.List.of_binaries()
     end
   end

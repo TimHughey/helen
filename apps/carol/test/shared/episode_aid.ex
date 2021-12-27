@@ -14,12 +14,13 @@ defmodule Carol.EpisodeAid do
       when is_list(epi_opts)
       when is_list(opts) do
     opts_all = epi_opts ++ opts
+    {analyze?, opts_all} = Keyword.pop(opts_all, :analyze, true)
 
     case what do
       x when x in @many -> make_many(what, opts_all)
       x when x in @single -> make_single(what, opts_all)
     end
-    |> wrap_return(opts)
+    |> wrap_episodes(analyze?, opts)
   end
 
   def add(_), do: :ok
@@ -29,7 +30,6 @@ defmodule Carol.EpisodeAid do
     {want_count, rest} = Keyword.pop(opts, :count, 1)
     {sched_opts, rest} = Keyword.split(rest, [:ref_dt, :timezone])
     {shift_opts, rest} = Keyword.split(rest, @shift_opts)
-    #  {shift_opts,opts_rest} = Keyword.split(opts_rest, @shift_opts)
 
     shift_opts = (shift_opts == [] && [seconds: 1]) || shift_opts
 
@@ -92,20 +92,28 @@ defmodule Carol.EpisodeAid do
   ## PRIVATE
   ## PRIVATE
 
-  defp fixed(what, opts) when what in [:future, :now, :past] do
+  @fixed_types [:future, :now, :past, :yesterday]
+  defp fixed(what, opts) when what in @fixed_types do
     {dt, rest} = Keyword.pop(opts, :ref_dt, Timex.now(@tz))
     {shift_opts, _} = Keyword.split(rest, @shift_opts)
 
     case what do
       x when x in [:future, :past] -> shift_adjust(shift_opts, what)
       :now -> []
+      :yesterday -> [days: -1]
     end
     |> then(fn shift_opts -> Timex.shift(dt, shift_opts) end)
     |> to_asn1()
   end
 
   defp id_from_counter(what, counter) do
-    [Atom.to_string(what) |> String.capitalize(), to_string(counter)]
+    what = Atom.to_string(what) |> String.capitalize()
+
+    case what do
+      x when x in ["Future", "Now"] -> counter
+      "Past" -> counter * -1
+    end
+    |> then(fn counter -> [what, to_string(counter)] end)
     |> Enum.join(" ")
   end
 
@@ -126,10 +134,17 @@ defmodule Carol.EpisodeAid do
 
   defp to_asn1(%DateTime{} = dt), do: Timex.format!(dt, "{ASN1:GeneralizedTime:Z}")
 
-  defp wrap_return([%Episode{} | _] = episodes, opts) do
-    episodes
-    |> Enum.map(fn episode -> Carol.Episode.calc_at(episode, opts) end)
-    |> Carol.Episode.sort(:ascending)
-    |> then(fn episodes -> %{episodes: episodes} end)
+  defp wrap_episodes(episodes, true = _analyze?, opts) do
+    Carol.Episode.analyze_episodes(episodes, opts) |> wrap_episodes()
   end
+
+  # when analyze is false just calc_at
+  defp wrap_episodes(episodes, false = _analyze?, opts) do
+    for episode <- episodes do
+      Carol.Episode.calc_at(episode, opts)
+    end
+    |> wrap_episodes()
+  end
+
+  defp wrap_episodes(episodes), do: %{episodes: episodes}
 end

@@ -52,22 +52,22 @@ defmodule CarolEpisodeAidTest do
   end
 
   describe "Sally.EpisodeAid.add/1" do
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
+    @tag episodes_add: {:mixed, [analyze: false, past: 3, now: 1, future: 3]}
     test "creates a mix of episodes: past, now, future", ctx do
       assert_episodes(ctx, past: 3, now: 1, future: 3)
     end
 
-    @tag episodes_add: {:mixed, [past: 3, future: 3]}
+    @tag episodes_add: {:mixed, [analyze: false, past: 3, future: 3]}
     test "creates a mix of episodes: past, future", ctx do
       assert_episodes(ctx, past: 3, now: 0, future: 3)
     end
 
-    @tag episodes_add: {:past, [count: 10]}
+    @tag episodes_add: {:past, [analyze: false, count: 10]}
     test "creates past episodes", ctx do
       assert_episodes(ctx, past: 10, now: 0, future: 0)
     end
 
-    @tag episodes_add: {:future, [count: 10]}
+    @tag episodes_add: {:future, [analyze: false, count: 10]}
     test "creates future episodes", ctx do
       assert_episodes(ctx, past: 0, now: 0, future: 10)
     end

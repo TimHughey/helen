@@ -68,7 +68,7 @@ defmodule Carol.Episode do
 
   # drat, we didn't find an active episode. this occurs at startup before we've
   # stablized the episode list (e.g. keeping active always at the head)
-  defp check_analysis(%{active: [], rest: episodes}, _opts) do
+  defp check_analysis(%{active: [], rest: episodes}, opts) do
     # since we didn't find an active episode we know all episodes are in the
     # future relative to ref_dt and the list is not yet stable.
 
@@ -77,22 +77,33 @@ defmodule Carol.Episode do
     # stable list the passage of time activates each episode and moves the
     # previously active episode to the future.
 
-    # move all episodes to the past and sort descending to reveal the
-    # episode in the most recent past (at the head of the list).  we take active
-    # out of the list then send the tail through futurize to create a stable list
-    episodes = sort(episodes, :descending)
-    active = hd(episodes) |> shift_past()
+    # sort the list of future episodes descending so the last episode of the 24 hour
+    # clock is at the head.
+    [future_active | future_rest] = sort(episodes, :descending)
 
-    [active | tl(episodes)]
-    |> sort(:ascending)
+    # move the future active to the previous day using calc_at/3
+    # NOTE: always use calc_at to ensure accurate at calculation based on the event
+    active = calc_at(future_active, {:days, -1}, opts)
+
+    # create the stable list of active and remaining episodes sorted ascending.
+    sort([active | future_rest], :ascending)
   end
 
   @doc since: "0.3.0"
-  def calc_at(%Episode{} = ep, opts \\ []) when is_list(opts) do
+  # (1 of 3) calculate episode using ref_dt in opts
+  def calc_at(%Episode{} = ep, opts) when is_list(opts) do
     [event: ep.event, shift_opts: ep.shift]
     |> Keyword.merge(opts)
     |> Carol.Episode.Event.parse()
     |> then(fn at -> struct(ep, at: at) end)
+  end
+
+  def calc_at(%Episode{} = episode, {:days, days}, opts) when is_integer(days) and is_list(opts) do
+    # days is > 0 ; shift ref_dt forward by days then calc_at
+    next_ref_dt = ref_dt() |> Timex.shift(days: days)
+    next_opts = Keyword.put(opts, :ref_dt, next_ref_dt)
+
+    calc_at(episode, next_opts)
   end
 
   @doc since: "0.3.0"
@@ -244,32 +255,51 @@ defmodule Carol.Episode do
     |> Enum.join(" ")
   end
 
-  # move any episode in the past to the future but don't touch active
+  # (1 of 4) ensure a single episode is moved to the future by performing
+  # calc_at until the episode at is greater than or equal to ref_dt
+  defp futurize(%Episode{} = episode, opts) do
+    # a calc_at with current ref_dt might bring the episode into the future
+    new_episode = calc_at(episode, {:days, 0}, opts)
+    compare_tuple = futurize_compare_tuple(new_episode, opts)
+
+    # check if episode moved to the future
+    futurize(episode, compare_tuple, opts)
+  end
+
+  # (2 of 4) ensure a list of episodes are moved to the future using futurize/2
+  # then return the stable episode list (active at head)
+  # NOTE: does not change the active episode
   defp futurize(%Episode{} = active, episodes, opts) when is_list(episodes) do
-    # NOTE: the episode list passed in may include the active episode
-    # so we must exclude it from being futurized.
     for %Episode{} = episode <- episodes, reduce: [active] do
       acc -> [futurize(episode, opts) | acc]
     end
     |> sort(:ascending)
   end
 
-  # handle single episode lists
-  defp futurize(%Episode{at: at} = episode, [], opts) do
-    # NOTE: when the active episode is one or more days in the past when
-    # bring it current
-    days_diff = Timex.diff(ref_dt(), at, :days)
-
-    case days_diff do
-      x when x < 0 -> shift(episode, days: abs(days_diff))
-      _ -> episode
-    end
-    |> List.wrap()
+  # (3 of 4) futurizing complete; the episode is in the future (or now)
+  defp futurize(%Episode{} = episode, {ref_gus, ep_gus}, _opts) when ref_gus <= ep_gus do
+    episode
   end
 
-  # futurize an episode
-  defp futurize(%{at: at} = episode, opts) do
-    (Timex.before?(at, ref_dt()) && calc_at(episode, tomorrow_opts(opts))) || episode
+  # (4 of 4) the episode is in the past; execute calc_at with an accumulator of
+  # the count of days into the future.
+  defp futurize(%Episode{} = episode, compare, opts) when is_tuple(compare) do
+    days = Keyword.get(opts, :futurize_days, 0) + 1
+
+    new_episode = calc_at(episode, {:days, days}, opts)
+
+    # create compare tuple, store futurize_days and recurse
+    compare_tuple = futurize_compare_tuple(new_episode, opts)
+    next_futurize_opts = Keyword.put(opts, :futurize_days, days)
+    futurize(new_episode, compare_tuple, next_futurize_opts)
+  end
+
+  # use gregorian microseconds for comparison via pattern matching
+  defp futurize_compare_tuple(%{at: at}, opts) do
+    ref_gus = ref_dt() |> Timex.to_gregorian_microseconds()
+    ep_gus = at |> Timex.to_gregorian_microseconds()
+
+    {ref_gus, ep_gus}
   end
 
   defp humanize_ms(ms) do
@@ -278,17 +308,5 @@ defmodule Carol.Episode do
     |> trunc()
     |> Timex.Duration.from_seconds()
     |> Timex.format_duration(:humanized)
-  end
-
-  defp shift(%Episode{at: at} = episode, shift_opts) do
-    struct(episode, at: Timex.shift(at, shift_opts))
-  end
-
-  defp shift_past(%Episode{} = episode), do: shift(episode, days: -1)
-
-  defp tomorrow_opts(opts) do
-    ref_dt()
-    |> Timex.shift(days: 1)
-    |> then(fn tomorrow -> Keyword.put(opts, :ref_dt, tomorrow) end)
   end
 end
