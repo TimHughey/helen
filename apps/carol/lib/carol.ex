@@ -7,9 +7,6 @@ defmodule Carol do
     quote bind_quoted: [opts: opts] do
       @behaviour Carol
 
-      # otp_app = Keyword.fetch!(opts, :otp_app)
-      # instances = Application.compile_env(otp_app, :instances, []) |> Keyword.keys()
-
       {otp_app} = Carol.Supervisor.compile_config(opts)
 
       @otp_app otp_app
@@ -48,10 +45,11 @@ defmodule Carol do
         Carol.Supervisor.start_link({@otp_app, __MODULE__}, opts)
       end
 
+      def state(instance, args), do: call_fuzzy(instance, :state) |> Carol.state(args)
+
       @status_def_opts [format: :humanized]
       def status(instance, opts \\ @status_def_opts) do
-        which_children()
-        |> Carol.call_fuzzy(instance, {:status, opts})
+        call_fuzzy(instance, {:status, opts})
         |> Carol.status_post_process()
       end
 
@@ -93,7 +91,7 @@ defmodule Carol do
   end
 
   @doc since: "0.3.0"
-  def call_fuzzy(children, instance, args) do
+  def call_fuzzy(children, instance, args) when is_list(children) do
     case find_instance_fuzzy(children, instance) do
       [{id, _pid, _display_name}] -> call(id, args)
       [] -> {:no_server, instance}
@@ -143,9 +141,9 @@ defmodule Carol do
 
   """
   @doc since: "0.2.6"
-  def state(server, args) do
-    state_map = Carol.call(server, :state)
+  def state(server, args) when is_atom(server), do: call(server, :state) |> state(args)
 
+  def state(state_map, args) when is_map(state_map) do
     case args do
       :all -> state_map
       x when x == [] or x == :keys -> Map.keys(state_map)
@@ -155,6 +153,10 @@ defmodule Carol do
     end
     |> assemble_reply()
   end
+
+  def state(pid, args) when is_pid(pid), do: call(pid, :state) |> state(args)
+
+  def state(x, _args), do: x
 
   @doc since: "0.3.0"
   def status(server, opts \\ [format: :humanized]) do

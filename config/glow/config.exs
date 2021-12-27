@@ -38,7 +38,7 @@ config :glow, Glow,
       equipment: "greenhouse power",
       episodes: [
         [id: "Sunshine", event: "astro rise", execute: [cmd: "on"]],
-        [id: "Night", event: "astro rise", shift: [hours: 16], execute: [cmd: "pff"]]
+        [id: "Night", event: "astro rise", shift: [hours: 16], execute: [cmd: "off"]]
       ]
     ]
   ]
