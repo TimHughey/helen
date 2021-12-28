@@ -45,6 +45,7 @@ defmodule Carol.Episode do
       %{active: %Episode{}} = acc -> accumulate_rest(episode, acc)
     end
     |> check_analysis(opts)
+    |> sort(:ascending)
   end
 
   # (3 of 3) no episodes or bad config
@@ -85,8 +86,8 @@ defmodule Carol.Episode do
     # NOTE: always use calc_at to ensure accurate at calculation based on the event
     active = calc_at(future_active, {:days, -1}, opts)
 
-    # create the stable list of active and remaining episodes sorted ascending.
-    sort([active | future_rest], :ascending)
+    # NOTE: analyze_episodes/2 will create sort episodes to create stable list
+    [active | future_rest]
   end
 
   @doc since: "0.3.0"
@@ -107,23 +108,25 @@ defmodule Carol.Episode do
   end
 
   @doc since: "0.3.0"
-  def execute_args(want_id, episodes) when is_list(episodes) do
-    case want_id do
-      :active -> List.first(episodes)
-      x when is_binary(x) -> Enum.find(episodes, fn %{id: id} -> id == want_id end)
-    end
-    |> finalize_execute_args()
+  def execute_args(extra_opts, :active, episodes)
+      when is_list(extra_opts)
+      when is_list(episodes) do
+    List.first(episodes) |> execute_args(extra_opts)
   end
 
-  defp finalize_execute_args(%Episode{id: id, execute: execute, defaults: defaults}) do
-    execute = Keyword.put_new(execute, :cmd, id)
-    defaults = defaults[:execute] || []
-
-    if(defaults != [], do: [defaults: defaults], else: [])
-    |> Keyword.merge(execute)
+  def execute_args(extra_opts, want_id, episodes)
+      when is_list(extra_opts)
+      when is_binary(want_id)
+      when is_list(episodes) do
+    Enum.find(episodes, [], fn %{id: id} -> id == want_id end)
+    |> execute_args(extra_opts)
   end
 
-  defp finalize_execute_args(_), do: []
+  def execute_args(%Episode{execute: args, defaults: defaults}, extra_opts) do
+    {args ++ extra_opts, defaults}
+  end
+
+  def execute_args([], _), do: {[], []}
 
   @doc since: "0.3.0"
   def ms_until_next_episode([%Episode{} = episode | rest], opts) do
@@ -257,50 +260,46 @@ defmodule Carol.Episode do
 
   # (1 of 4) ensure a single episode is moved to the future by performing
   # calc_at until the episode at is greater than or equal to ref_dt
-  defp futurize(%Episode{} = episode, opts) do
-    # a calc_at with current ref_dt might bring the episode into the future
-    new_episode = calc_at(episode, {:days, 0}, opts)
-    compare_tuple = futurize_compare_tuple(new_episode, opts)
+  # defp futurize(%Episode{} = episode, opts) do
+  #   # a calc_at with current ref_dt might bring the episode into the future
+  #   new_episode = calc_at(episode, {:days, 0}, opts)
+  #   compare_tuple = futurize_compare_tuple(new_episode, opts)
+  #
+  #   # check if episode moved to the future
+  #   futurize(episode, compare_tuple, opts)
+  # end
 
-    # check if episode moved to the future
-    futurize(episode, compare_tuple, opts)
-  end
-
-  # (2 of 4) ensure a list of episodes are moved to the future using futurize/2
+  # (1 of 3) ensure a list of episodes are moved to the future using futurize/2
   # then return the stable episode list (active at head)
   # NOTE: does not change the active episode
   defp futurize(%Episode{} = active, episodes, opts) when is_list(episodes) do
     for %Episode{} = episode <- episodes, reduce: [active] do
-      acc -> [futurize(episode, opts) | acc]
+      acc ->
+        compare = futurize_compare(episode, opts)
+
+        [futurize(episode, compare, opts) | acc]
     end
-    |> sort(:ascending)
   end
 
-  # (3 of 4) futurizing complete; the episode is in the future (or now)
-  defp futurize(%Episode{} = episode, {ref_gus, ep_gus}, _opts) when ref_gus <= ep_gus do
+  # (2 of 3) futurizing complete; the episode is in the future (or now)
+  defp futurize(%Episode{} = episode, compare, _opts) when compare in [:lt, :eq] do
     episode
   end
 
-  # (4 of 4) the episode is in the past; execute calc_at with an accumulator of
+  # (3 of 3) the episode is in the past; execute calc_at with an accumulator of
   # the count of days into the future.
-  defp futurize(%Episode{} = episode, compare, opts) when is_tuple(compare) do
-    days = Keyword.get(opts, :futurize_days, 0) + 1
+  defp futurize(%Episode{} = episode, :gt, opts) do
+    days = Keyword.get(opts, :futurize_days, 0)
 
     new_episode = calc_at(episode, {:days, days}, opts)
 
     # create compare tuple, store futurize_days and recurse
-    compare_tuple = futurize_compare_tuple(new_episode, opts)
-    next_futurize_opts = Keyword.put(opts, :futurize_days, days)
-    futurize(new_episode, compare_tuple, next_futurize_opts)
+    compare = futurize_compare(new_episode, opts)
+    next_futurize_opts = Keyword.put(opts, :futurize_days, days + 1)
+    futurize(new_episode, compare, next_futurize_opts)
   end
 
-  # use gregorian microseconds for comparison via pattern matching
-  defp futurize_compare_tuple(%{at: at}, opts) do
-    ref_gus = ref_dt() |> Timex.to_gregorian_microseconds()
-    ep_gus = at |> Timex.to_gregorian_microseconds()
-
-    {ref_gus, ep_gus}
-  end
+  defp futurize_compare(%{at: at}, opts), do: DateTime.compare(ref_dt(), at)
 
   defp humanize_ms(ms) do
     Timex.Duration.from_milliseconds(ms)

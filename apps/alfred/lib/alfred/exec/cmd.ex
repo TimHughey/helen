@@ -92,7 +92,7 @@ defmodule Alfred.ExecCmd do
   end
 
   @doc since: "0.2.12"
-  def from_args(args) when is_list(args) do
+  def from_args(args) when is_list(args) or is_tuple(args) do
     Alfred.ExecCmd.Args.auto(args)
     |> new()
     |> validate()

@@ -3,6 +3,12 @@ defmodule Alfred.ExecAid do
 
   def execute(cmd, opts \\ [])
 
+  def execute({args, defaults} = x, _opts) when is_list(args) and is_list(defaults) do
+    Alfred.ExecCmd.Args.auto(x)
+    |> Alfred.ExecCmd.new()
+    |> execute([])
+  end
+
   def execute(%ExecCmd{} = ec, _opts) do
     # when testing always echo unless explictly set to false
     echo = Keyword.get(ec.cmd_opts, :echo, true)

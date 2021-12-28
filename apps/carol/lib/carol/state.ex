@@ -21,9 +21,13 @@ defmodule Carol.State do
         }
 
   @doc false
-  def add_equipment_to_opts(opts, %State{equipment: equipment}) when is_list(opts) do
-    [List.to_tuple([:equipment, equipment]) | opts]
-  end
+  # def add_equipment_to_opts({execute, defaults}, %State{equipment: equipment}) do
+  #   {[List.to_tuple([:equipment, equipment]) | execute], defaults}
+  # end
+  #
+  # def add_equipment_to_opts(opts, %State{equipment: equipment}) when is_list(opts) do
+  #   [List.to_tuple([:equipment, equipment]) | opts]
+  # end
 
   @doc false
   def alfred, do: Process.get(:opts) |> Keyword.get(:alfred)

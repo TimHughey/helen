@@ -47,6 +47,12 @@ defmodule Alfred do
     |> execute(rest_opts)
   end
 
+  def execute({args, defaults} = x, _opts) when is_list(args) and is_list(defaults) do
+    Alfred.ExecCmd.Args.auto(x)
+    |> Alfred.ExecCmd.new()
+    |> execute([])
+  end
+
   def execute(%ExecCmd{valid: :unchecked} = ec, opts), do: ExecCmd.validate(ec) |> execute(opts)
 
   def execute(%ExecCmd{valid: :yes} = ec, opts) do

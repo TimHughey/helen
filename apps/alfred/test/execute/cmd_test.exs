@@ -98,6 +98,75 @@ defmodule Alfred.ExecCmdTest do
     end
   end
 
+  describe "Aflred.ExecCmd.Args.auto/2" do
+    test "creates args from :id, :equipment, :params, :opts (no defaults)" do
+      params = [type: "random", min: 0, max: 256]
+      opts = [ack: :immediate]
+
+      base = [cmd: "Overnight", name: "equip name"]
+      cmd_params = [cmd_params: [max: 256, min: 0, type: "random"]]
+      cmd_opts = [cmd_opts: [ack: :immediate]]
+      want_kv = base ++ cmd_params ++ cmd_opts
+
+      [id: "Overnight", params: params, equipment: "equip name", opts: opts]
+      |> Alfred.ExecCmd.Args.auto([])
+      |> Should.Contain.kv_pairs(want_kv)
+    end
+
+    test "creates args from cmd: :off, :name (no defaults)" do
+      [cmd: :off, name: "equip name"]
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Contain.kv_pairs(cmd: "off", name: "equip name")
+    end
+
+    test "honors defaults" do
+      defaults = [opts: [ack: :immediate], params: [min: 0]]
+
+      want_opts = [ack: :immediate]
+      want_params = [min: 0, type: "random"]
+      want_kv = [cmd: "special", cmd_opts: want_opts, cmd_params: want_params, name: "equip name"]
+
+      [cmd: "special", name: "equip name", params: [type: "random"]]
+      |> Alfred.ExecCmd.Args.auto(defaults)
+      |> Should.Contain.kv_pairs(want_kv)
+    end
+
+    test "honors short cmd opts keys" do
+      defaults = [ack: :immediate]
+
+      want_opts = [ack: :immediate, notify_when_released: true]
+      want_kv = [cmd: "on", name: "some name", cmd_opts: want_opts]
+
+      [cmd: :on, name: "some name", notify: true]
+      |> Alfred.ExecCmd.Args.auto(defaults)
+      |> Should.Contain.kv_pairs(want_kv)
+    end
+
+    test "keeps original arg when defaults contains cmd" do
+      defaults = [cmd: "off", opts: [ack: :immediate], params: [min: 0]]
+
+      want_opts = [ack: :immediate]
+      want_params = [min: 0, type: "random"]
+      want_kv = [cmd: "special", cmd_opts: want_opts, cmd_params: want_params, name: "equip name"]
+
+      [cmd: "special", name: "equip name", params: [type: "random"]]
+      |> Alfred.ExecCmd.Args.auto(defaults)
+      |> Should.Contain.kv_pairs(want_kv)
+    end
+
+    test "ignores unknown args" do
+      defaults = [ack: :immediate]
+
+      want_opts = [ack: :immediate, notify_when_released: true]
+      want_kv = [cmd: "on", name: "some name", cmd_opts: want_opts]
+
+      {[cmd: :on, weird_opt: true, name: "some name", notify: true], defaults}
+      |> Alfred.ExecCmd.Args.auto()
+      |> Should.Contain.kv_pairs(want_kv)
+      |> then(fn args -> refute args[:weird_opt], Should.msg(args, "should include :weird_opt") end)
+    end
+  end
+
   describe "Alfred.ExecCmd.version_cmd/1" do
     test "handles args list with unversioned cmd" do
       [cmd: "special"]

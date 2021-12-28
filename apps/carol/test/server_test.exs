@@ -74,16 +74,17 @@ defmodule CarolServerTest do
     @tag start_args_add: {:new_app, :carol, __MODULE__, :short_episodes}
     @tag start_supervised_add: []
     test "live plus multiple short episodes", %{server_name: server_name} do
+      Carol.active_episode(server_name) |> Should.Be.equal("Now 1")
+
       for x when x <= 500 <- 1..500, reduce: :query_active do
-        active_id when active_id in ["Future 10", "Future 11"] ->
+        "Future 1" = active_id ->
           active_id
 
         _ ->
           Process.sleep(10)
-
           Carol.active_episode(server_name)
       end
-      |> Should.Be.equal("Future 10")
+      |> Should.Be.equal("Future 1")
     end
   end
 

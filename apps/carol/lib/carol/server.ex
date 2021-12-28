@@ -187,22 +187,31 @@ defmodule Carol.Server do
   end
 
   @doc false
-  def execute(%State{episodes: episodes} = state) do
-    first_exec = Process.get(:first_exec, true)
+  def execute(%State{} = state) do
+    # equipment_opts = State.equipment_opts(state)
 
-    Carol.Episode.execute_args(:active, episodes)
-    |> State.add_equipment_to_opts(state)
-    |> Alfred.ExecCmd.from_args()
-    |> Alfred.ExecCmd.merge_cmd_opts(force: first_exec)
-    |> Alfred.ExecCmd.add_notify()
-    |> State.alfred().execute()
+    # Carol.Episode.execute_args(:active, episodes, equipment_opts)
+    # |> State.add_equipment_to_opts(state)
+    # |> Alfred.ExecCmd.from_args()
+    # |> Alfred.ExecCmd.merge_cmd_opts(force: first_exec)
+    # |> Alfred.ExecCmd.add_notify()
+    state
+    |> assemble_execute_opts()
+    |> State.alfred().execute([])
     |> State.save_exec_result(state)
-    |> tap(fn _ -> Process.put(:first_exec, false) end)
+    |> tap(fn _ -> Process.put(:first_exec_force, false) end)
   end
 
   ## PRIVATE
   ## PRIVATE
   ## PRIVATE
+
+  defp assemble_execute_opts(%State{equipment: equipment, episodes: episodes}) do
+    force = Process.get(:first_exec_force, true)
+
+    [equipment: equipment, notify: true, force: force]
+    |> Carol.Episode.execute_args(:active, episodes)
+  end
 
   # GenServer reply helpers
 
