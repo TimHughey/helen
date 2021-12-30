@@ -25,7 +25,8 @@ defmodule Carol.Instance do
   end
 
   def config({otp_app, module}) do
-    Application.get_env(otp_app, module) || []
+    Application.get_env(otp_app, module, [])
+    |> Enum.sort()
   end
 
   @doc """

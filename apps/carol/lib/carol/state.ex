@@ -21,16 +21,7 @@ defmodule Carol.State do
         }
 
   @doc false
-  # def add_equipment_to_opts({execute, defaults}, %State{equipment: equipment}) do
-  #   {[List.to_tuple([:equipment, equipment]) | execute], defaults}
-  # end
-  #
-  # def add_equipment_to_opts(opts, %State{equipment: equipment}) when is_list(opts) do
-  #   [List.to_tuple([:equipment, equipment]) | opts]
-  # end
-
-  @doc false
-  def alfred, do: Process.get(:opts) |> Keyword.get(:alfred)
+  def alfred, do: Process.get(:opts) |> Keyword.get(:alfred, Alfred)
 
   @doc since: "0.3.0"
   def new(args) do
@@ -82,7 +73,7 @@ defmodule Carol.State do
     opts = Process.get(:opts)
     tz = opts[:timezone]
 
-    [List.to_tuple([:ref_dt, Timex.now(tz)]) | opts]
+    [List.to_tuple([:ref_dt, Timex.now(tz)]) | opts] |> Enum.sort()
   end
 
   @doc since: "0.3.0"
@@ -145,10 +136,13 @@ defmodule Carol.State do
     {alfred, rest} = Keyword.pop(rest, :alfred, Alfred)
     {server_name, rest} = Keyword.pop(rest, :id)
 
-    [[alfred: alfred, server_name: server_name] | opts]
-    |> List.flatten()
-    |> tap(fn opts_all -> Process.put(:opts, opts_all) end)
-    |> then(fn opts_all -> {opts_all, rest} end)
+    # ensure Alfred is set
+    opts_all = Keyword.put_new(opts, :alfred, alfred) ++ [server_name: server_name]
+
+    Process.put(:opts, opts_all)
+
+    # return tuple of opts first element, rest second element
+    {opts_all, rest}
   end
 
   defp pop_equipment(args) do

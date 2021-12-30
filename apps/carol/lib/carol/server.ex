@@ -177,6 +177,9 @@ defmodule Carol.Server do
   end
 
   @impl true
+  def handle_info({:echo, _}, state), do: noreply(state, :timeout)
+
+  @impl true
   def handle_info(:timeout, %State{} = s) do
     continue(:tick, s)
   end
@@ -188,13 +191,6 @@ defmodule Carol.Server do
 
   @doc false
   def execute(%State{} = state) do
-    # equipment_opts = State.equipment_opts(state)
-
-    # Carol.Episode.execute_args(:active, episodes, equipment_opts)
-    # |> State.add_equipment_to_opts(state)
-    # |> Alfred.ExecCmd.from_args()
-    # |> Alfred.ExecCmd.merge_cmd_opts(force: first_exec)
-    # |> Alfred.ExecCmd.add_notify()
     state
     |> assemble_execute_opts()
     |> State.alfred().execute([])

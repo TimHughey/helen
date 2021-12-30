@@ -4,7 +4,6 @@ end
 
 defmodule CarolSupervisorTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag carol: true, carol_supervisor: true
 end

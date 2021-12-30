@@ -1,17 +1,22 @@
 defmodule CarolEpisodeTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag carol: true, carol_episode: true
 
   @tz "America/New_York"
 
-  setup [:opts_add, :episodes_add, :sim_add]
+  setup [:opts_add, :episodes_add, :episodes_summary]
 
-  defmacro assert_active(episode, ref_dt) do
-    quote bind_quoted: [episode: episode, ref_dt: ref_dt] do
-      before? = Timex.compare(episode.at, ref_dt) <= 0
-      assert before?, Should.msg(episode, "active should be less than or equal to ref_dt", ref_dt)
+  @fail_msgs [
+    active: "active should be less than or equal to ref_dt",
+    rest: "episode should be greater than previous"
+  ]
+  defmacro assert_active(episodes, ref_dt) do
+    quote bind_quoted: [episodes: episodes, ref_dt: ref_dt] do
+      import Should, only: [msg: 3]
+      active = hd(episodes)
+
+      assert Timex.compare(active.at, ref_dt) <= 0, msg(active, @fail_msgs[:active], ref_dt)
     end
   end
 
@@ -19,23 +24,20 @@ defmodule CarolEpisodeTest do
     quote bind_quoted: [ctx: ctx] do
       episode_count = episode_count(ctx)
 
-      episodes =
-        ctx.episodes
-        |> Should.Be.List.with_length(episode_count, unwrap: false)
-        |> Should.Be.List.of_type({:struct, Carol.Episode})
+      episodes = ctx.episodes
+      assert [%Carol.Episode{} | _] = episodes
+      assert length(episodes) == episode_count
 
-      cond do
-        episode_count >= 2 ->
-          [active | rest] = episodes
-          assert_active(active, ctx.ref_dt)
-          assert_rest(active, rest, ctx.ref_dt)
+      case episode_count do
+        x when x >= 2 ->
+          assert_active(episodes, ctx.ref_dt)
+          assert_rest(episodes, ctx.ref_dt)
 
-        episode_count == 1 ->
-          [active] = episodes
-          assert_active(active, ctx.ref_dt)
+        x when x == 1 ->
+          assert_active(episodes, ctx.ref_dt)
 
         # empty episode list
-        true ->
+        _ ->
           assert true
       end
 
@@ -43,81 +45,49 @@ defmodule CarolEpisodeTest do
     end
   end
 
-  defmacro assert_rest(active, rest, ref_dt) do
-    quote bind_quoted: [active: active, rest: rest, ref_dt: ref_dt] do
-      for episode <- rest, reduce: active do
-        previous ->
-          after? = Timex.compare(episode.at, previous.at) >= 0
-          assert after?, Should.msg(episode, "episode should be greater than previous", previous)
+  defmacro assert_rest(episodes, ref_dt) do
+    quote bind_quoted: [episodes: episodes, ref_dt: ref_dt] do
+      import Should, only: [msg: 3]
 
-          episode
-      end
+      [active | rest] = episodes
+
+      Enum.reduce(rest, active, fn episode, previous ->
+        assert Timex.compare(episode.at, previous.at) >= 0, msg(episode, @fail_msgs[:rest], previous)
+        # accumulate the single previous
+        previous
+      end)
     end
   end
 
-  defmacro assert_sim(want_order) do
-    quote bind_quoted: [want_order: want_order] do
-      %{episodes: episodes, opts: opts, ref_dt: ref_dt, sim_ms: sim_ms, step_ms: step_ms} = var!(ctx)
+  @add_keys [:future, :now, :past, :yesterday]
+  defp episode_count(ctx) when is_map(ctx) do
+    add_opts = ctx[:episodes_add] || :none
 
-      sim_measure = Map.get(var!(ctx), :sim_measure, true)
-
-      for ms when ms < sim_ms <- 0..sim_ms//1000, reduce: {:none, episodes, want_order} do
-        {prev_active, prev_episodes, want_order} ->
-          {timestamp, episodes} =
-            Timex.Duration.measure(fn ->
-              Carol.Episode.analyze_episodes(prev_episodes, shift_ref_dt(opts, ms))
-            end)
-
-          if prev_active == :none and sim_measure do
-            episodes_add = Map.get(var!(ctx), :episodes_add)
-            elapsed = Timex.format_duration(timestamp, :humanized)
-            ["\n", inspect(episodes_add), " ", elapsed] |> IO.puts()
-          end
-
-          active = Carol.Episode.active_id(episodes)
-
-          if active != prev_active do
-            [expect_active | want_order_rest] = want_order
-            assert active == expect_active, Should.msg({active, expect_active}, "should be equal", episodes)
-
-            {active, episodes, want_order_rest}
-          else
-            {active, episodes, want_order}
-          end
-      end
+    case add_opts do
+      :none -> 0
+      {_, []} -> 1
+      {_, [_ | _] = x} -> episode_count(x)
     end
   end
 
-  defp episode_count(%{episodes_add: {_, []}}), do: 1
-
-  defp episode_count(%{episodes_add: {_, add_opts}}) do
-    for what <- add_opts, reduce: 0 do
-      acc ->
-        case what do
-          {key, count} when key in [:future, :now, :past, :yesterday] -> acc + count
-          {:count, count} -> count
-          _ -> acc
-        end
-    end
+  defp episode_count(add_opts) when is_list(add_opts) do
+    Enum.reduce(add_opts, 0, fn
+      {k, v}, acc when k in @add_keys -> acc + v
+      {:count, v}, _acc -> v
+      _kv, acc -> acc
+    end)
   end
-
-  defp episode_count(_), do: 0
 
   describe "Sally.Episode.new/1" do
     test "creates valid Episode with a Solar sun ref" do
-      [event: "astro rise"]
-      |> Carol.Episode.new()
-      |> Should.Be.Struct.of_key_types(Carol.Episode, event: :binary, at: :atom)
+      assert %Carol.Episode{event: <<_::binary>>, at: :none} = Carol.Episode.new(event: "astro rise")
     end
 
     test "creates valid Episode from HH:MM:SS binary" do
       calc_opts = [timezone: @tz, ref_dt: Timex.now(@tz)]
-      want_types = [event: :binary, at: :datetime]
 
-      [event: "fixed 01:02:03"]
-      |> Carol.Episode.new()
-      |> Carol.Episode.calc_at(calc_opts)
-      |> Should.Be.Struct.of_key_types(Carol.Episode, want_types)
+      assert %Carol.Episode{event: <<_::binary>>, at: %DateTime{}} =
+               Carol.Episode.new(event: "fixed 01:02:03") |> Carol.Episode.calc_at(calc_opts)
     end
   end
 
@@ -158,64 +128,27 @@ defmodule CarolEpisodeTest do
     end
 
     test "handles empty list", ctx do
-      Carol.Episode.analyze_episodes([], ctx.opts)
-      |> Should.Be.List.empty()
-    end
-  end
-
-  describe "Sally.Episode timeline" do
-    @tag skip: true
-    @tag timeout: 10 * 1000
-    @tag sim_days: 3, step_ms: 1000
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag want_order: ["Now 1", "Future 1", "Future 2", "Future 3", "Past -3", "Past -2", "Past -1"]
-    test "simulated 48hrs", ctx do
-      want_order = ctx.want_order
-
-      assert_sim(want_order)
-    end
-
-    @tag timeout: 10 * 1000
-    @tag sim_days: 3, step_ms: 1000
-    @tag want_order: ["Overnight", "Day", "Evening"]
-    @tag episodes_add: {:sim, :porch}
-    test "porch simulation", ctx do
-      active = Carol.Episode.active_id(ctx.episodes)
-      want_order = Enum.drop_while(ctx.want_order, fn x -> x != active end)
-
-      assert_sim(want_order)
-    end
-
-    @tag timeout: 10 * 1000
-    @tag sim_days: 3, step_ms: 1000
-    @tag want_order: ["Day", "Night"]
-    @tag episodes_add: {:sim, :greenhouse}
-    test "greenhouse simulation", ctx do
-      active = Carol.Episode.active_id(ctx.episodes)
-      want_order = Enum.drop_while(ctx.want_order, fn x -> x != active end)
-
-      assert_sim(want_order)
+      assert [] = Carol.Episode.analyze_episodes([], ctx.opts)
     end
   end
 
   describe "Sally.Episode.ms_until_next_episode/2" do
     test "handles empty episode list", ctx do
-      Carol.Episode.ms_until_next_episode([], ctx.opts)
-      |> Should.Be.equal(1000)
+      assert 1000 = Carol.Episode.ms_until_next_episode([], ctx.opts)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "handles mixed episode list", ctx do
-      assert_episodes(ctx)
-      |> Carol.Episode.ms_until_next_episode(ctx.opts)
-      |> Should.Be.equal(3000)
+      episodes = assert_episodes(ctx)
+
+      assert 6000 = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
     end
 
     @tag episodes_add: {:future, [count: 10, minutes: 1]}
     test "handles list of only future episodes", ctx do
-      assert_episodes(ctx)
-      |> Carol.Episode.ms_until_next_episode(ctx.opts)
-      |> Should.Be.equal(63_000)
+      episodes = assert_episodes(ctx)
+
+      assert 63_000 = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
     end
   end
 
@@ -224,68 +157,55 @@ defmodule CarolEpisodeTest do
     test "put_execute/2 updates :execute for the given id", ctx do
       episodes = assert_episodes(ctx)
 
-      {"Future 2", [cmd: "updated", params: [type: "random"]]}
-      |> Carol.Episode.put_execute(episodes)
-      |> Enum.find(fn %{id: id} -> id == "Future 2" end)
-      |> Should.Contain.key(:execute, :value)
-      |> Should.Contain.kv_pairs(cmd: "updated")
+      episodes =
+        {"Future 2", [cmd: "updated", params: [type: "random"]]}
+        |> Carol.Episode.put_execute(episodes)
+
+      assert %Carol.Episode{execute: [{:cmd, "updated"} | _]} =
+               Enum.find(episodes, fn %{id: id} -> id == "Future 2" end)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns active execute args", ctx do
       episodes = assert_episodes(ctx)
 
-      Carol.Episode.execute_args([], :active, episodes)
-      |> Should.Be.Tuple.with_size(2)
-      |> tap(fn {args, _} -> Should.Contain.key(args, :cmd) end)
+      assert {[cmd: _], []} = Carol.Episode.execute_args([], :active, episodes)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns execute args for known id", ctx do
       episodes = assert_episodes(ctx)
-      want_kv = [equipment: "equip", cmd: :on]
 
-      Carol.Episode.execute_args([equipment: "equip"], "Past -3", episodes)
-      |> Should.Be.Tuple.with_size(2)
-      |> tap(fn {args, _} -> Should.Contain.kv_pairs(args, want_kv) end)
+      # two element tuple:
+      #  - elem0 = execute args
+      #  - elem1 = default args
+      assert {[cmd: :on, equipment: "equip"], []} =
+               Carol.Episode.execute_args([equipment: "equip"], "Past -3", episodes)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns empty list for unknown id", ctx do
       episodes = assert_episodes(ctx)
 
-      Carol.Episode.execute_args([], "Unknown", episodes)
-      |> Should.Be.match({[], []})
+      assert {[], []} = Carol.Episode.execute_args([], "Unknown", episodes)
     end
   end
 
   describe "Sally.Episode.status_from_list/2" do
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "creates list of status maps", ctx do
-      assert_episodes(ctx)
-      |> Carol.Episode.status_from_list(ctx.opts ++ [format: :humanized])
-      |> Should.Be.List.of_binaries()
+      episodes = assert_episodes(ctx)
+
+      assert [<<_::binary>>, <<_::binary>> | _] =
+               Carol.Episode.status_from_list(episodes, ctx.opts ++ [format: :humanized])
     end
   end
 
-  def episodes_summary(%{episodes: episodes, ref_dt: ref_dt} = ctx) do
-    episodes_summary(episodes, ref_dt)
-
-    ctx
+  def episodes_summary(%{episodes: episodes, ref_dt: ref_dt}) do
+    %{episodes_summary: Enum.map(episodes, fn e -> {e.id, Timex.diff(e.at, ref_dt, :milliseconds)} end)}
   end
 
-  def episodes_summary(episodes, ref_dt) do
-    for e <- episodes do
-      #  diff = Timex.diff(ref_dt, e.at, :duration) |> Timex.format_duration(:humanized)
-
-      diff = Timex.diff(e.at, ref_dt, :milliseconds)
-
-      {e.id, diff}
-    end
-    |> pretty_puts()
-
-    episodes
-  end
+  def episodes_summary(_ctx), do: :ok
 
   ## PRIVATE
   ## PRIVATE
@@ -293,21 +213,4 @@ defmodule CarolEpisodeTest do
 
   defp episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
   defp opts_add(ctx), do: Carol.OptsAid.add(ctx)
-
-  defp sim_add(%{ref_dt: start_dt, sim_days: sim_days, want_order: want_order}) do
-    finish_dt = start_dt |> Timex.shift(days: sim_days)
-    sim_ms = Timex.diff(finish_dt, start_dt, :milliseconds)
-
-    sim_days = 1..(sim_days + 1)
-    want_order = Enum.reduce(sim_days, [], fn _, acc -> [want_order | acc] end)
-
-    %{sim_ms: sim_ms, want_order: List.flatten(want_order)}
-  end
-
-  defp sim_add(_), do: :ok
-
-  defp shift_ref_dt(opts, ms) do
-    Timex.shift(opts[:ref_dt], milliseconds: ms)
-    |> then(fn ref_dt -> Keyword.replace(opts, :ref_dt, ref_dt) end)
-  end
 end

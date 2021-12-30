@@ -1,6 +1,5 @@
 defmodule CarolEpisodeAidTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag carol: true, carol_episode_aid: true
 
@@ -17,7 +16,7 @@ defmodule CarolEpisodeAidTest do
       summary = Enum.sort(summary)
       want_counts = Enum.sort(want_counts)
 
-      Should.Be.equal(summary, want_counts)
+      assert summary = want_counts
     end
   end
 
@@ -27,7 +26,7 @@ defmodule CarolEpisodeAidTest do
       ref_dt = ctx.ref_dt
 
       for episode <- episodes do
-        Should.Be.struct(episode, Carol.Episode)
+        assert %Carol.Episode{} = episode
 
         diff_ms = Timex.diff(episode.at, ref_dt, :milliseconds)
 
@@ -45,7 +44,7 @@ defmodule CarolEpisodeAidTest do
 
   defmacro assert_passed(results) do
     quote bind_quoted: [results: results] do
-      Enum.each(results, fn {type, _} = r -> Should.Be.equal(r, {type, :passed}) end)
+      Enum.each(results, fn {type, _} = r -> assert {^type, :passed} = r end)
 
       results
     end

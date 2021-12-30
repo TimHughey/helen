@@ -8,37 +8,28 @@ end
 
 defmodule CarolTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag carol: true, carol_use: true
 
   setup [:opts_add, :start_args_add, :start_supervised_add]
 
   describe "UseCarol.Alpha" do
-    @tag skip: true
+    # @tag skip: true
     test "config/0 returns list" do
-      want_kv = [otp_app: :use_carol, instances: [first: [], second: [], last: []]]
-
-      UseCarol.Alpha.config()
-      |> Should.Be.NonEmpty.list()
-      |> Should.Contain.kv_pairs(want_kv)
+      assert [instances: [_ | _], opts: [alfred: AlfredSim], otp_app: :carol] = UseCarol.Alpha.config()
     end
 
     test "instances/0 returns list" do
-      instance_list = [:first, :last, :second]
-
-      UseCarol.Alpha.instances()
-      |> Should.Be.equal(instance_list)
+      assert [:first, :last, :second] = UseCarol.Alpha.instances()
     end
 
     test "can be started as a Supervisor" do
       child_spec = UseCarol.Alpha.child_spec([])
 
-      start_supervised(child_spec)
-      |> Should.Be.Ok.tuple_with_pid()
+      assert {:ok, _pid} = start_supervised(child_spec)
 
       for {mod, _pid, :worker, _mods} <- Supervisor.which_children(UseCarol.Alpha) do
-        Carol.state(mod, :all) |> Should.Contain.kv_pairs(cmd_live: :none)
+        assert [{:cmd_live, :none} | _] = Carol.state(mod, :all)
       end
     end
   end
@@ -48,15 +39,14 @@ defmodule CarolTest do
       import ExUnit.CaptureIO, only: [capture_io: 1]
       child_spec = UseCarol.Beta.child_spec([])
 
-      start_supervised(child_spec)
-      |> Should.Be.Ok.tuple_with_pid()
+      assert {:ok, _pid} = start_supervised(child_spec)
 
       capture_io(fn ->
-        UseCarol.Beta.status("first") |> Should.Be.ok()
+        assert :ok == UseCarol.Beta.status("first")
       end)
 
-      UseCarol.Beta.pause("first") |> Should.Be.equal(:pause)
-      UseCarol.Beta.resume(:first) |> Should.Be.equal(:ok)
+      assert :pause = UseCarol.Beta.pause("first")
+      assert :ok = UseCarol.Beta.resume(:first)
     end
   end
 
@@ -64,8 +54,7 @@ defmodule CarolTest do
     @tag start_args_add: {:app, :carol, CarolWithEpisodes, :first_instance}
     @tag start_supervised_add: []
     test "status/2 returns list of binary status", ctx do
-      Carol.status(ctx.server_name)
-      |> Should.Be.List.of_binaries()
+      assert [<<_::binary>>, <<_::binary>> | _] = Carol.status(ctx.server_name)
     end
   end
 
@@ -77,12 +66,10 @@ defmodule CarolTest do
 
   defp start_args_add(ctx), do: Carol.StartArgsAid.add(ctx)
 
-  defp start_supervised_add(%{start_supervised_add: _} = ctx) do
-    case ctx do
-      %{child_spec: child_spec} -> start_supervised(child_spec) |> Should.Be.Ok.tuple_with_pid()
-      _ -> :no_child_spec
-    end
-    |> then(fn pid -> %{server_pid: pid} end)
+  defp start_supervised_add(%{start_supervised_add: _, child_spec: child_spec}) do
+    assert {:ok, pid} = start_supervised(child_spec)
+
+    %{server_pid: pid}
   end
 
   defp start_supervised_add(_x), do: :ok

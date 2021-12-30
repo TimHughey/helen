@@ -67,6 +67,7 @@ if config_env() == :test do
     ]
 
   config :carol, UseCarol.Alpha,
+    opts: [alfred: AlfredSim],
     instances: [
       first: [equipment: "first instance"],
       second: [equipment: "second instance"],

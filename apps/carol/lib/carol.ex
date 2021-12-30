@@ -18,7 +18,7 @@ defmodule Carol do
 
       def config do
         {:ok, config} = Carol.Supervisor.runtime_config(@otp_app, __MODULE__, [])
-        config
+        config |> Enum.sort()
       end
 
       # NOTE: Supervisor child_spec

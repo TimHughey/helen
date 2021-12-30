@@ -17,8 +17,7 @@ defmodule Carol.StateAid do
 
     new_state =
       [
-        opts: [timezone: "America/New_York"],
-        alfred: alfred,
+        opts: [alfred: alfred, timezone: "America/New_York"],
         id: server_name,
         equipment: equipment,
         episodes: ctx[:episodes] || :none

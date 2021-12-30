@@ -1,28 +1,24 @@
 defmodule Carol.StateTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag carol: true, carol_state: true
 
-  alias Carol.State
-
   describe "Carol.State.new/1" do
     test "assembles state from args" do
-      Carol.Instance.start_args({:carol, CarolTest, :front_chandelier})
-      |> State.new()
-      |> Should.Be.struct(State)
+      start_args = Carol.Instance.start_args({:carol, CarolTest, :front_chandelier})
+
+      assert %Carol.State{} = Carol.State.new(start_args)
     end
   end
 
   describe "Carol.State.sched_opts/0" do
     test "returns full opts" do
       # NOTE: must create State to populate process dictionary
-      Carol.Instance.start_args({:carol, CarolTest, :front_chandelier}) |> State.new()
+      start_args = Carol.Instance.start_args({:carol, CarolTest, :front_chandelier})
+      _state = Carol.State.new(start_args)
 
-      want_keys = [:latitude, :longitude, :ref_dt, :server_name]
-
-      State.sched_opts()
-      |> Should.Be.List.with_keys(want_keys)
+      assert [{:alfred, _}, {:latitude, _}, {:longitude, _}, {:ref_dt, _}, {:server_name, _} | _] =
+               Carol.State.sched_opts()
     end
   end
 end
