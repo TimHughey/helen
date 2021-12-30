@@ -56,7 +56,7 @@ defmodule Alfred.ExecCmd do
   end
 
   def add_ack(%ExecCmd{} = ec, type) when type in @ack_types do
-    %ExecCmd{ec | cmd_opts: Keyword.put(ec.cmd_opts, :ack, type)}
+    struct(ec, cmd_opts: Keyword.put(ec.cmd_opts, :ack, type))
   end
 
   @doc """
@@ -64,7 +64,7 @@ defmodule Alfred.ExecCmd do
   """
   @doc since: "0.2.6"
   def add_cmd_opt(%ExecCmd{} = ec, key) when is_atom(key) do
-    %ExecCmd{ec | cmd_opts: Keyword.put(ec.cmd_opts, key, true)}
+    struct(ec, cmd_opts: Keyword.put(ec.cmd_opts, key, true))
   end
 
   @doc """
@@ -106,7 +106,7 @@ defmodule Alfred.ExecCmd do
   """
   @doc since: "0.2.6"
   def merge_cmd_opts(%ExecCmd{cmd_opts: cmd_opts} = ec, opts) do
-    %ExecCmd{ec | cmd_opts: Keyword.merge(cmd_opts, opts)}
+    struct(ec, cmd_opts: Keyword.merge(cmd_opts, opts))
   end
 
   @new_keys [:name, :cmd, :cmd_params, :cmd_opts, :pub_opts]
@@ -123,7 +123,7 @@ defmodule Alfred.ExecCmd do
   def params_adjust(%ExecCmd{} = ec, params) when is_list(params) do
     adjusted = Map.merge(ec.cmd_params, Enum.into(params, %{}))
 
-    %ExecCmd{ec | cmd: version_cmd(ec.cmd), cmd_params: adjusted}
+    struct(ec, cmd: version_cmd(ec.cmd), cmd_params: adjusted)
     |> validate()
   end
 
@@ -143,20 +143,19 @@ defmodule Alfred.ExecCmd do
 
   @doc since: "0.2.6"
   def validate(%ExecCmd{cmd_params: params} = ec) when is_list(params) do
-    %ExecCmd{ec | cmd_params: Enum.into(params, %{})} |> validate()
+    struct(ec, cmd_params: Enum.into(params, %{})) |> validate()
   end
 
   def validate(%ExecCmd{cmd: cmd} = ec) when is_atom(cmd) do
-    %ExecCmd{ec | cmd: Atom.to_string(cmd)} |> validate()
+    struct(ec, cmd: Atom.to_string(cmd)) |> validate()
   end
 
   def validate(%ExecCmd{} = ec) do
     case ec do
-      %ExecCmd{name: "default"} -> invalid(ec, "name is not set")
-      %ExecCmd{cmd: c} when c in ["on", "off"] -> valid(ec)
-      %ExecCmd{cmd: c, cmd_params: %{type: t}} when is_binary(c) and is_binary(t) -> valid(ec)
-      %ExecCmd{cmd: c} when is_binary(c) -> invalid(ec, "custom cmds must include type")
-      _ -> invalid(ec, "cmd must be a binary")
+      %{name: "default"} -> invalid(ec, "name is not set")
+      %{name: name} when not is_binary(name) -> invalid(ec, "name must be a binary")
+      %{cmd: "unknown"} -> invalid(ec, "cmd is not set")
+      _ -> valid(ec)
     end
   end
 
@@ -166,6 +165,6 @@ defmodule Alfred.ExecCmd do
 
   # @cmd_vers_regex ~r/(?: v(?<version>\d{3}$))|(?<cmd>[[:print:]]+)/
 
-  defp invalid(%ExecCmd{} = ec, reason), do: %ExecCmd{ec | valid: :no, invalid_reason: reason}
-  defp valid(%ExecCmd{} = ec), do: %ExecCmd{ec | valid: :yes}
+  defp invalid(%ExecCmd{} = ec, reason), do: struct(ec, valid: :no, invalid_reason: reason)
+  defp valid(%ExecCmd{} = ec), do: struct(ec, valid: :yes)
 end
