@@ -1,11 +1,10 @@
 defmodule Rena.SetPt.ServerTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag rena: true, rena_setpt_server: true
 
   alias Alfred.ExecResult
-  alias Alfred.Notify.{Memo, Ticket}
+  alias Alfred.Notify.{Memo}
   alias Broom.TrackerEntry
   alias Rena.Sensor
   alias Rena.SetPt.{Server, ServerTest, State}
@@ -35,17 +34,16 @@ defmodule Rena.SetPt.ServerTest do
   describe "Rena.SetPt.Server starts supervised" do
     test "fails when init args missing :server_name" do
       child_spec = %{id: ServerTest, start: {Server, :start_link, [[]]}, restart: :transient}
-      start_supervised(child_spec) |> Should.Be.Tuple.with_rc(:error)
+      assert {:error, _} = start_supervised(child_spec)
     end
 
     @tag server_add: []
     test "when init args contains :server_name", ctx do
-      Should.Be.Map.with_key(ctx, :server_pid)
+      assert %{server_pid: server_pid, server_name: server_name} = ctx
+      assert Process.alive?(server_pid)
 
-      state = :sys.get_state(ctx.server_name) |> Should.Be.struct(State)
-
-      Should.Be.binary(state.equipment)
-      Should.Be.struct(state.ticket, Ticket)
+      assert %Rena.SetPt.State{equipment: <<_::binary>>, ticket: %Alfred.Notify.Ticket{}} =
+               :sys.get_state(server_name)
     end
   end
 
@@ -57,16 +55,14 @@ defmodule Rena.SetPt.ServerTest do
   describe "Rena.SetPt.Server.handle_info/2 processes Notify" do
     @tag equipment_add: [], state_add: []
     test "missing messages", %{state: state} do
-      {Alfred, %Memo{name: state.equipment, missing?: true}}
-      |> Server.handle_info(state)
-      |> Should.Be.NoReply.with_state()
+      assert {:noreply, %Rena.SetPt.State{}} =
+               Server.handle_info({Alfred, %Memo{name: state.equipment, missing?: true}}, state)
     end
 
     @tag equipment_add: [], state_add: []
     test "normal messages", %{state: state} do
-      {Alfred, %Memo{name: state.equipment, missing?: false}}
-      |> Server.handle_info(state)
-      |> Should.Be.NoReply.with_state()
+      assert {:noreply, %Rena.SetPt.State{}} =
+               Server.handle_info({Alfred, %Memo{name: state.equipment, missing?: false}}, state)
     end
   end
 
@@ -78,10 +74,8 @@ defmodule Rena.SetPt.ServerTest do
       te = %TrackerEntry{refid: refid, acked: true, acked_at: acked_at}
       er = %ExecResult{refid: refid}
 
-      Server.handle_info({Broom, te}, %State{state | last_exec: er})
-      |> Should.Be.NoReply.with_state()
-      |> Should.Be.State.with_key(:last_exec)
-      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, acked_at) end)
+      assert {:noreply, %Rena.SetPt.State{last_exec: ^acked_at}} =
+               Server.handle_info({Broom, te}, %State{state | last_exec: er})
     end
 
     @tag equipment_add: [], state_add: []
@@ -90,10 +84,8 @@ defmodule Rena.SetPt.ServerTest do
       te = %TrackerEntry{refid: refid, acked: false}
       er = %ExecResult{refid: refid}
 
-      Server.handle_info({Broom, te}, %State{state | last_exec: er})
-      |> Should.Be.NoReply.with_state()
-      |> Should.Be.State.with_key(:last_exec)
-      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, :failed) end)
+      assert {:noreply, %Rena.SetPt.State{last_exec: :failed}} =
+               Server.handle_info({Broom, te}, %State{state | last_exec: er})
     end
 
     @tag equipment_add: [], state_add: []
@@ -101,10 +93,8 @@ defmodule Rena.SetPt.ServerTest do
       te = %TrackerEntry{refid: "123456", acked: true}
       er = %ExecResult{refid: "7890"}
 
-      Server.handle_info({Broom, te}, %State{state | last_exec: er})
-      |> Should.Be.NoReply.with_state()
-      |> Should.Be.State.with_key(:last_exec)
-      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, :failed) end)
+      assert {:noreply, %Rena.SetPt.State{last_exec: :failed}} =
+               Server.handle_info({Broom, te}, %State{state | last_exec: er})
     end
 
     @tag equipment_add: [], state_add: []
@@ -112,10 +102,7 @@ defmodule Rena.SetPt.ServerTest do
     test "when State last_exec is not an ExecResult", %{state: state} do
       te = %TrackerEntry{refid: "123456", acked: true}
 
-      Server.handle_info({Broom, te}, state)
-      |> Should.Be.NoReply.with_state()
-      |> Should.Be.State.with_key(:last_exec)
-      |> then(fn {_, last_exec} -> Should.Be.equal(last_exec, :none) end)
+      assert {:noreply, %Rena.SetPt.State{last_exec: :none}} = Server.handle_info({Broom, te}, state)
     end
   end
 
@@ -125,9 +112,11 @@ defmodule Rena.SetPt.ServerTest do
         :ok
 
       %{server_add: [], start_args: start_args} ->
-        pid = start_supervised({Server, start_args}) |> Should.Be.Ok.tuple_with_pid()
+        assert {:ok, pid} = start_supervised({Server, start_args})
 
-        %{server_pid: Should.Be.alive(pid)}
+        assert Process.alive?(pid)
+
+        %{server_pid: pid}
 
       _ ->
         :ok

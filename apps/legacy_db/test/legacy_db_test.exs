@@ -1,6 +1,5 @@
 defmodule LegacyDbTest do
   use ExUnit.Case, async: true
-  use Should
 
   @pwm_alias LegacyDb.PulseWidth.Alias
   @pwm_device LegacyDb.PulseWidth.Device
@@ -66,32 +65,26 @@ defmodule LegacyDbTest do
   end
 
   test "pwm all aliases" do
-    LegacyDb.all_pwm_aliases()
-    |> Should.Be.List.of_type(:map)
+    assert [%{} | _] = LegacyDb.all_pwm_aliases()
   end
 
   test "pwm all alias names" do
-    LegacyDb.all_pwm_names()
-    |> Should.Be.List.of_type(:binary)
+    assert [<<_::binary>> | _] = LegacyDb.all_pwm_names()
   end
 
   test "pwm lookup alias details" do
-    LegacyDb.pwm_alias("front leds porch")
-    |> Should.Be.Map.with_key(:name)
+    assert %{name: _} = LegacyDb.pwm_alias("front leds porch")
   end
 
   test "sensor lookup alias details" do
-    LegacyDb.sensor_alias("display_tank")
-    |> Should.Be.Map.with_key(:name)
+    assert %{name: _} = LegacyDb.sensor_alias("display_tank")
   end
 
   test "switch lookup alias details" do
-    LegacyDb.switch_alias("display tank heater")
-    |> Should.Be.Map.with_key(:name)
+    assert %{name: _} = LegacyDb.switch_alias("display tank heater")
   end
 
   test "ds sensor lookup by device name" do
-    LegacyDb.ds_sensor("ds.280cd73a1a1901")
-    |> Should.Contain.value("lab window west")
+    assert %{name: "lab window west"} = LegacyDb.ds_sensor("ds.280cd73a1a1901")
   end
 end

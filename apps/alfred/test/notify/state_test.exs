@@ -1,32 +1,18 @@
 defmodule Alfred.NotifyStateTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag alfred: true, alfred_notify_state: true
 
-  alias Alfred.NamesAid
-  alias Alfred.Notify.{Memo, State, Ticket}
-  alias Alfred.SeenName
-
   defmacro assert_receive_memo_for(ticket) do
     quote location: :keep, bind_quoted: [ticket: ticket] do
-      receive do
-        {Alfred, %Memo{} = memo} ->
-          want_kv = [name: ticket.name, ref: ticket.ref]
-          Should.Be.Struct.with_all_key_value(memo, Memo, want_kv)
+      assert %Alfred.Notify.Ticket{name: name, ref: ref} = ticket
 
-        error ->
-          refute true, Should.msg(error, "should have received Memo")
-      after
-        100 -> refute true, "should have received memo"
-      end
+      assert_receive({Alfred, %Alfred.Notify.Memo{name: name, ref: ref}}, 100)
     end
   end
 
   setup_all do
-    state = State.new()
-
-    {:ok, %{state: state}}
+    {:ok, %{state: Alfred.Notify.State.new()}}
   end
 
   setup [:register_name]
@@ -34,45 +20,43 @@ defmodule Alfred.NotifyStateTest do
   describe "Alfred.Notify.State.register/2" do
     @tag register: []
     test "adds registration and replies with Ticket", %{state: state, ticket: ticket} do
-      Should.Be.Map.with_size(state.registrations, 1)
-      Should.Be.struct(ticket, Ticket)
+      assert %Alfred.Notify.State{registrations: registrations} = state
+      assert map_size(registrations) == 1
+
+      assert %Alfred.Notify.Ticket{} = ticket
     end
 
     test "catches non-existant pid", %{state: state} do
-      register_opts = [pid: :c.pid(0, 9999, 0), name: NamesAid.unique("notifystate"), link: true]
+      register_opts = [pid: :c.pid(0, 9999, 0), name: Alfred.NamesAid.unique("notifystate"), link: true]
 
-      want_tuple = {:failed, :no_process_for_pid}
-
-      State.register(register_opts, state)
-      |> Should.Be.Tuple.of_types(2, [:struct, {:tuple, 2}])
-      |> tap(fn {state, _} -> Should.Be.State.with_key(state, :started_at) end)
-      |> tap(fn {_, tuple} -> Should.Be.equal(tuple, want_tuple) end)
+      assert {%Alfred.Notify.State{started_at: %DateTime{}}, {:failed, :no_process_for_pid}} =
+               Alfred.Notify.State.register(register_opts, state)
     end
   end
 
   describe "Alfred.Notify.State.notify/2" do
     @tag register: []
     test "finds a registration and notifies", %{state: state, ticket: ticket} do
-      utc_now = DateTime.utc_now()
-      seen_list = [%SeenName{name: ticket.name, ttl_ms: 10_000, seen_at: utc_now}]
+      assert %Alfred.Notify.Ticket{name: name} = ticket
+      seen_list = [%Alfred.SeenName{name: name, ttl_ms: 10_000, seen_at: DateTime.utc_now()}]
 
-      State.notify(seen_list, state)
-      |> Should.Be.Tuple.of_types(2, [:struct, :list])
-      |> tap(fn {state, _} -> Should.Be.State.with_key(state, :started_at) end)
-      |> tap(fn {_, seen_names} -> Should.Be.equal(seen_names, [ticket.name]) end)
+      assert {%Alfred.Notify.State{started_at: %DateTime{}}, seen_names} =
+               Alfred.Notify.State.notify(seen_list, state)
+
+      assert [seen_name | _] = seen_names
+
+      assert ^name = seen_name
 
       assert_receive_memo_for(ticket)
     end
 
     @tag register: []
     test "does not notify when name not registered", %{state: state} do
-      utc_now = DateTime.utc_now()
-      seen_list = [%SeenName{name: NamesAid.unique("notifystate"), ttl_ms: 10_000, seen_at: utc_now}]
+      seen_fields = [name: Alfred.NamesAid.unique("notifystate"), ttl_ms: 10_000, seen_at: DateTime.utc_now()]
+      seen_list = [struct(Alfred.SeenName, seen_fields)]
 
-      State.notify(seen_list, state)
-      |> Should.Be.Tuple.of_types(2, [:struct, :list])
-      |> tap(fn {state, _} -> Should.Be.State.with_key(state, :started_at) end)
-      |> tap(fn {_, seen_names} -> Should.Be.List.empty(seen_names) end)
+      assert {%Alfred.Notify.State{started_at: %DateTime{}}, []} =
+               Alfred.Notify.State.notify(seen_list, state)
 
       refute_received {Alfred, _}
     end
@@ -81,35 +65,39 @@ defmodule Alfred.NotifyStateTest do
   describe "Alfred.Notify.State.unregister/2" do
     @tag register: []
     test "removes the registration for a reference", %{state: state, ticket: ticket} do
-      ticket.ref
-      |> State.unregister(state)
-      |> Should.Be.State.with_key(:registrations)
-      |> tap(fn {_state, val} -> Should.Be.Map.empty(val) end)
+      assert %Alfred.Notify.Ticket{ref: ref} = ticket
+      assert %Alfred.Notify.State{registrations: registrations} = Alfred.Notify.State.unregister(ref, state)
+
+      assert is_map(registrations)
+      assert not is_map_key(registrations, ref)
     end
 
     @tag register: []
     test "leaves registratons unchanged when reference isn't known", %{state: state} do
-      make_ref()
-      |> State.unregister(state)
-      |> Should.Be.State.with_key(:registrations)
-      |> tap(fn {_state, val} -> Should.Be.NonEmpty.map(val) end)
+      assert %Alfred.Notify.State{registrations: initial_registrations} = state
+
+      unknown_ref = make_ref()
+
+      assert %Alfred.Notify.State{registrations: after_registrations} =
+               Alfred.Notify.State.unregister(unknown_ref, state)
+
+      assert initial_registrations == after_registrations
     end
   end
 
-  defp register_name(%{register: opts, state: %State{} = state}) when is_list(opts) do
+  defp register_name(%{register: opts, state: %Alfred.Notify.State{} = state}) when is_list(opts) do
     # NOTE: ttl_ms is generally not provided when registering
 
-    name = opts[:name] || NamesAid.unique("notifystate")
+    name = opts[:name] || Alfred.NamesAid.unique("notifystate")
     frequency = opts[:frequency] || []
     missing_ms = opts[:missing_ms] || 60_000
     pid = opts[:pid] || self()
     register_opts = [name: name, frequency: frequency, missing_ms: missing_ms, pid: pid]
 
-    State.register(register_opts, state)
-    |> Should.Be.Tuple.with_size(2)
-    |> tap(fn {state, _} -> Should.Be.State.with_key(state, :started_at) end)
-    |> tap(fn {_, rc} -> Should.Be.Ok.tuple_with_struct(rc, Ticket) end)
-    |> then(fn {state, {:ok, ticket}} -> %{state: state, ticket: ticket} end)
+    assert {%Alfred.Notify.State{started_at: %DateTime{}} = new_state,
+            {:ok, %Alfred.Notify.Ticket{} = ticket}} = Alfred.Notify.State.register(register_opts, state)
+
+    %{state: new_state, ticket: ticket}
   end
 
   defp register_name(_), do: :ok

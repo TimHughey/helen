@@ -1,17 +1,6 @@
 defmodule Alfred.ExecCmd.Args do
   @moduledoc false
 
-  @remaining_args [:cmd_opts, :cmd_params, :pub_opts]
-
-  def auto(args) when is_list(args) do
-    [cmd: make_cmd(args), name: make_name(args)]
-    |> get_defaults_and_remaining(args)
-    |> merge_all()
-    |> prune_spurious_args()
-    |> Enum.map(&sort_embedded_lists/1)
-    |> Enum.sort()
-  end
-
   def auto({args, defaults}), do: auto(args, defaults)
 
   @auto_merge [:cmd_opts, :cmd_params, :pub_opts]
@@ -75,15 +64,6 @@ defmodule Alfred.ExecCmd.Args do
     |> then(fn cmd_opts -> Map.put(acc, :cmd_opts, cmd_opts) end)
   end
 
-  @cmd [:cmd, :id]
-  @defaults [:cmd_defaults, :defaults]
-  @name [:name, :equipment]
-
-  defp defaults(args), do: Keyword.take(args, @defaults) |> pick_first([]) |> map_to_actual()
-  defp get_defaults_and_remaining(acc, args), do: {acc, defaults(args), remaining(args)}
-  defp make_cmd(args), do: Keyword.take(args, @cmd) |> pick_first() |> to_string()
-  defp make_name(args), do: Keyword.take(args, @name) |> pick_first()
-
   @version_split ~r/(?: v(?=\d{3}$))/
   defp make_version(x) do
     try do
@@ -98,12 +78,7 @@ defmodule Alfred.ExecCmd.Args do
     |> Enum.join(" ")
   end
 
-  defp map_to_actual(args), do: Enum.map(args, &short_key_to_actual/1)
   defp map_short_keys(args), do: Enum.map(args, &short_key_to_actual/1)
-
-  defp merge_all({acc, defaults, remaining}) do
-    Keyword.merge(defaults, acc ++ remaining, &pick_or_merge/3)
-  end
 
   defp merge_and_put(acc, key, defaults) do
     Map.get(acc, key)
@@ -111,27 +86,6 @@ defmodule Alfred.ExecCmd.Args do
     |> then(fn merged -> Map.put(acc, key, merged) end)
   end
 
-  defp pick_first(possible, default \\ :none), do: Keyword.values(possible) |> Enum.at(0, default)
-
-  defp pick_or_merge(key, default, override) do
-    case key do
-      x when x in [:cmd_params, :cmd_opts, :pub_opts] -> Keyword.merge(default, override)
-      x when x in [:cmd, :name] -> override
-    end
-  end
-
-  @no_params [:off, :on, "off", "on"]
-  defp prune_spurious_args(exec_opts) do
-    exec_opts_map = Enum.into(exec_opts, %{})
-
-    for {:cmd_params, _val} <- exec_opts_map, reduce: exec_opts_map do
-      %{cmd: cmd} = acc when cmd in @no_params -> Map.delete(acc, :cmd_params)
-      acc -> acc
-    end
-    |> Enum.into([])
-  end
-
-  defp remaining(args), do: map_to_actual(args) |> Keyword.take(@remaining_args)
   defp short_key_to_actual({:params, val}), do: {:cmd_params, val}
   defp short_key_to_actual({:opts, val}), do: {:cmd_opts, val}
   defp short_key_to_actual(kv), do: kv
