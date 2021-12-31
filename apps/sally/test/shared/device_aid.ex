@@ -24,7 +24,7 @@ defmodule Sally.DeviceAid do
     |> Repo.insert(insert_opts)
     |> then(fn
       {:ok, %Device{} = x} -> %{device: x}
-      error -> Should.prettyi(error)
+      error -> tap(error, fn -> inspect(error, pretty: true) |> IO.puts() end)
     end)
   end
 

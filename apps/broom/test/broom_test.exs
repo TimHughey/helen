@@ -1,6 +1,5 @@
 defmodule BroomTest do
   use ExUnit.Case
-  use Should
 
   alias Broom.Repo, as: Repo
   alias Broom.Test.Support
@@ -16,10 +15,6 @@ defmodule BroomTest do
     added_cmd: nil,
     tracker_entry: nil
   ]
-
-  setup_all ctx do
-    ctx
-  end
 
   setup ctx do
     ctx
@@ -62,27 +57,23 @@ defmodule BroomTest do
   #   end
   # end
 
-  test "can Broom create a child_spec for the using module", ctx do
-    ctx.impl_mod.child_spec(initial: :test)
-    |> Should.Be.Map.with_all_key_value(id: ctx.impl_mod)
+  test "can Broom create a child_spec for the using module", %{impl_mod: impl_mod} do
+    assert %{id: ^impl_mod} = impl_mod.child_spec(initial: :test)
   end
 
   test "can Broom get counts", ctx do
-    Broom.via_mod_counts(ctx.impl_mod)
-    |> Should.Be.struct(Broom.Counts)
+    assert %Broom.Counts{} = Broom.via_mod_counts(ctx.impl_mod)
   end
 
   test "can Broom reset counts", ctx do
-    Broom.via_mod_counts_reset(ctx.impl_mod, [:orphaned, :tracked, :not_a_count])
-    |> Should.Be.Tuple.rc_and_struct(:reset, Broom.Counts)
+    assert {:reset, %Broom.Counts{}} =
+             Broom.via_mod_counts_reset(ctx.impl_mod, [:orphaned, :tracked, :not_a_count])
   end
 
   @tag skip: false
   @tag dump_state: false
   test "can Broom get server state", ctx do
-    ctx
-    |> server_state()
-    |> Should.Be.State.with_key(:tracker)
+    assert %Broom.State{tracker: %{}} = server_state(ctx)
 
     dump_state(ctx)
   end
@@ -94,37 +85,38 @@ defmodule BroomTest do
     @tag dump_tracked_refs: false
     @tag cmd_disposition: :ack
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 2]
-    test "can track a schema, invoke track_timeout, notify and ack", ctx do
-      te = ctx.tracker_entry
-      fail = pretty("TrackerEntry validation failed", te)
+    test "can track a schema, invoke track_timeout, notify and ack", %{tracker_entry: te} do
+      assert %Broom.TrackerEntry{
+               acked: true,
+               acked_at: %DateTime{},
+               dev_alias_id: dev_alias_id,
+               cmd: "ack",
+               module: Broom.Execute,
+               notify_pid: notify_pid,
+               track_timeout_ms: 2,
+               orphaned: false,
+               refid: <<_::binary>>,
+               released: true,
+               released_at: %DateTime{},
+               schema: Broom.Command,
+               schema_id: schema_id,
+               sent_at: %DateTime{},
+               timer: nil,
+               tracked_at: %DateTime{}
+             } = te
 
-      # systematically confirm all %TrackerEntry fields are properly set
-      assert te.acked, fail
-      assert %DateTime{} = te.acked_at, fail
-      assert is_integer(te.dev_alias_id), fail
-      assert te.dev_alias_id > 0, fail
-      assert te.cmd == "ack", fail
-      assert te.module == Broom.Execute, fail
-      assert is_pid(te.notify_pid), fail
-      assert Process.alive?(te.notify_pid), fail
-      assert te.track_timeout_ms == 2, fail
-      assert te.orphaned == false, fail
-      # NOTE: data type of refid may change in the future, only check for nil
-      refute is_nil(te.refid), fail
-      assert te.released, fail
-      assert %DateTime{} = te.released_at, fail
-      assert te.schema == Broom.Command, fail
-      assert is_number(te.schema_id), fail
-      assert te.schema_id > 0, fail
-      assert %DateTime{} = te.sent_at, fail
-      assert is_nil(te.timer), fail
-      assert %DateTime{} = te.tracked_at, fail
+      assert is_integer(dev_alias_id)
+      assert dev_alias_id > 0
+      assert is_pid(notify_pid)
+      assert Process.alive?(notify_pid)
+      assert is_number(schema_id)
+      assert schema_id > 0
 
       # valid *_at fields describe processing sequence
-      assert DateTime.compare(te.sent_at, te.tracked_at) == :lt, fail
-      assert DateTime.compare(te.acked_at, te.released_at) == :lt, fail
+      assert DateTime.compare(te.sent_at, te.tracked_at) == :lt
+      assert DateTime.compare(te.acked_at, te.released_at) == :lt
 
-      dump_tracked_refs(ctx)
+      # dump_tracked_refs(ctx)
     end
 
     @tag dev_alias_opts: [name: "Track with Immediate Ack", pio: 2]
@@ -134,7 +126,7 @@ defmodule BroomTest do
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 1]
     test "can track an immediately acked schema, invoke track_timeout, notify and ack", ctx do
       te = ctx.tracker_entry
-      fail = pretty("TrackerEntry validation failed", te)
+      fail = "TrackerEntry validation failed"
 
       # systematically confirm all %TrackerEntry fields are properly set
       assert te.acked, fail
@@ -163,7 +155,7 @@ defmodule BroomTest do
 
       # check the actual Command
       cmd_schema = Repo.get!(Broom.Command, te.schema_id)
-      fail = pretty("Command validation failed", cmd_schema)
+      fail = "Command validation failed"
       assert cmd_schema.acked == true, fail
       refute cmd_schema.orphaned, fail
       # this is an immediate ack so sent_at == acked_at and rt_latency_us == 0
@@ -180,7 +172,7 @@ defmodule BroomTest do
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 0]
     test "can track a schema, invoke track_timeout and orphan", ctx do
       te = ctx.tracker_entry
-      fail = pretty("TrackerEntry validation failed", te)
+      fail = "TrackerEntry validation failed"
 
       # systematically confirm all %TrackerEntry fields are properly set
       # NOTE: orphaned cmds include acked and acked_at
@@ -210,7 +202,7 @@ defmodule BroomTest do
 
       # check the actual Command
       cmd_schema = Repo.get!(Broom.Command, te.schema_id)
-      fail = pretty("Command validation failed", cmd_schema)
+      fail = "Command validation failed"
       assert cmd_schema.acked == true, fail
       assert cmd_schema.orphaned, fail
       assert cmd_schema.rt_latency_us > 0, fail
@@ -225,10 +217,10 @@ defmodule BroomTest do
     @tag cmd_disposition: :ack
     test "can support refid access and release via db result", ctx do
       found_te = GenServer.call(ctx.impl_mod, {:get_refid_entry, ctx.tracker_entry.refid})
-      fail = pretty("should find TrackerEntry:", found_te)
+      fail = "should find TrackerEntry:"
       assert %Broom.TrackerEntry{} = found_te, fail
 
-      fail = pretty("found TrackerEntry validation failed", found_te)
+      fail = "found TrackerEntry validation failed"
 
       # systematically confirm all %TrackerEntry fields are properly set
       # NOTE: this should be an unreleased entry
@@ -258,7 +250,7 @@ defmodule BroomTest do
 
       assert %Broom.TrackerEntry{} = released_te, fail
 
-      fail = pretty("released TrackerEntry validation failed", released_te)
+      fail = "released TrackerEntry validation failed"
 
       # systematically confirm all %TrackerEntry fields are properly set
       # NOTE: this should be a released entry
@@ -294,67 +286,39 @@ defmodule BroomTest do
     @tag cmd_disposition: :orphan
     @tag track_opts: [notify_when_released: true, track_timeout_ms: 0]
     test "can Broom change the metrics reporting interval", ctx do
-      ctx.impl_mod
-      |> Broom.via_mod_change_metrics_interval("PT0.01S")
-      |> Should.Be.equal({:ok, %Broom.MetricsOpts{interval: "PT0.01S"}})
+      assert {:ok, %Broom.MetricsOpts{interval: "PT0.01S"}} =
+               Broom.via_mod_change_metrics_interval(ctx.impl_mod, "PT0.01S")
 
       Process.sleep(300)
 
-      alias Broom.Metrics
-
-      ctx.impl_mod
-      |> :sys.get_state()
-      |> Should.Be.State.with_key(:metrics)
-      |> then(fn {_, metrics} -> Should.Be.Struct.with_key(metrics, Metrics, :interval_ms) end)
-      |> then(fn interval_ms -> Should.Be.equal(interval_ms, 10) end)
+      assert %Broom.State{metrics: %Broom.Metrics{interval_ms: 10}} = :sys.get_state(ctx.impl_mod)
 
       dump_state(ctx) |> dump_tracked_refs()
     end
   end
 
-  # NOTE: ctx should include ack: true or orphan: true to set disposition of cmd
-  defp create_cmd(ctx) do
-    cmd_opts = ctx[:cmd_opts] || []
-
-    Broom.Command.add(ctx.dev_alias, make_cmd_binary(ctx), cmd_opts)
-    |> Should.Be.schema(Broom.Command)
-    |> then(fn schema -> Map.put(ctx, :added_cmd, schema) end)
-  end
-
   @dev_alias_defaults [decription: "default", ttl_ms: 3000]
-  defp create_alias(%{dev_alias_opts: opts, device: device} = ctx) do
-    opts
-    |> Keyword.merge(@dev_alias_defaults)
-    |> then(fn dev_alias_opts -> Support.add_dev_alias(device, dev_alias_opts) end)
-    |> Should.Be.schema(Broom.DevAlias)
-    |> then(fn schema -> Map.merge(ctx, %{dev_alias: schema, alias_name: schema.name}) end)
-  end
-
-  defp create_alias(ctx), do: ctx
-
-  defp create_device(ctx) do
-    ident = ctx[:dev_ident] || "broom/default-device"
-    # h = ctx[:dev_host] || "broom-host"
-    pios = ctx[:dev_pios] || 8
-    # now = ctx[:dev_last_seen_at] || DateTime.utc_now()
-    device_opts = [ident: ident, family: "i2c", mutable: true, pios: pios]
-
-    Support.add_device(ctx.host, device_opts)
-    |> Should.Be.schema(Broom.Device)
-    |> then(fn schema -> Map.put(ctx, :device, schema) end)
-  end
-
-  defp create_host(ctx) do
-    host_opts = [host: "broom.testhost", name: "Broom Test Host"]
-
-    Support.add_host(host_opts)
-    |> Should.Be.schema(Broom.Host)
-    |> then(fn schema -> Map.put(ctx, :host, schema) end)
-  end
-
-  defp create_wrapped(ctx) do
+  defp create_wrapped(%{dev_alias_opts: dev_alias_opts} = ctx) do
     Repo.transaction(fn ->
-      ctx |> create_host() |> create_device() |> create_alias() |> create_cmd()
+      host_opts = [host: "broom.testhost", name: "Broom Test Host"]
+      host = Support.add_host(host_opts)
+      assert %Broom.Host{ident: "broom.testhost"} = host
+
+      ident = "broom/default-device"
+      device = Support.add_device(host, ident: ident, family: "i2c", mutable: true, pios: 8)
+      assert %Broom.Device{ident: ^ident} = device
+
+      dev_alias_opts = Keyword.merge(@dev_alias_defaults, dev_alias_opts)
+      dev_alias = Support.add_dev_alias(device, dev_alias_opts)
+      assert %Broom.DevAlias{} = dev_alias
+
+      # NOTE: ctx should include ack: true or orphan: true to set disposition of cmd
+      cmd_opts = ctx[:cmd_opts] || []
+      added_cmd = Broom.Command.add(dev_alias, make_cmd_binary(ctx), cmd_opts)
+
+      assert %Broom.Command{} = added_cmd
+
+      %{host: host, device: device, dev_alias: dev_alias, alias_name: dev_alias.name, added_cmd: added_cmd}
     end)
     |> elem(1)
   end
@@ -380,11 +344,9 @@ defmodule BroomTest do
   defp track_cmd(ctx) do
     track_opts = ctx[:track_opts] || []
 
-    te_rc = Broom.Execute.track(ctx.added_cmd, track_opts)
+    assert {:ok, %Broom.TrackerEntry{} = te} = Broom.Execute.track(ctx.added_cmd, track_opts)
 
-    Should.Be.Ok.tuple(te_rc)
-
-    %{ctx | tracker_entry: elem(te_rc, 1)}
+    %{tracker_entry: te}
   end
 
   defp make_cmd_binary(ctx) do
@@ -399,19 +361,18 @@ defmodule BroomTest do
     if track_opts[:notify_when_released] == true do
       receive do
         msg ->
-          fail = pretty("notification msg did not match", msg)
-          assert {Broom, %Broom.TrackerEntry{}} = msg, fail
+          assert {Broom, %Broom.TrackerEntry{}} = msg
 
-          # return the TrackerEntry
-          %{ctx | tracker_entry: elem(msg, 1)}
+          # return the TrackerEntry to merge into ctx
+          %{tracker_entry: elem(msg, 1)}
       after
         1000 ->
-          fail = pretty("should have received: {Broom, %Broom.TrackerEntry{}}", :timeout)
-
-          assert :timeout == true, fail
+          assert :timeout == true, "should have received: {Broom, %Broom.TrackerEntry{}}"
+          # nothing to merge into ctx
+          :ok
       end
     else
-      ctx
+      :ok
     end
   end
 end
