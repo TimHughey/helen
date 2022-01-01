@@ -7,13 +7,19 @@ defmodule CarolEpisodeTest do
 
   setup [:opts_add, :episodes_add, :episodes_summary]
 
+  defmacro msg(lhs, text, rhs) do
+    quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
+      [Macro.to_string(lhs), text, Macro.to_string(rhs), "\n"]
+      |> Enum.join("\n")
+    end
+  end
+
   @fail_msgs [
     active: "active should be less than or equal to ref_dt",
     rest: "episode should be greater than previous"
   ]
   defmacro assert_active(episodes, ref_dt) do
     quote bind_quoted: [episodes: episodes, ref_dt: ref_dt] do
-      import Should, only: [msg: 3]
       active = hd(episodes)
 
       assert Timex.compare(active.at, ref_dt) <= 0, msg(active, @fail_msgs[:active], ref_dt)
@@ -47,8 +53,6 @@ defmodule CarolEpisodeTest do
 
   defmacro assert_rest(episodes, ref_dt) do
     quote bind_quoted: [episodes: episodes, ref_dt: ref_dt] do
-      import Should, only: [msg: 3]
-
       [active | rest] = episodes
 
       Enum.reduce(rest, active, fn episode, previous ->

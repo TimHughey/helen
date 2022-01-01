@@ -4,7 +4,7 @@ defmodule Should.MixProject do
   def project do
     [
       app: :should,
-      version: "0.6.34",
+      version: "0.7.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -23,7 +23,7 @@ defmodule Should.MixProject do
       ## Docs
       name: "Should",
       source_url: "https://github.com/timhughey/helen",
-      homepage_url: "http://www.wisslanding.com",
+      homepage_url: "http://www.wisslanding.com/helen/doc",
       docs: docs()
     ]
   end
@@ -42,11 +42,7 @@ defmodule Should.MixProject do
       # The main page in the docs
       main: "Should",
       # logo: "path/to/logo.png",
-      extras: ["README.md"],
-      groups_for_modules: [
-        "Should Be": [Should.Be, Should.Be.Invalid, Should.Be.Map]
-      ]
-      # nest_modules_by_prefix: [Should.Be, Be, Should.Contain, Contain]
+      extras: ["README.md"]
     ]
   end
 

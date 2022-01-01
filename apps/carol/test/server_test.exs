@@ -1,5 +1,6 @@
 defmodule CarolServerTest do
   use ExUnit.Case, async: true
+  use Should
 
   @moduletag carol: true, carol_server: true
 
@@ -7,6 +8,13 @@ defmodule CarolServerTest do
   setup [:memo_add, :start_args_add, :start_supervised_add]
   setup [:missing_opts_add]
   setup [:ctx_puts]
+
+  defmacro msg(lhs, text, rhs) do
+    quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
+      [Macro.to_string(lhs), text, Macro.to_string(rhs), "\n"]
+      |> Enum.join("\n")
+    end
+  end
 
   defmacro assert_cmd_echoed(ctx, cmd) do
     quote location: :keep, bind_quoted: [ctx: ctx, cmd: cmd] do
@@ -105,8 +113,6 @@ defmodule CarolServerTest do
     @tag start_args_add: {:app, :carol, CarolWithEpisodes, :first_instance}
     @tag start_supervised_add: []
     test "can be paused, resumed and restarted", ctx do
-      import Should, only: [msg: 3]
-
       pid = ctx.server_pid
       server_name = ctx.server_name
 
@@ -211,7 +217,6 @@ defmodule CarolServerTest do
   end
 
   defp ctx_puts(%{ctx_puts: what} = ctx) do
-    import Should, only: [pretty_puts: 1]
     ctx = Map.delete(ctx, :ctx_puts)
 
     case what do

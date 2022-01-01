@@ -5,10 +5,15 @@ defmodule CarolEpisodeSimTest do
 
   setup [:opts_add, :episodes_add, :sim_add]
 
+  defmacro msg(lhs, text, rhs) do
+    quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
+      [Macro.to_string(lhs), text, Macro.to_string(rhs), "\n"]
+      |> Enum.join("\n")
+    end
+  end
+
   defmacro assert_sim(want_order) do
     quote bind_quoted: [want_order: want_order] do
-      import Should, only: [msg: 3]
-
       %{episodes: episodes, opts: opts, ref_dt: ref_dt, sim_ms: sim_ms, step_ms: step_ms} = var!(ctx)
 
       sim_measure = Map.get(var!(ctx), :sim_measure, false)
@@ -47,8 +52,6 @@ defmodule CarolEpisodeSimTest do
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag want_order: ["Now 1", "Future 1", "Future 2", "Future 3", "Past -3", "Past -2", "Past -1"]
     test "mixed episodes using Carol.Episode.ms_until_next_episode/2 to advance ref_dt", ctx do
-      import Should, only: [msg: 3]
-
       # calculate the number of reductions we need to simulate the requested sim days
       %{episodes_add: {_, add_opts}} = ctx
       sim_episodes = Enum.reduce(add_opts, 0, fn {_k, val}, acc -> acc + val end) * ctx.sim_days
