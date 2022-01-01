@@ -1,7 +1,9 @@
 defmodule Sally.DeviceAid do
-  alias Sally.{DevAlias, Device, Host, Repo}
+  @moduledoc """
+  Supporting functionality for creating Sally.Device for testing
+  """
 
-  def add(%{device_add: opts, host: %Host{} = host}) when is_list(opts) do
+  def add(%{device_add: opts, host: %Sally.Host{} = host}) when is_list(opts) do
     device = Ecto.build_assoc(host, :devices)
     type = opts[:auto] || :ds
     ident = opts[:ident] || unique(type)
@@ -9,7 +11,7 @@ defmodule Sally.DeviceAid do
     base = %{last_seen_at: DateTime.utc_now()}
 
     insert_opts = [
-      on_conflict: {:replace, Device.columns(:replace)},
+      on_conflict: {:replace, Sally.Device.columns(:replace)},
       returning: true,
       conflict_target: [:ident]
     ]
@@ -20,25 +22,31 @@ defmodule Sally.DeviceAid do
       :pwm -> %{ident: ident, family: "pwm", pios: 4, mutable: true}
     end
     |> Map.merge(base)
-    |> Device.changeset(device)
-    |> Repo.insert(insert_opts)
-    |> then(fn
-      {:ok, %Device{} = x} -> %{device: x}
-      error -> tap(error, fn -> inspect(error, pretty: true) |> IO.puts() end)
+    |> Sally.Device.changeset(device)
+    |> Sally.Repo.insert(insert_opts)
+    |> then(fn insert_rc ->
+      case insert_rc do
+        {:ok, %Sally.Device{} = x} ->
+          %{device: x}
+
+        error ->
+          tap(error, fn -> inspect(error, pretty: true) |> IO.puts() end)
+          %{device: :failed}
+      end
     end)
   end
 
   def add(_), do: :ok
 
-  def aliases(%Device{} = device) do
-    Device.load_aliases(device)
+  def aliases(%Sally.Device{} = device) do
+    Sally.Device.load_aliases(device)
   end
 
-  def next_pio(%Device{} = device) do
-    device = Device.load_aliases(device)
+  def next_pio(%Sally.Device{} = device) do
+    device = Sally.Device.load_aliases(device)
 
     all_pios = 0..(device.pios - 1) |> Enum.to_list()
-    used_pios = for %DevAlias{pio: x} <- device.aliases, do: x
+    used_pios = for %Sally.DevAlias{pio: x} <- device.aliases, do: x
 
     available_pios = all_pios -- used_pios
 

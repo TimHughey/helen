@@ -1,10 +1,7 @@
 defmodule Sally.DevAliasAidTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag sally: true, sally_devalias_aid: true
-
-  alias Sally.{DevAlias, DevAliasAid, Device, DeviceAid, HostAid}
 
   setup_all do
     {:ok, %{host_add: [], host_setup: []}}
@@ -15,43 +12,37 @@ defmodule Sally.DevAliasAidTest do
   describe "DevAliasAid.add/1" do
     @tag device_add: [], devalias_add: []
     test "creates a new DevAlias with defaults", ctx do
-      Should.Be.Map.with_key(ctx, :dev_alias)
-
-      device_kv = [family: "ds", mutable: false, pios: 1]
-      Should.Be.Struct.with_all_key_value(ctx.device, Device, device_kv)
-
-      devalias_kv = [pio: 0]
-      Should.Be.Schema.with_all_key_value(ctx.dev_alias, DevAlias, devalias_kv)
+      assert %{
+               dev_alias: %Sally.DevAlias{pio: 0},
+               device: %Sally.Device{family: "ds", mutable: false, pios: 1}
+             } = ctx
     end
 
     @tag device_add: [], devalias_add: []
     test "does nothing when :devalias_add not present in context", ctx do
-      Should.Be.Map.with_key(ctx, :device)
-      Should.Be.Map.without_key(ctx, :devalias)
+      assert %{device: %Sally.Device{}} = ctx
+      refute is_map_key(ctx, :devalias)
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: []
     test "creates a new DevAlias to a mutable", ctx do
-      Should.Be.Map.with_key(ctx, :dev_alias)
-
-      device_kv = [family: "i2c", mutable: true, pios: 8]
-      Should.Be.Struct.with_all_key_value(ctx.device, Device, device_kv)
-
-      devalias_kv = [pio: 0]
-      Should.Be.Schema.with_all_key_value(ctx.dev_alias, DevAlias, devalias_kv)
+      assert %{
+               dev_alias: %Sally.DevAlias{pio: 0},
+               device: %Sally.Device{family: "i2c", mutable: true, pios: 8}
+             } = ctx
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 4]
     test "creates multiple DevAlias", ctx do
-      dev_aliases = Should.Be.Map.with_key(ctx, :dev_alias)
+      assert %{
+               dev_alias: [%Sally.DevAlias{} | _] = dev_aliases,
+               device: %Sally.Device{family: "i2c", mutable: true, pios: 8}
+             } = ctx
 
-      Should.Be.List.with_length(dev_aliases, 4)
+      assert length(dev_aliases) == 4
 
-      want_kv = [device_id: ctx.device.id]
-
-      for dev_alias <- dev_aliases do
-        Should.Be.Schema.with_all_key_value(dev_alias, DevAlias, want_kv)
-      end
+      device_id = ctx.device.id
+      Enum.all?(dev_aliases, fn dev_alias -> assert %Sally.DevAlias{device_id: ^device_id} = dev_alias end)
     end
   end
 
@@ -62,19 +53,19 @@ defmodule Sally.DevAliasAidTest do
       count = ctx[:devalias_add][:count] || 0
       jsr = ctx[:sally_just_saw]
 
-      Should.Be.List.with_length(jsr, count)
+      assert length(jsr) == count
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 4]
     test "does nothing when :just_saw not present in context", ctx do
-      Should.Be.Map.with_key(ctx, :dev_alias)
-      Should.Be.Map.without_key(ctx, :sally_just_saw)
+      assert %{dev_alias: [%Sally.DevAlias{} | _]} = ctx
+      refute is_map_key(ctx, :sally_just_saw)
     end
   end
 
-  def devalias_add(ctx), do: DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: DeviceAid.add(ctx)
-  def host_add(ctx), do: HostAid.add(ctx)
-  def host_setup(ctx), do: HostAid.setup(ctx)
+  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
+  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
+  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
+  def host_add(ctx), do: Sally.HostAid.add(ctx)
+  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
 end

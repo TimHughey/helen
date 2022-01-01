@@ -1,10 +1,8 @@
 defmodule Sally.HostTest do
   # NOTE:  don't use async: true due to testing Sally.host_setup(:unnamed)
   use ExUnit.Case
-  use Should
-  use Sally.TestAid
 
-  alias Sally.Host
+  use Sally.TestAid
 
   @moduletag sally: true, sally_host: true
 
@@ -17,15 +15,15 @@ defmodule Sally.HostTest do
 
   describe "Sally.host_ota_live/1" do
     test "invokes an OTA for live hosts with default opts", %{host: _} do
-      Sally.host_ota_live() |> Should.Be.List.of_structs(Sally.Host.Instruct)
+      assert [%Sally.Host.Instruct{} | _] = Sally.host_ota_live()
     end
   end
 
   test "Sally.host_retire/1 retires an existing host", %{host: host} do
-    host = Sally.host_retire(host.name) |> Should.Be.Ok.tuple_with_struct(Host)
+    %Sally.Host{name: retire_name, ident: retire_ident} = host
 
-    want_kv = [authorized: false, reset_reason: "retired", name: host.ident]
-    Should.Be.Struct.with_all_key_value(host, Host, want_kv)
+    assert {:ok, %Sally.Host{authorized: false, ident: ^retire_ident, reset_reason: "retired"}} =
+             Sally.host_retire(retire_name)
   end
 
   describe "Sally.host_rename/1 handles" do
@@ -33,33 +31,35 @@ defmodule Sally.HostTest do
       # create a second host
       %{host: host2} = host_add(%{host_add: [], host_setup: []})
 
-      opts = [from: host.name, to: host2.name]
-      Sally.host_rename(opts) |> Should.Be.Tuple.with_rc_and_binaries(:name_taken, host2.name)
+      taken_name = host2.name
+      opts = [from: host.name, to: taken_name]
+      assert {:name_taken, ^taken_name} = Sally.host_rename(opts)
     end
 
     test "when the new name is available", %{host: host} do
       # first, test Host performs the rename
-      opts = [from: host.name, to: HostAid.unique(:name)]
-      Host.rename(opts) |> Should.Be.struct(Host)
+      opts = [from: host.name, to: Sally.HostAid.unique(:name)]
+      assert %Sally.Host{} = Sally.Host.rename(opts)
 
       # second, test Sally.host_rename recognizes success
-      opts = [from: opts[:to], to: HostAid.unique(:name)]
-      Sally.host_rename(opts) |> Should.Be.match(:ok)
+      opts = [from: opts[:to], to: Sally.HostAid.unique(:name)]
+      assert :ok = Sally.host_rename(opts)
     end
 
     test "when requested host name is unavailable" do
-      opts = [from: HostAid.unique(:name), to: HostAid.unique(:name)]
-      Sally.host_rename(opts) |> Should.Be.Tuple.with_rc_and_binaries(:not_found, opts[:from])
+      opts = [from: Sally.HostAid.unique(:name), to: Sally.HostAid.unique(:name)]
+      src_name = opts[:from]
+      assert {:not_found, ^src_name} = Sally.host_rename(opts)
     end
 
     test "when opts are invalid" do
-      Sally.host_rename([]) |> Should.Be.Tuple.with_rc(:bad_args)
+      assert {:bad_args, _} = Sally.host_rename([])
     end
   end
 
   describe "Sally.Host.live/1" do
     test "returns a list of %Host{} with default opts", %{host: _host} do
-      Host.live() |> Should.Be.List.of_schemas(Host)
+      assert [%Sally.Host{} | _] = Sally.Host.live()
     end
   end
 end

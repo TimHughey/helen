@@ -1,13 +1,8 @@
 defmodule Sally.DevAliasJustSawTest do
   use ExUnit.Case, async: true
-  use Should
   use Sally.TestAid
 
   @moduletag sally: true, sally_dev_alias_just_saw: true
-
-  alias Ecto.Multi
-  alias Sally.{DevAlias, DeviceAid, HostAid}
-  alias Sally.Repo
 
   setup_all do
     {:ok, %{host_add: [], host_setup: []}}
@@ -16,17 +11,12 @@ defmodule Sally.DevAliasJustSawTest do
   setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
 
   defmacro validate_db_result(db_result, seen_at, count) do
-    quote location: :keep, bind_quoted: [db_result: db_result, seen_at: seen_at, count: count] do
-      results = Should.Be.Tuple.with_rc(db_result, :ok)
+    quote bind_quoted: [db_result: db_result, seen_at: seen_at, count: count] do
+      assert {:ok, %{seen_list: seen_list}} = db_result
 
-      map = Should.Be.Map.with_keys(results, [:seen_list])
-      seen_list = Should.Be.List.with_length(map.seen_list, count, unwrap: false)
+      assert length(seen_list) == count
 
-      for dev_alias <- seen_list do
-        Should.Be.Schema.named(dev_alias, DevAlias)
-
-        Should.Be.match(dev_alias.updated_at, seen_at)
-      end
+      Enum.all?(seen_list, fn dev_alias -> assert %Sally.DevAlias{updated_at: ^seen_at} = dev_alias end)
     end
   end
 
@@ -36,10 +26,10 @@ defmodule Sally.DevAliasJustSawTest do
       seen_at = Timex.now()
 
       db_result =
-        Multi.new()
-        |> Multi.put(:aliases, [ctx.dev_alias])
-        |> Multi.run(:seen_list, DevAlias, :just_saw, [seen_at])
-        |> Repo.transaction()
+        Ecto.Multi.new()
+        |> Ecto.Multi.put(:aliases, [ctx.dev_alias])
+        |> Ecto.Multi.run(:seen_list, Sally.DevAlias, :just_saw, [seen_at])
+        |> Sally.Repo.transaction()
 
       validate_db_result(db_result, seen_at, 1)
     end
@@ -51,10 +41,10 @@ defmodule Sally.DevAliasJustSawTest do
       expected_count = length(dev_aliases)
 
       db_result =
-        Multi.new()
-        |> Multi.put(:aliases, dev_aliases)
-        |> Multi.run(:seen_list, DevAlias, :just_saw, [seen_at])
-        |> Repo.transaction()
+        Ecto.Multi.new()
+        |> Ecto.Multi.put(:aliases, dev_aliases)
+        |> Ecto.Multi.run(:seen_list, Sally.DevAlias, :just_saw, [seen_at])
+        |> Sally.Repo.transaction()
 
       validate_db_result(db_result, seen_at, expected_count)
     end
@@ -63,13 +53,13 @@ defmodule Sally.DevAliasJustSawTest do
   describe "Sally.DevAlias.just_saw/4" do
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 8]
     test "handles a single DevAlias id in an Ecto.Multi pipeline", ctx do
-      dev_alias = DevAliasAid.random_pick(ctx.dev_alias, 1)
+      dev_alias = Sally.DevAliasAid.random_pick(ctx.dev_alias, 1)
       seen_at = Timex.now()
 
       db_result =
-        Multi.new()
-        |> Multi.run(:seen_list, DevAlias, :just_saw_id, [dev_alias.id, seen_at])
-        |> Repo.transaction()
+        Ecto.Multi.new()
+        |> Ecto.Multi.run(:seen_list, Sally.DevAlias, :just_saw_id, [dev_alias.id, seen_at])
+        |> Sally.Repo.transaction()
 
       validate_db_result(db_result, seen_at, 1)
     end

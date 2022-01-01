@@ -1,5 +1,7 @@
 defmodule Sally.HostAid do
-  alias Sally.{Host, Repo}
+  @moduledoc """
+  Supporting functionality for creating Sally.Host for testing
+  """
 
   # NOTE:
   # all functions are intended for use in ExUnit.Case setup functions
@@ -7,24 +9,22 @@ defmodule Sally.HostAid do
   # returns either a map to merge into the context or :ok
 
   def add(%{host_add: opts}) do
-    alias Sally.Host.ChangeControl
-
     ident = opts[:ident] || unique(:ident)
     start_at = opts[:start_at] || DateTime.utc_now()
     seen_at = opts[:seen_at] || DateTime.utc_now()
 
     want_keys = [:ident, :last_start_at, :last_seen_at, :name]
 
-    cc = %ChangeControl{
+    cc = %Sally.Host.ChangeControl{
       raw_changes: %{ident: ident, last_start_at: start_at, last_seen_at: seen_at, name: ident},
       required: want_keys,
       replace: want_keys
     }
 
-    changes = Host.changeset(cc)
+    changes = Sally.Host.changeset(cc)
 
-    case Repo.insert(changes, Host.insert_opts(cc.replace)) do
-      {:ok, %Host{} = host} -> %{host: host}
+    case Sally.Repo.insert(changes, Sally.Host.insert_opts(cc.replace)) do
+      {:ok, %Sally.Host{} = host} -> %{host: host}
       _ -> :fail
     end
   end
@@ -62,12 +62,12 @@ defmodule Sally.HostAid do
     |> Msgpax.pack!(iodata: false)
   end
 
-  def setup(%{host_setup: opts, host: %Host{} = host}) do
+  def setup(%{host_setup: opts, host: %Sally.Host{} = host}) do
     name = opts[:name] || unique(:name)
     profile = opts[:profile] || "generic"
 
-    case Host.setup(host, name: name, profile: profile) do
-      {:ok, %Host{} = host} -> %{host: host}
+    case Sally.Host.setup(host, name: name, profile: profile) do
+      {:ok, %Sally.Host{} = host} -> %{host: host}
       _ -> :fail
     end
   end

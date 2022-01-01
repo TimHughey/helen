@@ -1,8 +1,7 @@
 defmodule Sally.DispatchAid do
-  use Should
-
-  alias Sally.Dispatch
-  alias Sally.HostAid
+  @moduledoc """
+  Supporting functionality for creating Sally.Dispatch for testing
+  """
 
   def add(%{dispatch_add: opts} = ctx) when is_list(opts) do
     fields = [
@@ -13,38 +12,38 @@ defmodule Sally.DispatchAid do
       recv_at: recv_at(opts)
     ]
 
-    case struct(Dispatch, fields) do
-      %Dispatch{subsystem: "host", category: "boot"} = x -> add_host(x, ctx, :boot)
-      %Dispatch{subsystem: "host", category: "startup"} = x -> add_host(x, ctx, :startup)
-      %Dispatch{subsystem: "immut", category: "celsius"} = x -> add_immutable(x, ctx)
-      %Dispatch{subsystem: "immut", category: "relhum"} = x -> add_immutable(x, ctx)
-      %Dispatch{subsystem: "mut", category: "cmdack"} = x -> add_mutable_cmdack(x, ctx)
-      %Dispatch{subsystem: "mut", category: "status"} = x -> add_mutable(x, ctx)
-      %Dispatch{} -> :ok
+    case struct(Sally.Dispatch, fields) do
+      %Sally.Dispatch{subsystem: "host", category: "boot"} = x -> add_host(x, ctx, :boot)
+      %Sally.Dispatch{subsystem: "host", category: "startup"} = x -> add_host(x, ctx, :startup)
+      %Sally.Dispatch{subsystem: "immut", category: "celsius"} = x -> add_immutable(x, ctx)
+      %Sally.Dispatch{subsystem: "immut", category: "relhum"} = x -> add_immutable(x, ctx)
+      %Sally.Dispatch{subsystem: "mut", category: "cmdack"} = x -> add_mutable_cmdack(x, ctx)
+      %Sally.Dispatch{subsystem: "mut", category: "status"} = x -> add_mutable(x, ctx)
+      %Sally.Dispatch{} -> :ok
     end
     |> preprocess()
   end
 
   def add(_), do: :ok
 
-  # (2 of x) create a Dispatch for a host boot messgge
+  # (2 of x) create a Sally.Dispatch for a host boot messgge
   def add_host(base, %{dispatch_add: opts} = ctx, :boot) do
     host_ident = if ctx[:host], do: ctx.host.ident, else: Sally.HostAid.unique(:ident)
     host_profile = if ctx[:host], do: ctx.host.profile, else: "generic"
 
     [
       ident: host_ident,
-      payload: HostAid.make_payload(:startup, opts),
+      payload: Sally.HostAid.make_payload(:startup, opts),
       filter_extra: [host_profile]
     ]
     |> then(fn fields -> %{dispatch: struct(base, fields)} end)
   end
 
-  # (1 of x) create a Dispatch for a host startup
+  # (1 of x) create a Sally.Dispatch for a host startup
   def add_host(base, %{dispatch_add: opts} = ctx, :startup) do
     host_ident = if ctx[:host], do: ctx.host.ident, else: Sally.HostAid.unique(:ident)
 
-    [ident: host_ident, payload: HostAid.make_payload(:startup, opts)]
+    [ident: host_ident, payload: Sally.HostAid.make_payload(:startup, opts)]
     |> then(fn fields -> %{dispatch: struct(base, fields)} end)
   end
 
@@ -82,22 +81,19 @@ defmodule Sally.DispatchAid do
 
   defmacro assert_processed(x) do
     quote location: :keep, bind_quoted: [x: x] do
-      alias Sally.{DevAlias, Device}
-
       base_valid_kv = [valid?: true, invalid_reason: :none]
-      dispatch = Should.Be.Struct.with_all_key_value(x, Dispatch, base_valid_kv)
 
-      results = Should.Be.map(dispatch.results)
-
-      device = Should.Be.Map.with_key(results, :device) |> Should.Be.struct(Device)
-      seen_list = Should.Be.NonEmpty.list(dispatch.seen_list)
+      assert %Sally.Dispatch{
+               valid?: true,
+               invalid_reason: :none,
+               results: %{device: %Sally.Device{mutable: mutable?}},
+               seen_list: [_ | _] = seen_list
+             } = dispatch = x
 
       # validate the device processed established appropriate Alfred linkages
-      want_struct = if device.mutable, do: Alfred.MutableStatus, else: Alfred.ImmutableStatus
+      want_struct = if mutable?, do: Alfred.MutableStatus, else: Alfred.ImmutableStatus
 
-      for name <- seen_list do
-        Alfred.status(name) |> Should.Be.struct(want_struct)
-      end
+      Enum.all?(seen_list, fn name -> assert is_struct(Alfred.status(name), want_struct) end)
 
       # return the processed dispatch
       dispatch
@@ -108,7 +104,7 @@ defmodule Sally.DispatchAid do
 
   defp make_pins(count, cmd), do: for(pin <- 0..(count - 1), do: [pin, cmd])
 
-  defp preprocess(%{dispatch: %Dispatch{} = x}), do: %{dispatch: Dispatch.preprocess(x)}
+  defp preprocess(%{dispatch: %Sally.Dispatch{} = x}), do: %{dispatch: Sally.Dispatch.preprocess(x)}
   defp preprocess(any), do: any
 
   defp recv_at(opts), do: opts[:recv_at] || DateTime.utc_now()

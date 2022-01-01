@@ -1,12 +1,9 @@
 defmodule SallyDevAliasTest do
   # can not use async: true due to indirect use of Sally.device_latest/1
   use ExUnit.Case
-  use Should
   use Sally.TestAid
 
   @moduletag sally: true, sally_dev_alias: true
-
-  alias Sally.DevAlias
 
   setup_all do
     # always create and setup a host
@@ -16,43 +13,56 @@ defmodule SallyDevAliasTest do
   setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
   setup [:command_add, :datapoint_add, :dispatch_add]
 
+  # defmacro assert_rc_regex(x, rc, regex) do
+  #   quote bind_quoted: [x: x, rc: rc, regex: regex] do
+  #     assert {^rc, binaries} = x
+  #     assert binaries =~ regex
+  #   end
+  # end
+
   describe "Sally.device_add_alias/1" do
     @tag device_add: [auto: :mcp23008]
     test "detects missing options", %{device: device} do
-      opts = [name: DevAliasAid.unique(:devalias)]
-      Sally.device_add_alias(opts) |> Should.Be.Tuple.with_rc_and_binaries(:error, "device")
+      assert {:error, text} = Sally.device_add_alias(name: Sally.DevAliasAid.unique(:devalias))
+      assert text =~ ~r/:device missing/
 
-      opts = [device: device.ident]
-      Sally.device_add_alias(opts) |> Should.Be.Tuple.with_rc_and_binaries(:error, "name")
+      assert {:error, text} = Sally.device_add_alias(device: device.ident)
+      assert text =~ ~r/name/
 
-      opts = [device: device.ident, name: DevAliasAid.unique(:devalias)]
-      Sally.device_add_alias(opts) |> Should.Be.Tuple.with_rc_and_binaries(:error, "pio")
+      assert {:error, text} =
+               Sally.device_add_alias(device: device.ident, name: Sally.DevAliasAid.unique(:devalias))
+
+      assert text =~ ~r/pio/
     end
 
     test "detects missing device" do
-      opts = [device: "ds.missing", name: DevAliasAid.unique(:devalias)]
-      Sally.device_add_alias(opts) |> Should.Be.Tuple.with_rc_and_binaries(:not_found, "missing")
+      assert {:not_found, text} =
+               Sally.device_add_alias(device: "ds.missing", name: Sally.DevAliasAid.unique(:devalias))
+
+      assert text =~ ~r/ds.missing/
     end
 
     @tag device_add: [auto: :mcp23008]
     test "handles changeset errors", %{device: device} do
-      opts = [device: device.ident, name: DevAliasAid.unique(:dev_alias), pio: -1]
-      Sally.device_add_alias(opts) |> Should.Be.Tuple.with_rc(:error) |> Should.Be.NonEmpty.list()
+      opts = [device: device.ident, name: Sally.DevAliasAid.unique(:dev_alias), pio: -1]
+      assert {:error, [{:pio, _}]} = Sally.device_add_alias(opts)
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
     test "detects duplicate name", %{device: device, dev_alias: dev_alias} do
+      taken_name = dev_alias.name
+
       opts = [device: device.ident, name: dev_alias.name]
-      Sally.device_add_alias(opts) |> Should.Be.Tuple.with_rc_and_binaries(:name_taken, dev_alias.name)
+      assert {:name_taken, ^taken_name} = Sally.device_add_alias(opts)
     end
 
     @tag device_add: [auto: :ds]
     test "creates alias to latest device discovered", %{device: device} do
-      opts = [device: :latest, name: DevAliasAid.unique(:dev_alias)]
-      dev_alias = Sally.device_add_alias(opts) |> Should.Be.schema(DevAlias)
+      opts = [device: :latest, name: Sally.DevAliasAid.unique(:dev_alias)]
+      assert %Sally.DevAlias{} = dev_alias = Sally.device_add_alias(opts)
 
-      dev_alias = DevAlias.load_device(dev_alias) |> Should.Be.schema(DevAlias)
-      Should.Be.asserted(fn -> dev_alias.device.ident == device.ident end)
+      assert %Sally.DevAlias{device: %Sally.Device{ident: ident}} = Sally.DevAlias.load_device(dev_alias)
+      assert ident == device.ident
     end
   end
 
@@ -60,76 +70,90 @@ defmodule SallyDevAliasTest do
     @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
     @tag command_add: [count: 250, shift_unit: :days, shift_increment: -1]
     test "deletes a mutable DevAlias name", ctx do
-      ctx.dev_alias.name
-      |> Sally.devalias_delete()
-      |> Should.Be.Tuple.with_rc_and_list(:ok)
-      |> Should.Be.NonEmpty.list()
+      assert %Sally.DevAlias{name: to_delete_name} = ctx.dev_alias
+
+      assert {:ok, [{:name, ^to_delete_name}, {:commands, _}, {:datapoints, _}, {:alfred, _}]} =
+               Sally.devalias_delete(to_delete_name)
     end
 
     @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
     @tag datapoint_add: [count: 250, shift_unit: :days, shift_increment: -1]
     test "deletes an immutable DevAlias name", ctx do
-      ctx.dev_alias.name
-      |> Sally.devalias_delete()
-      |> Should.Be.Tuple.with_rc_and_list(:ok)
-      |> Should.Be.NonEmpty.list()
+      assert %Sally.DevAlias{name: to_delete_name} = ctx.dev_alias
+
+      assert {:ok, [{:name, ^to_delete_name}, {:commands, _}, {:datapoints, _}, {:alfred, _}]} =
+               Sally.devalias_delete(to_delete_name)
     end
   end
 
   @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
   test "Sally.devalias_info/2 returns summarized and raw results", %{device: device, host: host} do
-    opts = [device: device.ident, name: DevAliasAid.unique(:dev_alias)]
-    dev_alias = Sally.device_add_alias(opts) |> Should.Be.schema(DevAlias)
+    assert %Sally.Host{
+             name: host_name,
+             ident: host_ident,
+             profile: host_profile,
+             last_seen_at: host_last_seen_at
+           } = host
 
-    to_match = %{
-      cmd: %{},
-      description: "<none>",
-      name: dev_alias.name,
-      pio: dev_alias.pio,
-      ttl_ms: dev_alias.ttl_ms,
-      host: %{name: host.name, ident: host.ident, profile: host.profile, last_seen_at: host.last_seen_at},
-      device: %{ident: device.ident, last_seen_at: device.last_seen_at}
-    }
+    assert %Sally.Device{ident: dev_ident, last_seen_at: dev_last_seen_at} = device
 
-    Sally.devalias_info(dev_alias.name) |> Should.Be.match(to_match)
+    name = Sally.DevAliasAid.unique(:dev_alias)
+
+    assert %Sally.DevAlias{name: ^name, pio: dev_alias_pio, ttl_ms: dev_alias_ttl_ms} =
+             Sally.device_add_alias(device: device.ident, name: name)
+
+    assert %{
+             cmd: %{},
+             description: "<none>",
+             name: ^name,
+             pio: ^dev_alias_pio,
+             ttl_ms: ^dev_alias_ttl_ms,
+             host: %{
+               name: ^host_name,
+               ident: ^host_ident,
+               profile: ^host_profile,
+               last_seen_at: ^host_last_seen_at
+             },
+             device: %{ident: ^dev_ident, last_seen_at: ^dev_last_seen_at}
+           } = Sally.devalias_info(name)
   end
 
   describe "Sally.devalias_rename/1 handles" do
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 2], just_saw: []
     test "when the to name is taken", %{dev_alias: dev_aliases} do
-      [%DevAlias{name: from}, %DevAlias{name: to}] = dev_aliases
+      assert [%Sally.DevAlias{name: from}, %Sally.DevAlias{name: to}] = dev_aliases
 
-      opts = [from: from, to: to]
-      Sally.devalias_rename(opts) |> Should.Be.Tuple.with_rc_and_binaries(:name_taken, to)
+      assert {:name_taken, ^to} = Sally.devalias_rename(from: from, to: to)
     end
 
     @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
     test "when the new name is available", %{dev_alias: dev_alias} do
       # first, test Host performs the rename
-      opts = [from: dev_alias.name, to: DevAliasAid.unique(:dev_alias)]
-      DevAlias.rename(opts) |> Should.Be.Schema.with_all_key_value(DevAlias, name: opts[:to])
+      new_name = Sally.DevAliasAid.unique(:dev_alias)
+
+      assert %Sally.DevAlias{name: ^new_name} = Sally.DevAlias.rename(from: dev_alias.name, to: new_name)
 
       # second, test Sally.dev_alias_rename recognizes success
-      opts = [from: opts[:to], to: DevAliasAid.unique(:dev_alias)]
-      Sally.devalias_rename(opts) |> Should.Be.match(:ok)
+      assert :ok = Sally.devalias_rename(from: new_name, to: Sally.DevAliasAid.unique(:dev_alias))
     end
 
     test "when requested dev_alias name is unavailable" do
-      # first, test Host performs the rename
-      opts = [from: DevAliasAid.unique(:dev_alias), to: DevAliasAid.unique(:dev_alias)]
-      Sally.devalias_rename(opts) |> Should.Be.Tuple.with_rc_and_binaries(:not_found, opts[:from])
+      unavailable = Sally.DevAliasAid.unique(:dev_alias)
+
+      assert {:not_found, ^unavailable} =
+               Sally.devalias_rename(from: unavailable, to: Sally.DevAliasAid.unique(:dev_alias))
     end
 
     test "when opts are invalid" do
-      Sally.devalias_rename([]) |> Should.Be.Tuple.with_rc(:bad_args)
+      assert {:bad_args, _} = Sally.devalias_rename([])
     end
   end
 
   @tag skip: true
   @tag device_add: [auto: :mcp23008], devalias_add: [count: 5], command_add: [count: 100]
   test "Sally.DevAlias.explain/2", ctx do
-    %DevAlias{name: name} = ctx.dev_alias |> List.first()
+    %Sally.DevAlias{name: name} = ctx.dev_alias |> List.first()
 
-    DevAlias.explain(name)
+    Sally.DevAlias.explain(name)
   end
 end

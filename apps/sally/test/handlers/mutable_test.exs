@@ -1,13 +1,9 @@
 defmodule Sally.MutableHandlerTest do
   use ExUnit.Case, async: true
-  use Should
   use Sally.TestAid
+  require Sally.DispatchAid
 
   @moduletag sally: true, sally_mutable_handler: true
-
-  alias Sally.{Command, DevAlias, Device}
-  alias Sally.Dispatch
-  alias Sally.Mutable.Handler
 
   setup_all do
     # always create and setup a host
@@ -20,46 +16,53 @@ defmodule Sally.MutableHandlerTest do
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "well-formed Sally.Dispatch with one DevAlias", ctx do
-      dispatch = Should.Be.Struct.named(ctx[:dispatch], Dispatch)
+      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
 
-      db_rc = Handler.db_actions(dispatch)
-      db_results = Should.Be.Tuple.with_rc(db_rc, :ok)
+      assert {:ok,
+              %{
+                aliases: [
+                  %Sally.DevAlias{
+                    id: dev_alias_id,
+                    device_id: device_id,
+                    updated_at: dev_alias_updated_at_before
+                  }
+                  | _
+                ],
+                aligned_0: %Sally.Command{dev_alias_id: dev_alias_id, cmd: "on"},
+                device: %Sally.Device{id: device_id, family: "i2c", mutable: true},
+                seen_list: [
+                  %Sally.DevAlias{
+                    id: dev_alias_id,
+                    device_id: device_id,
+                    updated_at: dev_alias_updated_at_after
+                  }
+                  | _
+                ]
+              }} = Sally.Mutable.Handler.db_actions(dispatch)
 
-      Should.Be.map(db_results)
-
-      want_keys = [:aliases, :aligned_0, :device, :seen_list]
-      verified_map = Should.Be.Map.with_keys(db_results, want_keys)
-
-      Should.Be.schema(verified_map.device, Device)
-      Should.Be.NonEmpty.map(verified_map.aligned_0)
-
-      Should.Be.List.of_schemas(verified_map.aliases, DevAlias)
-      Should.Be.List.of_schemas(verified_map.seen_list, DevAlias)
+      assert DateTime.compare(dev_alias_updated_at_before, dev_alias_updated_at_after) == :lt
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 5]
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "well-formed Sally.Dispatch with multiple DevAlias", ctx do
-      dispatch = Should.Be.Struct.named(ctx[:dispatch], Dispatch)
+      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
 
-      db_rc = Handler.db_actions(dispatch)
-      db_results = Should.Be.Tuple.with_rc(db_rc, :ok)
+      assert {:ok,
+              %{
+                aliases: aliases,
+                device: %Sally.Device{family: "i2c", mutable: true},
+                seen_list: seen_list
+              } = db_multi_result} = Sally.Mutable.Handler.db_actions(dispatch)
 
-      Should.Be.map(db_results)
+      assert length(aliases) == 5
+      assert length(seen_list) == 5
 
-      want_keys = [:aliases, :device, :seen_list]
-      verified_map = Should.Be.Map.with_keys(db_results, want_keys)
-
-      Should.Be.schema(verified_map.device, Device)
-
-      for pio <- 0..4 do
+      Enum.all?(0..4, fn pio ->
         aligned_key = String.to_atom("aligned_#{pio}")
-        aligned = Should.Be.Map.with_key(db_results, aligned_key)
-        Should.Be.schema(aligned, Command)
-      end
-
-      Should.Be.List.of_schemas(verified_map.aliases, DevAlias)
-      Should.Be.List.of_schemas(verified_map.seen_list, DevAlias)
+        assert is_map_key(db_multi_result, aligned_key)
+        assert %Sally.Command{} = Map.get(db_multi_result, aligned_key)
+      end)
     end
   end
 
@@ -68,18 +71,16 @@ defmodule Sally.MutableHandlerTest do
     @tag command_add: [cmd: "on"]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "well formed Sally.Dispatch", ctx do
-      dispatch = Should.Be.Struct.named(ctx[:dispatch], Dispatch)
+      assert %Sally.DevAlias{id: dev_alias_id} = ctx[:dev_alias]
+      assert %Sally.Command{id: command_id} = ctx[:command]
+      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
 
-      %Command{id: command_id} = ctx.command
-      %DevAlias{id: dev_alias_id} = ctx.dev_alias
-
-      db_rc = Handler.db_cmd_ack(dispatch, command_id, dev_alias_id)
-      db_results = Should.Be.Tuple.with_rc(db_rc, :ok)
-
-      map = Should.Be.Map.with_keys(db_results, [:command, :device, :seen_list])
-      Should.Be.schema(map.command, Command)
-      Should.Be.schema(map.device, Device)
-      Should.Be.List.of_schemas(map.seen_list, DevAlias)
+      assert {:ok,
+              %{
+                command: %Sally.Command{id: ^command_id},
+                device: %Sally.Device{},
+                seen_list: [%Sally.DevAlias{} | _]
+              }} = Sally.Mutable.Handler.db_cmd_ack(dispatch, command_id, dev_alias_id)
     end
   end
 
@@ -88,20 +89,22 @@ defmodule Sally.MutableHandlerTest do
     @tag command_add: [cmd: "on", track: true]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "handles a cmdack Dispatch", ctx do
-      ctx
-      |> Should.Be.Map.with_key(:dispatch)
-      |> Handler.process()
-      |> DispatchAid.assert_processed()
+      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+
+      dispatch
+      |> Sally.Mutable.Handler.process()
+      |> Sally.DispatchAid.assert_processed()
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag command_add: []
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "handles a status Dispatch", ctx do
-      ctx
-      |> Should.Be.Map.with_key(:dispatch)
-      |> Handler.process()
-      |> DispatchAid.assert_processed()
+      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+
+      dispatch
+      |> Sally.Mutable.Handler.process()
+      |> Sally.DispatchAid.assert_processed()
     end
   end
 end

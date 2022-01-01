@@ -1,14 +1,16 @@
 defmodule Sally.DatapointAid do
-  alias Sally.{Datapoint, DevAlias, Repo}
+  @moduledoc """
+  Supporting functionality for creating Sally.Datapoint for testing
+  """
 
-  def add(%{datapoint_add: opts, dev_alias: %DevAlias{}} = ctx) when is_list(opts) do
+  def add(%{datapoint_add: opts, dev_alias: %Sally.DevAlias{}} = ctx) when is_list(opts) do
     case Enum.into(opts, %{}) do
       %{count: x} when is_integer(x) -> add_many(ctx.dev_alias, opts)
       _ -> %{datapoint: add_one(ctx.dev_alias, opts)}
     end
   end
 
-  def add(%{datapoint_add: opts, dev_alias: [%DevAlias{} | _]} = ctx) when is_list(opts) do
+  def add(%{datapoint_add: opts, dev_alias: [%Sally.DevAlias{} | _]} = ctx) when is_list(opts) do
     dev_aliases = ctx.dev_alias
 
     for dev_alias <- dev_aliases, reduce: %{datapoint: []} do
@@ -18,16 +20,16 @@ defmodule Sally.DatapointAid do
 
   def add(_), do: :ok
 
-  defp accumulate(%Datapoint{} = cmd, %{datapoint: acc}), do: %{datapoint: [cmd] ++ acc}
+  defp accumulate(%Sally.Datapoint{} = cmd, %{datapoint: acc}), do: %{datapoint: [cmd] ++ acc}
 
-  defp add_one(%DevAlias{} = dev_alias, opts) when is_list(opts) do
+  defp add_one(%Sally.DevAlias{} = dev_alias, opts) when is_list(opts) do
     {data, opts_rest} = Keyword.pop(opts, :data, %{temp_c: 21.1, relhum: 54.2})
     {reading_at, _opts_rest} = Keyword.pop(opts_rest, :reading_at, Timex.now())
 
     Ecto.Multi.new()
     |> Ecto.Multi.put(:aliases, [dev_alias])
-    |> Ecto.Multi.run(:datapoint, DevAlias, :add_datapoint, [data, reading_at])
-    |> Repo.transaction()
+    |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, [data, reading_at])
+    |> Sally.Repo.transaction()
     |> detuple_txn_result()
   end
 

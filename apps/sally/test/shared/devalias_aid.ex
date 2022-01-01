@@ -1,7 +1,9 @@
 defmodule Sally.DevAliasAid do
-  alias Sally.{DevAlias, Device, DeviceAid}
+  @moduledoc """
+  Supporting functionality for creating Sally.DevAlias for testing
+  """
 
-  def add(%{devalias_add: opts, device: %Device{} = device}) when is_list(opts) do
+  def add(%{devalias_add: opts, device: %Sally.Device{} = device}) when is_list(opts) do
     count = opts[:count] || 1
 
     if count == 1 do
@@ -27,15 +29,15 @@ defmodule Sally.DevAliasAid do
 
   def add(_), do: :ok
 
-  def just_saw(%{just_saw: opts, device: %Device{}} = ctx) when is_list(opts) do
-    dev_aliases = Device.load_aliases(ctx.device).aliases
+  def just_saw(%{just_saw: opts, device: %Sally.Device{}} = ctx) when is_list(opts) do
+    dev_aliases = Sally.Device.load_aliases(ctx.device).aliases
 
     %{sally_just_saw: Sally.just_saw(ctx.device, dev_aliases)}
   end
 
   def just_saw(_), do: :ok
 
-  def random_pick([%DevAlias{} | _] = dev_aliases, count \\ 1) do
+  def random_pick([%Sally.DevAlias{} | _] = dev_aliases, count \\ 1) do
     picked = Enum.take_random(dev_aliases, count)
 
     if count == 1, do: List.first(picked), else: picked
@@ -47,16 +49,16 @@ defmodule Sally.DevAliasAid do
     ["devalias_", x] |> IO.iodata_to_binary()
   end
 
-  defp add_one(%Device{} = device, opts) when is_list(opts) do
-    aliases = DeviceAid.aliases(device)
+  defp add_one(%Sally.Device{} = device, opts) when is_list(opts) do
+    aliases = Sally.DeviceAid.aliases(device)
     name = opts[:name] || unique(:devalias)
-    pio = if(device.mutable, do: DeviceAid.next_pio(aliases), else: 0)
+    pio = if(device.mutable, do: Sally.DeviceAid.next_pio(aliases), else: 0)
     ttl_ms = opts[:ttl_ms] || 15_000
 
     params = [name: name, pio: pio, description: description(), ttl_ms: ttl_ms]
 
-    case DevAlias.create(device, params) do
-      {:ok, %DevAlias{} = x} -> %{dev_alias: x}
+    case Sally.DevAlias.create(device, params) do
+      {:ok, %Sally.DevAlias{} = x} -> %{dev_alias: x}
       error -> error
     end
   end
@@ -67,7 +69,7 @@ defmodule Sally.DevAliasAid do
 
   # defp next_pio(dev_aliases) do
   #   all_pios = [0..7] |> Enum.to_list()
-  #   used_pios = for %DevAlias{pio: x} <- dev_aliases, do: x
+  #   used_pios = for %Sally.DevAlias{pio: x} <- dev_aliases, do: x
   #
   #   available_pios = all_pios -- used_pios
   #

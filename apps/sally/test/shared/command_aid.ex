@@ -1,14 +1,16 @@
 defmodule Sally.CommandAid do
-  alias Sally.{Command, DevAlias, Execute}
+  @moduledoc """
+  Supporting functionality for creating Sally.Command for testing
+  """
 
-  def add(%{command_add: opts, dev_alias: %DevAlias{}} = ctx) when is_list(opts) do
+  def add(%{command_add: opts, dev_alias: %Sally.DevAlias{}} = ctx) when is_list(opts) do
     case Enum.into(opts, %{}) do
       %{count: x} when is_integer(x) -> add_many(ctx.dev_alias, opts)
       _ -> %{command: add_one(ctx.dev_alias, opts)}
     end
   end
 
-  def add(%{command_add: opts, dev_alias: [%DevAlias{} | _]} = ctx) when is_list(opts) do
+  def add(%{command_add: opts, dev_alias: [%Sally.DevAlias{} | _]} = ctx) when is_list(opts) do
     dev_aliases = ctx.dev_alias
 
     for dev_alias <- dev_aliases, reduce: %{command: []} do
@@ -18,14 +20,14 @@ defmodule Sally.CommandAid do
 
   def add(_), do: :ok
 
-  defp accumulate(%Command{} = cmd, %{command: acc}), do: %{command: [cmd] ++ acc}
+  defp accumulate(%Sally.Command{} = cmd, %{command: acc}), do: %{command: [cmd] ++ acc}
 
-  defp add_one(%DevAlias{} = dev_alias, opts) when is_list(opts) do
+  defp add_one(%Sally.DevAlias{} = dev_alias, opts) when is_list(opts) do
     {cmd, opts_rest} = Keyword.pop(opts, :cmd, "on")
     {track_cmd, opts_rest} = Keyword.pop(opts_rest, :track, false)
 
-    Command.add(dev_alias, cmd, opts_rest)
-    |> tap(fn cmd -> if(track_cmd, do: Execute.track(cmd, opts_rest)) end)
+    Sally.Command.add(dev_alias, cmd, opts_rest)
+    |> tap(fn cmd -> if(track_cmd, do: Sally.Execute.track(cmd, opts_rest)) end)
   end
 
   defp add_many(dev_alias, opts) do
@@ -46,7 +48,7 @@ defmodule Sally.CommandAid do
 
         cmd_opts = [sent_at: sent_at] ++ final_opts
 
-        Command.add(dev_alias, cmd_num, cmd_opts) |> accumulate(acc)
+        Sally.Command.add(dev_alias, cmd_num, cmd_opts) |> accumulate(acc)
     end
   end
 end
