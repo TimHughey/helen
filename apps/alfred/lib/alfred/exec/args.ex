@@ -7,26 +7,39 @@ defmodule Alfred.ExecCmd.Args do
   @select_first [:name, :cmd]
   @cmd_opts_short [:ack, :echo, :force, :notify]
   def auto(args, defaults) when is_list(args) and is_list(defaults) do
-    args = map_short_keys(args)
-    defaults = map_short_keys(defaults)
+    # NOTE:  we allow :id as an alternate for :cmd however we always want to select :cmd
+    #        when specified in args __OR__ defaults. here we remove :id from args. if :id
+    #        doesn't exist default it to :none so it is skipped while processing final args.
+    {args_id, args_rest} = Keyword.pop(args, :id, :none)
+    args_cleaned = map_short_keys(args_rest)
 
+    {defaults_id, defaults_rest} = Keyword.pop(defaults, :id, :none)
+    defaults_cleaned = map_short_keys(defaults_rest)
+
+    # create final args and append :id to the end so it is select when :cmd is not present
+    final_args = [args_cleaned, defaults_cleaned, [id: args_id, id: defaults_id]] |> List.flatten()
+
+    # we collect args into a map for efficient pattern matching and determining when an
+    # argument is already populated (see select_first/3)
     base = %{cmd_opts: [], cmd_params: [], pub_opts: []}
 
     # make a single list of specified args first and defaults second
     # so the reduction finds specific args first
-    for {key, value} <- args ++ defaults, reduce: base do
+
+    Enum.reduce(final_args, base, fn
       # always merge :cmd_opts, :cmd_params and :pub_opts
-      acc when key in @auto_merge -> merge_and_put(acc, key, value)
+      {key, value}, acc when key in @auto_merge -> merge_and_put(acc, key, value)
       # use the first :cmd and :name found
-      acc when key in @select_first -> select_first(acc, key, value)
-      # alternates for name
-      acc when key == :equipment -> select_first(acc, :name, value)
-      # alternates for cmd
-      acc when key == :id -> select_first(acc, :cmd, value)
-      acc when key in @cmd_opts_short -> cmd_opts_merge(acc, key, value)
+      {key, value}, acc when key in @select_first -> select_first(acc, key, value)
+      # handle abbreviated cmd opts
+      {key, value}, acc when key in @cmd_opts_short -> cmd_opts_merge(acc, key, value)
+      # alternate for name
+      {:equipment, value}, acc -> select_first(acc, :name, value)
+      # alternate for cmd
+      {:id, <<_::binary>> = value}, acc -> select_first(acc, :cmd, value)
       # ignore unknown keys
-      acc -> acc
-    end
+      {_key, _value}, acc -> acc
+    end)
     |> Enum.into([])
     |> Enum.map(fn kv -> sort_embedded_lists(kv) end)
     |> Enum.sort()

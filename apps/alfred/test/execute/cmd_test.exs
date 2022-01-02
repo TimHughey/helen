@@ -105,6 +105,20 @@ defmodule Alfred.ExecCmdTest do
                )
     end
 
+    test "ignores :id when :cmd present in defaults" do
+      assert [
+               cmd: "25% of max",
+               cmd_opts: [],
+               cmd_params: [percent: 25, type: "fixed"],
+               name: "some name",
+               pub_opts: []
+             ] =
+               Alfred.ExecCmd.Args.auto(
+                 [id: "ignore this", name: "some name", params: [percent: 25, type: "fixed"]],
+                 cmd: "25% of max"
+               )
+    end
+
     test "honors short cmd opts keys" do
       assert [
                cmd: "on",
