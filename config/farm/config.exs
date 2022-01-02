@@ -8,10 +8,13 @@ config :farm, Farm,
   ],
   instances: [
     womb_circulation: [
-      defaults: [execute: [cmd: "25% of max", params: [type: "fixed", percent: 25]]],
       equipment: "womb circulation pwm",
       episodes: [
-        [id: "All Day", event: "beginning of day", execute: []]
+        [
+          id: "All Day",
+          event: "beginning of day",
+          execute: [cmd: "25% of max", params: [type: "fixed", percent: 25]]
+        ]
       ]
     ]
   ]
