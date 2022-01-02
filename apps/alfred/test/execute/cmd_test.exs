@@ -129,6 +129,10 @@ defmodule Alfred.ExecCmdTest do
       assert [{:cmd, "special v002"} | _] = Alfred.ExecCmd.version_cmd(cmd: "special v001")
     end
 
+    test "handles args list with versioned cmd (special characters)" do
+      assert [{:cmd, "25% of max v002"} | _] = Alfred.ExecCmd.version_cmd(cmd: "25% of max v001")
+    end
+
     test "handles args list with atom and binary cmd" do
       assert [cmd: :off] = Alfred.ExecCmd.version_cmd(cmd: :off)
       assert [cmd: "off"] = Alfred.ExecCmd.version_cmd(cmd: "off")
