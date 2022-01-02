@@ -173,7 +173,7 @@ defmodule CarolEpisodeTest do
     test "execute_args/2 returns active execute args", ctx do
       episodes = assert_episodes(ctx)
 
-      assert {[cmd: _], []} = Carol.Episode.execute_args([], :active, episodes)
+      assert {[opts: [ack: :host]], [cmd: :on]} = Carol.Episode.execute_args([], :active, episodes)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
@@ -183,7 +183,7 @@ defmodule CarolEpisodeTest do
       # two element tuple:
       #  - elem0 = execute args
       #  - elem1 = default args
-      assert {[cmd: :on, equipment: "equip"], []} =
+      assert {[opts: [ack: :host], equipment: "equip"], [cmd: :on]} =
                Carol.Episode.execute_args([equipment: "equip"], "Past -3", episodes)
     end
 

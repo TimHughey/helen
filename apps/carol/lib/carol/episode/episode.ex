@@ -123,7 +123,8 @@ defmodule Carol.Episode do
   end
 
   def execute_args(%Episode{execute: args, defaults: defaults}, extra_opts) do
-    {args ++ extra_opts, defaults}
+    execute_defaults = Keyword.get(defaults, :execute, [])
+    {args ++ extra_opts, execute_defaults}
   end
 
   def execute_args([], _), do: {[], []}

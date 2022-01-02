@@ -32,10 +32,10 @@ defmodule Carol.EpisodeAid do
   @solar_events Solar.event_opts(:binaries)
   def make_events(events) do
     Enum.map(events, fn
-      {id, event} when event in @solar_events -> [id: id, event: event, execute: :on]
-      {id, event, shift} -> [id: id, event: event, shift: shift, execute: :on]
+      {id, event} when event in @solar_events -> [id: id, event: event]
+      {id, event, shift} -> [id: id, event: event, shift: shift]
     end)
-    |> Carol.Episode.new_from_episode_list([])
+    |> Carol.Episode.new_from_episode_list(execute: [cmd: :on])
   end
 
   @make_many_type [:future, :now, :past, :yesterday]
@@ -54,9 +54,9 @@ defmodule Carol.EpisodeAid do
       |> Keyword.merge(
         id: id_from_counter(type, count),
         event: fixed(type, fixed_opts),
-        execute: [cmd: :on]
+        execute: [opts: [ack: :host]]
       )
-      |> Episode.new()
+      |> Episode.new(execute: [cmd: :on])
     end
   end
 
