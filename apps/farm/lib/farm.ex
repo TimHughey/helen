@@ -3,6 +3,8 @@ defmodule Farm do
   Documentation for `Farm`.
   """
 
+  use Carol, otp_app: :farm
+
   alias Farm.Womb
 
   def womb_circulation_restart do

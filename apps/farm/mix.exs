@@ -4,7 +4,7 @@ defmodule Farm.MixProject do
   def project do
     [
       app: :farm,
-      version: "0.2.1",
+      version: "0.2.2",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -27,6 +27,7 @@ defmodule Farm.MixProject do
   defp deps do
     [
       {:alfred, in_umbrella: true},
+      {:carol, in_umbrella: true},
       {:rena, in_umbrella: true},
       {:should, in_umbrella: true, only: :test}
     ]

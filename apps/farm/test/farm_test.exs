@@ -25,24 +25,37 @@ defmodule FarmTest do
     end
   end
 
-  describe "Womb.Farm.Circulation" do
-    test "starts" do
-      assert_started(Farm.Womb.Circulation, attempts: 10)
+  # describe "Womb.Farm.Circulation" do
+  #   test "starts" do
+  #     assert_started(Farm.Womb.Circulation, attempts: 10)
+  #   end
+  # end
+
+  describe "Farm.children/0" do
+    test "returns list of children" do
+      children = Farm.which_children()
+
+      assert [{_, _, _, _} = _child1] = children
+
+      for {id, pid, _type, _module} <- children do
+        assert ["Farm" | _] = Module.split(id)
+        assert is_pid(pid)
+      end
     end
   end
 
-  describe "Farm.womb_" do
-    test "circulation_state/0 returns the State" do
-      assert %Rena.HoldCmd.State{} = Farm.womb_circulation_state()
-    end
-
-    test "circulation_restart/0 restarts the server" do
-      assert {:ok, pid} = Farm.womb_circulation_restart()
-      assert is_pid(pid)
-    end
-
-    test "heater_state/0 returns the State" do
-      assert %Rena.SetPt.State{} = Farm.womb_heater_state()
-    end
-  end
+  # describe "Farm.womb_" do
+  #   test "circulation_state/0 returns the State" do
+  #     assert %Rena.HoldCmd.State{} = Farm.womb_circulation_state()
+  #   end
+  #
+  #   test "circulation_restart/0 restarts the server" do
+  #     assert {:ok, pid} = Farm.womb_circulation_restart()
+  #     assert is_pid(pid)
+  #   end
+  #
+  #   test "heater_state/0 returns the State" do
+  #     assert %Rena.SetPt.State{} = Farm.womb_heater_state()
+  #   end
+  # end
 end
