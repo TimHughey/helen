@@ -26,9 +26,6 @@ defmodule Sally.Host do
     timestamps(type: :utc_datetime_usec)
   end
 
-  @helen_base "HELEN_BASE"
-  @profiles_dir Application.compile_env!(:sally, [Sally.Host, :profiles_path])
-
   def authorize(name, val \\ true) when is_boolean(val) do
     case Repo.get_by(Schema, name: name) do
       %Schema{} = h -> changeset(h, %{authorized: val}, [:authorized]) |> Repo.update!()
@@ -37,11 +34,9 @@ defmodule Sally.Host do
   end
 
   def boot_payload_data(%Schema{} = h) do
-    # file = [System.get_env(@env_profile_path, "/tmp"), "profiles", "#{h.profile}.toml"] |> Path.join()
-
-    file = [profiles_path(), "#{h.profile}.toml"] |> Path.join()
-
-    Toml.decode_file!(file)
+    [profiles_path(), "#{h.profile}.toml"]
+    |> Path.join()
+    |> Toml.decode_file!()
   end
 
   # (1 of 2) accept a ChangeControl
@@ -161,9 +156,7 @@ defmodule Sally.Host do
     |> Repo.all()
   end
 
-  defp profiles_path do
-    [System.get_env(@helen_base), @profiles_dir] |> Path.join()
-  end
+  defp profiles_path, do: Sally.Config.dir_get({__MODULE__, :host_profiles})
 
   def unnamed do
     import Ecto.Query, only: [from: 2]
@@ -200,12 +193,16 @@ defmodule Sally.Host do
   def summary(%Schema{} = x), do: Map.take(x, [:name, :ident, :profile, :last_seen_at])
 
   defp validate_profile_exists(%Changeset{} = cs) do
-    #  profile_dir = [System.get_env("RUTH_CONFIG_PATH", "/tmp"), "profiles"] |> Path.join()
+    case profiles_path() do
+      <<_::binary>> = path -> validate_profile_exists(path, cs)
+      _ -> cs
+    end
+  end
 
+  defp validate_profile_exists(<<_::binary>> = path, cs) do
     case Changeset.fetch_field(cs, :profile) do
       {_src, profile} ->
-        file = "#{profile}.toml"
-        file_path = [profiles_path(), file] |> Path.join()
+        file_path = [path, "#{profile}.toml"] |> Path.join()
 
         case Toml.decode_file(file_path, filename: file_path) do
           {:ok, _profile} -> cs

@@ -2,4 +2,3 @@
 
 export MIX_ENV=test
 export HELEN_ENV=test
-export HELEN_BASE=${HOME}/devel/helen

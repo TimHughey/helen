@@ -1,7 +1,5 @@
 defmodule Sally.HostTest do
-  # NOTE:  don't use async: true due to testing Sally.host_setup(:unnamed)
-  use ExUnit.Case
-
+  use ExUnit.Case, async: false
   use Sally.TestAid
 
   @moduletag sally: true, sally_host: true
@@ -60,6 +58,12 @@ defmodule Sally.HostTest do
   describe "Sally.Host.live/1" do
     test "returns a list of %Host{} with default opts", %{host: _host} do
       assert [%Sally.Host{} | _] = Sally.Host.live()
+    end
+  end
+
+  describe "Sally.Host profiles" do
+    test "current directory" do
+      assert true == true
     end
   end
 end

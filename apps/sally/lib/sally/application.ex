@@ -6,10 +6,12 @@ defmodule Sally.Application do
   use Application
 
   @mqtt_connection Application.compile_env!(:sally, :mqtt_connection)
+  @config_all Application.get_all_env(:sally)
 
   @impl true
   def start(_type, _args) do
     children = [
+      {Sally.Config.Agent, @config_all},
       {Sally.Repo, []},
       {Tortoise.Connection, @mqtt_connection},
       {Sally.Execute, []},

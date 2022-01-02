@@ -9,6 +9,8 @@ defmodule Sally.Host.Firmware do
 
   @doc false
   def assemble_opts(opts) when is_list(opts) do
+    # Sally.Config.get_mod(__MODULE__)
+    # Keyword.merge(opts)
     Keyword.merge(@config_opts, opts)
   end
 
@@ -59,19 +61,22 @@ defmodule Sally.Host.Firmware do
   ```
   """
   @doc since: "0.5.23"
-  def find_dir(opts) do
+  def find_dir(opts) when is_list(opts) do
     {search_paths, opts_rest} = Keyword.pop(opts, :search_paths, ["."])
     {dir, _opts_rest} = Keyword.pop(opts_rest, :dir, "firmware")
 
-    for path when is_binary(path) <- search_paths, into: [] do
-      dir_path = Path.join(path, dir)
+    Enum.reduce(search_paths, {:not_found, :dir}, fn
+      search_path, acc when is_tuple(acc) ->
+        path = Path.join(search_path, dir)
 
-      case File.stat(dir_path) do
-        {:ok, %Stat{type: :directory}} -> dir_path
-        _ -> []
-      end
-    end
-    |> List.first({:not_found, :dir})
+        case File.stat(path) do
+          {:ok, %Stat{type: :directory, access: x}} when x in [:read, :read_write] -> path
+          _ -> acc
+        end
+
+      _search_path, acc ->
+        acc
+    end)
   end
 
   def ota(:live, opts) when is_list(opts) do

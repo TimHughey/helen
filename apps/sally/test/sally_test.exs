@@ -1,5 +1,5 @@
 defmodule SallyTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   # NOTE:
   # all Sally functions are tested by other test cases (e.g. dev_alias_test.exs)

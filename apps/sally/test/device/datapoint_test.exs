@@ -1,6 +1,5 @@
 defmodule SallyDatapointTest do
-  # can not use async: true due to indirect use of Sally.device_latest/1
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   use Sally.TestAid
 

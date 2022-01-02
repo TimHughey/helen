@@ -1,6 +1,5 @@
 defmodule SallyDevAliasTest do
-  # can not use async: true due to indirect use of Sally.device_latest/1
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   use Sally.TestAid
 
   @moduletag sally: true, sally_dev_alias: true
@@ -12,13 +11,6 @@ defmodule SallyDevAliasTest do
 
   setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
   setup [:command_add, :datapoint_add, :dispatch_add]
-
-  # defmacro assert_rc_regex(x, rc, regex) do
-  #   quote bind_quoted: [x: x, rc: rc, regex: regex] do
-  #     assert {^rc, binaries} = x
-  #     assert binaries =~ regex
-  #   end
-  # end
 
   describe "Sally.device_add_alias/1" do
     @tag device_add: [auto: :mcp23008]
@@ -54,15 +46,6 @@ defmodule SallyDevAliasTest do
 
       opts = [device: device.ident, name: dev_alias.name]
       assert {:name_taken, ^taken_name} = Sally.device_add_alias(opts)
-    end
-
-    @tag device_add: [auto: :ds]
-    test "creates alias to latest device discovered", %{device: device} do
-      opts = [device: :latest, name: Sally.DevAliasAid.unique(:dev_alias)]
-      assert %Sally.DevAlias{} = dev_alias = Sally.device_add_alias(opts)
-
-      assert %Sally.DevAlias{device: %Sally.Device{ident: ident}} = Sally.DevAlias.load_device(dev_alias)
-      assert ident == device.ident
     end
   end
 

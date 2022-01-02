@@ -10,8 +10,17 @@ config :sally,
     keep_alive: 36
   ]
 
+config :sally, Sally.Host,
+  host_profiles: [dir: :auto, search_paths: [".", "/usr/local/helen_v2/etc", "test/toml"]]
+
+config :sally, Sally.Host.Firmware,
+  opts: [
+    search_paths: ["/dar/www/wisslanding/htdocs/sally", "."],
+    dir: "firmware",
+    file_regex: ~r/\d\d\.\d\d\.\d\d.+-ruth\.bin$/
+  ]
+
 config :sally, Sally.Host.Instruct, publish: [prefix: "#{config_env()}", qos: 0]
-# config :sally, Sally.Message.Handler, mtime_variance_ms: 100_000
 
 if config_env() in [:dev, :test] do
   import_config "test.exs"

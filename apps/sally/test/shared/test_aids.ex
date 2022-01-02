@@ -8,6 +8,7 @@ defmodule Sally.TestAid do
 
   defmacro __using__(_) do
     quote location: :keep do
+      use Should
       @behaviour Sally.TestAid
 
       def command_add(ctx), do: Sally.CommandAid.add(ctx)
