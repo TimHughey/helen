@@ -16,15 +16,6 @@ defmodule Farm.Application do
     Supervisor.start_link(children, opts)
   end
 
-  # def womb_circulation_args(add_args) do
-  #   alias Alfred.ExecCmd
-  #
-  #   hold_cmd = %ExecCmd{cmd: "25% of max", cmd_params: %{type: "fixed", percent: 25}}
-  #
-  #   [hold_cmd: hold_cmd, equipment: "womb circulation pwm"]
-  #   |> Keyword.merge(add_args)
-  # end
-
   def womb_setpt_args(add_args) do
     sensors = ["womb 1", "womb 2", "womb 3", "womb 4"]
     range = [low: 78.0, high: 80.1]
