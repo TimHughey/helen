@@ -79,12 +79,29 @@ defmodule Alfred.ExecCmdTest do
              ] =
                Alfred.ExecCmd.Args.auto(
                  [
-                   cmd: "special",
                    cmd_opts: [ack: :immediate],
                    cmd_params: [min: 0, type: "random"],
                    name: "some name"
                  ],
+                 cmd: "special",
                  params: [max: 256]
+               )
+    end
+
+    test "honors only defaults" do
+      assert [
+               cmd: "special",
+               cmd_opts: [ack: :immediate],
+               cmd_params: [max: 256, min: 0, type: "random"],
+               name: "some name",
+               pub_opts: []
+             ] =
+               Alfred.ExecCmd.Args.auto(
+                 [],
+                 name: "some name",
+                 cmd: "special",
+                 opts: [ack: :immediate],
+                 params: [max: 256, min: 0, type: "random"]
                )
     end
 
