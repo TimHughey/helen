@@ -18,7 +18,7 @@ config :glow, Glow,
     ],
     front_evergreen: [
       equipment: "front evergreen pwm",
-      defaults: [execute: [params: [type: "random", primes: 8, step: 12, step_ms: 40]]],
+      defaults: [execute: [params: [type: "random", step: 12, step_ms: 40]]],
       episodes: [
         [id: "Evening", event: "sunset", execute: [type: "random", params: [min: 384, max: 3072]]],
         [id: "Overnight", event: "astro set", execute: [type: "random", params: [min: 175, max: 2560]]],
@@ -27,7 +27,7 @@ config :glow, Glow,
     ],
     front_red_maple: [
       equipment: "front red maple pwm",
-      defaults: [execute: [params: [type: "random", primes: 8, step: 12, step_ms: 40]]],
+      defaults: [execute: [params: [primes: 8, step: 12, step_ms: 40]]],
       episodes: [
         [id: "Evening", event: "sunset", execute: [type: "random", params: [min: 384, max: 3072]]],
         [id: "Overnight", event: "astro set", execute: [type: "random", params: [min: 175, max: 2560]]],
