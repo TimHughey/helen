@@ -47,7 +47,7 @@ defmodule Alfred do
     |> execute(rest_opts)
   end
 
-  def execute({args, defaults} = x, _opts) when is_list(args) and is_list(defaults) do
+  def execute({_args, _defaults} = x, _opts) do
     Alfred.ExecCmd.Args.auto(x)
     |> Alfred.ExecCmd.new()
     |> execute([])

@@ -122,9 +122,9 @@ defmodule Carol.Episode do
     |> execute_args(extra_opts)
   end
 
-  def execute_args(%Episode{execute: args, defaults: defaults}, extra_opts) do
+  def execute_args(%Episode{id: id, execute: args, defaults: defaults}, extra_opts) do
     execute_defaults = Keyword.get(defaults, :execute, [])
-    {args ++ extra_opts, execute_defaults}
+    {args ++ extra_opts, execute_defaults ++ [id: id]}
   end
 
   def execute_args([], _), do: {[], []}
