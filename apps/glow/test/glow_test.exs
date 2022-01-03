@@ -9,19 +9,22 @@ defmodule GlowTest do
 
   describe "Glow instance execute args" do
     test "validate front chandelier" do
+      common_args = [equipment: "some name"]
       episodes = Glow.state(:chan, :episodes)
 
-      ec =
-        Carol.Episode.execute_args([equipment: "some name"], :active, episodes)
-        |> Alfred.ExecCmd.Args.auto()
-        |> Alfred.ExecCmd.new()
+      assert {[_ | _] = _args, [_ | _] = defaults} =
+               execute = Carol.Episode.execute_args(common_args, :active, episodes)
 
-      assert %Alfred.ExecCmd{
-               cmd: "Overnight",
-               cmd_opts: [],
-               cmd_params: %{min: _, max: _, primes: _, step: _, step_ms: _, type: "random"},
-               name: "some name"
-             } = ec
+      if defaults[:cmd] == "Overnight" do
+        ec = Alfred.ExecCmd.Args.auto(execute) |> Alfred.ExecCmd.new()
+
+        assert %Alfred.ExecCmd{
+                 cmd: "off",
+                 cmd_opts: [],
+                 cmd_params: %{primes: _, step: _, step_ms: _},
+                 name: "some name"
+               } = ec
+      end
     end
   end
 end
