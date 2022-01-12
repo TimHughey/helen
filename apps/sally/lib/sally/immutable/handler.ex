@@ -29,11 +29,7 @@ defmodule Sally.Immutable.Handler do
         # NOTE: alert Alfred of just seen names after txn is complete
         Sally.just_saw(device, seen_list) |> Dispatch.save_seen_list(msg) |> Dispatch.valid(txn_results)
 
-      {:error, :datapoint, error} ->
-        Dispatch.invalid(msg, error)
-
-      error ->
-        [inspect(error, pretty: true)] |> Logger.warn()
+      {:error, :datapoint, error, _db_results} ->
         Dispatch.invalid(msg, error)
     end
   end
