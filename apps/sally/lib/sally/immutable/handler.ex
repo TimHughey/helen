@@ -31,6 +31,10 @@ defmodule Sally.Immutable.Handler do
 
       {:error, :datapoint, error} ->
         Dispatch.invalid(msg, error)
+
+      error ->
+        [inspect(error, pretty: true)] |> Logger.warn()
+        Dispatch.invalid(msg, error)
     end
   end
 
