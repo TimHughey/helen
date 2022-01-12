@@ -67,12 +67,4 @@ defmodule Sally.Immutable.Handler do
 
   @impl true
   def post_process(dispatch), do: dispatch
-
-  # @impl true
-  # def post_process(%Dispatch{valid?: true} = msg) do
-  #   msg
-  # end
-  #
-  # @impl true
-  # def post_process(%Dispatch{valid?: false} = msg), do: msg
 end

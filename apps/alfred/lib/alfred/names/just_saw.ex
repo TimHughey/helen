@@ -15,6 +15,67 @@ defmodule Alfred.JustSaw do
           valid?: boolean()
         }
 
+  defmacro __using__(use_opts) do
+    quote bind_quoted: [use_opts: use_opts] do
+      @behaviour Alfred.JustSaw
+      @use_opts use_opts
+
+      # Alfred.JustSaw.put_callbacks_attribute(__MODULE__, unquote(use_opts))
+
+      @doc false
+      def callbacks, do: Alfred.JustSaw.callbacks_for_module(__MODULE__)
+
+      def just_saw(names, opts \\ []) do
+        callbacks() |> Alfred.JustSaw.just_saw(names, opts)
+      end
+    end
+  end
+
+  @callback callbacks() :: %{:execute => any(), :status => any()}
+  @callback just_saw(String.t() | map() | list(), list()) :: :ok
+
+  # NOTE: unused at present
+  defmacro __before_compile__(env) do
+    unless Module.defines?(env.module, {:callbacks_defined, 1}) do
+      callbacks =
+        %{
+          status: Module.defines?(env.module, {:status, 2}),
+          execute: Module.defines?(env.module, {:execute, 2})
+        }
+        # Macro.escape/1 converts map into AST for direct insertion via unquote
+        |> Macro.escape()
+
+      quote do
+        def callbacks_defined, do: unquote(callbacks)
+        defoverridable callbacks_defined: 0
+      end
+    end
+  end
+
+  #
+  # Alfred.JustSaw implementation
+  #
+
+  @doc false
+  def callbacks_for_module(module) do
+    use_opts_callbacks = get_in(module.__info__(:attributes), [:use_opts, :callbacks]) || []
+    functions = Keyword.take(module.__info__(:functions), [:execute, :status])
+
+    Enum.reduce(functions, %{execute: false, status: false}, fn
+      {func, 2}, acc -> Map.put(acc, func, get_in(use_opts_callbacks, [func]) || {module, 2})
+      _, acc -> acc
+    end)
+  end
+
+  @doc since: "0.3.0"
+  def just_saw(callbacks, name, opts) when is_binary(name), do: just_saw(callbacks, [name], opts)
+
+  def just_saw(callbacks, names, opts) when is_list(names) do
+    opts_all = [{:callbacks, callbacks} | opts]
+
+    Enum.each(names, fn name -> Alfred.Name.register(name, opts_all) end)
+  end
+
   def new_immutable(seen_list, map_seen_fn, {_type, _val} = callback)
       when is_list(seen_list)
       when is_function(map_seen_fn, 1),
@@ -28,6 +89,13 @@ defmodule Alfred.JustSaw do
   def new(type, seen_list, map_seen_fn, callback) when type in [:immutable, :mutable] do
     %JustSaw{mutable?: type == :mutable, callback: callback, seen_list: Enum.map(seen_list, map_seen_fn)}
     |> validate()
+  end
+
+  @doc false
+  def put_callbacks_attribute(module, use_opts) do
+    callback = Keyword.get(use_opts, :callbacks, module)
+
+    Module.put_attribute(module, :alfred_callbacks, callback)
   end
 
   def to_known_name(%JustSaw{valid?: false}), do: []

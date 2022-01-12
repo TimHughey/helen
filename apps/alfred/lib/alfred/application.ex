@@ -10,6 +10,9 @@ defmodule Alfred.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Registry, [name: Alfred.Name.Registry, keys: :unique]},
+      {Alfred.Notify.Supervisor, []},
+      {Registry, [name: Alfred.Notify.Registry, keys: :duplicate]},
       {Names.Server, []},
       {Notify.Server, []}
     ]

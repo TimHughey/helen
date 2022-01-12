@@ -13,91 +13,6 @@ defmodule Alfred.NamesAid do
 
   alias Alfred.{JustSaw, SeenName}
 
-  # @type seen_name_opts() :: [name: String.t(), seen_at: %DateTime{}, ttl_ms: integer()]
-  #
-  # @type ctx_map :: %{
-  #         optional(:name_add) => name_opts(),
-  #         optional(:parts_add) => String.t(),
-  #         optional(:seen_name) => seen_name_opts(),
-  #         optional(:name) => String.t()
-  #       }
-  #
-  # @doc "Submits the name in the ctx via Alfred.JustSaw"
-  # @callback just_saw(ctx_map) :: %{optional(:just_saw_result) => [String.t(), ...]}
-  #
-  # @doc "Makes a name for a test context"
-  #
-  # @callback name_add(ctx_map) :: %{optional(:name) => String.t()} | :ok
-  # @callback parts_add(ctx_map) :: %{optional(:parts) => name_parts_map()} | :ok
-  # @callback parts_add_auto(ctx_map) :: %{optional(:name) => String.t()} | :ok
-  # @callback make_seen_name(ctx_map) :: %{optional(:seen_name) => %SeenName{}}
-  #
-  # @doc "Creates a unique name of specified type using passed opts"
-  # @type name_type :: :imm | :mut | :unk
-  # @type name_rc :: :ok | :pending | :error | :unknown
-  # @type name_opts :: [rc: name_rc, cmd: String.t(), expired_ms: integer(), temp_f: float(), relhum: float()]
-  # @callback binary_from_opts(type :: atom(), opts :: name_opts()) :: binary()
-  #
-  # @doc "Creates a map of the parts of a created unique name"
-  # @type name_parts_map() :: %{
-  #         :name => binary(),
-  #         :rc => name_rc(),
-  #         optional(:cmd) => binary(),
-  #         optional(:expired_ms) => integer(),
-  #         optional(:temp_f) => float(),
-  #         optional(:relhum) => float()
-  #       }
-  # @callback name_to_parts(name :: binary()) :: name_parts_map()
-  #
-  # @doc "Creates a unique name with the specified prefix"
-  # @callback unique_with_prefix(prefix :: binary(), index :: integer()) :: binary()
-  #
-  # defmacro __using__(use_opts) do
-  #   quote location: :keep, bind_quoted: [use_opts: use_opts] do
-  #     alias Alfred.NamesAid
-  #
-  #     if use_opts != [] do
-  #       for what when what in [:equipment, :sensor, :sensors] <- use_opts do
-  #         fn_name = [Atom.to_string(what), "_add"] |> Enum.join() |> String.to_atom()
-  #         def unquote(fn_name)(ctx), do: NamesAid.unquote(fn_name)(ctx)
-  #       end
-  #     else
-  #       @behaviour Alfred.NamesAid
-  #
-  #       alias Alfred.NamesAid
-  #
-  #       def equipment_add(ctx), do: NamesAid.equipment_add(ctx)
-  #
-  #       def just_saw(ctx), do: NamesAid.just_saw(ctx)
-  #       def name_add(ctx), do: NamesAid.name_add(ctx)
-  #       def parts_add(ctx), do: NamesAid.parts_add(ctx)
-  #       def parts_add_auto(ctx), do: NamesAid.parts_add_auto(ctx)
-  #       def make_seen_name(ctx), do: NamesAid.make_seen_name(ctx)
-  #
-  #       def name_add(ctx), do: NamesAid.name_add(ctx)
-  #
-  #       def binary_from_opts(type, opts)
-  #           when is_atom(type)
-  #           when is_list(opts)
-  #           when opts != [] do
-  #         Alfred.NamesAid.from_opts(type, opts)
-  #       end
-  #
-  #       def name_to_parts(name)
-  #           when is_binary(name) do
-  #         Alfred.NamesAid.to_parts(name)
-  #       end
-  #
-  #       def unique_with_prefix(prefix, index \\ 4)
-  #           when is_binary(prefix)
-  #           when is_integer(index)
-  #           when index >= 0 and index <= 4 do
-  #         Alfred.NamesAid.unique(prefix, index)
-  #       end
-  #     end
-  #   end
-  # end
-
   ##
   ## ExUnit setup functions
   ##
@@ -242,15 +157,23 @@ defmodule Alfred.NamesAid do
 
   def binary_to_parts(name) when is_binary(name) do
     case regex_common(name) do
-      %{type: :mut, args: args} = x -> regex_mutable(args) |> merge_and_clean(x)
-      %{type: :imm, args: args} = x -> regex_immutable(args) |> merge_and_clean(x)
-      %{type: :unk} = x -> %{rc: :unkown} |> Map.merge(x)
+      %{type: :mut, args: args} = x -> {regex_mutable(args), x}
+      %{type: :imm, args: args} = x -> {regex_immutable(args), x}
+      %{type: :unk} = x -> {%{rc: :unkown}, x}
     end
+    |> merge_and_clean()
   end
 
   ##
   ## Misc
   ##
+
+  def possible_parts do
+    # NOTE: the order of part keys is significant for assembling an
+    # accurate view of a binary name.  e.g. expired_ms is used to
+    # create updated_at.
+    [:name, :expired_ms, :type, :rc, :ttl_ms, :cmd, :temp_f, :relhum]
+  end
 
   def unique(prefix, index \\ 4)
       when is_binary(prefix)
@@ -267,9 +190,7 @@ defmodule Alfred.NamesAid do
   ## Private
   ##
 
-  defp merge_and_clean(m1, m2) do
-    Map.merge(m1, m2) |> Map.drop([:args])
-  end
+  defp merge_and_clean({m1, m2}), do: Map.merge(m1, m2) |> Map.drop([:args])
 
   defp immutable(opts_map) do
     [unique("immutable"), add_rc(opts_map), add_expired(opts_map), add_data(opts_map)] |> to_binary()
@@ -309,6 +230,7 @@ defmodule Alfred.NamesAid do
     case opts_map do
       %{expired_ms: _} -> "expired"
       %{pending: true} -> "pending"
+      %{orphaned: true} -> "orphaned"
       %{rc: rc} when is_atom(rc) -> Atom.to_string(rc)
       %{rc: rc} when is_binary(rc) -> rc
       _ -> "ok"

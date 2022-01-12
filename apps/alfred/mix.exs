@@ -4,7 +4,7 @@ defmodule Alfred.MixProject do
   def project do
     [
       app: :alfred,
-      version: "0.2.16",
+      version: "0.3.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -61,7 +61,7 @@ defmodule Alfred.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/shared", "test/status"]
+  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/shared", "test/impl"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp preferred_cli_env do

@@ -48,7 +48,16 @@ defmodule Sally.Datapoint do
 
   def columns(:cast), do: columns(:all)
 
-  def preload_avg(dev_alias_or_nil, since_ms) do
+  @since_ms_default 1000 * 60 * 5
+  def preload_avg(nil, _opts), do: nil
+
+  def preload_avg(dev_alias_or_nil, opts) when is_list(opts) do
+    since_ms = Keyword.get(opts, :since_ms, @since_ms_default)
+
+    preload_avg(dev_alias_or_nil, since_ms)
+  end
+
+  def preload_avg(dev_alias_or_nil, since_ms) when is_integer(since_ms) do
     import Ecto.Query, only: [from: 2, subquery: 1]
 
     # select the datapoints within the requested range
@@ -82,5 +91,49 @@ defmodule Sally.Datapoint do
 
         {:ok, acc + deleted}
     end
+  end
+
+  def reduce_to_avgs(%DevAlias{datapoints: [%Sally.Datapoint{} | _] = datapoints} = dev_alias) do
+    Enum.reduce(datapoints, {0, %{}}, fn %Sally.Datapoint{} = datapoint, {count, sums} ->
+      {count + 1,
+       Map.take(datapoint, [:temp_c, :relhum])
+       |> Enum.reduce(%{}, fn
+         {key, val}, acc -> if(val, do: Map.put(acc, key, Map.get(sums, key, 0) + val), else: acc)
+       end)}
+    end)
+    |> then(fn {count, sums} -> Enum.into(sums, %{}, fn {key, val} -> {key, val / count} end) end)
+    |> then(fn avgs -> Map.put(avgs, :temp_f, Map.get(avgs, :temp_c) * 1.8 + 32) end)
+    |> then(fn avgs -> struct(dev_alias, datapoints: [avgs]) end)
+  end
+
+  def reduce_to_avgs(dev_alias), do: dev_alias
+
+  def status(name, opts) do
+    status_query(name, opts)
+    |> Sally.Repo.one()
+    |> reduce_to_avgs()
+  end
+
+  def status_query(<<_::binary>> = name, opts) when is_list(opts) do
+    require Ecto.Query
+
+    since_ms = Keyword.get(opts, :since_ms, @since_ms_default)
+
+    Ecto.Query.from(dev_alias in Sally.DevAlias,
+      as: :dev_alias,
+      where: [name: ^name],
+      join: datapoints in assoc(dev_alias, :datapoints),
+      inner_lateral_join:
+        latest_datapoints in subquery(
+          Ecto.Query.from(datapoint in Sally.Datapoint,
+            where: [dev_alias_id: parent_as(:dev_alias).id],
+            where: datapoint.reading_at >= ago(^since_ms, "millisecond"),
+            order_by: [desc: :reading_at],
+            select: [:id]
+          )
+        ),
+      on: latest_datapoints.id == datapoints.id,
+      preload: [datapoints: datapoints]
+    )
   end
 end

@@ -109,8 +109,9 @@ defmodule Sally.DispatchAid do
 
   defp recv_at(opts), do: opts[:recv_at] || DateTime.utc_now()
 
+  @shift_opts [milliseconds: -2]
   defp sent_at(opts) do
-    shift_opts = [milliseconds: -2]
-    opts[:sent_at] || DateTime.utc_now() |> Timex.shift(shift_opts)
+    Keyword.get(opts, :sent_at, DateTime.utc_now())
+    |> Timex.shift(@shift_opts)
   end
 end

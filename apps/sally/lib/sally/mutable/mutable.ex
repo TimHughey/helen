@@ -39,7 +39,7 @@ defmodule Sally.Mutable do
   @doc """
   Create an `Ecto.Changeset` to align the `DevAlias` status to the reported status
   """
-  @spec align_status_cs_one(Ecto.Schema.t(), data_map(), seen_at) :: Ecto.Changset.t() | :nochange
+  @spec align_status_cs_one(Ecto.Schema.t(), data_map(), seen_at) :: Ecto.Changeset.t() | :nochange
   def align_status_cs_one(dev_alias, data, seen_at) do
     pin_cmd = pin_status(data.pins, dev_alias.pio)
 

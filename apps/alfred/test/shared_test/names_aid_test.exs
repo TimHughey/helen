@@ -1,5 +1,6 @@
 defmodule AlfredNamesAidTest do
   use ExUnit.Case, async: true
+  use Should
 
   @moduletag alfred: true, alfred_names_aid: true
 
@@ -26,6 +27,13 @@ defmodule AlfredNamesAidTest do
       assert_binaries(name, ["mutable", "pending", "on"])
 
       assert %{name: ^name, rc: :pending, cmd: "on", type: :mut} = parts
+    end
+
+    @tag name_add: [type: :mut, rc: :orphaned, cmd: "on"]
+    test "makes mutable name with rc orphaned and cmd on", %{name: name, parts: parts} do
+      assert_binaries(name, ["mutable", "orphaned", "on"])
+
+      assert %{name: ^name, rc: :orphaned, cmd: "on", type: :mut} = parts
     end
 
     @tag name_add: [type: :mut, cmd: "on", expired_ms: 1000]

@@ -23,4 +23,12 @@ defmodule Alfred.Notify.Memo do
       missing?: opts[:missing?]
     }
   end
+
+  def send(%{pid: pid} = fields) when is_struct(fields) do
+    fields
+    |> Map.from_struct()
+    |> Map.put(:missing?, true)
+    |> then(fn fields -> struct(__MODULE__, fields) end)
+    |> then(fn memo -> Process.send(pid, {Alfred, memo}, []) end)
+  end
 end

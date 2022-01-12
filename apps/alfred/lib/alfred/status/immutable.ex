@@ -1,7 +1,7 @@
 defmodule Alfred.ImmutableStatus do
   alias __MODULE__, as: Status
 
-  @derive [Alfred.Status]
+  # @derive [Alfred.Status]
   defstruct name: nil,
             good?: false,
             found?: true,

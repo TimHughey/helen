@@ -12,6 +12,12 @@ defmodule SallyDevAliasTest do
   setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
   setup [:command_add, :datapoint_add, :dispatch_add]
 
+  defmacro assert_execution_us(elapsed, expected_us) do
+    quote bind_quoted: [elapsed: elapsed, expected_us: expected_us] do
+      assert Timex.Duration.to_microseconds(elapsed) < expected_us, format_elapsed_ms(elapsed)
+    end
+  end
+
   describe "Sally.device_add_alias/1" do
     @tag device_add: [auto: :mcp23008]
     test "detects missing options", %{device: device} do
@@ -50,6 +56,7 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.devalias_delete/1" do
+    @tag skip: true
     @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
     @tag command_add: [count: 250, shift_unit: :days, shift_increment: -1]
     test "deletes a mutable DevAlias name", ctx do
@@ -59,6 +66,7 @@ defmodule SallyDevAliasTest do
                Sally.devalias_delete(to_delete_name)
     end
 
+    @tag skip: true
     @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
     @tag datapoint_add: [count: 250, shift_unit: :days, shift_increment: -1]
     test "deletes an immutable DevAlias name", ctx do
@@ -70,7 +78,9 @@ defmodule SallyDevAliasTest do
   end
 
   @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
-  test "Sally.devalias_info/2 returns summarized and raw results", %{device: device, host: host} do
+  test "Sally.devalias_info/2 returns summarized and raw results", ctx do
+    assert %{device: device, host: host} = ctx
+
     assert %Sally.Host{
              name: host_name,
              ident: host_ident,
@@ -132,11 +142,64 @@ defmodule SallyDevAliasTest do
     end
   end
 
-  @tag skip: true
-  @tag device_add: [auto: :mcp23008], devalias_add: [count: 5], command_add: [count: 100]
-  test "Sally.DevAlias.explain/2", ctx do
-    %Sally.DevAlias{name: name} = ctx.dev_alias |> List.first()
+  describe "Sally.DevAlias.status_lookup/3" do
+    @tag device_add: [auto: :mcp23008], devalias_add: []
+    @tag command_add: [count: 50, shift_unit: :minutes, shift_increment: -1]
+    test "handles a DevAlias with Commands", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-    Sally.DevAlias.explain(name)
+      name_map = %{name: name, nature: :cmds}
+      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
+      assert_execution_us(elapsed, 15_000)
+
+      assert %Sally.DevAlias{} = dev_alias
+      assert Ecto.assoc_loaded?(dev_alias.cmds)
+      assert Ecto.assoc_loaded?(dev_alias.datapoints)
+
+      assert [%Sally.Command{}] = dev_alias.cmds
+      refute dev_alias.datapoints
+    end
+
+    @tag device_add: [auto: :ds], devalias_add: []
+    @tag datapoint_add: [count: 100, shift_unit: :seconds, shift_increment: -7]
+    test "handles DevAlias with Datapoints", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+
+      name_map = %{name: name, nature: :datapoints}
+      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
+      assert_execution_us(elapsed, 15_000)
+
+      assert %Sally.DevAlias{} = dev_alias
+      assert Ecto.assoc_loaded?(dev_alias.cmds)
+      assert Ecto.assoc_loaded?(dev_alias.datapoints)
+
+      assert [%{temp_f: temp_f, temp_c: temp_c, relhum: relhum}] = dev_alias.datapoints
+      assert is_float(temp_f)
+      assert is_float(temp_c)
+      assert is_float(relhum)
+      refute dev_alias.cmds
+    end
   end
+
+  describe "Sally.DevAlias EXPLAIN" do
+    @tag skip: true
+    @tag device_add: [auto: :mcp23008], devalias_add: []
+    @tag command_add: [count: 50, shift_unit: :minutes, shift_increment: -1]
+    test "for join of last Sally.Command", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+
+      Sally.DevAlias.explain(name, :status, :cmds, [])
+    end
+
+    @tag skip: true
+    @tag device_add: [auto: :ds], devalias_add: []
+    @tag datapoint_add: [count: 40, shift_unit: :seconds, shift_increment: -7]
+    test "for join of recent Sally.Datapoint", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+
+      Sally.DevAlias.explain(name, :status, :datapoints, [])
+    end
+  end
+
+  defp format_elapsed_ms(ms), do: Timex.format_duration(ms, :humanized)
 end

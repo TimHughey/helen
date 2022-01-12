@@ -20,27 +20,11 @@ defmodule Sally.MutableHandlerTest do
 
       assert {:ok,
               %{
-                aliases: [
-                  %Sally.DevAlias{
-                    id: dev_alias_id,
-                    device_id: device_id,
-                    updated_at: dev_alias_updated_at_before
-                  }
-                  | _
-                ],
+                aliases: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _],
                 aligned_0: %Sally.Command{dev_alias_id: dev_alias_id, cmd: "on"},
                 device: %Sally.Device{id: device_id, family: "i2c", mutable: true},
-                seen_list: [
-                  %Sally.DevAlias{
-                    id: dev_alias_id,
-                    device_id: device_id,
-                    updated_at: dev_alias_updated_at_after
-                  }
-                  | _
-                ]
+                seen_list: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _]
               }} = Sally.Mutable.Handler.db_actions(dispatch)
-
-      assert DateTime.compare(dev_alias_updated_at_before, dev_alias_updated_at_after) == :lt
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 5]

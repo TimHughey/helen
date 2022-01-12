@@ -7,9 +7,10 @@ defmodule Sally.DevAlias do
   require a `Sally.DevAlias`
   """
   require Logger
+  require Ecto.Query
 
   use Ecto.Schema
-  require Ecto.Query
+  use Alfred.Status
 
   alias __MODULE__, as: Schema
   alias Ecto.Changeset
@@ -118,18 +119,24 @@ defmodule Sally.DevAlias do
     end
   end
 
-  def explain(name, opts \\ [analyze: true]) do
-    import Ecto.Query, only: [where: 2]
+  @doc """
+  SQL Explain for status queries
+  """
+  @spec explain(name :: String.t(), :status, opts :: list()) :: :ok
+  def explain(name, :status, what, opts \\ [analyze: true]) do
+    {analyze, query_opts} = Keyword.pop(opts, :analyze, true)
 
-    %Schema{id: schema_id} = find(name)
+    explain_opts = [analyze: analyze]
 
-    query = Command.query_preload_latest_cmd(schema_id)
-
-    for line <- Repo.explain(:all, query, opts) |> String.split("\n") do
-      IO.puts(line)
+    case what do
+      :cmds -> Sally.Command
+      :datapoints -> Sally.Datapoint
     end
-
-    :ok
+    |> tap(fn module -> ["\n", inspect(module), ".status_query/2\n"] |> IO.puts() end)
+    |> then(fn module -> apply(module, :status_query, [name, query_opts]) end)
+    |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
+    |> String.split("\n")
+    |> Enum.each(fn line -> [line] |> IO.puts() end)
   end
 
   # (1 of 2) find with proper opts
@@ -239,8 +246,6 @@ defmodule Sally.DevAlias do
       repo.preload(schema, cmds: cmd_q)
     end
     |> then(fn dev_aliases -> {:ok, dev_aliases} end)
-
-    #  {:ok, all_query |> repo.all()}
   end
 
   defp load_command_ids(schema_or_nil) do
@@ -290,5 +295,21 @@ defmodule Sally.DevAlias do
     end
   end
 
+  def status_lookup(%{name: name, nature: nature}, opts) do
+    case nature do
+      :cmds -> Sally.Command.status(name, opts)
+      :datapoints -> Sally.Datapoint.status(name, opts)
+    end
+    |> status_lookup_finalize()
+  end
+
   def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
+
+  defp status_lookup_finalize(dev_alias) do
+    case dev_alias do
+      %Sally.DevAlias{cmds: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, cmds: nil)
+      %Sally.DevAlias{datapoints: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, datapoints: nil)
+      other -> other
+    end
+  end
 end

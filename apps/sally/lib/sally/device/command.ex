@@ -127,6 +127,28 @@ defmodule Sally.Command do
     |> changeset(reported_cmd)
   end
 
+  def status(name, opts), do: status_query(name, opts) |> Sally.Repo.one()
+
+  def status_query(<<_::binary>> = name, _opts) do
+    require Ecto.Query
+
+    Ecto.Query.from(dev_alias in Sally.DevAlias,
+      as: :dev_alias,
+      where: [name: ^name],
+      join: cmds in assoc(dev_alias, :cmds),
+      inner_lateral_join:
+        latest_cmd in subquery(
+          Ecto.Query.from(Sally.Command,
+            where: [dev_alias_id: parent_as(:dev_alias).id],
+            order_by: [desc: :sent_at],
+            limit: 1
+          )
+        ),
+      on: latest_cmd.id == cmds.id,
+      preload: [cmds: cmds]
+    )
+  end
+
   def summary(%Schema{} = x) do
     Map.take(x, [:cmd, :acked, :sent_at])
   end

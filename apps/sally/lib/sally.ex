@@ -381,14 +381,6 @@ defmodule Sally do
     |> Alfred.just_saw()
   end
 
-  # def just_saw([%DevAlias{device_id: dev_id} | _] = dev_aliases) do
-  #   alias Alfred.{JustSaw, SeenName}
-  #
-  #   Device.type(dev_id)
-  #   |> JustSaw.new(dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
-  #   |> Alfred.just_saw()
-  # end
-
   # required as callback from Alfred
   # function head
   def status(type, name, opts \\ [])

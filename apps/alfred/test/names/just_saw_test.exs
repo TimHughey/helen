@@ -1,5 +1,6 @@
 defmodule Alfred.JustSawTest do
   use ExUnit.Case, async: true
+  use Should
 
   @moduletag alfred: true, alfred_names: true, alfred_just_saw: true
 
@@ -123,6 +124,23 @@ defmodule Alfred.JustSawTest do
     test "detects invalid callback" do
       invalid_js = %Alfred.JustSaw{seen_list: [%Alfred.SeenName{}]} |> Alfred.JustSaw.validate()
       assert %Alfred.JustSaw{valid?: false} = invalid_js
+    end
+  end
+
+  describe "Alfred.JustSaw.callbacks_defined/1" do
+    test "returns accurate map for using module" do
+      assert %{execute: {Alfred.JustSawImpl, 2}, status: {Alfred.JustSawImpl, 2}} =
+               Alfred.JustSawImpl.callbacks()
+    end
+  end
+
+  describe "Alfred.JustSawImpl.just_saw/2" do
+    test "does stuff" do
+      names = [%{name: "name1", ttl_ms: 1000}, %{name: "name2", ttl_ms: 1000}]
+
+      assert :ok = Alfred.JustSawImpl.just_saw(names)
+
+      assert %DateTime{} = Alfred.Name.seen_at("name1")
     end
   end
 
