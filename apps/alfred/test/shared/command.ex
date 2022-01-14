@@ -1,15 +1,47 @@
 defmodule Alfred.Test.Command do
   @moduledoc false
 
+  use Alfred.Broom, timeout_after: "PT3.3S", metrics_interval: "PT1M", cmd_opts: [notify_when_released: true]
+
   defstruct refid: nil,
             cmd: "off",
             acked: true,
             orphaned: false,
             rt_latency_us: nil,
             sent_at: nil,
-            acked_at: nil
+            acked_at: nil,
+            dev_alias: nil
 
   @tz "America/New_York"
+
+  def ack_now(refid, ack_at, disposition) do
+    {__MODULE__, refid, ack_at, disposition}
+    |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.puts() end)
+
+    :ok
+  end
+
+  def add(%Alfred.Test.DevAlias{name: _name}, opts) do
+    {at, opts_rest} = Keyword.pop(opts, :ref_dt, now())
+    {cmd, opts_rest} = Keyword.pop(opts_rest, :cmd)
+    {cmd_opts, _opts_rest} = Keyword.pop(opts_rest, :cmd_opts)
+
+    {ack, _cmd_opts_rest} = Keyword.pop(cmd_opts, :ack)
+
+    parts = %{rc: (ack == :immediate && :ok) || :pending, cmd: cmd}
+
+    inserted_cmd = new(parts, at)
+
+    case parts do
+      %{rc: :ok} -> {:ok, inserted_cmd}
+      %{rc: :pending} -> {:pending, inserted_cmd}
+      _ -> {:error, inserted_cmd}
+    end
+  end
+
+  def broom_timeout(%Alfred.Broom{} = broom) do
+    broom |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.puts() end)
+  end
 
   def new(%{cmd: cmd} = parts, at) when is_map(parts) do
     case parts do
@@ -19,7 +51,7 @@ defmodule Alfred.Test.Command do
       %{rc: :expired} -> [acked: true, orphaned: false, acked_at: shift_ms(at, -1000)]
       _ -> []
     end
-    |> then(fn fields -> [{:ref_dt, at} | [{:cmd, cmd} | [{:refid, refid()} | fields]]] end)
+    |> then(fn fields -> [{:ref_dt, at} | [{:cmd, cmd} | [{:refid, make_refid()} | fields]]] end)
     |> sent_at()
     |> rt_latency_us()
     |> new()
@@ -27,14 +59,9 @@ defmodule Alfred.Test.Command do
 
   def new(fields), do: struct(__MODULE__, fields)
 
-  ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
+  def now, do: Timex.now(@tz)
 
-  defp now, do: Timex.now(@tz)
-  defp refid, do: Ecto.UUID.generate() |> String.split("-") |> List.first()
-
-  defp rt_latency_us(fields) do
+  def rt_latency_us(fields) do
     acked = Keyword.get(fields, :acked, false)
     acked_at = Keyword.get(fields, :acked_at, :none)
     sent_at = Keyword.get(fields, :sent_at, shift_ms(acked_at, -20))
@@ -46,7 +73,7 @@ defmodule Alfred.Test.Command do
     end
   end
 
-  defp sent_at(fields) do
+  def sent_at(fields) do
     acked = Keyword.get(fields, :acked, false)
     acked_at = Keyword.get(fields, :acked_at, :none)
     ref_dt = Keyword.get(fields, :ref_dt, now())
@@ -59,7 +86,6 @@ defmodule Alfred.Test.Command do
   end
 
   # DateTime calculations
-  defp diff_ms(lhs, rhs), do: Timex.diff(lhs, rhs, :milliseconds)
-
-  defp shift_ms(dt, ms), do: Timex.shift(dt, milliseconds: ms)
+  def diff_ms(lhs, rhs), do: Timex.diff(lhs, rhs, :milliseconds)
+  def shift_ms(dt, ms), do: Timex.shift(dt, milliseconds: ms)
 end

@@ -6,6 +6,13 @@ defmodule Alfred.StatusTest do
 
   setup [:equipment_add, :sensor_add, :name_add, :register_add]
 
+  describe "Alfred.Status.status/2" do
+    @tag name_add: [type: :unk]
+    test "handles unknown name", %{name: name} do
+      assert %Alfred.Status{name: ^name, detail: :none, rc: :not_found} = Alfred.Status.status(name, [])
+    end
+  end
+
   describe "Alfred.Status.of_name/2" do
     @tag name_add: [type: :unk]
     test "handles unknown name", %{name: name} do
@@ -40,6 +47,26 @@ defmodule Alfred.StatusTest do
                Alfred.StatusImpl.status(name, [])
 
       assert_in_delta(15_000, expired_ms, 150)
+    end
+  end
+
+  describe "Alfred.status_v3/2" do
+    test "invokes correct callback module" do
+      names =
+        Enum.map(1..3, fn _x ->
+          fake_ctx = %{sensor_add: [temp_f: 71.2]}
+          %{sensor: name} = Alfred.NamesAid.sensor_add(fake_ctx)
+
+          name
+          |> Alfred.NamesAid.binary_to_parts()
+          |> Alfred.Test.DevAlias.new()
+        end)
+
+      assert :ok = Alfred.Test.DevAlias.just_saw(names)
+
+      assert %{name: name} = List.first(names)
+
+      assert %Alfred.Status{name: ^name, detail: %{temp_f: _}} = Alfred.status_v3(name)
     end
   end
 

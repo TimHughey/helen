@@ -42,12 +42,10 @@ defmodule Sally.Command do
   def columns(:cast), do: columns(:all)
 
   def ack_now_cs(id, %DateTime{} = sent_at, %DateTime{} = ack_at, disposition) when is_atom(disposition) do
-    alias Ecto.Changeset
-
     rt_us = DateTime.diff(ack_at, sent_at, :microsecond)
     changes = %{acked: true, acked_at: ack_at, orphaned: disposition == :orphan, rt_latency_us: rt_us}
 
-    %Schema{id: id} |> Changeset.cast(changes, Map.keys(changes))
+    %Schema{id: id} |> Ecto.Changeset.cast(changes, Map.keys(changes))
   end
 
   def add(%DevAlias{} = da, cmd, opts) do

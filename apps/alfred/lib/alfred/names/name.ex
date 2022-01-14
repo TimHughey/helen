@@ -4,7 +4,7 @@ defmodule Alfred.Name do
   require Logger
   use GenServer
 
-  @registry Alfred.Name.Registry
+  @registry Alfred.Application.registry(:name)
   @callback_default {__MODULE__, :callback_default}
   @callback_defaults %{status: @callback_default, execute: @callback_default}
   @nature_default :datapoints

@@ -2,7 +2,7 @@ defmodule Alfred.JustSawTest do
   use ExUnit.Case, async: true
   use Should
 
-  @moduletag alfred: true, alfred_names: true, alfred_just_saw: true
+  @moduletag alfred: true, alfred_just_saw: true
 
   defmacro assert_just_saw(new_js, want_kv) do
     quote location: :keep, bind_quoted: [new_js: new_js, want_kv: want_kv] do
@@ -130,17 +130,26 @@ defmodule Alfred.JustSawTest do
   describe "Alfred.JustSaw.callbacks_defined/1" do
     test "returns accurate map for using module" do
       assert %{execute: {Alfred.JustSawImpl, 2}, status: {Alfred.JustSawImpl, 2}} =
-               Alfred.JustSawImpl.callbacks()
+               Alfred.JustSaw.callbacks(Alfred.JustSawImpl)
     end
   end
 
-  describe "Alfred.JustSawImpl.just_saw/2" do
-    test "does stuff" do
-      names = [%{name: "name1", ttl_ms: 1000}, %{name: "name2", ttl_ms: 1000}]
+  describe "Alfred.DevAlias.just_saw/2" do
+    test "processes a list of Alfred.DevAlias" do
+      names =
+        Enum.map(1..3, fn _x ->
+          fake_ctx = %{sensor_add: [temp_f: 71.2]}
+          %{sensor: name} = Alfred.NamesAid.sensor_add(fake_ctx)
 
-      assert :ok = Alfred.JustSawImpl.just_saw(names)
+          name
+          |> Alfred.NamesAid.binary_to_parts()
+          |> Alfred.Test.DevAlias.new()
+        end)
 
-      assert %DateTime{} = Alfred.Name.seen_at("name1")
+      assert :ok = Alfred.Test.DevAlias.just_saw(names)
+
+      assert %Alfred.Test.DevAlias{name: name} = List.first(names)
+      assert %DateTime{} = Alfred.Name.seen_at(name)
     end
   end
 

@@ -2,7 +2,7 @@ defmodule Alfred.Notify do
   require Logger
   use GenServer
 
-  @registry Alfred.Notify.Registry
+  @registry Alfred.Application.registry(:notify)
 
   defstruct name: nil,
             ref: nil,

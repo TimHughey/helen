@@ -210,6 +210,10 @@ defmodule Alfred do
     names_lookup(name, opts) |> status_for_known_name(opts)
   end
 
+  def status_v3(<<_::binary>> = name, opts \\ []) when is_list(opts) do
+    Alfred.Status.status(name, opts)
+  end
+
   def toggle(name, opts \\ []) when is_binary(name) and is_list(opts) do
     case status(name, opts) do
       %ImmutableStatus{} -> %ExecResult{name: name, rc: :immutable}

@@ -1,6 +1,10 @@
 defmodule Alfred.Test.DevAlias do
   @moduledoc false
 
+  use Alfred.Status
+  use Alfred.Execute, broom: Alfred.Test.Command
+  use Alfred.JustSaw
+
   defstruct name: "",
             pio: 0,
             description: "<none>",
@@ -13,10 +17,15 @@ defmodule Alfred.Test.DevAlias do
 
   @tz "America/New_York"
 
+  @impl true
+  def execute_cmd(%Alfred.Status{} = status, opts) do
+    Alfred.Status.raw(status) |> Alfred.Test.Command.add(opts)
+  end
+
   # (1 of 4) handle unkonwn names
   def new(%{type: :unk}), do: new(nil)
 
-  # (2 of 4) construct a new DevAlias from a name parts map
+  # (2 of 4) construct a new DevAlias from a parts map
   def new(parts) when is_map(parts) do
     populate_order = [:name, :timestamps, :cmds, :datapoints]
 
@@ -34,6 +43,21 @@ defmodule Alfred.Test.DevAlias do
 
   # (3 of 4) catch all
   def new(_), do: nil
+
+  @impl true
+  def status_lookup(%{name: name, nature: :datapoints}, opts) when is_list(opts) do
+    %{datapoints: [datapoint]} = dev_alias = Alfred.NamesAid.binary_to_parts(name) |> new()
+
+    datapoint
+    |> Map.from_struct()
+    |> Enum.reject(fn {_key, val} -> is_nil(val) end)
+    |> Enum.into(%{})
+    |> then(fn datapoint -> struct(dev_alias, datapoints: [datapoint]) end)
+  end
+
+  def status_lookup(%{name: name, nature: :cmds}, opts) when is_list(opts) do
+    Alfred.NamesAid.binary_to_parts(name) |> new()
+  end
 
   ## PRIVATE
   ## PRIVATE
@@ -59,7 +83,7 @@ defmodule Alfred.Test.DevAlias do
 
   defp datapoints(_parts, fields), do: fields
 
-  def description(fields, description), do: [{:description, description} | fields]
+  defp description(fields, description), do: [{:description, description} | fields]
 
   defp now, do: Timex.now(@tz)
 

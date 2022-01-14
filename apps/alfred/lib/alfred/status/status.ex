@@ -1,10 +1,12 @@
 defmodule Alfred.Status do
   @moduledoc """
-  Generalized status of an `Alfred.KnownName`
+  Generalized status of an `Alfred.Name`
 
   """
 
-  defstruct name: :none, detail: %{}, rc: {:unset, :default}
+  @rc_default {:unset, :default}
+
+  defstruct name: :none, detail: :none, rc: @rc_default, __raw__: nil
 
   @type lookup_result() :: nil | {:ok, any()} | {:error, any()} | struct() | map()
   @type nature() :: :cmds | :datapoints
@@ -15,28 +17,41 @@ defmodule Alfred.Status do
 
   @type t :: %__MODULE__{name: String.t(), detail: status_detail(), rc: status_rc()}
 
+  @mod_attribute :alfred_status_overrides_map
   @callback status(binary(), list()) :: %__MODULE__{}
   @callback status_check(atom(), map() | struct(), list()) :: :ok | {atom(), any()}
   @callback status_lookup(map(), list()) :: lookup_result()
 
   @optional_callbacks [status_check: 3]
 
+  @doc false
   defmacro __using__(use_opts) do
-    quote do
-      Alfred.Status.overrides_attribute_put(__MODULE__, unquote(use_opts))
+    quote bind_quoted: [use_opts: use_opts] do
+      Alfred.Status.put_attribute(__MODULE__, use_opts)
 
       @behaviour Alfred.Status
-      def status(name, opts), do: Alfred.Status.of_name(name, __MODULE__, @alfred_status_overrides, opts)
+      def status(name, opts), do: Alfred.Status.status(name, __MODULE__, opts)
     end
   end
 
   @doc false
-  def overrides_attribute_put(module, use_opts) do
+  def put_attribute(module, use_opts) do
+    Module.register_attribute(module, @mod_attribute, persist: true)
     overrides = use_opts[:overrides] || []
-    overrides_map = Enum.map(overrides, fn key -> {key, true} end) |> Enum.into(%{})
 
-    Module.put_attribute(module, :alfred_status_overrides, overrides_map)
+    [
+      overrides: Enum.into(overrides, %{}, fn key -> {key, true} end)
+    ]
+    |> then(fn val -> Module.put_attribute(module, @mod_attribute, val) end)
   end
+
+  @doc false
+  def overrides_map(module) do
+    get_in(module.__info__(:attributes), [@mod_attribute, :overrides])
+  end
+
+  @doc since: "0.3.0"
+  def raw(%Alfred.Status{__raw__: raw}), do: raw
 
   # Creating the Status of a Name
   #
@@ -66,12 +81,17 @@ defmodule Alfred.Status do
   #     a. :detail varies depending on the nature of the name (e.g. cmds vs. datapoints)
   #     b. the caller is responsible for interpreting the detail
   #
-  @checks [:registered, :ttl_info, :lookup, :ttl_lookup, :pending, :orphan, :good, :detail]
-  def of_name(name, module, overrides_map, opts) do
-    default_opts = [ref_dt: Timex.now()]
-    opts_all = Keyword.merge(default_opts, [{:name, name} | opts])
 
-    checks_map = %{info: Alfred.Name.info(name), name: name}
+  @doc since: "0.3.0"
+  @checks [:registered, :ttl_info, :lookup, :ttl_lookup, :pending, :orphan, :good, :detail]
+  # (aaa of bbb) invoked via status/2 injected into using module
+  def status(name, module, opts) do
+    {info, opts_rest} = Keyword.pop(opts, :__name_info__, Alfred.Name.info(name))
+
+    opts_all = Keyword.merge([ref_dt: Timex.now()], [{:name, name} | opts_rest])
+    overrides_map = overrides_map(module)
+
+    checks_map = %{info: info, name: name}
 
     Enum.reduce(@checks, {:ok, checks_map}, fn
       # a check has failed or otherwise signals checking should stop
@@ -82,6 +102,19 @@ defmodule Alfred.Status do
       what, {_rc, checks_map} -> apply_check(what, checks_map, module, overrides_map, opts_all)
     end)
     |> new_from_checks_tuple()
+  end
+
+  # (aaa of bbb) typically invoked from Alfred.status_v3/2
+  def status(name, opts) do
+    info = Alfred.Name.info(name)
+    opts_all = [{:__name_info__, info} | opts]
+
+    case info do
+      %{name: name, callbacks: %{status: {mod, _}}} -> apply(mod, :status, [name, opts_all])
+      %{callbacks: %{status: nil}} -> {:error, :status_not_supported}
+      {:not_found = rc, name} -> struct(__MODULE__, name: name, rc: rc, detail: :none)
+      rc -> rc
+    end
   end
 
   @doc false
@@ -100,6 +133,7 @@ defmodule Alfred.Status do
   def new_from_checks_tuple({rc, checks_map}) do
     checks_map
     |> Map.take([:detail, :name, :rc])
+    |> Map.put(:__raw__, Map.get(checks_map, :lookup, :none))
     |> Map.put_new(:detail, :none)
     |> Map.put_new(:rc, rc)
     |> then(fn fields -> struct(__MODULE__, fields) end)

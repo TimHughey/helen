@@ -52,8 +52,8 @@ defmodule Alfred.MixProject do
       {:betty, in_umbrella: true},
       {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
+      {:uuid, "~> 1.1"},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
-      {:ecto, "~> 3.7", only: [:dev, :test]},
       {:excoveralls, "~> 0.10", only: :test},
       {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false},
       {:should, in_umbrella: true, only: :test}

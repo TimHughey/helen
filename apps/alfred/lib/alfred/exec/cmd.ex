@@ -28,7 +28,7 @@ defmodule Alfred.ExecCmd do
   @type t :: %__MODULE__{
           name: String.t(),
           cmd: cmd(),
-          inserted_cmd: Ecto.Schema.t(),
+          inserted_cmd: struct() | map(),
           cmd_params: cmd_params(),
           cmd_opts: cmd_opts(),
           pub_opts: pub_opts(),

@@ -15,63 +15,54 @@ defmodule Alfred.JustSaw do
           valid?: boolean()
         }
 
-  defmacro __using__(use_opts) do
-    quote bind_quoted: [use_opts: use_opts] do
-      @behaviour Alfred.JustSaw
-      @use_opts use_opts
-
-      # Alfred.JustSaw.put_callbacks_attribute(__MODULE__, unquote(use_opts))
-
-      @doc false
-      def callbacks, do: Alfred.JustSaw.callbacks_for_module(__MODULE__)
-
-      def just_saw(names, opts \\ []) do
-        callbacks() |> Alfred.JustSaw.just_saw(names, opts)
-      end
-    end
-  end
-
-  @callback callbacks() :: %{:execute => any(), :status => any()}
   @callback just_saw(String.t() | map() | list(), list()) :: :ok
 
-  # NOTE: unused at present
-  defmacro __before_compile__(env) do
-    unless Module.defines?(env.module, {:callbacks_defined, 1}) do
-      callbacks =
-        %{
-          status: Module.defines?(env.module, {:status, 2}),
-          execute: Module.defines?(env.module, {:execute, 2})
-        }
-        # Macro.escape/1 converts map into AST for direct insertion via unquote
-        |> Macro.escape()
+  @doc false
+  defmacro __using__(use_opts) do
+    quote bind_quoted: [use_opts: use_opts] do
+      # NOTE: capture use opts for Alfred.JustSaw
+      Alfred.JustSaw.put_attribute(__MODULE__, use_opts)
 
-      quote do
-        def callbacks_defined, do: unquote(callbacks)
-        defoverridable callbacks_defined: 0
+      @behaviour Alfred.JustSaw
+
+      def just_saw(names, opts \\ []) do
+        Alfred.JustSaw.just_saw(names, __MODULE__, opts)
       end
     end
   end
 
-  #
-  # Alfred.JustSaw implementation
-  #
+  @mod_attribute :alfred_just_saw_use_opts
+  @doc false
+  def put_attribute(module, use_opts) do
+    Module.put_attribute(module, @mod_attribute, use_opts)
+  end
 
   @doc false
-  def callbacks_for_module(module) do
-    use_opts_callbacks = get_in(module.__info__(:attributes), [:use_opts, :callbacks]) || []
-    functions = Keyword.take(module.__info__(:functions), [:execute, :status])
+  def callbacks(module) do
+    use_opts = module.__info__(:attributes)[@mod_attribute]
+    use_cb = use_opts[:callbacks] || []
 
-    Enum.reduce(functions, %{execute: false, status: false}, fn
-      {func, 2}, acc -> Map.put(acc, func, get_in(use_opts_callbacks, [func]) || {module, 2})
-      _, acc -> acc
+    functions = module.__info__(:functions)
+    defined_cb = Keyword.take(functions, [:execute, :status])
+
+    Enum.reduce(defined_cb, %{execute: false, status: false}, fn
+      {func, 2}, acc ->
+        # NOTE: callbacks specified via use opts are giving highest precedence
+        fa = Keyword.get(use_cb, func, {module, 2})
+        Map.put(acc, func, fa)
+
+      _, acc ->
+        acc
     end)
   end
 
   @doc since: "0.3.0"
-  def just_saw(callbacks, name, opts) when is_binary(name), do: just_saw(callbacks, [name], opts)
+  def just_saw(name, module, opts) when is_binary(name) do
+    just_saw([name], module, opts)
+  end
 
-  def just_saw(callbacks, names, opts) when is_list(names) do
-    opts_all = [{:callbacks, callbacks} | opts]
+  def just_saw(names, module, opts) when is_list(names) do
+    opts_all = [{:callbacks, callbacks(module)} | opts]
 
     Enum.each(names, fn name -> Alfred.Name.register(name, opts_all) end)
   end
@@ -89,13 +80,6 @@ defmodule Alfred.JustSaw do
   def new(type, seen_list, map_seen_fn, callback) when type in [:immutable, :mutable] do
     %JustSaw{mutable?: type == :mutable, callback: callback, seen_list: Enum.map(seen_list, map_seen_fn)}
     |> validate()
-  end
-
-  @doc false
-  def put_callbacks_attribute(module, use_opts) do
-    callback = Keyword.get(use_opts, :callbacks, module)
-
-    Module.put_attribute(module, :alfred_callbacks, callback)
   end
 
   def to_known_name(%JustSaw{valid?: false}), do: []

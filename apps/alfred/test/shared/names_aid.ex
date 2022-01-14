@@ -181,7 +181,7 @@ defmodule Alfred.NamesAid do
       when index >= 0 and index <= 4 do
     index = if(is_integer(index), do: index, else: 4)
 
-    serial = Ecto.UUID.generate() |> String.split("-") |> Enum.at(index)
+    serial = UUID.uuid4() |> String.split("-") |> Enum.at(index)
 
     [prefix, "_", serial] |> IO.iodata_to_binary()
   end

@@ -7,12 +7,15 @@ defmodule Alfred.Application do
 
   alias Alfred.{Names, Notify}
 
+  @registries [broom: Alfred.Broom.Registry, name: Alfred.Name.Registry, notify: Alfred.Notify.Registry]
+
   @impl true
   def start(_type, _args) do
     children = [
-      {Registry, [name: Alfred.Name.Registry, keys: :unique]},
+      {Registry, [name: @registries[:name], keys: :unique]},
       {Alfred.Notify.Supervisor, []},
-      {Registry, [name: Alfred.Notify.Registry, keys: :duplicate]},
+      {Registry, [name: @registries[:notify], keys: :duplicate]},
+      {Alfred.Broom.Supervisor, [registry(:broom)]},
       {Names.Server, []},
       {Notify.Server, []}
     ]
@@ -20,4 +23,6 @@ defmodule Alfred.Application do
     opts = [strategy: :one_for_one, name: Alfred.Supervisor, max_restarts: 10, max_seconds: 5]
     Supervisor.start_link(children, opts)
   end
+
+  def registry(what), do: @registries[what]
 end
