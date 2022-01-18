@@ -58,14 +58,6 @@ defmodule Alfred.Execute do
   end
 
   @doc since: "0.3.0"
-  def get_cmd(%__MODULE__{} = execute) do
-    case execute do
-      %{detail: %{cmd: cmd}} -> cmd
-      _ -> "UNKNOWN"
-    end
-  end
-
-  @doc since: "0.3.0"
   def on(_name, _opts) do
     :ok
   end

@@ -51,6 +51,14 @@ defmodule Alfred.Status do
   end
 
   @doc since: "0.3.0"
+  def get_cmd(%__MODULE__{} = status) do
+    case status do
+      %{detail: %{cmd: cmd}} -> cmd
+      _ -> "UNKNOWN"
+    end
+  end
+
+  @doc since: "0.3.0"
   def raw(%Alfred.Status{__raw__: raw}), do: raw
 
   # Creating the Status of a Name

@@ -55,7 +55,7 @@ defmodule Sally.DevAlias do
 
     case status(dev_alias, nature: :cmds) do
       status when pin_cmd == :no_pin ->
-        cmd_mismatch(status, :no_pin)
+        cmd_mismatch(status, "bad_pin")
 
       %{rc: :pending} ->
         :no_change
@@ -73,19 +73,23 @@ defmodule Sally.DevAlias do
     end
   end
 
-  defp cmd_mismatch(status, pin_cmd) do
-    dev_alias = Alfred.Status.raw(status)
-
+  defp cmd_mismatch(%Alfred.Status{} = status, pin_cmd) do
     [
       module: Sally.Command,
       align_status: true,
       mismatch: true,
       reported_cmd: pin_cmd,
-      local_cmd: status.detail.cmd,
+      local_cmd: Alfred.Status.get_cmd(status),
       status_error: status.rc,
-      name: dev_alias.name
+      name: status.name
     ]
     |> Betty.app_error_v2()
+
+    :no_change
+  end
+
+  defp cmd_mismatch(status, pin_cmd) do
+    [pin_cmd, "\n", inspect(status, pretty: true)] |> Logger.warn()
 
     :no_change
   end
