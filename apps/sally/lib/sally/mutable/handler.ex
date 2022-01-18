@@ -34,7 +34,10 @@ defmodule Sally.Mutable.Handler do
 
     case db_actions(msg) do
       {:ok, txn} ->
-        Sally.DevAlias.just_saw(txn.aliases, seen_at: msg.sent_at)
+        # HACK: get the updated DevAlias for just_saw/2
+        dev_aliases = Enum.map(txn.aliases, fn %{name: name} -> Sally.Command.status(name, []) end)
+
+        :ok = Sally.DevAlias.just_saw(dev_aliases, seen_at: msg.sent_at)
 
         Sally.Dispatch.valid(msg, txn)
 
@@ -59,7 +62,10 @@ defmodule Sally.Mutable.Handler do
       {:ok, txn} ->
         :ok = Sally.Command.release(refid, [])
 
-        Sally.DevAlias.just_saw(txn.aliases, seen_at: msg.sent_at)
+        # HACK: assemble an appropriate DevAlias for DevAlias.just_saw/2 to properly detect it's nature
+        dev_alias = struct(txn.aliases, cmds: txn.command)
+
+        :ok = Sally.DevAlias.just_saw(dev_alias, seen_at: msg.sent_at)
 
         Sally.Dispatch.valid(msg, txn)
 
