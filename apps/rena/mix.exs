@@ -30,7 +30,6 @@ defmodule Rena.MixProject do
     [
       {:alfred, in_umbrella: true},
       {:betty, in_umbrella: true},
-      {:broom, in_umbrella: true},
       {:timex, "~> 3.0"},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test, runtime: false},

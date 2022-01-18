@@ -60,28 +60,12 @@ defmodule Sally.Device do
     |> Changeset.validate_number(:pios, greater_than_or_equal_to: 1)
   end
 
-  def columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
+  @columns_all [:ident, :family, :mutable, :pios, :last_seen_at, :updated_at, :inserted_at]
+  def columns(:cast), do: @columns_all
+  def columns(:required), do: columns_exclude([:inserted_at, :updated_at])
+  def columns(:replace), do: columns_exclude([:last_seen_at, :updated_at])
 
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  def columns(:cast), do: columns(:all)
-  def columns(:required), do: columns_all(drop: [:inserted_at, :updated_at])
-  def columns(:replace), do: columns_all(only: [:last_seen_at, :updated_at])
-
-  def columns_all(opts) when is_list(opts) do
-    case opts do
-      [drop: x] ->
-        keep_set = columns(:all) |> MapSet.new()
-        drop_set = x |> MapSet.new()
-
-        MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
-
-      [only: keep] ->
-        keep
-    end
-  end
+  def columns_exclude(cols), do: Enum.reject(@columns_all, fn key -> key in cols end)
 
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
@@ -205,8 +189,7 @@ defmodule Sally.Device do
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
 
   def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
-    %Schema{id: id}
-    |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
+    struct(__MODULE__, id: id) |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
   end
 
   def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])

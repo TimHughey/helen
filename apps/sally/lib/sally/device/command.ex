@@ -4,6 +4,9 @@ defmodule Sally.Command do
   require Logger
 
   use Ecto.Schema
+  use Alfred.Broom, timeout_after: "PT3.3S"
+
+  require Ecto.Query
 
   alias __MODULE__, as: Schema
   alias Sally.{DevAlias, Repo}
@@ -20,6 +23,35 @@ defmodule Sally.Command do
     belongs_to(:dev_alias, DevAlias)
   end
 
+  def ack_now_cs(multi_changes, disposition) do
+    %{cmd_to_ack: cmd, recv_at: ack_at} = multi_changes
+    orphaned = disposition == :orphan
+
+    changes = %{acked: true, acked_at: ack_at, orphaned: orphaned} |> include_rt_latency(cmd)
+    required = Map.keys(changes)
+
+    Sally.Repo.load(__MODULE__, id: cmd.id)
+    |> Ecto.Changeset.cast(changes, required)
+  end
+
+  def ack_orphan_now(nil), do: {:ok, :already_acked}
+
+  def ack_orphan_now(%Schema{} = cmd) do
+    changes = %{acked: true, acked_at: now(), orphaned: true} |> include_rt_latency(cmd)
+    required = Map.keys(changes)
+
+    Ecto.Changeset.cast(cmd, changes, required) |> Sally.Repo.update()
+  end
+
+  # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
+  @impl true
+  def broom_timeout(%Alfred.Broom{tracked_info: %{id: id}}) do
+    # NOTE: there could be a race condition, only retrieve unacked cmd
+    Ecto.Query.from(cmd in __MODULE__, where: [id: ^id, acked: false])
+    |> Sally.Repo.one()
+    |> ack_orphan_now()
+  end
+
   def changeset(changes, %Schema{} = c) when is_map(changes) do
     alias Ecto.Changeset
 
@@ -32,21 +64,7 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
-  # helpers for changeset columns
-  def columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
-
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  def columns(:cast), do: columns(:all)
-
-  def ack_now_cs(id, %DateTime{} = sent_at, %DateTime{} = ack_at, disposition) when is_atom(disposition) do
-    rt_us = DateTime.diff(ack_at, sent_at, :microsecond)
-    changes = %{acked: true, acked_at: ack_at, orphaned: disposition == :orphan, rt_latency_us: rt_us}
-
-    %Schema{id: id} |> Ecto.Changeset.cast(changes, Map.keys(changes))
-  end
+  def columns(:cast), do: [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
 
   def add(%DevAlias{} = da, cmd, opts) do
     new_cmd = Ecto.build_assoc(da, :cmds)
@@ -66,6 +84,33 @@ defmodule Sally.Command do
     |> Repo.insert!(returning: true)
   end
 
+  def add_v2(%DevAlias{} = da, opts) do
+    {cmd, opts_rest} = Keyword.pop(opts, :cmd)
+    {cmd_opts, opts_rest} = Keyword.pop(opts_rest, :cmd_opts, [])
+    {ref_dt, _opts_rest} = Keyword.pop(opts_rest, :ref_dt, now())
+
+    new_cmd = Ecto.build_assoc(da, :cmds)
+
+    # handle special case of ack immediate
+    ack_immediate? = cmd_opts[:ack] == :immediate
+
+    # base changes for all new cmds
+    %{
+      refid: make_refid(),
+      cmd: cmd,
+      acked: ack_immediate?,
+      acked_at: if(ack_immediate?, do: ref_dt, else: nil),
+      sent_at: ref_dt
+    }
+    |> changeset(new_cmd)
+    |> Repo.insert!(returning: true)
+  end
+
+  @doc false
+  def include_rt_latency(%{acked_at: ack_at} = changes, %{sent_at: sent_at} = _cmd) do
+    changes |> Map.put(:rt_latency_us, Timex.diff(ack_at, sent_at))
+  end
+
   def load(id) when is_integer(id) do
     case Repo.get(Schema, id) do
       %Schema{} = x -> {:ok, x}
@@ -73,13 +118,13 @@ defmodule Sally.Command do
     end
   end
 
-  @doc """
-  Load the `Sally.DevAlias`, if needed
-  """
-  @doc since: "0.5.15"
-  def load_dev_alias(cmd) when is_struct(cmd) or is_nil(cmd) do
-    cmd |> Repo.preload(:dev_alias)
-  end
+  # @doc """
+  # Load the `Sally.DevAlias`, if needed
+  # """
+  # @doc since: "0.5.15"
+  # def load_dev_alias(cmd) when is_struct(cmd) or is_nil(cmd) do
+  #   cmd |> Repo.preload(:dev_alias)
+  # end
 
   def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
     import Ecto.Query, only: [from: 2]
@@ -125,7 +170,23 @@ defmodule Sally.Command do
     |> changeset(reported_cmd)
   end
 
-  def status(name, opts), do: status_query(name, opts) |> Sally.Repo.one()
+  def status(name, opts) do
+    query = status_query(name, opts)
+
+    case Sally.Repo.one(query) do
+      %Sally.DevAlias{} = dev_alias -> dev_alias
+      nil -> status_fix_missing_cmd(name, opts) |> status(opts)
+    end
+  end
+
+  @doc false
+  def status_fix_missing_cmd(name, opts) do
+    opts = Keyword.merge(opts, cmd: "unknown", cmd_opts: [ack: :immediate])
+
+    Sally.DevAlias.find(name) |> add_v2(opts)
+
+    name
+  end
 
   def status_query(<<_::binary>> = name, _opts) do
     require Ecto.Query

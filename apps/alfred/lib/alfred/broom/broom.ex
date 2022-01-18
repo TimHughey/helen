@@ -4,12 +4,14 @@ defmodule Alfred.Broom do
   require Logger
   use GenServer
 
-  @registry Alfred.Broom.Registry
+  @registry Alfred.Broom.Supervisor.registry()
+
   @timeout_ms_default 3300
 
   defstruct refid: nil,
             tracked_info: nil,
             at: %{sent: nil, tracked: nil, released: nil, timeout: nil},
+            rc: :none,
             module: nil,
             notify_pid: nil,
             timeout_ms: @timeout_ms_default,
@@ -25,6 +27,7 @@ defmodule Alfred.Broom do
   @type t :: %__MODULE__{
           refid: String.t(),
           tracked_info: map() | struct(),
+          rc: :none | :ok | :timeout,
           at: at_map(),
           module: module(),
           notify_pid: :none | pid(),
@@ -34,27 +37,41 @@ defmodule Alfred.Broom do
 
   @callback broom_timeout(Alfred.Broom.t()) :: any()
   @callback make_refid() :: String.t()
+  @callback now() :: DateTime.t()
   @callback release(refid :: String.t(), opts :: list()) :: :ok
   @callback track(schema :: map(), opts :: list()) :: Broom.t()
+  @callback tracked_info(refid :: String.t()) :: any()
 
+  # coveralls-ignore-start
   defmacro __using__(use_opts) do
     quote bind_quoted: [use_opts: use_opts] do
       # NOTE: capture use opts for Alfred.Broom
       Alfred.Broom.put_attribute(__MODULE__, use_opts)
       @behaviour Alfred.Broom
 
-      @doc since: "0.3.0"
       def make_refid, do: Alfred.Broom.make_refid()
 
-      @doc since: "0.3.0"
+      @doc false
+      def now(), do: Alfred.Broom.now()
+
       def release(refid, opts), do: Alfred.Broom.release(refid, __MODULE__, opts)
 
-      @doc since: "0.3.0"
       def track(exec_result, opts), do: Alfred.Broom.track(exec_result, __MODULE__, opts)
+
+      def tracked_info(refid), do: Alfred.Broom.tracked_info(refid, __MODULE__)
     end
   end
 
   @mod_attribute :alfred_broom_use_opts
+
+  @doc false
+  def put_attribute(module, use_opts) do
+    Module.register_attribute(module, @mod_attribute, persist: true)
+    Module.put_attribute(module, @mod_attribute, use_opts)
+  end
+
+  # coveralls-ignore-stop
+
   @doc false
   def get_attribute(module) do
     attributes = module.__info__(:attributes)
@@ -64,12 +81,6 @@ defmodule Alfred.Broom do
 
   @doc false
   defdelegate use_opts(module), to: __MODULE__, as: :get_attribute
-
-  @doc false
-  def put_attribute(module, use_opts) do
-    Module.register_attribute(module, @mod_attribute, persist: true)
-    Module.put_attribute(module, @mod_attribute, use_opts)
-  end
 
   def make_refid do
     UUID.uuid4() |> String.split("-") |> List.first()
@@ -91,6 +102,10 @@ defmodule Alfred.Broom do
     end
   end
 
+  def tracked_info(refid, module) do
+    {:tracked_info, refid, opts_final(module, [])} |> call(refid)
+  end
+
   ## GenServer
 
   @doc false
@@ -109,7 +124,7 @@ defmodule Alfred.Broom do
     Process.link(caller_pid)
     state = make_state(caller_pid, opts_rest)
 
-    Alfred.Broom.Metrics.count(state)
+    :ok = Alfred.Broom.Metrics.count(state)
 
     {:ok, state, timeout_ms(state)}
   end
@@ -139,21 +154,25 @@ defmodule Alfred.Broom do
   def handle_call({:release, refid, opts}, _from, %{refid: refid} = state) do
     release_at = Keyword.get(opts, :ref_dt, now())
 
-    state = update_at(state, :released, release_at)
+    state = update_at(state, :released, release_at) |> notify_if_requested(:ok)
 
-    %{notify_pid: notify_pid} = state
-
-    if is_pid(notify_pid), do: Process.send(notify_pid, {Alfred, state}, [])
-
-    Alfred.Broom.Metrics.count(state)
+    :ok = record_metrics(state)
+    :ok = Alfred.Broom.Metrics.count(state)
 
     # :normal exit won't restart the linked process
     {:stop, :normal, :ok, state}
   end
 
   @impl true
+  # NOTE: duplicate variables in the pattern are matched
+  def handle_call({:tracked_info, refid, _opts}, _from, %{refid: refid} = state) do
+    state.tracked_info |> reply(state)
+  end
+
+  @impl true
   def handle_info(:timeout, %{module: module} = state) do
-    state = update_at(state, :timeout, now())
+    now = now()
+    state = update_at(state, [:timeout, :released], now) |> notify_if_requested(:timeout)
 
     try do
       _ignored = module.broom_timeout(state)
@@ -161,7 +180,9 @@ defmodule Alfred.Broom do
       _, _ -> :ok
     end
 
-    Alfred.Broom.Metrics.count(state)
+    :ok = record_metrics(state)
+    :ok = Alfred.Broom.Metrics.count(state)
+    :ok = record_timeout(state)
 
     {:stop, :normal, state}
   end
@@ -179,10 +200,45 @@ defmodule Alfred.Broom do
   def metrics(state), do: state
 
   @doc false
-  def server(refid), do: {:via, Registry, {@registry, refid}}
+  def notify_if_requested(%{notify_pid: pid} = state, rc) do
+    struct(state, rc: rc)
+    |> tap(fn state -> if is_pid(pid), do: Process.send(pid, {Alfred, state}, []) end)
+  end
 
   @doc false
-  def short_name({:via, Registry, {_, short_name}}), do: short_name
+  def server(refid), do: {:via, Registry, {@registry, refid}}
+
+  # @doc false
+  # def short_name({:via, Registry, {_, short_name}}), do: short_name
+
+  @doc false
+  def record_metrics(state) do
+    %{opts: opts, module: module, at: at} = state
+
+    [
+      measurement: "command",
+      tags: [module: module, name: opts[:name], cmd: opts[:cmd]],
+      fields: [
+        cmd_roundtrip_us: Timex.diff(at.released, at.tracked),
+        cmd_total_us: Timex.diff(at.released, at.sent)
+      ]
+    ]
+    |> Betty.write()
+
+    :ok
+  end
+
+  @doc false
+  def record_timeout(state) do
+    %{module: module, opts: opts, refid: refid} = state
+
+    name = opts[:name]
+
+    [mutable: name, module: module, name: name, cmd: opts[:cmd], timeout: true, refid: refid]
+    |> Betty.app_error_v2()
+
+    :ok
+  end
 
   @doc false
   def call(msg, refid) do
@@ -247,6 +303,10 @@ defmodule Alfred.Broom do
   end
 
   @doc false
+  def update_at(state, [_ | _] = keys, at) do
+    Enum.reduce(keys, state, fn key, acc -> update_at(acc, key, at) end)
+  end
+
   @at_keys [:sent, :tracked, :released, :timeout]
   def update_at(state, key, %DateTime{} = at) when key in @at_keys do
     struct(state, at: Map.put(state.at, key, at))

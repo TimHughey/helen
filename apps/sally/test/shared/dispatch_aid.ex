@@ -86,14 +86,15 @@ defmodule Sally.DispatchAid do
       assert %Sally.Dispatch{
                valid?: true,
                invalid_reason: :none,
-               results: %{device: %Sally.Device{mutable: mutable?}},
-               seen_list: [_ | _] = seen_list
+               results: %{device: %Sally.Device{mutable: mutable?}}
+               # seen_list: []
+               #   seen_list: [_ | _] = seen_list
              } = dispatch = x
 
       # validate the device processed established appropriate Alfred linkages
-      want_struct = if mutable?, do: Alfred.MutableStatus, else: Alfred.ImmutableStatus
+      # want_struct = if mutable?, do: Alfred.MutableStatus, else: Alfred.ImmutableStatus
 
-      Enum.all?(seen_list, fn name -> assert is_struct(Alfred.status(name), want_struct) end)
+      # Enum.all?(seen_list, fn name -> assert is_struct(Alfred.status(name), want_struct) end)
 
       # return the processed dispatch
       dispatch

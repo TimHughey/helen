@@ -14,7 +14,11 @@ defmodule Alfred.Memo do
         }
 
   def new(base_info, overrides) when is_struct(base_info) do
-    {at_map, fields_rest} = Map.from_struct(base_info) |> Map.pop(:at)
+    Map.from_struct(base_info) |> new(overrides)
+  end
+
+  def new(base_info, overrides) when is_map(base_info) do
+    {at_map, fields_rest} = Map.pop(base_info, :at)
     seen_at = Map.get(at_map, :seen, DateTime.utc_now())
 
     fields = Map.put(fields_rest, :seen_at, seen_at)

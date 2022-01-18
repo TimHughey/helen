@@ -1,4 +1,4 @@
-defmodule Alfred.ExecCmd.Args do
+defmodule Alfred.Execute.Args do
   @moduledoc false
 
   def auto({args, defaults}), do: auto(args, defaults)

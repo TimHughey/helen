@@ -24,8 +24,7 @@ defmodule Sally.ImmutableHandlerTest do
               %{
                 aliases: [%Sally.DevAlias{} | _],
                 datapoint: [%Sally.Datapoint{} | _],
-                device: %Sally.Device{},
-                seen_list: [%Sally.DevAlias{} | _]
+                device: %Sally.Device{}
               }} = Sally.Immutable.Handler.db_actions(dispatch)
     end
   end

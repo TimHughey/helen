@@ -2,13 +2,26 @@ defmodule Alfred.ExecuteTest do
   use ExUnit.Case, async: true
   use Should
 
-  @moduletag alfred: true, alfred_dev_alias: true, alfred_execute: true
+  import Alfred.NamesAid, only: [equipment_add: 1, name_add: 1, sensor_add: 1]
 
-  setup [:equipment_add, :sensor_add, :name_add, :register_add]
+  @moduletag alfred: true, alfred_execute: true
+
+  setup [:equipment_add, :sensor_add, :name_add]
+
+  defmacrop get_name_from_ctx do
+    quote do
+      possible = Map.take(var!(ctx), [:sensor, :equipment, :name]) |> Map.values()
+      assert [name | _] = possible
+
+      name
+    end
+  end
 
   describe "Alfred.Execute.execute/2" do
     @tag name_add: [type: :unk]
-    test "handles unknown name", %{name: name} do
+    test "handles unknown name", ctx do
+      name = get_name_from_ctx()
+
       assert %Alfred.Execute{name: ^name, rc: :not_found, detail: :none} =
                Alfred.Execute.execute([name: name, cmd: "on"], [])
     end
@@ -16,44 +29,24 @@ defmodule Alfred.ExecuteTest do
 
   describe "Alfred.Test.DevAlias.execute/2" do
     @tag name_add: [type: :unk]
-    test "handles unknown name", %{name: name} do
+    test "handles unknown name", ctx do
+      name = get_name_from_ctx()
+
       assert %Alfred.Execute{name: ^name, rc: :not_found, detail: :none} =
                Alfred.Test.DevAlias.execute([name: name, cmd: "on"], [])
     end
 
-    test "handles cmd equal to status" do
-      names =
-        Enum.map(1..3, fn _x ->
-          fake_ctx = %{equipment_add: [cmd: "off"]}
-          %{equipment: name} = Alfred.NamesAid.equipment_add(fake_ctx)
-
-          name
-          |> Alfred.NamesAid.binary_to_parts()
-          |> Alfred.Test.DevAlias.new()
-        end)
-
-      assert :ok == Alfred.Test.DevAlias.just_saw(names)
-
-      assert %{name: name} = List.first(names)
+    @tag equipment_add: [cmd: "off"]
+    test "handles cmd equal to status", ctx do
+      name = get_name_from_ctx()
 
       assert %Alfred.Execute{detail: %{cmd: "off"}, name: ^name} =
                Alfred.Test.DevAlias.execute([name: name, cmd: "off"], [])
     end
 
-    test "cmd different than status" do
-      names =
-        Enum.map(1..3, fn _x ->
-          fake_ctx = %{equipment_add: [cmd: "off"]}
-          %{equipment: name} = Alfred.NamesAid.equipment_add(fake_ctx)
-
-          name
-          |> Alfred.NamesAid.binary_to_parts()
-          |> Alfred.Test.DevAlias.new()
-        end)
-
-      assert :ok == Alfred.Test.DevAlias.just_saw(names)
-
-      assert %{name: name} = List.first(names)
+    @tag equipment_add: [cmd: "off"]
+    test "cmd different than status", ctx do
+      name = get_name_from_ctx()
       execute_args = [name: name, cmd: "on"]
 
       assert %Alfred.Execute{detail: %{cmd: "on", __execute__: %{refid: refid}}, name: ^name, rc: :pending} =
@@ -67,21 +60,4 @@ defmodule Alfred.ExecuteTest do
       assert tracked > 0
     end
   end
-
-  def equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
-  def name_add(ctx), do: Alfred.NamesAid.name_add(ctx)
-
-  def register_add(ctx) when is_map_key(ctx, :sensor) or is_map_key(ctx, :equipment) do
-    register_opts = Map.get(ctx, :register_opts, [])
-
-    case ctx do
-      %{sensor: name} -> Alfred.StatusImpl.register(name, register_opts)
-      %{equipment: name} -> Alfred.StatusImpl.register(name, register_opts)
-    end
-    |> then(fn registered_name -> %{registered_name: registered_name} end)
-  end
-
-  def register_add(_ctx), do: :ok
-
-  def sensor_add(ctx), do: Alfred.NamesAid.sensor_add(ctx)
 end

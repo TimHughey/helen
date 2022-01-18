@@ -13,10 +13,11 @@ defmodule Sally.Immutable.Handler do
     alias Sally.Repo
 
     Multi.new()
+    |> Multi.put(:seen_at, msg.sent_at)
     |> Multi.insert(:device, Device.changeset(msg, msg.host), Device.insert_opts())
     |> Multi.run(:aliases, DevAlias, :load_aliases, [])
     |> Multi.run(:datapoint, DevAlias, :add_datapoint, [msg.data, msg.sent_at])
-    |> Multi.run(:seen_list, DevAlias, :just_saw, [msg.sent_at])
+    |> Multi.update_all(:just_saw_db, fn x -> DevAlias.just_saw_db(x) end, [])
     |> Repo.transaction()
   end
 
@@ -25,9 +26,10 @@ defmodule Sally.Immutable.Handler do
   @impl true
   def process(%Dispatch{category: x, filter_extra: [_ident, "ok"]} = msg) when x in @categories do
     case db_actions(msg) do
-      {:ok, %{device: device, seen_list: seen_list} = txn_results} ->
-        # NOTE: alert Alfred of just seen names after txn is complete
-        Sally.just_saw(device, seen_list) |> Dispatch.save_seen_list(msg) |> Dispatch.valid(txn_results)
+      {:ok, txn} ->
+        :ok = Sally.DevAlias.just_saw(txn.aliases, seen_at: msg.sent_at)
+
+        Dispatch.valid(msg, txn)
 
       {:error, :datapoint, error, _db_results} ->
         Dispatch.invalid(msg, error)

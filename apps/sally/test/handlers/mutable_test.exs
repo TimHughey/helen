@@ -22,8 +22,8 @@ defmodule Sally.MutableHandlerTest do
               %{
                 aliases: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _],
                 aligned_0: %Sally.Command{dev_alias_id: dev_alias_id, cmd: "on"},
-                device: %Sally.Device{id: device_id, family: "i2c", mutable: true},
-                seen_list: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _]
+                device: %Sally.Device{id: device_id, family: "i2c", mutable: true}
+                # seen_list: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _]
               }} = Sally.Mutable.Handler.db_actions(dispatch)
     end
 
@@ -35,12 +35,12 @@ defmodule Sally.MutableHandlerTest do
       assert {:ok,
               %{
                 aliases: aliases,
-                device: %Sally.Device{family: "i2c", mutable: true},
-                seen_list: seen_list
+                device: %Sally.Device{family: "i2c", mutable: true}
+                # seen_list: seen_list
               } = db_multi_result} = Sally.Mutable.Handler.db_actions(dispatch)
 
       assert length(aliases) == 5
-      assert length(seen_list) == 5
+      # assert length(seen_list) == 5
 
       Enum.all?(0..4, fn pio ->
         aligned_key = String.to_atom("aligned_#{pio}")
@@ -55,16 +55,16 @@ defmodule Sally.MutableHandlerTest do
     @tag command_add: [cmd: "on"]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "well formed Sally.Dispatch", ctx do
-      assert %Sally.DevAlias{id: dev_alias_id} = ctx[:dev_alias]
-      assert %Sally.Command{id: command_id} = ctx[:command]
+      assert %Sally.DevAlias{} = ctx[:dev_alias]
+      assert %Sally.Command{id: command_id} = command = ctx[:command]
       assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
 
       assert {:ok,
               %{
                 command: %Sally.Command{id: ^command_id},
                 device: %Sally.Device{},
-                seen_list: [%Sally.DevAlias{} | _]
-              }} = Sally.Mutable.Handler.db_cmd_ack(dispatch, command_id, dev_alias_id)
+                aliases: %Sally.DevAlias{}
+              }} = Sally.Mutable.Handler.db_cmd_ack(dispatch, command)
     end
   end
 

@@ -1,28 +1,19 @@
 defmodule Carol.StateAid do
-  @doc """
-  Add %State{} to testing context
+  @moduledoc false
 
-  State fields set by default: `:alfred, :server_name, :equipment, :programs`
-
-  ```
-
-  ```
-
-  """
-  @doc since: "0.2.1"
   def add(%{state_add: opts} = ctx) when is_list(opts) do
     alfred = ctx[:alfred] || AlfredSim
     server_name = ctx[:server_name] || __MODULE__
     equipment = ctx[:equipment] || "equipment missing"
 
-    new_state =
-      [
-        opts: [alfred: alfred, timezone: "America/New_York"],
-        id: server_name,
-        equipment: equipment,
-        episodes: ctx[:episodes] || :none
-      ]
-      |> Carol.State.new()
+    fields = [
+      opts: [alfred: alfred, timezone: "America/New_York"],
+      id: server_name,
+      equipment: equipment,
+      episodes: ctx[:episodes] || :none
+    ]
+
+    new_state = Carol.State.new(fields)
 
     case Enum.into(opts, %{}) do
       %{bootstrap: true} -> Carol.Server.handle_continue(:bootstrap, new_state)

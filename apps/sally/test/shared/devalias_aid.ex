@@ -32,7 +32,7 @@ defmodule Sally.DevAliasAid do
   def just_saw(%{just_saw: opts, device: %Sally.Device{}} = ctx) when is_list(opts) do
     dev_aliases = Sally.Device.load_aliases(ctx.device).aliases
 
-    %{sally_just_saw: Sally.just_saw(ctx.device, dev_aliases)}
+    %{sally_just_saw_v3: Sally.DevAlias.just_saw(dev_aliases)}
   end
 
   def just_saw(_), do: :ok

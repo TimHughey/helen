@@ -1,8 +1,6 @@
 defmodule Rena.SetPt.State do
   alias __MODULE__
 
-  alias Alfred.{ExecCmd, ExecResult}
-  alias Alfred.Notify.Ticket
   alias Rena.Sensor
 
   defstruct alfred: Alfred,
@@ -18,13 +16,13 @@ defmodule Rena.SetPt.State do
             last_transition: DateTime.from_unix!(0),
             timezone: "America/New_York"
 
-  @type cmds :: [{:active, ExecCmd.t()}, {:inactive, ExecCmd.t()}]
-  @type last_exec :: :none | :failed | DateTime.t() | ExecCmd.t()
-  @type ticket() :: :none | :paused | Ticket.t()
+  @type cmds :: [{:active, list()}, {:inactive, list()}]
+  @type last_exec :: :none | :failed | DateTime.t() | Alfred.Execute.t()
+  @type ticket() :: :none | :paused | Alfred.Ticket.t()
   @type t :: %State{
           alfred: module(),
           server_name: atom(),
-          equipment: String.t() | Ticket.t(),
+          equipment: String.t() | Alfred.Ticket.t(),
           ticket: ticket(),
           sensors: list(),
           sensor_range: Sensor.Range.t(),
@@ -48,7 +46,7 @@ defmodule Rena.SetPt.State do
 
   def pause_notifies(%State{ticket: ticket} = s) do
     case ticket do
-      %Ticket{} = x ->
+      %Alfred.Ticket{} = x ->
         s.alfred.notify_unregister(x)
         save_ticket(:paused, s)
 
@@ -57,24 +55,12 @@ defmodule Rena.SetPt.State do
     end
   end
 
-  def save_ticket(ticket_rc, %State{} = s) do
-    case ticket_rc do
-      x when is_atom(x) -> %State{s | ticket: x}
-      {:ok, x} -> %State{s | ticket: x}
-      {:no_server, _} -> {:stop, :normal, s}
-    end
-  end
+  def save_ticket({:ok, ticket}, state), do: struct(state, ticket: ticket)
+  def save_ticket(status, state) when is_atom(status), do: struct(state, ticket: status)
 
-  def start_notifies(%State{ticket: ticket} = s) do
-    case ticket do
-      x when x in [:none, :pause] ->
-        [name: s.equipment, frequency: :all, link: true]
-        |> s.alfred.notify_register()
-        |> save_ticket(s)
-
-      %Ticket{} ->
-        s
-    end
+  @notify_opts [interval_ms: :all, missing_ms: 60_000]
+  def start_notifies(%State{alfred: alfred} = s) do
+    [{:name, s.equipment} | @notify_opts] |> alfred.notify_register() |> save_ticket(s)
   end
 
   def transition(%State{} = s), do: %State{s | last_transition: DateTime.utc_now()}
@@ -86,7 +72,7 @@ defmodule Rena.SetPt.State do
   def update_last_exec(%State{} = s, what) do
     case what do
       %DateTime{} = at -> %State{s | last_exec: at} |> transition()
-      %ExecResult{} = er -> %State{s | last_exec: er}
+      %Alfred.Execute{} = execute -> struct(s, last_exec: execute)
       :failed -> %State{s | last_exec: :failed}
       _ -> s
     end

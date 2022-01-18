@@ -8,53 +8,8 @@ defmodule Alfred.Execute do
 
   defstruct name: :none, detail: :none, rc: @rc_default
 
-  @mod_attribute :alfred_execute_use_opts
   @callback execute_cmd(any(), opts :: list()) :: any()
   @callback execute(args :: any(), opts :: list) :: any()
-
-  @doc false
-  defmacro __using__(use_opts) do
-    common =
-      quote bind_quoted: [use_opts: use_opts] do
-        Alfred.Execute.put_attribute(__MODULE__, use_opts)
-
-        @behaviour Alfred.Execute
-        def execute(args, opts) when is_list(opts) do
-          Alfred.ExecCmd.Args.auto({args, opts}) |> Alfred.Execute.execute(__MODULE__)
-        end
-      end
-
-    quote do
-      unquote(common)
-    end
-  end
-
-  @doc false
-  def put_attribute(module, use_opts) do
-    Module.register_attribute(module, @mod_attribute, persist: true)
-    overrides = use_opts[:overrides] || []
-
-    # broom = use_opts[:broom]
-    #
-    # unless Module.open?(broom) do
-    #   mod_funcs = broom.__info__(:functions)
-    # end
-
-    [
-      broom: use_opts[:broom] || :none,
-      overrides: Enum.into(overrides, %{}, fn key -> {key, true} end)
-    ]
-    |> then(fn val -> Module.put_attribute(module, @mod_attribute, val) end)
-  end
-
-  @doc false
-  def overrides_map(module) do
-    get_in(module.__info__(:attributes), [@mod_attribute, :overrides])
-  end
-
-  @doc false
-  @broom_key [@mod_attribute, :broom]
-  def broom_module(module), do: module.__info__(:attributes) |> get_in(@broom_key)
 
   # Executing a command for a Name
   #
@@ -62,6 +17,23 @@ defmodule Alfred.Execute do
 
   @doc since: "0.3.0"
   @checks [:registered, :ttl_info, :status, :verify, :compare, :execute, :track, :finalize]
+  # (aaa of bbb) accept a tuple of args and overrides
+  def execute({[_ | _] = args, overrides}) when is_list(overrides) do
+    Alfred.Execute.Args.auto({args, overrides}) |> Enum.into(%{}) |> execute()
+  end
+
+  def execute(%{name: name} = args_map) do
+    info = Alfred.Name.info(name)
+    args_all = [{:__name_info__, info} | Enum.into(args_map, [])]
+
+    case info do
+      %{callbacks: %{execute: {mod, _}, status: {_, _}}} -> mod.execute(name, args_all)
+      %{callbacks: %{execute: nil}} -> struct(__MODULE__, name: name, rc: :not_supported)
+      {:not_found = rc, name} -> struct(__MODULE__, name: name, rc: rc)
+      rc -> rc
+    end
+  end
+
   def execute(args, module) when is_list(args) and is_atom(module) do
     name = Keyword.get(args, :name)
     {info, args_rest} = Keyword.pop(args, :__name_info__, Alfred.Name.info(name))
@@ -81,22 +53,55 @@ defmodule Alfred.Execute do
     |> new_from_checks_accumulator()
   end
 
-  # (aaa of bbb) typically invoked from Alfred.execute_v3/2
-  def execute(args, opts) when is_list(opts) do
-    Alfred.ExecCmd.Args.auto({args, opts}) |> Enum.into(%{}) |> execute()
+  def execute([_ | _] = args, opts) when is_list(opts) do
+    Alfred.Execute.Args.auto({args, opts}) |> Enum.into(%{}) |> execute()
   end
 
-  def execute(%{name: name} = args_map) do
-    info = Alfred.Name.info(name)
-    args_all = [{:__name_info__, info} | Enum.into(args_map, [])]
-
-    case info do
-      %{callbacks: %{execute: {mod, _}, status: {_, _}}} -> mod.execute(name, args_all)
-      %{callbacks: %{execute: nil}} -> struct(__MODULE__, name: name, rc: :not_supported)
-      {:not_found = rc, name} -> struct(__MODULE__, name: name, rc: rc)
-      rc -> rc
+  @doc since: "0.3.0"
+  def get_cmd(%__MODULE__{} = execute) do
+    case execute do
+      %{detail: %{cmd: cmd}} -> cmd
+      _ -> "UNKNOWN"
     end
   end
+
+  @doc since: "0.3.0"
+  def on(_name, _opts) do
+    :ok
+  end
+
+  @doc since: "0.3.0"
+  def off(_name, _opts) do
+    :ok
+  end
+
+  @doc since: "0.3.0"
+  def toggle(_name, _opts) do
+    :ok
+  end
+
+  @doc """
+  Convert an `Alfred.Execute` to a sratus binary
+
+  """
+  @doc since: "0.3.0"
+  def to_binary(%{name: name} = execute, _opts \\ []) do
+    case execute do
+      %{rc: :ok, detail: %{cmd: cmd}} -> ["OK", "{#{cmd}}"]
+      %{rc: :pending, detail: %{cmd: cmd, refid: refid}} -> ["PENDING", "{#{cmd}}", "@#{refid}"]
+      %{rc: :not_found} -> ["NOT_FOUND"]
+      %{rc: {:ttl_expired, ms}} -> ["TTL_EXPIRED", "+#{ms}ms"]
+      %{rc: {:orphaned, ms}} -> ["ORPHANED", "+#{ms}ms"]
+      %{rc: :error} -> ["ERROR"]
+      _ -> ["UNMATCHED"]
+    end
+    |> then(fn detail -> detail ++ ["[#{name}]"] end)
+    |> Enum.join(" ")
+  end
+
+  ##
+  ## END OF PUBLIC API
+  ##
 
   @doc false
   def new_from_checks_accumulator({:cont, checks_map}) do
@@ -127,7 +132,11 @@ defmodule Alfred.Execute do
       status = var!(status)
       what = var!(checks_map)
 
-      {:halt, Map.merge(checks_map, %{what => rc, :rc => rc, :detail => status.detail})}
+      cmd = if(match?(%{detail: %{cmd: _}}, status), do: status.detail.cmd, else: "unknown")
+
+      merge_map = %{what => rc, rc: rc, cmd: cmd, detail: status.detail}
+
+      {:halt, Map.merge(checks_map, merge_map)}
     end
   end
 
@@ -159,7 +168,7 @@ defmodule Alfred.Execute do
   def check(:verify = what, %{status: status} = checks_map, _opts) do
     case status do
       %Alfred.Status{rc: :ok} -> put_what_rc_cont(:ok)
-      %Alfred.Status{rc: rc} -> put_final_rc(rc)
+      %Alfred.Status{rc: rc} = status -> put_status_detail_rc(rc)
     end
   end
 
@@ -228,5 +237,62 @@ defmodule Alfred.Execute do
     else
       put_final_rc({:ttl_expired, DateTime.diff(ref_dt, at, :millisecond)})
     end
+  end
+
+  ##
+  ## __using__ and helpers
+  ##
+
+  @mod_attribute :alfred_execute_use_opts
+
+  # coveralls-ignore-start
+  @doc false
+  defmacro __using__(use_opts) do
+    quote bind_quoted: [use_opts: use_opts] do
+      Alfred.Execute.put_attribute(__MODULE__, use_opts)
+
+      @behaviour Alfred.Execute
+      def execute({[_ | _] = _args, opts} = tuple) when is_list(opts) do
+        tuple |> Alfred.Execute.Args.auto() |> Alfred.Execute.execute(__MODULE__)
+      end
+
+      def execute(<<_::binary>> = name, opts) do
+        Keyword.put(opts, :name, name)
+        |> Alfred.Execute.execute(__MODULE__)
+      end
+
+      def execute(args, opts) when is_list(opts) do
+        Alfred.Execute.Args.auto({args, opts}) |> Alfred.Execute.execute(__MODULE__)
+      end
+    end
+  end
+
+  @doc false
+  @broom_key [@mod_attribute, :broom]
+  def broom_module(module), do: module.__info__(:attributes) |> get_in(@broom_key)
+
+  @doc false
+  def put_attribute(module, use_opts) do
+    Module.register_attribute(module, @mod_attribute, persist: true)
+    overrides = use_opts[:overrides] || []
+
+    # broom = use_opts[:broom]
+    #
+    # unless Module.open?(broom) do
+    #   mod_funcs = broom.__info__(:functions)
+    # end
+
+    [
+      broom: use_opts[:broom] || :none,
+      overrides: Enum.into(overrides, %{}, fn key -> {key, true} end)
+    ]
+    |> then(fn val -> Module.put_attribute(module, @mod_attribute, val) end)
+  end
+
+  # coveralls-ignore-stop
+
+  @doc false
+  def overrides_map(module) do
+    get_in(module.__info__(:attributes), [@mod_attribute, :overrides])
   end
 end

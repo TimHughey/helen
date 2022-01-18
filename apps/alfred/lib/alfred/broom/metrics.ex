@@ -31,9 +31,7 @@ defmodule Alfred.Broom.Metrics do
   end
 
   @doc false
-  def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: __MODULE__)
-  end
+  def start_link(args), do: GenServer.start_link(__MODULE__, args, name: __MODULE__)
 
   @impl true
   def handle_call({:counts, metrics}, _from, state) do

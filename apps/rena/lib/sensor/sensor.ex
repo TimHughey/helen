@@ -1,23 +1,26 @@
 defmodule Rena.Sensor do
-  alias Rena.Sensor.{Range, Result}
+  @moduledoc false
 
   @type alfred() :: module() | nil
   @type names() :: [String.t()]
   @type compare_opts() :: [{:alfred, module()}]
 
-  @spec range_compare(names(), %Range{}, list()) :: Result.t()
-  def range_compare(names, %Range{} = range, opts \\ []) when is_list(opts) do
-    alias Alfred.ImmutableStatus, as: Status
-
+  @spec range_compare(names(), %Rena.Sensor.Range{}, list()) :: Rena.Sensor.Result.t()
+  def range_compare(names, %Rena.Sensor.Range{} = range, opts \\ []) when is_list(opts) do
     alfred = opts[:alfred] || Alfred
 
-    for name when is_binary(name) <- List.wrap(names), reduce: %Result{} do
-      acc ->
-        case alfred.status(name) do
-          %Status{good?: true, datapoints: dpts} -> Range.compare(dpts, range) |> Result.tally_datapoint(acc)
-          _ -> Result.tally_datapoint(:invalid, acc)
-        end
-    end
-    |> Result.tally_total()
+    List.wrap(names)
+    |> Enum.reduce(%Rena.Sensor.Result{}, fn name, acc ->
+      status = alfred.status(name, opts)
+
+      case status do
+        %Alfred.Status{rc: :ok, detail: dpts} ->
+          Rena.Sensor.Range.compare(dpts, range) |> Rena.Sensor.Result.tally_datapoint(acc)
+
+        _error ->
+          Rena.Sensor.Result.tally_datapoint(:invalid, acc)
+      end
+    end)
+    |> Rena.Sensor.Result.tally_total()
   end
 end

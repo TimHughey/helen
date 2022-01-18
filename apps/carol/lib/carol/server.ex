@@ -5,7 +5,6 @@ defmodule Carol.Server do
   use GenServer
 
   alias __MODULE__
-  alias Alfred.Notify.Memo
   alias Carol.State
 
   @impl true
@@ -151,7 +150,7 @@ defmodule Carol.Server do
   end
 
   @impl true
-  def handle_info({Alfred, %Memo{missing?: true} = memo}, %State{} = s) do
+  def handle_info({Alfred, %Alfred.Memo{missing?: true} = memo}, %State{} = s) do
     [server_name: s.server_name, equipment: memo.name, missing: true]
     |> Betty.app_error_v2(passthrough: s)
     |> State.update_notify_at()
@@ -167,9 +166,9 @@ defmodule Carol.Server do
   end
 
   @impl true
-  def handle_info({Broom, te}, %State{exec_result: er} = s) do
-    case {te, er} do
-      {%{refid: refid}, %{refid: refid}} -> Alfred.ExecResult.to_binary(er)
+  def handle_info({Alfred, %Alfred.Broom{} = broom}, %{exec_result: execute} = s) do
+    case {broom, execute} do
+      {%{refid: refid}, %{refid: refid}} -> execute
       {_, %{refid: refid}} -> {:unexpected_refid, refid}
     end
     |> State.save_cmd(s)
@@ -193,7 +192,7 @@ defmodule Carol.Server do
   def execute(%State{} = state) do
     state
     |> assemble_execute_opts()
-    |> State.alfred().execute([])
+    |> State.alfred().execute()
     |> State.save_exec_result(state)
     |> tap(fn _ -> Process.put(:first_exec_force, false) end)
   end

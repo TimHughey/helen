@@ -2,7 +2,7 @@
 # and its dependencies with the aid of the Mix.Config module.
 import Config
 
-local_secrets = [System.user_home(), "devel", "shell", "local"]
+# local_secrets = [System.user_home(), "devel", "shell", "local"]
 
 config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 
@@ -18,8 +18,6 @@ config :logger,
     [application: :helen, level_lower_than: :info]
   ]
 
-apps = ["betty", "broom", "carol", "farm", "glow", "sally", "legacy_db"]
+apps = ["betty", "carol", "farm", "glow", "sally", "legacy_db"]
 
-for app <- apps do
-  import_config "#{app}/config.exs"
-end
+Enum.each(apps, fn app -> import_config "#{app}/config.exs" end)

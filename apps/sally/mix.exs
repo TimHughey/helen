@@ -86,7 +86,6 @@ defmodule Sally.MixProject do
       {:toml, "~> 0.6.1"},
       {:alfred, in_umbrella: true},
       {:betty, in_umbrella: true},
-      {:broom, in_umbrella: true},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},

@@ -1,12 +1,5 @@
 defmodule Carol.OptsAid do
-  @moduledoc """
-  Create the standard `opts` required for Carol modules
-
-  Carol modules perform significant DateTime calculations and
-  require a point of reference passed via an opts list..
-
-  This module adds those essential opts for testing convenience.
-  """
+  @moduledoc false
 
   @tz "America/New_York"
 

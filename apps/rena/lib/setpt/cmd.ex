@@ -1,12 +1,10 @@
 defmodule Rena.SetPt.Cmd do
-  alias Alfred.{ExecCmd, ExecResult}
-  alias Alfred.MutableStatus, as: MutStatus
   alias Rena.Sensor.Result
 
   def effectuate(make_result, opts) do
     case make_result do
-      {action, %ExecCmd{} = ec} when action in [:activate, :deactivate] ->
-        execute(ec, opts) |> log_execute_result(action, opts)
+      {action, cmd_args} when action in [:activate, :deactivate] ->
+        execute(cmd_args, opts) |> log_execute_result(action, opts)
 
       {:datapoint_error = x, _} ->
         Betty.app_error(opts, [{x, true}])
@@ -16,12 +14,16 @@ defmodule Rena.SetPt.Cmd do
         Betty.app_error(opts, [{reason, true}])
         :failed
 
-      {:equipment_error, %MutStatus{name: name, ttl_expired?: true}} ->
-        Betty.app_error(opts, equipment: name, equipment_error: "ttl_expired")
+      {:equipment_error, %{name: name, rc: {:ttl_expired, ms}}} ->
+        Betty.app_error(opts, equipment: name, equipment_error: "ttl_expired #{ms}ms")
         :failed
 
-      {:equipment_error, %MutStatus{name: name, error: error}} ->
-        Betty.app_error(opts, equipment: name, equipment_error: error)
+      {:equipment_error, %{name: name, rc: {:orphaned, ms}}} ->
+        Betty.app_error(opts, equipment: name, equipment_error: "orphaned #{ms}ms")
+        :failed
+
+      {:equipment_error, %{name: name, rc: rc}} ->
+        Betty.app_error(opts, equipment: name, equipment_error: rc)
         :failed
 
       {:no_change, _status} ->
@@ -29,54 +31,55 @@ defmodule Rena.SetPt.Cmd do
     end
   end
 
-  def execute(%ExecCmd{} = ec, opts) do
+  def execute(cmd_args, opts) do
     alfred = opts[:alfred] || Alfred
 
-    case alfred.execute(ec) do
-      %ExecResult{rc: rc} = exec_result when rc in [:ok, :pending] -> {:ok, exec_result}
-      %ExecResult{} = exec_result -> {:failed, exec_result}
+    case alfred.execute({cmd_args, []}) do
+      %Alfred.Execute{rc: rc} = execute when rc in [:ok, :pending] -> {:ok, execute}
+      %Alfred.Execute{} = execute -> {:failed, execute}
     end
   end
 
-  def log_execute_result({rc, %ExecResult{} = er}, action, opts) when action in [:activate, :deactivate] do
-    tags = [equipment: er.name]
+  def log_execute_result({rc, %{name: name} = execute}, action, opts) do
+    tags = [equipment: name]
 
     # always log that an action was performed (even if it failed)
     Betty.runtime_metric(opts, tags, [{action, true}])
 
     if rc == :failed do
-      Betty.app_error(opts, tags ++ [cmd_fail: true])
+      Betty.app_error(opts, [{:cmd_fail, true} | tags])
     end
 
-    # pass through the ExecResult
-    er
+    # pass through the execute result
+    execute
   end
 
   def make(name, %Result{} = result, opts \\ []) do
     alfred = opts[:alfred] || Alfred
-    cmd_opts = [notify_when_released: true]
-    active_cmd_opt = opts[:active_cmd] || %ExecCmd{name: name, cmd: "on", cmd_opts: cmd_opts}
-    inactive_cmd_opt = opts[:inactive_cmd] || %ExecCmd{name: name, cmd: "off", cmd_opts: cmd_opts}
+    cmd_args = [name: name, cmd_opts: [notify_when_released: true]]
+
+    active_cmd_args = opts[:active_cmd] || [{:cmd, "on"} | cmd_args]
+    inactive_cmd_args = opts[:inactive_cmd] || [{:cmd, "off"} | cmd_args]
 
     with {:datapoints, true} <- sufficient_datapoints?(result),
-         {:active_cmd, %ExecCmd{} = active_cmd} <- {:active_cmd, active_cmd_opt},
-         {:inactive_cmd, %ExecCmd{} = inactive_cmd} <- {:inactive_cmd, inactive_cmd_opt},
-         %MutStatus{good?: true} = mut_status <- alfred.status(name) do
-      status = simple_status(mut_status, active_cmd)
+         {:active_cmd, active_cmd_args} <- {:active_cmd, active_cmd_args},
+         {:inactive_cmd, inactive_cmd_args} <- {:inactive_cmd, inactive_cmd_args},
+         %Alfred.Status{rc: :ok} = full_status <- alfred.status(name) do
+      status = simple_status(full_status, active_cmd_args)
 
       activate? = status == :inactive and should_be_active?(result)
       deactivate? = status == :active and should_be_inactive?(result)
 
       cond do
-        activate? -> {:activate, %ExecCmd{active_cmd | name: name}}
-        deactivate? -> {:deactivate, %ExecCmd{inactive_cmd | name: name}}
+        activate? -> {:activate, active_cmd_args}
+        deactivate? -> {:deactivate, inactive_cmd_args}
         true -> {:no_change, status}
       end
     else
       {:datapoints, false} -> {:datapoint_error, result}
       {:active_cmd, _} -> {:error, :invalid_active_cmd}
       {:inactive_cmd, _} -> {:error, :invalid_inactive_cmd}
-      %MutStatus{} = x -> {:equipment_error, x}
+      %Alfred.Status{} = status -> {:equipment_error, status}
     end
   end
 
@@ -111,8 +114,12 @@ defmodule Rena.SetPt.Cmd do
     end
   end
 
-  defp simple_status(%MutStatus{cmd: scmd}, %ExecCmd{cmd: acmd}) when scmd == acmd, do: :active
-  defp simple_status(%MutStatus{}, %ExecCmd{}), do: :inactive
+  defp simple_status(status, cmd_args) when is_list(cmd_args) do
+    simple_status(status, Enum.into(cmd_args, %{}))
+  end
+
+  defp simple_status(%Alfred.Status{detail: %{cmd: have}}, %{cmd: want}) when have == want, do: :active
+  defp simple_status(%Alfred.Status{}, _cmd_args), do: :inactive
 
   defp sufficient_datapoints?(%Result{valid: x, total: y}) when x >= 3 and y >= 3, do: {:datapoints, true}
   defp sufficient_datapoints?(%Result{}), do: {:datapoints, false}

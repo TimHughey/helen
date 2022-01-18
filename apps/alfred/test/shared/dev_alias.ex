@@ -17,13 +17,22 @@ defmodule Alfred.Test.DevAlias do
 
   @tz "America/New_York"
 
+  def add_callbacks(opts) do
+    callbacks = %{execute: {__MODULE__, 2}, status: {__MODULE__, 2}}
+
+    Keyword.put_new(opts, :callbacks, callbacks)
+  end
+
   @impl true
   def execute_cmd(%Alfred.Status{} = status, opts) do
+    Process.send(self(), {:echo, status}, [])
+
     Alfred.Status.raw(status) |> Alfred.Test.Command.add(opts)
   end
 
   # (1 of 4) handle unkonwn names
   def new(%{type: :unk}), do: new(nil)
+  def new(%{rc: :error}), do: new(nil)
 
   # (2 of 4) construct a new DevAlias from a parts map
   def new(parts) when is_map(parts) do
@@ -41,8 +50,23 @@ defmodule Alfred.Test.DevAlias do
   # (3 of 4) construct a DevAlias struct from a list of fields
   def new(fields) when is_list(fields), do: struct(__MODULE__, fields)
 
+  def new(<<_::binary>> = name), do: Alfred.NamesAid.binary_to_parts(name) |> new()
+
   # (3 of 4) catch all
   def new(_), do: nil
+
+  def register(_what, false), do: nil
+
+  # name registration helper
+  def register(what, opts) do
+    case {what, opts} do
+      {_what, false} -> nil
+      {<<_::binary>> = name, _register_opts} -> new(name)
+      {%__MODULE__{} = dev_alias, _register_opts} -> dev_alias
+      {_what, _register_opts} -> nil
+    end
+    |> just_saw(opts)
+  end
 
   @impl true
   def status_lookup(%{name: name, nature: :datapoints}, opts) when is_list(opts) do

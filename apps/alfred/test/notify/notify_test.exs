@@ -53,7 +53,7 @@ defmodule Alfred.NotifyTest do
       receive do
         {link_pid, {:ok, %Alfred.Ticket{notifier_pid: notifier_pid}}} ->
           # validate the notifier pid is properly supervised
-          assert Enum.any?(Supervisor.which_children(Alfred.Notify.Supervisor), fn
+          assert Enum.any?(Supervisor.which_children(Alfred.Notify.DynamicSupervisor), fn
                    {:undefined, ^notifier_pid, :worker, [Alfred.Notify]} -> true
                    _ -> false
                  end)
@@ -114,7 +114,7 @@ defmodule Alfred.NotifyTest do
       pid = self()
 
       # NOTE: the minimum allowed missing ms is 100
-      assert_receive({Alfred, memo}, 101)
+      assert_receive({Alfred, memo}, 200)
       assert %Alfred.Memo{name: ^name, pid: ^pid, ref: ^ref, seen_at: :never, missing?: true} = memo
     end
   end

@@ -38,7 +38,13 @@ defmodule Rena.Sensor.SensorTest do
   describe "Rena.Sensor.range_compare/3" do
     setup [:sensors_add, :basic_range_add]
 
-    @tag sensors_add: [[temp_f: 6.0], [temp_f: 6.1], [temp_f: 0.5], [temp_f: 11.1], [rc: :error, temp_f: 0]]
+    @tag sensors_add: [
+           [temp_f: 6.0],
+           [temp_f: 6.1],
+           [temp_f: 0.5],
+           [temp_f: 11.1],
+           [rc: :error, temp_f: 0]
+         ]
     test "creates accurate summary", %{range_add: range, sensors: sensors} do
       res = Rena.Sensor.range_compare(sensors, range, alfred: AlfredSim)
 

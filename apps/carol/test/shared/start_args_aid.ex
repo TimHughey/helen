@@ -1,7 +1,5 @@
 defmodule Carol.StartArgsAid do
-  @moduledoc """
-  Creates start args for the Server
-  """
+  @moduledoc false
 
   def add(%{start_args_add: {:app, app, module, instance}}) do
     %{

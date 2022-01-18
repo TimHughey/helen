@@ -11,11 +11,13 @@ defmodule Alfred.NamesAid do
 
   """
 
-  alias Alfred.{JustSaw, SeenName}
-
   ##
   ## ExUnit setup functions
   ##
+
+  defmacrop ref_dt do
+    quote do: Map.get(var!(ctx), :ref_dt, Timex.now("America/New_York"))
+  end
 
   @doc """
   Create a unique equipment name for merge into a test `Exunit` test context.
@@ -28,27 +30,20 @@ defmodule Alfred.NamesAid do
   See `Alfred.NamesAid.name_add/1` for available options.
 
   """
-  def equipment_add(ctx) do
-    case ctx do
-      %{equipment_add: opts} -> %{equipment: binary_from_opts(:mut, opts)}
-      _ -> :ok
-    end
+  # NOTE: need ctx for ref_dt/0
+  def equipment_add(%{equipment_add: opts} = ctx) do
+    {register_opts, opts_rest} = Keyword.pop(opts, :register, [])
+    register_opts = Alfred.Name.register_opts(register_opts, seen_at: ref_dt())
+
+    name = binary_from_opts(:mut, opts_rest)
+
+    dev_alias = Alfred.Test.DevAlias.new(name)
+    rc = Alfred.Test.DevAlias.register(dev_alias, register_opts)
+
+    %{equipment: name, registered_name: %{dev_alias: dev_alias, name: name, rc: rc}}
   end
 
-  def just_saw_add(ctx) do
-    case ctx do
-      %{seen_name: sn, parts: parts, just_saw_add: opts} when is_list(opts) ->
-        cb = opts[:callback] || {:module, __MODULE__}
-        mut? = parts.type == :mut
-
-        js = %JustSaw{mutable?: mut?, callback: cb, seen_list: [sn]}
-
-        %{just_saw_add: js, just_saw_result: Alfred.just_saw(js)}
-
-      _ ->
-        :ok
-    end
-  end
+  def equipment_add(_), do: :ok
 
   @doc """
   Create a unique name of type for merge into `ExUnit` test context.
@@ -103,40 +98,44 @@ defmodule Alfred.NamesAid do
     end
   end
 
-  def seen_name_add(ctx) do
-    case ctx do
-      %{name: name, parts: parts} ->
-        expired_ms = (parts[:expired_ms] || 0) * -1
-        ttl_ms = parts[:ttl_ms] || 5_000
-        seen_at = DateTime.utc_now() |> DateTime.add(expired_ms)
-        %{seen_name: %SeenName{name: name, seen_at: seen_at, ttl_ms: ttl_ms}}
+  def sensor_add(%{sensor_add: opts} = ctx) do
+    {register_opts, opts_rest} = Keyword.pop(opts, :register, [])
+    register_opts = Alfred.Name.register_opts(register_opts, seen_at: ref_dt())
 
-      _ ->
-        :ok
-    end
+    name = binary_from_opts(:imm, opts_rest)
+
+    dev_alias = Alfred.Test.DevAlias.new(name)
+    rc = Alfred.Test.DevAlias.register(name, register_opts)
+
+    %{sensor: name, registered_name: %{dev_alias: dev_alias, name: name, rc: rc}}
   end
 
-  def sensor_add(ctx) do
-    case ctx do
-      %{sensor_add: opts} when is_list(opts) -> %{sensor: binary_from_opts(:imm, opts)}
-      _ -> :ok
-    end
-  end
+  def sensor_add(_), do: :ok
 
+  @default_temp_f [11.0, 11.1, 11.2, 6.2]
   def sensors_add(%{sensors_add: []}) do
-    temps = [11.0, 11.1, 11.2, 6.2]
-    default_opts = Enum.each(temps, fn temp_f -> [temp_f: temp_f] end)
+    default_opts = Enum.map(@default_temp_f, fn temp_f -> [temp_f: temp_f] end)
 
     %{sensors_add: default_opts}
     |> sensors_add()
   end
 
-  def sensors_add(%{sensors_add: multiple_sensor_opts})
-      when is_list(multiple_sensor_opts) do
-    for sensor_opts when is_list(sensor_opts) <- multiple_sensor_opts do
-      %{sensor_add: sensor_opts} |> sensor_add() |> Map.get(:sensor)
-    end
-    |> then(fn sensors -> %{sensors: sensors} end)
+  def sensors_add(%{sensors_add: [_ | _] = many} = ctx) do
+    Enum.reduce(many, %{register: [seen_at: ref_dt()], sensors: []}, fn
+      [{:register = key, val}], acc ->
+        Map.put(acc, key, val)
+
+      [_ | _] = opts, %{register: register_opts, sensors: sensors} = acc ->
+        name = binary_from_opts(:imm, opts)
+
+        register_opts = Alfred.Name.register_opts(register_opts, seen_at: ref_dt())
+        Alfred.Test.DevAlias.register(name, register_opts)
+
+        Map.put(acc, :sensors, [name | sensors])
+
+      _, acc ->
+        acc
+    end)
   end
 
   def sensors_add(_ctx), do: :ok

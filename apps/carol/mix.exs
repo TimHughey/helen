@@ -40,7 +40,6 @@ defmodule Carol.MixProject do
     [
       {:alfred, in_umbrella: true},
       {:betty, in_umbrella: true},
-      {:broom, in_umbrella: true},
       {:timex, "~> 3.7"},
       {:solar, in_umbrella: true},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},

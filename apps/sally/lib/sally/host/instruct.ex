@@ -39,12 +39,6 @@ defmodule Sally.Host.Instruct do
   ##
   ## Public API
   ##
-  def send(opts) when is_list(opts) do
-    struct(Instruct, opts) |> send()
-    # opts_map = Enum.into(opts, %{})
-    #
-    # Map.merge(%Instruct{}, opts_map) |> send()
-  end
 
   def send(%Instruct{} = msg) do
     Logger.debug("\n#{inspect(msg, pretty: true)}")
@@ -52,6 +46,8 @@ defmodule Sally.Host.Instruct do
     {:send, msg |> add_mtime() |> set_qos()}
     |> Instruct.call()
   end
+
+  def send(fields) when is_list(fields) or is_map(fields), do: struct(__MODULE__, fields) |> send()
 
   @impl true
   def init(_) do

@@ -49,17 +49,18 @@ defmodule Sally.DevAliasAidTest do
   describe "DevAliasAid.just_saw/1" do
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 4]
     @tag just_saw: []
-    test "invokes Sally.just_saw/2 for created DevAlias", ctx do
-      count = ctx[:devalias_add][:count] || 0
-      jsr = ctx[:sally_just_saw]
+    test "invokes Sally.DevAlias.just_saw/2 for created DevAlias", ctx do
+      assert %{sally_just_saw_v3: :ok, dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 
-      assert length(jsr) == count
+      Enum.each(dev_aliases, fn %Sally.DevAlias{name: name} ->
+        assert %{name: ^name} = Alfred.Name.info(name)
+      end)
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 4]
     test "does nothing when :just_saw not present in context", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _]} = ctx
-      refute is_map_key(ctx, :sally_just_saw)
+      refute is_map_key(ctx, :sally_just_saw_v3)
     end
   end
 

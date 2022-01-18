@@ -1,7 +1,5 @@
 defmodule Carol.EpisodeAid do
-  @moduledoc """
-  Create one or more `Episode`s to merge into the test context
-  """
+  @moduledoc false
 
   alias Carol.Episode
 

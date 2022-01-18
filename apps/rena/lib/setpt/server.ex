@@ -3,9 +3,6 @@ defmodule Rena.SetPt.Server do
   use GenServer
 
   alias __MODULE__
-  alias Alfred.ExecResult
-  alias Alfred.Notify.Memo
-  alias Broom.TrackerEntry
   alias Rena.SetPt.State
 
   @impl true
@@ -29,6 +26,7 @@ defmodule Rena.SetPt.Server do
     end
   end
 
+  @doc false
   def child_spec(opts) do
     # :id is for the Supervisor so remove it from opts
     {id, opts_rest} = Keyword.pop(opts, :id)
@@ -41,6 +39,7 @@ defmodule Rena.SetPt.Server do
     %{id: id, start: {Server, :start_link, [final_opts]}, restart: restart}
   end
 
+  @doc false
   def start_link(start_args) do
     GenServer.start_link(Server, start_args)
   end
@@ -58,28 +57,20 @@ defmodule Rena.SetPt.Server do
     #       equipment notification is received
   end
 
-  # (1 of 2) handle missing messages
+  # NOTE: missing: true messages are not sent by default, no need to handle them
   @impl true
-  def handle_info({Alfred, %Memo{missing?: true} = memo}, %State{} = s) do
-    Betty.app_error(s.server_name, equipment: memo.name, missing: true)
+  def handle_info({Alfred, %Alfred.Memo{missing?: false} = memo}, %State{} = s) do
+    # NOTE: only compute sensor results and potentially execute a command
+    # when a transition is allowed
+    if Rena.SetPt.State.allow_transition?(s) do
+      opts = [alfred: s.alfred, server_name: s.server_name]
+      sensor_results = Rena.Sensor.range_compare(s.sensors, s.sensor_range, opts)
 
-    State.update_last_notify_at(s) |> noreply()
-  end
-
-  # (2 of 2) handle normal notify messages
-  @impl true
-  def handle_info({Alfred, %Memo{missing?: false} = memo}, %State{} = s) do
-    alias Rena.Sensor
-    alias Rena.SetPt.Cmd
-
-    opts = [alfred: s.alfred, server_name: s.server_name]
-    sensor_results = Sensor.range_compare(s.sensors, s.sensor_range, opts)
-
-    if State.allow_transition?(s) do
-      Cmd.make(memo.name, sensor_results, opts)
-      |> Cmd.effectuate(opts)
-      |> State.update_last_exec(s)
-      |> State.update_last_notify_at()
+      memo.name
+      |> Rena.SetPt.Cmd.make(sensor_results, opts)
+      |> Rena.SetPt.Cmd.effectuate(opts)
+      |> Rena.SetPt.State.update_last_exec(s)
+      |> Rena.SetPt.State.update_last_notify_at()
       |> noreply()
     else
       noreply(s)
@@ -87,31 +78,19 @@ defmodule Rena.SetPt.Server do
   end
 
   @impl true
-  def handle_info({Broom, te}, %State{last_exec: %ExecResult{} = er} = s) do
-    want_refid = er.refid
-
-    case te do
-      %TrackerEntry{refid: refid, acked: true, acked_at: at} when refid == want_refid ->
-        State.update_last_exec(at, s)
-
-      %TrackerEntry{refid: refid, acked: false} when refid == want_refid ->
-        Betty.app_error(s, equipment: s.equipment, ack_fail: true)
-        |> State.update_last_exec(:failed)
-
-      %TrackerEntry{} ->
-        Betty.app_error(s, equipment: s.equipment, unknown_refid: true)
-        |> State.update_last_exec(:failed)
+  def handle_info({Alfred, %Alfred.Broom{} = broom}, %State{} = s) do
+    case broom do
+      %{rc: :ok} -> State.update_last_exec(broom.at.acked, s)
+      %{rc: rc} -> ack_fail(s, ack_fail: true, rc: rc) |> State.update_last_exec(:failed)
     end
     |> noreply()
   end
 
-  @impl true
-  def handle_info({Broom, %TrackerEntry{} = te}, %State{} = s) do
-    last_exec = fn -> inspect(s.last_exec, pretty: true) end
-    Logger.warn("tracker entry msg failed\nref=#{te.refid}\nlast_exec=#{last_exec.()}")
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
 
-    noreply(s)
-  end
+  defp ack_fail(%{equipment: name} = s, tags), do: Betty.app_error(s, [{:equipment, name} | tags])
 
   defp noreply(%State{} = s), do: {:noreply, s}
   defp noreply({:stop, :normal, s}), do: {:stop, :normal, s}

@@ -16,7 +16,7 @@ defmodule Alfred.Test.Command do
 
   def ack_now(refid, ack_at, disposition) do
     {__MODULE__, refid, ack_at, disposition}
-    |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.puts() end)
+    |> IO.warn()
 
     :ok
   end
@@ -25,7 +25,6 @@ defmodule Alfred.Test.Command do
     {at, opts_rest} = Keyword.pop(opts, :ref_dt, now())
     {cmd, opts_rest} = Keyword.pop(opts_rest, :cmd)
     {cmd_opts, _opts_rest} = Keyword.pop(opts_rest, :cmd_opts)
-
     {ack, _cmd_opts_rest} = Keyword.pop(cmd_opts, :ack)
 
     parts = %{rc: (ack == :immediate && :ok) || :pending, cmd: cmd}
@@ -40,7 +39,7 @@ defmodule Alfred.Test.Command do
   end
 
   def broom_timeout(%Alfred.Broom{} = broom) do
-    broom |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.puts() end)
+    Process.send(self(), {__MODULE__, :timeout, broom}, [])
   end
 
   def new(%{cmd: cmd} = parts, at) when is_map(parts) do
@@ -59,7 +58,7 @@ defmodule Alfred.Test.Command do
 
   def new(fields), do: struct(__MODULE__, fields)
 
-  def now, do: Timex.now(@tz)
+  def local_now, do: Timex.now(@tz)
 
   def rt_latency_us(fields) do
     acked = Keyword.get(fields, :acked, false)
@@ -76,7 +75,7 @@ defmodule Alfred.Test.Command do
   def sent_at(fields) do
     acked = Keyword.get(fields, :acked, false)
     acked_at = Keyword.get(fields, :acked_at, :none)
-    ref_dt = Keyword.get(fields, :ref_dt, now())
+    ref_dt = Keyword.get(fields, :ref_dt, local_now())
 
     case {acked, acked_at} do
       {true, %DateTime{}} -> shift_ms(acked_at, -20)

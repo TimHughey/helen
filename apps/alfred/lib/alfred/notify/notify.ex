@@ -2,7 +2,7 @@ defmodule Alfred.Notify do
   require Logger
   use GenServer
 
-  @registry Alfred.Application.registry(:notify)
+  @registry Alfred.Notify.Supervisor.registry()
 
   defstruct name: nil,
             ref: nil,
@@ -45,6 +45,16 @@ defmodule Alfred.Notify do
   end
 
   @doc since: "0.3.0"
+  def register([_ | _] = opts) do
+    {names, opts_rest} = Keyword.split(opts, [:name, :equipment])
+
+    case names do
+      [{_key, <<_::binary>> = name}] -> register(name, opts_rest)
+      [_ | _] = multiple -> raise(ArgumentError, "ambiguous name: #{inspect(multiple)}")
+      _ -> raise(ArgumentError, "name missing from opts")
+    end
+  end
+
   def register(<<_::binary>> = name, opts) when is_list(opts) do
     # NOTE: this code runs under the caller process therefore will return the
     # notify registration for this name if it existws
@@ -78,6 +88,8 @@ defmodule Alfred.Notify do
   end
 
   @doc since: "0.3.0"
+  def unregister(%Alfred.Ticket{ref: ref}), do: unregister(ref)
+
   def unregister(ref) when is_reference(ref) do
     case find_registration(ref) do
       {_name, notifier_pid, {_caller_pid, _ref}} -> call({:unregister, ref}, notifier_pid)
@@ -281,7 +293,7 @@ defmodule Alfred.Notify do
   def start_notifier(name, opts) do
     args = Keyword.merge(opts, name: name, link_pid: self(), restart: :temporary)
 
-    {:ok, notifier_pid} = Alfred.Notify.Supervisor.start_child(__MODULE__, args)
+    {:ok, notifier_pid} = Alfred.Notify.DynamicSupervisor.start_child(__MODULE__, args)
 
     call({:get, :ticket}, notifier_pid)
   end

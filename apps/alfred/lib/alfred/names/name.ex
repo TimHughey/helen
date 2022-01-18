@@ -1,56 +1,22 @@
 defmodule Alfred.Name do
-  @moduledoc false
+  @moduledoc """
+  Abstract Name Server Instance
+  """
 
   require Logger
   use GenServer
 
-  @registry Alfred.Application.registry(:name)
+  @registry Alfred.Name.Supervisor.registry()
   @callback_default {__MODULE__, :callback_default}
   @callback_defaults %{status: @callback_default, execute: @callback_default}
   @nature_default :datapoints
-  @natures [:cmds, :datapoints]
 
   defstruct name: nil, nature: @nature_default, seen_at: nil, ttl_ms: 30_000, callbacks: @callback_defaults
 
   @doc since: "0.3.0"
   def allowed_opts, do: [:seen_at, :ttl_ms, :callbacks]
 
-  @impl true
-  def init(fields) do
-    {from, fields_rest} = Keyword.pop(fields, :from)
-
-    Process.link(from)
-
-    {:ok, struct(__MODULE__, fields_rest)}
-  end
-
-  def start_link(opts) when is_list(opts) do
-    {via_name, opts_rest} = Keyword.pop(opts, :name)
-    {seen_at, opts_rest} = Keyword.pop(opts_rest, :seen_at, DateTime.utc_now())
-    {natures, opts_rest} = Keyword.split(opts_rest, @natures)
-    {fields_base, _} = Keyword.split(opts_rest, [:name, :ttl_ms, :callbacks])
-
-    [
-      name: short_name(via_name),
-      nature:
-        Enum.reduce_while(natures, @nature_default, fn
-          {_key, val}, acc when is_nil(val) or val == false -> {:cont, acc}
-          {key, _val_}, _acc -> {:halt, key}
-        end),
-      from: self(),
-      seen_at: seen_at
-    ]
-    |> then(fn fields_extra -> Keyword.merge(fields_base, fields_extra) end)
-    |> then(fn fields -> GenServer.start_link(__MODULE__, fields, name: via_name, restart: :temporary) end)
-  end
-
-  def start_link(opts) when is_struct(opts) or is_map(opts) do
-    case opts do
-      x when is_struct(x) -> Map.from_struct(x) |> Enum.into([])
-      x when is_map(x) -> Enum.into(x, [])
-    end
-    |> start_link()
-  end
+  def available?(name), do: not registered?(name)
 
   def callback(name, what) when is_binary(name) and what in [:execute, :status] do
     case callbacks(name) do
@@ -60,6 +26,16 @@ defmodule Alfred.Name do
   end
 
   def callbacks(name) when is_binary(name), do: call({:get, :callbacks}, name)
+
+  def fake_name_info(%{name: name, ttl_ms: ttl_ms, updated_at: seen_at}, module, opts) do
+    {nature, opts_rest} = Keyword.pop(opts, :nature)
+
+    callbacks = %{status: {module, 2}, execute: {module, 2}}
+
+    [name: name, nature: nature, seen_at: seen_at, ttl_ms: ttl_ms, callbacks: callbacks]
+    |> then(fn fields -> struct(__MODULE__, fields) end)
+    |> then(fn name_info -> Keyword.put(opts_rest, :__name_info__, name_info) end)
+  end
 
   def info(<<_::binary>> = name), do: call({:info}, name)
 
@@ -91,6 +67,21 @@ defmodule Alfred.Name do
     end
   end
 
+  def register_opts(opts, defaults) when is_list(opts) and is_list(defaults) do
+    Keyword.take(opts, allowed_opts())
+    |> then(fn priority_opts -> Keyword.merge(defaults, priority_opts) end)
+  end
+
+  def register_opts(_, _), do: false
+
+  @doc since: "0.3.0"
+  def registered?(<<_::binary>> = name) do
+    case info(name) do
+      %{name: ^name} -> true
+      _ -> false
+    end
+  end
+
   def seen_at(%{name: name}), do: seen_at(name)
 
   # (2 of 2)
@@ -104,6 +95,15 @@ defmodule Alfred.Name do
   end
 
   ## GenServer
+
+  @impl true
+  def init(fields) do
+    {from, fields_rest} = Keyword.pop(fields, :from)
+
+    Process.link(from)
+
+    {:ok, struct(__MODULE__, fields_rest)}
+  end
 
   @impl true
   def handle_call({:get, key}, _from, state) when is_map_key(state, key) do
@@ -137,6 +137,7 @@ defmodule Alfred.Name do
   def handle_call(msg, _from, state), do: {:invalid_msg, msg} |> reply(state)
 
   @impl true
+  @doc false
   def terminate(reason, %{name: name} = state) do
     reason = inspect(reason)
     pid = inspect(self())
@@ -145,12 +146,51 @@ defmodule Alfred.Name do
     state
   end
 
+  @doc false
+  def start_link(opts) when is_list(opts) do
+    {via_name, opts_rest} = Keyword.pop(opts, :name)
+    {seen_at, opts_rest} = Keyword.pop(opts_rest, :seen_at, DateTime.utc_now())
+    {nature, opts_rest} = Keyword.pop(opts_rest, :nature, discover_nature(opts_rest))
+    {fields_base, _} = Keyword.split(opts_rest, [:name, :ttl_ms, :callbacks])
+
+    [
+      name: short_name(via_name),
+      nature: nature,
+      from: self(),
+      seen_at: seen_at
+    ]
+    |> then(fn fields_extra -> Keyword.merge(fields_base, fields_extra) end)
+    |> then(fn fields -> GenServer.start_link(__MODULE__, fields, name: via_name, restart: :temporary) end)
+  end
+
+  # @doc false
+  # def start_link(opts) when is_struct(opts) or is_map(opts) do
+  #   case opts do
+  #     x when is_struct(x) -> Map.from_struct(x) |> Enum.into([])
+  #     x when is_map(x) -> Enum.into(x, [])
+  #   end
+  #   |> start_link()
+  # end
+
   ## PRIVATE
   ## PRIVATE
   ## PRIVATE
 
   @doc false
   def callback_default(_what, _opts), do: {:failed, :default_callback}
+
+  @doc false
+  @natures [:cmds, :datapoints]
+  def discover_nature(opts) do
+    natures = Keyword.take(opts, @natures)
+
+    Enum.reduce_while(natures, @nature_default, fn
+      {_key, nil}, acc -> {:cont, acc}
+      {_key, false}, acc -> {:cont, acc}
+      {_key, %Ecto.Association.NotLoaded{}}, acc -> {:cont, acc}
+      {key, _val_}, _acc -> {:halt, key}
+    end)
+  end
 
   @doc false
   def diff_greater_than_ms?(lhs, rhs, ms), do: Timex.diff(lhs, rhs, :milliseconds) >= ms

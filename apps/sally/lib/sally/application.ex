@@ -14,7 +14,6 @@ defmodule Sally.Application do
       {Sally.Config.Agent, @config_all},
       {Sally.Repo, []},
       {Tortoise.Connection, @mqtt_connection},
-      {Sally.Execute, []},
       {Sally.Immutable.Handler, []},
       {Sally.Mutable.Handler, []},
       {Sally.Host.Instruct, []},

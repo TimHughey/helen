@@ -1,9 +1,7 @@
 defmodule Alfred.NotifyAid do
   @moduledoc """
-    Add an `Alfred.Notify.Memo` to the test context
+    Add an `Alfred.Memo` to the test context
   """
-
-  alias Alfred.Notify.{Memo, Ticket}
 
   @doc """
     Adds `Alfred.Notify.Memo`, `{Alfred, %Memo{}}` and `memo_before_dt` to test context
@@ -58,20 +56,27 @@ defmodule Alfred.NotifyAid do
     %{memo: memo, memo_before_dt: before_dt, notify_msg: {Alfred, memo}}
   end
 
-  defp make_memo_from_ticket(%Ticket{} = ticket, opts) when is_list(opts) do
+  defp make_memo_from_ticket(%Alfred.Ticket{} = ticket, opts) when is_list(opts) do
     {seen_at, opts_rest} = Keyword.pop(opts, :seen_at, DateTime.utc_now())
     {missing?, _} = Keyword.pop(opts_rest, :missing?, false)
 
-    [name: ticket.name, pid: self(), ref: ticket.ref, seen_at: seen_at, missing?: missing?]
-    |> then(fn fields -> struct(Memo, fields) end)
+    Map.take(ticket, [:name, :ref])
+    |> Map.merge(%{pid: self(), at: %{seen: seen_at}, missing?: missing?})
+    |> Alfred.Memo.new([])
   end
 
-  @ticket_opts [:interval_ms, :missing_ms, :ttl_ms]
+  @ticket_defaults [interval_ms: 0, missing_ms: 60_000, send_missing_msg: false]
   defp make_ticket(args) do
-    {ticket_opts, args_rest} = Keyword.split(args, @ticket_opts)
-    {ref, args_rest} = Keyword.pop(args_rest, :ref, make_ref())
-    {name, _} = Keyword.pop(args_rest, :name, "missing name")
+    args = Keyword.merge(@ticket_defaults, args)
 
-    struct(Ticket, name: name, ref: ref, opts: ticket_opts)
+    %{
+      name: Keyword.get(args, :name, "missing name"),
+      ref: Keyword.get(args, :ref, make_ref()),
+      opts: %{
+        ms: %{interval: args[:interval_ms], missing: args[:missing_ms]},
+        send_missing_msg: args[:send_missing_msg]
+      }
+    }
+    |> Alfred.Ticket.new()
   end
 end

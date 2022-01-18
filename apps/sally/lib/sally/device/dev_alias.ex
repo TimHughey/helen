@@ -11,6 +11,8 @@ defmodule Sally.DevAlias do
 
   use Ecto.Schema
   use Alfred.Status
+  use Alfred.Execute, broom: Sally.Command
+  use Alfred.JustSaw
 
   alias __MODULE__, as: Schema
   alias Ecto.Changeset
@@ -35,6 +37,59 @@ defmodule Sally.DevAlias do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def align_status(%{aliases: [_ | _] = aliases, data: %{pins: _} = data, seen_at: seen_at}) do
+    Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi ->
+      multi_name = String.to_atom("aligned_#{dev_alias.pio}")
+
+      case align_status_one(dev_alias, data, seen_at) do
+        %Ecto.Changeset{} = cs -> Ecto.Multi.insert(multi, multi_name, cs, returning: true)
+        :no_change -> multi
+      end
+    end)
+  end
+
+  def align_status(_changes), do: Ecto.Multi.new()
+
+  def align_status_one(%{pio: pio} = dev_alias, %{pins: pins}, seen_at) do
+    pin_cmd = Enum.reduce(pins, :no_pin, fn [pin, cmd], acc -> if(pin == pio, do: cmd, else: acc) end)
+
+    case status(dev_alias, nature: :cmds) do
+      status when pin_cmd == :no_pin ->
+        cmd_mismatch(status, :no_pin)
+
+      %{rc: :pending} ->
+        :no_change
+
+      %{rc: :ok, detail: %{cmd: ^pin_cmd}} ->
+        :no_change
+
+      # NOTE: special case when DevAlias doesn't have any commands yet
+      %{rc: :error} ->
+        Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
+
+      status ->
+        cmd_mismatch(status, pin_cmd)
+        Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
+    end
+  end
+
+  defp cmd_mismatch(status, pin_cmd) do
+    dev_alias = Alfred.Status.raw(status)
+
+    [
+      module: Sally.Command,
+      align_status: true,
+      mismatch: true,
+      reported_cmd: pin_cmd,
+      local_cmd: status.detail.cmd,
+      status_error: status.rc,
+      name: dev_alias.name
+    ]
+    |> Betty.app_error_v2()
+
+    :no_change
+  end
+
   def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
       when is_map(raw_data) do
     for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
@@ -44,6 +99,14 @@ defmodule Sally.DevAlias do
           {:error, _reason} = rc -> rc
         end
     end
+  end
+
+  def changeset(changes) when is_list(changes) do
+    {id, changes_rest} = Keyword.pop(changes, :id)
+    required = Keyword.keys(changes)
+
+    Enum.into(changes_rest, %{})
+    |> changeset(struct(__MODULE__, id: id), required: required)
   end
 
   def changeset(changes, %Schema{} = a, opts \\ []) do
@@ -119,11 +182,25 @@ defmodule Sally.DevAlias do
     end
   end
 
+  @doc false
+  def execute_cmd(%Alfred.Status{} = status, opts), do: Alfred.Status.raw(status) |> execute_cmd(opts)
+
+  def execute_cmd(%Sally.DevAlias{} = dev_alias, opts) do
+    new_cmd = Sally.Command.add_v2(dev_alias, opts)
+
+    rc = if(new_cmd.acked, do: :ok, else: :pending)
+
+    preloads = [dev_alias: [device: [:host]]]
+    Sally.Repo.preload(new_cmd, preloads) |> Sally.Payload.send_cmd_v2(opts)
+
+    {rc, new_cmd}
+  end
+
   @doc """
   SQL Explain for status queries
   """
   @spec explain(name :: String.t(), :status, opts :: list()) :: :ok
-  def explain(name, :status, what, opts \\ [analyze: true]) do
+  def explain(name, :status, what, opts \\ [analyze: true, buffers: true]) do
     {analyze, query_opts} = Keyword.pop(opts, :analyze, true)
 
     explain_opts = [analyze: analyze]
@@ -133,7 +210,7 @@ defmodule Sally.DevAlias do
       :datapoints -> Sally.Datapoint
     end
     |> tap(fn module -> ["\n", inspect(module), ".status_query/2\n"] |> IO.puts() end)
-    |> then(fn module -> apply(module, :status_query, [name, query_opts]) end)
+    |> then(fn module -> module.status_query(name, query_opts) end)
     |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
     |> String.split("\n")
     |> Enum.each(fn line -> [line] |> IO.puts() end)
@@ -158,57 +235,68 @@ defmodule Sally.DevAlias do
 
   def find_by_name(name) when is_binary(name), do: find(name: name)
 
-  def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
+  # def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
 
-  @doc """
-    Mark a list of DevAlias as just seen within an Ecto.Multi sequence
+  # @doc """
+  #   Mark a list of DevAlias as just seen within an Ecto.Multi sequence
+  #
+  #   Returns:
+  #   ```
+  #   {:ok, [%DevAlias{} | []]}  # success
+  #   {:error, error}            # update failed for one DevAlias
+  #   ```
+  #
+  # """
+  # @doc since: "0.5.10"
+  # @type multi_changes :: %{aliases: [Ecto.Schema.t(), ...]}
+  # @type ok_tuple :: {:ok, Ecto.Schema.t()}
+  # @type error_tuple :: {:error, any()}
+  # @type db_result :: ok_tuple() | error_tuple()
+  # @spec just_saw(Ecto.Repo.t(), multi_changes(), DateTime.t()) :: db_result()
+  # def just_saw(repo, %{aliases: schemas}, %DateTime{} = seen_at) when is_list(schemas) do
+  #   for %Schema{} = schema <- schemas, reduce: {:ok, []} do
+  #     {:ok, acc} ->
+  #       cs = changeset(%{updated_at: seen_at}, schema)
+  #
+  #       case repo.update(cs, returning: true) do
+  #         {:ok, %Schema{} = x} -> {:ok, [x | acc]}
+  #         {:error, error} -> {:error, error}
+  #       end
+  #
+  #     {:error, _} = acc ->
+  #       acc
+  #   end
+  # end
 
-    Returns:
-    ```
-    {:ok, [%DevAlias{} | []]}  # success
-    {:error, error}            # update failed for one DevAlias
-    ```
+  def just_saw_db(%{} = multi_changes) do
+    %{device: %{id: device_id}, seen_at: seen_at} = multi_changes
 
-  """
-  @doc since: "0.5.10"
-  @type multi_changes :: %{aliases: [Ecto.Schema.t(), ...]}
-  @type ok_tuple :: {:ok, Ecto.Schema.t()}
-  @type error_tuple :: {:error, any()}
-  @type db_result :: ok_tuple() | error_tuple()
-  @spec just_saw(Ecto.Repo.t(), multi_changes(), DateTime.t()) :: db_result()
-  def just_saw(repo, %{aliases: schemas}, %DateTime{} = seen_at) when is_list(schemas) do
-    for %Schema{} = schema <- schemas, reduce: {:ok, []} do
-      {:ok, acc} ->
-        cs = changeset(%{updated_at: seen_at}, schema)
-
-        case repo.update(cs, returning: true) do
-          {:ok, %Schema{} = x} -> {:ok, [x] ++ acc}
-          {:error, error} -> {:error, error}
-        end
-
-      {:error, _} = acc ->
-        acc
-    end
+    Ecto.Query.from(dev_alias in Sally.DevAlias,
+      update: [set: [updated_at: ^seen_at]],
+      where: [device_id: ^device_id],
+      select: [:id, :name, :ttl_ms, :updated_at]
+    )
   end
 
-  @doc """
-    Mark a single DevAlias (by id) as just seen
-
-    Looks up the DevAlias by id then reuses `just_saw/3`
-  """
-  @doc since: "0.5.10"
-  @spec just_saw_id(Ecto.Repo.t(), multi_changes, id :: integer, DateTime.t()) :: db_result()
-  def just_saw_id(repo, _changes, id, %DateTime{} = seen_at) when is_integer(id) do
-    case repo.get(Schema, id) do
-      %Schema{} = x -> just_saw(repo, %{aliases: [x]}, seen_at)
-      x when is_nil(x) -> just_saw(repo, %{aliases: []}, seen_at)
-    end
-  end
+  # @doc """
+  #   Mark a single DevAlias (by id) as just seen
+  #
+  #   Looks up the DevAlias by id then reuses `just_saw/3`
+  # """
+  # @doc since: "0.5.10"
+  # @spec just_saw_id(Ecto.Repo.t(), multi_changes, id :: integer, DateTime.t()) :: db_result()
+  # def just_saw_id(repo, _changes, id, %DateTime{} = seen_at) when is_integer(id) do
+  #   case repo.get(Schema, id) do
+  #     %Schema{} = x -> just_saw(repo, %{aliases: [x]}, seen_at)
+  #     x when is_nil(x) -> just_saw(repo, %{aliases: []}, seen_at)
+  #   end
+  # end
 
   def load_aliases(repo, multi_changes) do
-    q = Ecto.Query.from(a in Schema, where: a.device_id == ^multi_changes.device.id, order_by: [asc: a.pio])
+    %{device: %{id: device_id}} = multi_changes
 
-    {:ok, q |> repo.all()}
+    Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
+    |> then(fn query -> {:ok, repo.all(query)} end)
   end
 
   def load_cmd_last(%Schema{} = x) do
@@ -216,37 +304,37 @@ defmodule Sally.DevAlias do
     Repo.preload(x, cmds: cmd_query)
   end
 
-  def load_alias_with_last_cmd(name) when is_binary(name) do
-    cmd_q = Command.query_preload_latest_cmd()
+  # def load_alias_with_last_cmd(name) when is_binary(name) do
+  #   cmd_q = Command.query_preload_latest_cmd()
+  #
+  #   Ecto.Query.from(a in Schema,
+  #     where: a.name == ^name,
+  #     order_by: [asc: a.pio],
+  #     preload: [cmds: ^cmd_q, device: []]
+  #   )
+  #   |> Repo.one()
+  # end
 
-    Ecto.Query.from(a in Schema,
-      where: a.name == ^name,
-      order_by: [asc: a.pio],
-      preload: [cmds: ^cmd_q, device: []]
-    )
-    |> Repo.one()
-  end
-
-  def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
-    import Ecto.Query, only: [from: 2]
-
-    # cmd_query = Command.query_preload_latest_cmd()
-
-    # NOTE: do not preload cmds here to avoid database performance hit
-    all_query =
-      from(a in Schema,
-        where: [device_id: ^device.id],
-        order_by: [asc: a.pio]
-        #  preload: [cmds: ^cmd_query]
-      )
-
-    # NOTE: rather, preload each DevAlias separately for max performance
-    for %Schema{} = schema <- repo.all(all_query) do
-      cmd_q = Command.query_preload_latest_cmd(schema.id)
-      repo.preload(schema, cmds: cmd_q)
-    end
-    |> then(fn dev_aliases -> {:ok, dev_aliases} end)
-  end
+  # def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
+  #   import Ecto.Query, only: [from: 2]
+  #
+  #   # cmd_query = Command.query_preload_latest_cmd()
+  #
+  #   # NOTE: do not preload cmds here to avoid database performance hit
+  #   all_query =
+  #     from(a in Schema,
+  #       where: [device_id: ^device.id],
+  #       order_by: [asc: a.pio]
+  #       #  preload: [cmds: ^cmd_query]
+  #     )
+  #
+  #   # NOTE: rather, preload each DevAlias separately for max performance
+  #   for %Schema{} = schema <- repo.all(all_query) do
+  #     cmd_q = Command.query_preload_latest_cmd(schema.id)
+  #     repo.preload(schema, cmds: cmd_q)
+  #   end
+  #   |> then(fn dev_aliases -> {:ok, dev_aliases} end)
+  # end
 
   defp load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])
@@ -268,6 +356,14 @@ defmodule Sally.DevAlias do
 
   def load_info(%Schema{} = schema) do
     schema |> Repo.preload(device: [:host]) |> load_cmd_last()
+  end
+
+  def mark_updated(%{} = multi_changes, source_key) do
+    %{:seen_at => seen_at, ^source_key => source} = multi_changes
+
+    case source do
+      %{dev_alias_id: id} -> changeset(id: id, updated_at: seen_at)
+    end
   end
 
   def names do
@@ -303,13 +399,14 @@ defmodule Sally.DevAlias do
     |> status_lookup_finalize()
   end
 
-  def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
-
-  defp status_lookup_finalize(dev_alias) do
+  @doc false
+  def status_lookup_finalize(dev_alias) do
     case dev_alias do
-      %Sally.DevAlias{cmds: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, cmds: nil)
-      %Sally.DevAlias{datapoints: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, datapoints: nil)
+      %{cmds: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, cmds: [])
+      %{datapoints: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, datapoints: [])
       other -> other
     end
   end
+
+  def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
 end

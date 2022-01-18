@@ -27,7 +27,7 @@ defmodule Sally.CommandAid do
     {track_cmd, opts_rest} = Keyword.pop(opts_rest, :track, false)
 
     Sally.Command.add(dev_alias, cmd, opts_rest)
-    |> tap(fn cmd -> if(track_cmd, do: Sally.Execute.track(cmd, opts_rest)) end)
+    |> tap(fn cmd -> if track_cmd, do: Sally.Command.track(cmd, opts_rest) end)
   end
 
   defp add_many(dev_alias, opts) do

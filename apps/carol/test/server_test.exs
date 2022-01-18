@@ -7,7 +7,6 @@ defmodule CarolServerTest do
   setup [:equipment_add, :opts_add, :episodes_add, :state_add]
   setup [:memo_add, :start_args_add, :start_supervised_add]
   setup [:missing_opts_add]
-  setup [:ctx_puts]
 
   defmacro msg(lhs, text, rhs) do
     quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
@@ -19,7 +18,9 @@ defmodule CarolServerTest do
   defmacro assert_cmd_echoed(ctx, cmd) do
     quote location: :keep, bind_quoted: [ctx: ctx, cmd: cmd] do
       assert %{equipment: <<_::binary>>} = ctx
-      assert_receive {:echo, %Alfred.ExecCmd{cmd: ^cmd}}, 100, "should have received ExecCmd"
+
+      assert_receive {:echo, %Alfred.Status{}}, 100
+      assert_receive {:echo, %Alfred.Execute{detail: %{cmd: ^cmd}}}, 100
     end
   end
 
@@ -42,7 +43,7 @@ defmodule CarolServerTest do
                notify_at: :none,
                server_name: ^server_name,
                episodes: [%Carol.Episode{}, %Carol.Episode{}, %Carol.Episode{}],
-               ticket: %Alfred.Notify.Ticket{}
+               ticket: %Alfred.Ticket{}
              } = :sys.get_state(pid)
     end
 
@@ -56,7 +57,7 @@ defmodule CarolServerTest do
                notify_at: :none,
                server_name: ^server_name,
                episodes: [%Carol.Episode{}, %Carol.Episode{}, %Carol.Episode{}],
-               ticket: %Alfred.Notify.Ticket{}
+               ticket: %Alfred.Ticket{}
              } = :sys.get_state(pid)
 
       assert [cmd_live: :none, exec_result: :none, notify_at: :none, server_name: ^server_name] =
@@ -151,7 +152,7 @@ defmodule CarolServerTest do
       assert {:noreply, %Carol.State{} = new_state, {:continue, :bootstrap}} = ctx.state
 
       # second call, vslidates ticket is %Ticket{}
-      assert {:noreply, %Carol.State{ticket: %Alfred.Notify.Ticket{}}, timeout} =
+      assert {:noreply, %Carol.State{ticket: %Alfred.Ticket{}}, timeout} =
                Carol.Server.handle_continue(:bootstrap, new_state)
 
       assert is_integer(timeout)
@@ -174,7 +175,7 @@ defmodule CarolServerTest do
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
     test "executes a cmd when a program is live", ctx do
-      assert {:noreply, %Carol.State{exec_result: %Alfred.ExecResult{cmd: "on"}}, _timeout} =
+      assert {:noreply, %Carol.State{exec_result: %Alfred.Execute{detail: %{cmd: "on"}}}, _timeout} =
                Carol.Server.handle_continue(:tick, ctx.state)
 
       assert_cmd_echoed(ctx, "on")
@@ -198,36 +199,27 @@ defmodule CarolServerTest do
     end
   end
 
-  describe "Carol.Server.handle_info/2 handles Broom" do
+  describe "Carol.Server.handle_info/2 handles Alfred.Broom" do
+    @tag skip: false
     @tag equipment_add: [cmd: "on", rc: :pending]
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
     test "TrackerEntry with matching refid", ctx do
       # NOTE: handle_continue/2 call required to trigger execute
-      assert {:noreply, %Carol.State{} = new_state, _timeout} = Carol.Server.handle_continue(:tick, ctx.state)
 
-      er = new_state.exec_result
-      te = %Broom.TrackerEntry{cmd: er.cmd, refid: er.refid}
+      noreply_tuple = Carol.Server.handle_continue(:tick, ctx.state)
+
+      assert {:noreply, %Carol.State{} = new_state, _timeout} = noreply_tuple
+
+      execute = new_state.exec_result
+      broom = %Alfred.Broom{tracked_info: %{cmd: execute.detail.cmd}, refid: execute.detail.refid}
 
       assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
-               Carol.Server.handle_info({Broom, te}, new_state)
+               Carol.Server.handle_info({Alfred, broom}, new_state)
 
       assert cmd_live =~ ~r/^PENDING\s\{on\}/
     end
   end
-
-  defp ctx_puts(%{ctx_puts: what} = ctx) do
-    ctx = Map.delete(ctx, :ctx_puts)
-
-    case what do
-      [] -> pretty_puts(ctx)
-      :keys -> Map.keys(ctx) |> Enum.sort() |> pretty_puts()
-    end
-
-    ctx
-  end
-
-  defp ctx_puts(_), do: :ok
 
   defp equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
 

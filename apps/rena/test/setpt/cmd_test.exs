@@ -22,7 +22,7 @@ defmodule Rena.SetPt.CmdTest do
 
       expect_cmd = if(action == :activate, do: "on", else: "off")
 
-      assert {^action, %Alfred.ExecCmd{name: ^equipment, cmd: ^expect_cmd}} = cmd_result
+      assert {^action, [{:cmd, ^expect_cmd}, {:name, ^equipment} | _]} = cmd_result
     end
   end
 
@@ -55,8 +55,8 @@ defmodule Rena.SetPt.CmdTest do
 
     @tag equipment_add: [rc: :error, cmd: "unknown"]
     @tag result_opts: [lt_low: 3]
-    test "equipment error tuple with MutableStatus not good", ctx do
-      assert {:equipment_error, %Alfred.MutableStatus{}} =
+    test "equipment error tuple with Alfred.Status not good", ctx do
+      assert {:equipment_error, %Alfred.Status{}} =
                Rena.SetPt.Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
     end
   end
@@ -75,7 +75,7 @@ defmodule Rena.SetPt.CmdTest do
     test "handles equipment ttl expired", %{opts: opts} do
       assert :failed =
                Rena.SetPt.Cmd.effectuate(
-                 {:equipment_error, %Alfred.MutableStatus{name: "bad equipment", ttl_expired?: true}},
+                 {:equipment_error, %Alfred.Status{name: "foo", rc: {:ttl_expired, 15_00}}},
                  opts
                )
     end
@@ -83,7 +83,7 @@ defmodule Rena.SetPt.CmdTest do
     test "handles equipment error", %{opts: opts} do
       assert :failed =
                Rena.SetPt.Cmd.effectuate(
-                 {:equipment_error, %Alfred.MutableStatus{name: "bad equipment", error: :unknown}},
+                 {:equipment_error, %Alfred.Status{name: "foo", rc: :error}},
                  opts
                )
     end
@@ -98,20 +98,22 @@ defmodule Rena.SetPt.CmdTest do
 
     @tag equipment_add: [cmd: "on"]
     test "handles equipment status :ok", ctx do
-      assert {:ok, %Alfred.ExecResult{rc: :ok, cmd: "on"}} =
-               Rena.SetPt.Cmd.execute(%Alfred.ExecCmd{name: ctx.equipment, cmd: "on"}, ctx.opts)
+      assert {:ok, %Alfred.Execute{rc: :ok, detail: %{cmd: "on"}}} =
+               Rena.SetPt.Cmd.execute([name: ctx.equipment, cmd: "on"], ctx.opts)
     end
 
     @tag equipment_add: [pending: true, cmd: "on"]
     test "handles equipment status is :pending", ctx do
-      assert {:ok, %Alfred.ExecResult{rc: :pending, cmd: "on"}} =
-               Rena.SetPt.Cmd.execute(%Alfred.ExecCmd{name: ctx.equipment, cmd: "on"}, ctx.opts)
+      assert {:ok, %Alfred.Execute{rc: :pending, detail: %{cmd: "on"}}} =
+               Rena.SetPt.Cmd.execute([name: ctx.equipment, cmd: "on"], ctx.opts)
     end
 
     @tag equipment_add: [expired_ms: 10_000]
     test "handles when equipment status is :ttl_expired", ctx do
-      assert {:failed, %Alfred.ExecResult{rc: {:ttl_expired, 10_000}}} =
-               Rena.SetPt.Cmd.execute(%Alfred.ExecCmd{name: ctx.equipment, cmd: "on"}, ctx.opts)
+      assert {:failed, %Alfred.Execute{rc: {:ttl_expired, ms}}} =
+               Rena.SetPt.Cmd.execute([name: ctx.equipment, cmd: "on"], ctx.opts)
+
+      assert_in_delta(ms, 10_000, 1000)
     end
   end
 

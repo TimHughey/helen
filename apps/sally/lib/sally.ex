@@ -3,7 +3,6 @@ defmodule Sally do
   Documentation for `Sally`.
   """
 
-  alias Alfred.ExecCmd
   alias Sally.{Command, DevAlias, Device, Host, Repo}
 
   @doc """
@@ -37,7 +36,7 @@ defmodule Sally do
   def devalias_delete(name_or_id) do
     case DevAlias.delete(name_or_id) do
       {:ok, results} ->
-        {:ok, results ++ [alfred: Alfred.names_delete(results[:name])]}
+        {:ok, results ++ [alfred: Alfred.name_unregister(results[:name])]}
 
       error ->
         error
@@ -112,7 +111,7 @@ defmodule Sally do
 
     case DevAlias.rename(opts) do
       %DevAlias{} ->
-        alfred.names_delete(opts[:from])
+        alfred.name_unregister(opts[:from])
         :ok
 
       error ->
@@ -165,7 +164,7 @@ defmodule Sally do
     with {:device_opt, device} when is_binary(device) <- {:device_opt, opts[:device]},
          {:device, %Device{} = device} <- {:device, Device.find(ident: device)},
          {:name_opt, name} when is_binary(name) <- {:name_opt, opts[:name]},
-         {:available, true} <- {:available, Alfred.names_available?(name)},
+         {:available, true} <- {:available, Alfred.name_available?(name)},
          {:pio_opt, pio} when is_integer(pio) <- {:pio_opt, Device.pio_check(device, opts)} do
       final_opts = [name: name, pio: pio] ++ Keyword.take(opts, [:description, :ttl_ms])
 
@@ -225,9 +224,6 @@ defmodule Sally do
       {:to, :latest} -> Keyword.replace(opts, :to, device_latest()) |> device_move_aliases()
     end
   end
-
-  # required as callback from Alfred
-  def execute(%ExecCmd{} = ec, opts \\ []) when is_list(opts), do: Sally.Execute.cmd(ec, opts)
 
   def host_devices(name) do
     host = Host.find_by_name(name) |> Repo.preload(:devices)
@@ -368,26 +364,26 @@ defmodule Sally do
     end
   end
 
-  @doc """
-
-  """
-  @doc since: "0.5.10"
-  def just_saw(%Device{} = device, dev_aliases) when is_list(dev_aliases) do
-    alias Alfred.{JustSaw, SeenName}
-
-    type = Device.type(device)
-
-    JustSaw.new(type, dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
-    |> Alfred.just_saw()
-  end
+  # @doc """
+  #
+  # """
+  # @doc since: "0.5.10"
+  # def just_saw(%Device{} = device, dev_aliases) when is_list(dev_aliases) do
+  #   alias Alfred.{JustSaw, SeenName}
+  #
+  #   type = Device.type(device)
+  #
+  #   JustSaw.new(type, dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
+  #   |> Alfred.just_saw()
+  # end
 
   # required as callback from Alfred
   # function head
-  def status(type, name, opts \\ [])
-
-  # (1 of 2) handle mutable devices
-  def status(:mut_status, name, opts), do: Sally.Mutable.status(name, opts)
-
-  # (2 of 2) handle immutable devices
-  def status(:imm_status, name, opts), do: Sally.Immutable.status(name, opts)
+  # def status(type, name, opts \\ [])
+  #
+  # # (1 of 2) handle mutable devices
+  # def status(:mut_status, name, opts), do: Sally.Mutable.status(name, opts)
+  #
+  # # (2 of 2) handle immutable devices
+  # def status(:imm_status, name, opts), do: Sally.Immutable.status(name, opts)
 end

@@ -6,12 +6,14 @@ defmodule Alfred.Broom.Supervisor do
   end
 
   @impl true
-  def init([registry]) do
+  def init(_inir_args) do
     children = [
       {Alfred.Broom.Metrics, []},
-      {Registry, [name: registry, keys: :unique]}
+      {Registry, [name: registry(), keys: :unique]}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
+
+  def registry, do: Alfred.Broom.Registry
 end

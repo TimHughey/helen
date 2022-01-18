@@ -50,6 +50,7 @@ defmodule Alfred.MixProject do
   defp deps do
     [
       {:betty, in_umbrella: true},
+      {:ecto_sql, "~> 3.1"},
       {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
       {:uuid, "~> 1.1"},

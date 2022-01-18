@@ -1,4 +1,5 @@
 defmodule Carol.State do
+  @moduledoc false
   alias __MODULE__
   require Logger
 
@@ -15,15 +16,13 @@ defmodule Carol.State do
           equipment: String.t(),
           episodes: [] | [Carol.Episode.t(), ...],
           cmd_live: :none | String.t(),
-          ticket: Alfred.Notify.Ticket.t(),
-          exec_result: %Alfred.ExecResult{},
+          ticket: Alfred.Ticket.t(),
+          exec_result: Alfred.Execute.t(),
           notify_at: DateTime.t()
         }
 
-  @doc false
   def alfred, do: Process.get(:opts) |> Keyword.get(:alfred, Alfred)
 
-  @doc since: "0.3.0"
   def new(args) do
     {opts, rest} = pop_and_put_opts(args)
     {equipment, rest} = pop_equipment(rest)
@@ -41,24 +40,25 @@ defmodule Carol.State do
     |> wrap_ok_if_requested(wrap?)
   end
 
-  @doc false
   def refresh_episodes(%State{} = s) do
     [episodes: Carol.Episode.analyze_episodes(s.episodes, sched_opts())]
     |> update(s)
   end
 
-  @doc false
-  def save_cmd(cmd, %State{} = s), do: [cmd_live: cmd] |> update(s)
-
-  # @doc false
-  # def save_episodes(episodes, %State{} = s), do: update([episodes: episodes], s)
-
-  @doc false
-  def save_exec_result(%Alfred.ExecResult{} = er, %State{} = s) do
-    [exec_result: er, cmd_live: er.cmd] |> update(s)
+  def save_cmd(cmd, %State{} = state) do
+    case cmd do
+      %Alfred.Execute{} = execute -> [cmd_live: Alfred.execute_to_binary(execute)]
+      anything -> [cmd_live: anything]
+    end
+    |> update(state)
   end
 
-  @doc false
+  def save_exec_result(%Alfred.Execute{} = execute, %State{} = s) do
+    state = update([exec_result: execute], s)
+
+    save_cmd(execute, state)
+  end
+
   def save_ticket(ticket_rc, %State{} = s) do
     case ticket_rc do
       x when is_atom(x) -> x
@@ -68,7 +68,6 @@ defmodule Carol.State do
     |> then(fn ticket -> struct(s, ticket: ticket) end)
   end
 
-  @doc since: "0.3.0"
   def sched_opts do
     opts = Process.get(:opts)
     tz = opts[:timezone]
@@ -76,7 +75,6 @@ defmodule Carol.State do
     [List.to_tuple([:ref_dt, Timex.now(tz)]) | opts] |> Enum.sort()
   end
 
-  @doc since: "0.3.0"
   def start_notifies(%State{ticket: ticket} = state) do
     case ticket do
       x when x in [:none, :pause] ->
@@ -89,7 +87,6 @@ defmodule Carol.State do
     end
   end
 
-  @doc since: "0.3.0"
   def stop_notifies(%State{ticket: ticket} = state) do
     case ticket do
       x when is_struct(x) ->
@@ -102,10 +99,8 @@ defmodule Carol.State do
     |> save_ticket(state)
   end
 
-  @doc since: "0.3.0"
   def timeout(%State{} = s), do: Carol.Episode.ms_until_next_episode(s.episodes, sched_opts())
 
-  @doc since: "0.3.0"
   def update_notify_at(s) do
     tz = Keyword.get(sched_opts(), :timezone)
 

@@ -1,7 +1,5 @@
 defmodule Sally.Payload do
-  require Logger
-
-  # use Sally.MsgOut.Client
+  @moduledoc false
 
   # reference for random command
   # def example(%Device{} = pwm_dev) do
@@ -21,35 +19,38 @@ defmodule Sally.Payload do
   #   create_outbound_cmd(pwm_dev, cmd, [])
   # end
 
-  alias Sally.Host
+  def send_cmd_v2(%Sally.Command{} = cmd, opts) do
+    %{refid: refid, dev_alias: %{device: %{host: host} = device}} = cmd
 
-  def send_cmd(%Alfred.ExecCmd{inserted_cmd: %Sally.Command{dev_alias: dev_alias}} = ec) do
-    host_id = dev_alias.device.host.ident
-    hostname = dev_alias.device.host.name
-    family = dev_alias.device.family
-    device = dev_alias.device.ident
-    refid = ec.inserted_cmd.refid
-    data = assemble_specific_cmd_data(ec)
-
-    %Host.Instruct{
-      ident: host_id,
-      name: hostname,
-      subsystem: family,
-      data: data,
-      filters: [device, refid]
-    }
-    |> Host.Instruct.send()
+    [
+      ident: host.ident,
+      name: host.name,
+      subsytem: device.family,
+      data: cmd_data(cmd, opts),
+      filters: [device.ident, refid]
+    ]
+    |> Sally.Host.Instruct.send()
   end
 
-  defp assemble_specific_cmd_data(%Alfred.ExecCmd{} = ec) do
-    add_ack_if_needed = fn x -> if ec.cmd_opts[:ack] != :immediate, do: put_in(x, [:ack], true), else: x end
+  defmacrop put_key(val) do
+    quote bind_quoted: [val: val], do: Map.put(var!(acc), var!(key), val)
+  end
 
-    include_cmd_params_if_needed = fn x ->
-      if map_size(ec.cmd_params) > 0, do: put_in(x, [:params], ec.cmd_params), else: x
-    end
+  def cmd_data(cmd, opts) do
+    %{cmd: cmd, dev_alias: %{pio: pio}} = cmd
 
-    %{pin: ec.inserted_cmd.dev_alias.pio, cmd: ec.cmd}
-    |> add_ack_if_needed.()
-    |> include_cmd_params_if_needed.()
+    cmd_opts = Keyword.get(opts, :cmd_opts, []) |> Keyword.put_new(:ack, true)
+    params = Keyword.get(opts, :cmd_params, :none)
+
+    opts = [{:params, params} | cmd_opts]
+
+    Enum.reduce(opts, %{pio: pio, cmd: cmd}, fn
+      {:ack = key, :immediate}, acc -> put_key(false)
+      {:ack = key, :host}, acc -> put_key(true)
+      {:ack = key, val}, acc when is_boolean(val) -> put_key(val)
+      {:params = key, %{} = params}, acc -> put_key(params)
+      {:params = key, [_ | _] = params}, acc -> Enum.into(params, %{}) |> put_key()
+      _, acc -> acc
+    end)
   end
 end
