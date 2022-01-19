@@ -103,7 +103,7 @@ defmodule Sally.Message.Handler.Server do
     # NOTE: return value ignored, pure side effects function
     _ = process(dispatch, callback_mod)
 
-    {:no_reply, state}
+    {:noreply, state}
   end
 
   ##
