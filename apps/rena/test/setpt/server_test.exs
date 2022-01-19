@@ -65,7 +65,7 @@ defmodule Rena.SetPt.ServerTest do
     test "when Alfred.Broom acked and Last Exec refids match", %{state: state} do
       acked_at = DateTime.utc_now()
 
-      msg = {Alfred, %Alfred.Broom{rc: :ok, at: %{acked: acked_at}}}
+      msg = {Alfred, %Alfred.Broom{rc: :ok, at: %{released: acked_at}}}
       assert {:noreply, %Rena.SetPt.State{last_exec: ^acked_at}} = Server.handle_info(msg, state)
     end
 

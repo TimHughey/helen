@@ -72,7 +72,7 @@ defmodule Rena.SetPt.State do
   def update_last_exec(%State{} = s, what) do
     case what do
       %DateTime{} = at -> %State{s | last_exec: at} |> transition()
-      %Alfred.Execute{} = execute -> struct(s, last_exec: execute)
+      %Alfred.Execute{} = execute -> struct(s, last_exec: execute) |> transition()
       :failed -> %State{s | last_exec: :failed}
       _ -> s
     end

@@ -70,10 +70,9 @@ defmodule Rena.SetPt.Server do
       |> Rena.SetPt.Cmd.make(sensor_results, opts)
       |> Rena.SetPt.Cmd.effectuate(opts)
       |> Rena.SetPt.State.update_last_exec(s)
-      |> Rena.SetPt.State.update_last_notify_at()
       |> noreply()
     else
-      noreply(s)
+      Rena.SetPt.State.update_last_notify_at(s) |> noreply()
     end
   end
 

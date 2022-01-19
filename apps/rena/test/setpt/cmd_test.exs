@@ -22,7 +22,8 @@ defmodule Rena.SetPt.CmdTest do
 
       expect_cmd = if(action == :activate, do: "on", else: "off")
 
-      assert {^action, [{:cmd, ^expect_cmd}, {:name, ^equipment} | _]} = cmd_result
+      # assert {^action, [{:cmd, ^expect_cmd}, {:name, ^equipment} | _]} = cmd_result
+      assert {^action, %{cmd: ^expect_cmd, name: equipment}} = cmd_result
     end
   end
 

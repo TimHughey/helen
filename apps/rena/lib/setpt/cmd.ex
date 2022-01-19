@@ -34,6 +34,8 @@ defmodule Rena.SetPt.Cmd do
   def execute(cmd_args, opts) do
     alfred = opts[:alfred] || Alfred
 
+    cmd_args = Enum.into(cmd_args, [])
+
     case alfred.execute({cmd_args, []}) do
       %Alfred.Execute{rc: rc} = execute when rc in [:ok, :pending] -> {:ok, execute}
       %Alfred.Execute{} = execute -> {:failed, execute}
@@ -56,10 +58,10 @@ defmodule Rena.SetPt.Cmd do
 
   def make(name, %Result{} = result, opts \\ []) do
     alfred = opts[:alfred] || Alfred
-    cmd_args = [name: name, cmd_opts: [notify_when_released: true]]
+    cmd_args = %{name: name, cmd_opts: [notify_when_released: true]}
 
-    active_cmd_args = opts[:active_cmd] || [{:cmd, "on"} | cmd_args]
-    inactive_cmd_args = opts[:inactive_cmd] || [{:cmd, "off"} | cmd_args]
+    active_cmd_args = opts[:active_cmd] || Map.put(cmd_args, :cmd, "on")
+    inactive_cmd_args = opts[:inactive_cmd] || Map.put(cmd_args, :cmd, "off")
 
     with {:datapoints, true} <- sufficient_datapoints?(result),
          {:active_cmd, active_cmd_args} <- {:active_cmd, active_cmd_args},
@@ -119,7 +121,7 @@ defmodule Rena.SetPt.Cmd do
   end
 
   defp simple_status(%Alfred.Status{detail: %{cmd: have}}, %{cmd: want}) when have == want, do: :active
-  defp simple_status(%Alfred.Status{}, _cmd_args), do: :inactive
+  defp simple_status(%Alfred.Status{detail: %{cmd: have}}, %{cmd: want}) when have != want, do: :inactive
 
   defp sufficient_datapoints?(%Result{valid: x, total: y}) when x >= 3 and y >= 3, do: {:datapoints, true}
   defp sufficient_datapoints?(%Result{}), do: {:datapoints, false}
