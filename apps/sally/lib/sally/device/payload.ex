@@ -1,4 +1,4 @@
-defmodule Sally.Payload do
+defmodule Sally.Command.Payload do
   @moduledoc false
 
   # reference for random command
@@ -19,15 +19,17 @@ defmodule Sally.Payload do
   #   create_outbound_cmd(pwm_dev, cmd, [])
   # end
 
-  def send_cmd_v2(%Sally.Command{} = cmd, opts) do
+  def send_cmd(%Sally.Command{} = cmd, opts) do
+    {send_opts, opts_rest} = Keyword.split(opts, [:echo])
     %{refid: refid, dev_alias: %{device: %{host: host} = device}} = cmd
 
     [
       ident: host.ident,
       name: host.name,
-      subsytem: device.family,
-      data: cmd_data(cmd, opts),
-      filters: [device.ident, refid]
+      subsystem: device.family,
+      data: cmd_data(cmd, opts_rest),
+      filters: [device.ident, refid],
+      opts: send_opts
     ]
     |> Sally.Host.Instruct.send()
   end

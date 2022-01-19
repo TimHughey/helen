@@ -13,18 +13,19 @@ defmodule SallyHostHandlerTest do
   @tag host_name: "sally.hostprocessor000"
   test "can Host Handler can process a boot message", ctx do
     # simulare the steps taken by Sally.Mqtt.Handler.handle_message/3 and Host.Handler.process/1
-    dispatch = {ctx.filter, ctx.packed} |> Sally.Dispatch.accept() |> Sally.Host.Handler.process()
+    dispatch = Sally.Dispatch.accept({ctx.filter, ctx.packed}) |> Sally.Host.Handler.process()
     host_ident = ctx.host_ident
 
     assert %Sally.Dispatch{
              valid?: true,
              category: "boot",
              data: %{},
-             host: %Sally.Host{ident: ^host_ident},
+             host: :not_loaded,
              invalid_reason: "none",
              sent_at: %DateTime{} = sent_at,
              payload: :unpacked,
              recv_at: %DateTime{} = recv_at,
+             txn_info: {:ok, %{host: %Sally.Host{ident: ^host_ident}}},
              routed: :no
            } = dispatch
 

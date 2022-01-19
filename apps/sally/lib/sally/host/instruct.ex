@@ -40,14 +40,23 @@ defmodule Sally.Host.Instruct do
   ## Public API
   ##
 
-  def send(%Instruct{} = msg) do
-    Logger.debug("\n#{inspect(msg, pretty: true)}")
+  def echo?(%__MODULE__{opts: opts}), do: Keyword.get(opts, :echo, false)
 
+  def send(%Instruct{} = msg) do
     {:send, msg |> add_mtime() |> set_qos()}
     |> Instruct.call()
   end
 
-  def send(fields) when is_list(fields) or is_map(fields), do: struct(__MODULE__, fields) |> send()
+  def send(%{} = fields), do: Enum.into(fields, []) |> send()
+
+  def send([_ | _] = fields) do
+    {opts, fields_rest} = Keyword.pop(fields, :opts, [])
+    {cmd_opts, fields_clean} = Keyword.pop(fields_rest, :cmd_opts, [])
+
+    Keyword.put(fields_clean, :opts, Keyword.merge(opts, cmd_opts))
+    |> then(fn fields -> struct(__MODULE__, fields) end)
+    |> send()
+  end
 
   @impl true
   def init(_) do
@@ -55,17 +64,17 @@ defmodule Sally.Host.Instruct do
   end
 
   def start_link(_) do
-    GenServer.start_link(Instruct, [], name: __MODULE__)
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
   @impl true
-  def handle_call({:send, %Instruct{} = msg}, _from, %State{} = s) do
-    Logger.debug("\n#{inspect(msg, pretty: true)}")
-    packed = %{mtime: msg.mtime} |> Map.merge(msg.data) |> Msgpax.pack!()
+  def handle_call({:send, %Instruct{} = msg}, {caller_pid, _term}, %State{} = s) do
+    packed = Map.put(msg.data, :mtime, msg.mtime) |> Msgpax.pack!()
 
     Tortoise.publish(msg.client_id, make_filter(msg), packed, qos: msg.qos)
     |> save_pub_rc(msg)
     |> save_packed_length(IO.iodata_length(packed))
+    |> tap(fn sent_msg -> if(echo?(sent_msg), do: Process.send(caller_pid, {:echo, sent_msg}, [])) end)
     |> State.save_last_pub(s)
     |> reply()
   end

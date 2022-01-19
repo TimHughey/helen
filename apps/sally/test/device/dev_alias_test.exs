@@ -183,14 +183,29 @@ defmodule SallyDevAliasTest do
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag command_add: [count: 3, shift_unit: :minutes, shift_increment: -1]
     test "creates new pending command from Sally.DevAlias", ctx do
-      assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
+      assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
 
       cmd = "on"
 
-      {elapsed, {:pending, %Sally.Command{cmd: ^cmd}}} =
-        Timex.Duration.measure(Sally.DevAlias, :execute_cmd, [dev_alias, [cmd: cmd]])
+      # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
+      # for validation
+      {:pending, %Sally.Command{cmd: ^cmd, refid: refid}} =
+        Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, echo: true)
 
-      assert_execution_us(elapsed, 25_000)
+      assert_receive {:echo,
+                      %Sally.Host.Instruct{
+                        client_id: "sally_test",
+                        data: %{ack: true, cmd: ^cmd, pio: 0},
+                        filters: [^device_ident, ^refid],
+                        ident: <<"host"::binary, _::binary>>,
+                        name: <<"hostname"::binary, _::binary>>,
+                        packed_length: 33,
+                        subsystem: "i2c"
+                      }},
+                     1
+
+      # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
+      refute Alfred.Broom.tracked?(refid)
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: []
@@ -209,22 +224,24 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.DevAlias EXPLAIN" do
-    @tag skip: true
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag command_add: [count: 50, shift_unit: :minutes, shift_increment: -1]
     test "for join of last Sally.Command", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-      Sally.DevAlias.explain(name, :status, :cmds, [])
+      explain_output = Sally.DevAlias.explain(name, :status, :cmds, [])
+
+      assert explain_output =~ ~r/Index Scan/
+      assert explain_output =~ ~r/Sort Method: top-N heapsort/
     end
 
-    @tag skip: true
     @tag device_add: [auto: :ds], devalias_add: []
     @tag datapoint_add: [count: 40, shift_unit: :seconds, shift_increment: -7]
     test "for join of recent Sally.Datapoint", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-      Sally.DevAlias.explain(name, :status, :datapoints, [])
+      explain_output = Sally.DevAlias.explain(name, :status, :datapoints, [])
+      assert explain_output =~ ~r/(Join Filter).|\s+(Index Scan).|\s+(Rows Removed)/
     end
   end
 

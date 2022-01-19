@@ -52,7 +52,7 @@ defmodule Alfred.Broom do
       def make_refid, do: Alfred.Broom.make_refid()
 
       @doc false
-      def now(), do: Alfred.Broom.now()
+      def now, do: Alfred.Broom.now()
 
       def release(refid, opts), do: Alfred.Broom.release(refid, __MODULE__, opts)
 
@@ -83,7 +83,7 @@ defmodule Alfred.Broom do
   defdelegate use_opts(module), to: __MODULE__, as: :get_attribute
 
   def make_refid do
-    UUID.uuid4() |> String.split("-") |> List.first()
+    Ecto.UUID.generate() |> String.split("-") |> List.first()
   end
 
   def release(refid, module, opts) do

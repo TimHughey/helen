@@ -5,7 +5,6 @@ defmodule Sally.Host do
   alias Ecto.Changeset
 
   alias Sally.Host, as: Schema
-  alias Sally.Host.ChangeControl
   alias Sally.Repo
 
   schema "host" do
@@ -39,10 +38,8 @@ defmodule Sally.Host do
     |> Toml.decode_file!()
   end
 
-  # (1 of 2) accept a ChangeControl
-  def changeset(%ChangeControl{} = cc) do
-    changeset(%Schema{}, cc.raw_changes, cc.required)
-  end
+  # NOTE: used by Sally.Host.Handler.process/1
+  def changeset(%{} = changes), do: changeset(struct(__MODULE__), changes, Map.keys(changes))
 
   # (2 of 2) traditional implementation accepting a Schema, changes and what's required
   def changeset(%Schema{} = schema, changes, required) do

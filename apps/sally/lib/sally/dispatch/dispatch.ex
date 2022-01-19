@@ -2,12 +2,12 @@ defmodule Sally.Dispatch do
   require Logger
 
   alias __MODULE__
-  alias Sally.{Host, Immutable, Mutable}
 
   # @derive {Inspect, only: [:valid?, :subsystem, :category]}
   defstruct env: nil,
             subsystem: nil,
             category: nil,
+            post_process?: false,
             ident: nil,
             filter_extra: [],
             payload: nil,
@@ -17,6 +17,7 @@ defmodule Sally.Dispatch do
             log: [],
             routed: :no,
             host: :not_loaded,
+            txn_info: :none,
             results: %{},
             seen_list: [],
             final_at: nil,
@@ -34,6 +35,7 @@ defmodule Sally.Dispatch do
           env: env(),
           subsystem: subsystem(),
           category: category(),
+          post_process?: boolean(),
           ident: host_ident(),
           filter_extra: extras(),
           payload: payload(),
@@ -43,6 +45,7 @@ defmodule Sally.Dispatch do
           log: list(),
           routed: :no | :ok,
           host: Ecto.Schema.t() | nil,
+          txn_info: :none | {:ok, map()} | {:error, map()},
           results: struct() | nil,
           seen_list: [binary(), ...],
           final_at: DateTime.t() | nil,
@@ -88,30 +91,44 @@ defmodule Sally.Dispatch do
     struct(dispatch, results: %{results | post_process: [acc] ++ results.post_process})
   end
 
-  def finalize(%Dispatch{} = m) do
-    %Dispatch{m | final_at: DateTime.utc_now()}
-    |> log_invalid_if_needed()
-  end
-
-  def handoff(%Dispatch{} = m) do
-    case m do
-      %Dispatch{valid?: true} = valid_msg -> route_msg(valid_msg)
-      %Dispatch{valid?: false} -> m
+  def check_txn(%Sally.Dispatch{} = dispatch) do
+    case dispatch do
+      # NOTE: filter out invalid Dispatch to avoid matching on valid? below
+      %{valid?: false} -> dispatch
+      %{txn_info: {:ok, %{host: host} = txn_info}} -> struct(dispatch, host: host, txn_info: txn_info)
+      %{txn_info: {:ok, txn_info}} -> struct(dispatch, txn_info: txn_info)
+      %{txn_info: {:error, txn_error}} -> invalid(dispatch, txn_error)
+      %{txn_info: :none} -> dispatch
     end
-    |> log_invalid_if_needed()
   end
 
-  def invalid(%Dispatch{} = d, reason) do
-    struct(d, valid?: false, invalid_reason: reason)
+  def finalize(dispatch) do
+    struct(dispatch, final_at: DateTime.utc_now())
+    |> tap(fn dispatch -> log_if_invalid(dispatch) end)
   end
+
+  @routing [host: Sally.Host.Handler, immut: Sally.Immutable.Handler, mut: Sally.Mutable.Handler]
+  def handoff(%Sally.Dispatch{subsystem: subsystem} = dispatch) do
+    msg_handler = Keyword.get(@routing, String.to_atom(subsystem), :unknown)
+
+    pid = GenServer.whereis(msg_handler)
+
+    cond do
+      msg_handler == :unknown -> invalid(dispatch, "undefined routing: #{subsystem}")
+      not is_pid(pid) -> invalid(dispatch, "no server: #{msg_handler}")
+      true -> struct(dispatch, routed: GenServer.cast(pid, dispatch))
+    end
+  end
+
+  def invalid(%Dispatch{} = d, reason), do: struct(d, valid?: false, invalid_reason: reason)
 
   def load_host(%Dispatch{} = m) do
     if m.valid? do
-      case Host.find_by_ident(m.ident) do
-        %Host{authorized: true} = host ->
+      case Sally.Host.find_by_ident(m.ident) do
+        %Sally.Host{authorized: true} = host ->
           %Dispatch{m | host: host}
 
-        %Host{authorized: false} = host ->
+        %Sally.Host{authorized: false} = host ->
           %Dispatch{m | host: host, valid?: false, invalid_reason: "host not authorized"}
 
         nil ->
@@ -121,6 +138,8 @@ defmodule Sally.Dispatch do
       m
     end
   end
+
+  def new(fields), do: struct(Sally.Dispatch, fields)
 
   def preprocess(%Dispatch{} = m) do
     with %Dispatch{valid?: true} = m <- check_metadata(m),
@@ -138,9 +157,14 @@ defmodule Sally.Dispatch do
     end
   end
 
-  def save_seen_list(seen_list, %Dispatch{} = m) do
-    %Dispatch{m | seen_list: seen_list}
+  def routed(%{routed: :ok, valid?: true} = dispatch, callback_mod) when is_atom(callback_mod) do
+    [post_process?: function_exported?(callback_mod, :post_process, 1)]
+    |> then(fn fields -> struct(dispatch, fields) end)
   end
+
+  def routed(%{} = dispatch), do: invalid(dispatch, :routing_failed) |> finalize()
+
+  def save_txn_info(txn_info, %Sally.Dispatch{} = dispatch), do: struct(dispatch, txn_info: txn_info)
 
   def unpack(%Dispatch{payload: payload} = m) do
     if is_bitstring(payload) do
@@ -152,6 +176,8 @@ defmodule Sally.Dispatch do
       invalid(m, "unknown payload")
     end
   end
+
+  def valid(%{txn_info: %{} = txn_info} = dispatch), do: valid(dispatch, txn_info)
 
   def valid(%Dispatch{} = d, results \\ %{}) do
     struct(d, valid?: true, results: results, invalid_reason: :none)
@@ -174,7 +200,7 @@ defmodule Sally.Dispatch do
     end
   end
 
-  @variance_opt [Sally.Message.Handle, :mtime_variance_ms]
+  @variance_opt [Sally.Message.Handler, :mtime_variance_ms]
   @variance_ms Application.compile_env(:sally, @variance_opt, 10_000)
 
   defp check_sent_time(%Dispatch{data: data} = m) do
@@ -193,22 +219,7 @@ defmodule Sally.Dispatch do
     end
   end
 
-  defp log_invalid_if_needed(m) do
-    if m.valid? == false, do: Logger.warn(["invalid_msg:\n", inspect(m, pretty: true)])
-
-    m
-  end
-
-  @routing [host: Host.Handler, immut: Immutable.Handler, mut: Mutable.Handler]
-  defp route_msg(%Dispatch{} = m) do
-    msg_handler_module = get_in(@routing, [String.to_atom(m.subsystem)])
-
-    pid = GenServer.whereis(msg_handler_module)
-
-    cond do
-      is_nil(msg_handler_module) -> invalid(m, "undefined routing: #{m.subsystem}")
-      not is_pid(pid) -> invalid(m, "no server: #{inspect(msg_handler_module)}")
-      true -> %Dispatch{m | routed: GenServer.cast(msg_handler_module, m)}
-    end
+  defp log_if_invalid(%{valid?: valid?} = dispatch) do
+    if valid? == false, do: Logger.warn(["\n", inspect(dispatch, pretty: true)]), else: :ok
   end
 end

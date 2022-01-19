@@ -23,10 +23,11 @@ defmodule Sally.CommandAid do
   defp accumulate(%Sally.Command{} = cmd, %{command: acc}), do: %{command: [cmd] ++ acc}
 
   defp add_one(%Sally.DevAlias{} = dev_alias, opts) when is_list(opts) do
-    {cmd, opts_rest} = Keyword.pop(opts, :cmd, "on")
-    {track_cmd, opts_rest} = Keyword.pop(opts_rest, :track, false)
+    {track_cmd, opts_rest} = Keyword.pop(opts, :track, true)
 
-    Sally.Command.add(dev_alias, cmd, opts_rest)
+    cmd_add_opts = Keyword.put_new(opts_rest, :cmd, "on")
+
+    Sally.Command.add(dev_alias, cmd_add_opts)
     |> tap(fn cmd -> if track_cmd, do: Sally.Command.track(cmd, opts_rest) end)
   end
 
@@ -46,9 +47,13 @@ defmodule Sally.CommandAid do
         shift_opts = [{shift_unit, num * shift_increment}]
         sent_at = Timex.shift(dt_base, shift_opts)
 
-        cmd_opts = [sent_at: sent_at] ++ final_opts
+        cmd_opts = Keyword.merge([sent_at: sent_at, cmd: cmd_num], final_opts)
 
-        Sally.Command.add(dev_alias, cmd_num, cmd_opts) |> accumulate(acc)
+        cmd = Sally.Command.add(dev_alias, cmd_opts)
+
+        Sally.Command.track(cmd, cmd_opts)
+
+        accumulate(cmd, acc)
     end
   end
 end

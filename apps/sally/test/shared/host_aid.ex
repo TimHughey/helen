@@ -13,17 +13,12 @@ defmodule Sally.HostAid do
     start_at = opts[:start_at] || DateTime.utc_now()
     seen_at = opts[:seen_at] || DateTime.utc_now()
 
-    want_keys = [:ident, :last_start_at, :last_seen_at, :name]
+    changes = %{ident: ident, last_start_at: start_at, last_seen_at: seen_at, name: ident}
+    replace_cols = [:ident, :last_start_at, :last_seen_at, :name]
 
-    cc = %Sally.Host.ChangeControl{
-      raw_changes: %{ident: ident, last_start_at: start_at, last_seen_at: seen_at, name: ident},
-      required: want_keys,
-      replace: want_keys
-    }
+    changeset = Sally.Host.changeset(changes)
 
-    changes = Sally.Host.changeset(cc)
-
-    case Sally.Repo.insert(changes, Sally.Host.insert_opts(cc.replace)) do
+    case Sally.Repo.insert(changeset, Sally.Host.insert_opts(replace_cols)) do
       {:ok, %Sally.Host{} = host} -> %{host: host}
       _ -> :fail
     end

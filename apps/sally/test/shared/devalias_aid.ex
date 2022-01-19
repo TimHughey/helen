@@ -53,19 +53,34 @@ defmodule Sally.DevAliasAid do
     aliases = Sally.DeviceAid.aliases(device)
     name = opts[:name] || unique(:devalias)
     pio = if(device.mutable, do: Sally.DeviceAid.next_pio(aliases), else: 0)
+    nature = if(device.mutable, do: :cmds, else: :datapoints)
     ttl_ms = opts[:ttl_ms] || 15_000
 
     params = [name: name, pio: pio, description: description(), ttl_ms: ttl_ms]
 
-    case Sally.DevAlias.create(device, params) do
-      {:ok, %Sally.DevAlias{} = x} -> %{dev_alias: x}
-      error -> error
-    end
+    Sally.DevAlias.create(device, params) |> register(nature, opts)
   end
 
   defp description do
     Ecto.UUID.generate() |> String.replace("-", " ")
   end
+
+  defp register({:ok, %Sally.DevAlias{} = dev_alias}, nature, opts) do
+    register_opts = Keyword.get(opts, :register, [])
+
+    if register_opts do
+      allowed_opts = Alfred.Name.allowed_opts()
+      register_opts = Keyword.take(opts, allowed_opts) |> Keyword.put_new(:nature, nature)
+
+      rc = Sally.DevAlias.just_saw(dev_alias, register_opts)
+
+      %{dev_alias: dev_alias, name_registration: %{rc: rc, name: dev_alias.name, nature: nature}}
+    else
+      %{dev_alias: dev_alias, name_registration: :none}
+    end
+  end
+
+  defp register(error, _nature, _opts), do: %{dev_alias: error}
 
   # defp next_pio(dev_aliases) do
   #   all_pios = [0..7] |> Enum.to_list()

@@ -18,6 +18,7 @@ defmodule Alfred do
   ## Alfred.Name delegations
   ##
 
+  defdelegate name_all_registered(), to: Alfred.Name, as: :registered
   defdelegate name_allowed_opts, to: Alfred.Name, as: :allowed_opts
   defdelegate name_available?(name), to: Alfred.Name, as: :available?
   defdelegate name_info(name), to: Alfred.Name, as: :info

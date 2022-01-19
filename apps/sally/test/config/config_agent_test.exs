@@ -20,9 +20,11 @@ defmodule SallyConfigAgentTest do
   end
 
   describe "Sally.Config.Agent.config_get/1" do
-    @tag skip: true
     test "dump all" do
-      :sys.get_state(Sally.Config.Agent) |> pretty_puts()
+      assert %{
+               config: %{SallyConfigAgentTest => [key1: [hello: :doctor, yesterday: :tomorrow]]},
+               runtime: %{dirs: %{}}
+             } = :sys.get_state(Sally.Config.Agent)
     end
 
     test "returns :none when {mod, key} do not exist" do

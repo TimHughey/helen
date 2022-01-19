@@ -105,7 +105,7 @@ defmodule Sally.Host.Firmware do
       data = %{valid_ms: valid_ms, file: fw_file}
 
       # create and send the host instruction
-      [ident: host.ident, filters: ["ota"], data: data]
+      [ident: host.ident, filters: ["ota"], data: data, opts: opts]
       |> Instruct.send()
     else
       {:not_found, :dir} -> {:error, "firmware directory not found"}

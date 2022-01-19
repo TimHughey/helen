@@ -66,25 +66,7 @@ defmodule Sally.Command do
 
   def columns(:cast), do: [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
 
-  def add(%DevAlias{} = da, cmd, opts) do
-    new_cmd = Ecto.build_assoc(da, :cmds)
-
-    [refid | _] = Ecto.UUID.generate() |> String.split("-")
-
-    # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
-    sent_at = opts[:sent_at] || DateTime.utc_now()
-
-    # handle special case of ack immediate
-    ack_immediate? = opts[:ack] == :immediate
-    acked_at = if ack_immediate?, do: sent_at, else: nil
-
-    # base changes for all new cmds
-    %{refid: refid, cmd: cmd, acked: ack_immediate?, acked_at: acked_at, sent_at: sent_at}
-    |> changeset(new_cmd)
-    |> Repo.insert!(returning: true)
-  end
-
-  def add_v2(%DevAlias{} = da, opts) do
+  def add(%DevAlias{} = da, opts) do
     {cmd, opts_rest} = Keyword.pop(opts, :cmd)
     {cmd_opts, opts_rest} = Keyword.pop(opts_rest, :cmd_opts, [])
     {ref_dt, _opts_rest} = Keyword.pop(opts_rest, :ref_dt, now())
@@ -111,12 +93,12 @@ defmodule Sally.Command do
     changes |> Map.put(:rt_latency_us, Timex.diff(ack_at, sent_at))
   end
 
-  def load(id) when is_integer(id) do
-    case Repo.get(Schema, id) do
-      %Schema{} = x -> {:ok, x}
-      _ -> {:error, :not_found}
-    end
-  end
+  # def load(id) when is_integer(id) do
+  #   case Repo.get(Schema, id) do
+  #     %Schema{} = x -> {:ok, x}
+  #     _ -> {:error, :not_found}
+  #   end
+  # end
 
   # @doc """
   # Load the `Sally.DevAlias`, if needed
@@ -142,15 +124,15 @@ defmodule Sally.Command do
     end
   end
 
-  def query_preload_latest_cmd(dev_alias_id) do
-    import Ecto.Query, only: [from: 2]
-
-    from(c in Schema,
-      distinct: c.dev_alias_id,
-      order_by: [desc: c.sent_at],
-      where: [dev_alias_id: ^dev_alias_id]
-    )
-  end
+  # def query_preload_latest_cmd(dev_alias_id) do
+  #   import Ecto.Query, only: [from: 2]
+  #
+  #   from(c in Schema,
+  #     distinct: c.dev_alias_id,
+  #     order_by: [desc: c.sent_at],
+  #     where: [dev_alias_id: ^dev_alias_id]
+  #   )
+  # end
 
   def query_preload_latest_cmd do
     import Ecto.Query, only: [from: 2]
@@ -183,7 +165,7 @@ defmodule Sally.Command do
   def status_fix_missing_cmd(name, opts) do
     opts = Keyword.merge(opts, cmd: "unknown", cmd_opts: [ack: :immediate])
 
-    Sally.DevAlias.find(name) |> add_v2(opts)
+    Sally.DevAlias.find(name) |> add(opts)
 
     name
   end

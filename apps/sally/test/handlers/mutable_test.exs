@@ -15,80 +15,73 @@ defmodule Sally.MutableHandlerTest do
   describe "Sally.Mutable.Handler.db_actions/1 processes a" do
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag dispatch_add: [subsystem: "mut", category: "status"]
-    test "well-formed Sally.Dispatch with one DevAlias", ctx do
-      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+    test "well-formed status Sally.Dispatch with one DevAlias", ctx do
+      assert %Sally.Dispatch{txn_info: txn_info} = ctx[:dispatch]
 
-      assert {:ok,
-              %{
-                aliases: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _],
-                aligned_0: %Sally.Command{dev_alias_id: dev_alias_id, cmd: "on"},
-                device: %Sally.Device{id: device_id, family: "i2c", mutable: true}
-                # seen_list: [%Sally.DevAlias{id: dev_alias_id, device_id: device_id} | _]
-              }} = Sally.Mutable.Handler.db_actions(dispatch)
+      assert %{
+               aliases: [%Sally.DevAlias{id: dev_alias_id, name: name, device_id: device_id} | _],
+               aligned_0: %Sally.Command{dev_alias_id: dev_alias_id, cmd: "on"},
+               device: %Sally.Device{id: device_id, family: "i2c", mutable: true}
+             } = txn_info
+
+      # NOTE: confirm the name is registered
+      assert %{name: ^name, nature: :cmds} = Alfred.name_info(name)
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: [count: 5]
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "well-formed Sally.Dispatch with multiple DevAlias", ctx do
-      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+      assert %Sally.Dispatch{txn_info: txn_info} = ctx[:dispatch]
 
-      assert {:ok,
-              %{
-                aliases: aliases,
-                device: %Sally.Device{family: "i2c", mutable: true}
-                # seen_list: seen_list
-              } = db_multi_result} = Sally.Mutable.Handler.db_actions(dispatch)
+      assert %{
+               aliases: aliases,
+               device: %Sally.Device{family: "i2c", mutable: true}
+             } = txn_info
 
       assert length(aliases) == 5
-      # assert length(seen_list) == 5
 
       Enum.all?(0..4, fn pio ->
         aligned_key = String.to_atom("aligned_#{pio}")
-        assert is_map_key(db_multi_result, aligned_key)
-        assert %Sally.Command{} = Map.get(db_multi_result, aligned_key)
+        assert is_map_key(txn_info, aligned_key)
+        assert %Sally.Command{} = Map.get(txn_info, aligned_key)
       end)
     end
   end
 
   describe "Sally.Mutable.Handler.db_cmd_ack/2 processes a" do
     @tag device_add: [auto: :mcp23008], devalias_add: []
-    @tag command_add: [cmd: "on"]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "well formed Sally.Dispatch", ctx do
-      assert %Sally.DevAlias{} = ctx[:dev_alias]
-      assert %Sally.Command{id: command_id} = command = ctx[:command]
-      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+      assert %Sally.DevAlias{id: dev_alias_id} = ctx[:dev_alias]
+      assert %Sally.Dispatch{txn_info: txn_info} = ctx[:dispatch]
 
-      assert {:ok,
-              %{
-                command: %Sally.Command{id: ^command_id},
-                device: %Sally.Device{},
-                aliases: %Sally.DevAlias{}
-              }} = Sally.Mutable.Handler.db_cmd_ack(dispatch, command)
+      assert %{
+               aliases: %Sally.DevAlias{id: ^dev_alias_id},
+               command: %Sally.Command{dev_alias_id: ^dev_alias_id, id: cmd_id, refid: refid},
+               cmd_to_ack: %Sally.Command{acked: false, id: cmd_id},
+               device: %Sally.Device{}
+             } = txn_info
+
+      assert :not_tracked == Sally.Command.tracked_info(refid)
     end
   end
 
   describe "Sally.Mutable.Handler.process/1" do
     @tag device_add: [auto: :mcp23008], devalias_add: []
-    @tag command_add: [cmd: "on", track: true]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "handles a cmdack Dispatch", ctx do
-      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+      assert %Sally.Dispatch{txn_info: %{}} = dispatch = ctx.dispatch
 
-      dispatch
-      |> Sally.Mutable.Handler.process()
-      |> Sally.DispatchAid.assert_processed()
+      Sally.DispatchAid.assert_processed(dispatch)
     end
 
     @tag device_add: [auto: :mcp23008], devalias_add: []
     @tag command_add: []
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "handles a status Dispatch", ctx do
-      assert %Sally.Dispatch{} = dispatch = ctx[:dispatch]
+      assert %Sally.Dispatch{txn_info: %{}} = dispatch = ctx.dispatch
 
-      dispatch
-      |> Sally.Mutable.Handler.process()
-      |> Sally.DispatchAid.assert_processed()
+      Sally.DispatchAid.assert_processed(dispatch)
     end
   end
 end

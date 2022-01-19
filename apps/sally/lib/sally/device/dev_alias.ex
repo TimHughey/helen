@@ -190,12 +190,12 @@ defmodule Sally.DevAlias do
   def execute_cmd(%Alfred.Status{} = status, opts), do: Alfred.Status.raw(status) |> execute_cmd(opts)
 
   def execute_cmd(%Sally.DevAlias{} = dev_alias, opts) do
-    new_cmd = Sally.Command.add_v2(dev_alias, opts)
+    new_cmd = Sally.Command.add(dev_alias, opts)
 
     rc = if(new_cmd.acked, do: :ok, else: :pending)
 
     preloads = [dev_alias: [device: [:host]]]
-    Sally.Repo.preload(new_cmd, preloads) |> Sally.Payload.send_cmd_v2(opts)
+    Sally.Repo.preload(new_cmd, preloads) |> Sally.Command.Payload.send_cmd(opts)
 
     {rc, new_cmd}
   end
@@ -204,20 +204,31 @@ defmodule Sally.DevAlias do
   SQL Explain for status queries
   """
   @spec explain(name :: String.t(), :status, opts :: list()) :: :ok
+  def explain do
+    """
+      iex> Sally.DevAlias.explain(name, what, opts)
+
+     name: name of a Sally.DevAlias
+     what: :status (currently only option)
+     opts: explain opts (default: [analyze: true, buffers: true])
+    """
+  end
+
   def explain(name, :status, what, opts \\ [analyze: true, buffers: true]) do
     {analyze, query_opts} = Keyword.pop(opts, :analyze, true)
 
     explain_opts = [analyze: analyze]
 
-    case what do
-      :cmds -> Sally.Command
-      :datapoints -> Sally.Datapoint
-    end
-    |> tap(fn module -> ["\n", inspect(module), ".status_query/2\n"] |> IO.puts() end)
-    |> then(fn module -> module.status_query(name, query_opts) end)
+    module =
+      case what do
+        :cmds -> Sally.Command
+        :datapoints -> Sally.Datapoint
+      end
+
+    module.status_query(name, query_opts)
     |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
-    |> String.split("\n")
-    |> Enum.each(fn line -> [line] |> IO.puts() end)
+    |> then(fn output -> ["\n", inspect(module), ".status_query/2", "\n", output] end)
+    |> IO.iodata_to_binary()
   end
 
   # (1 of 2) find with proper opts
@@ -307,38 +318,6 @@ defmodule Sally.DevAlias do
     cmd_query = Command.query_preload_latest_cmd()
     Repo.preload(x, cmds: cmd_query)
   end
-
-  # def load_alias_with_last_cmd(name) when is_binary(name) do
-  #   cmd_q = Command.query_preload_latest_cmd()
-  #
-  #   Ecto.Query.from(a in Schema,
-  #     where: a.name == ^name,
-  #     order_by: [asc: a.pio],
-  #     preload: [cmds: ^cmd_q, device: []]
-  #   )
-  #   |> Repo.one()
-  # end
-
-  # def load_aliases_with_last_cmd(repo, %{device: device} = _multi_changes) do
-  #   import Ecto.Query, only: [from: 2]
-  #
-  #   # cmd_query = Command.query_preload_latest_cmd()
-  #
-  #   # NOTE: do not preload cmds here to avoid database performance hit
-  #   all_query =
-  #     from(a in Schema,
-  #       where: [device_id: ^device.id],
-  #       order_by: [asc: a.pio]
-  #       #  preload: [cmds: ^cmd_query]
-  #     )
-  #
-  #   # NOTE: rather, preload each DevAlias separately for max performance
-  #   for %Schema{} = schema <- repo.all(all_query) do
-  #     cmd_q = Command.query_preload_latest_cmd(schema.id)
-  #     repo.preload(schema, cmds: cmd_q)
-  #   end
-  #   |> then(fn dev_aliases -> {:ok, dev_aliases} end)
-  # end
 
   defp load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])

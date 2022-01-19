@@ -82,6 +82,11 @@ defmodule Alfred.Name do
     end
   end
 
+  @doc since: "0.3.1"
+  def registered do
+    Registry.select(@registry, [{{:"$1", :_, :_}, [], [:"$1"]}]) |> Enum.sort()
+  end
+
   def seen_at(%{name: name}), do: seen_at(name)
 
   # (2 of 2)

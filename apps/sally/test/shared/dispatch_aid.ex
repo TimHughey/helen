@@ -3,25 +3,43 @@ defmodule Sally.DispatchAid do
   Supporting functionality for creating Sally.Dispatch for testing
   """
 
+  @tz "America/New_York"
+
+  @sent_at_shift [milliseconds: -2]
   def add(%{dispatch_add: opts} = ctx) when is_list(opts) do
+    {now, opts_rest} = Keyword.pop(opts, :ref_dt, Timex.now(@tz))
+    {sent_at, opts_rest} = Keyword.pop(opts_rest, :sent_at, now)
+    {recv_at, opts_rest} = Keyword.pop(opts_rest, :recv_at, now)
+    {subsystem, opts_rest} = Keyword.pop(opts_rest, :subsystem)
+    {category, opts_rest} = Keyword.pop(opts_rest, :category)
+    {callback_opt, _opts_rest} = Keyword.pop(opts_rest, :callback, String.to_atom(subsystem))
+
+    callback_mod = callback_mod(callback_opt)
+
     fields = [
       env: "test",
-      subsystem: opts[:subsystem],
-      category: opts[:category],
-      sent_at: sent_at(opts),
-      recv_at: recv_at(opts)
+      subsystem: subsystem,
+      category: category,
+      sent_at: Timex.shift(sent_at, @sent_at_shift),
+      recv_at: recv_at,
+      # NOTE: must simulate routed rc and valid?
+      routed: :ok,
+      valid?: true,
+      invalid_reason: :none
     ]
 
-    case struct(Sally.Dispatch, fields) do
-      %Sally.Dispatch{subsystem: "host", category: "boot"} = x -> add_host(x, ctx, :boot)
-      %Sally.Dispatch{subsystem: "host", category: "startup"} = x -> add_host(x, ctx, :startup)
-      %Sally.Dispatch{subsystem: "immut", category: "celsius"} = x -> add_immutable(x, ctx)
-      %Sally.Dispatch{subsystem: "immut", category: "relhum"} = x -> add_immutable(x, ctx)
-      %Sally.Dispatch{subsystem: "mut", category: "cmdack"} = x -> add_mutable_cmdack(x, ctx)
-      %Sally.Dispatch{subsystem: "mut", category: "status"} = x -> add_mutable(x, ctx)
-      %Sally.Dispatch{} -> :ok
+    dispatch = Sally.Dispatch.new(fields)
+
+    case dispatch do
+      %Sally.Dispatch{subsystem: "host", category: "boot"} -> add_host(dispatch, ctx, :boot)
+      %Sally.Dispatch{subsystem: "host", category: "startup"} -> add_host(dispatch, ctx, :startup)
+      %Sally.Dispatch{subsystem: "immut", category: "celsius"} -> add_immutable(dispatch, ctx)
+      %Sally.Dispatch{subsystem: "immut", category: "relhum"} -> add_immutable(dispatch, ctx)
+      %Sally.Dispatch{subsystem: "mut", category: "cmdack"} -> add_mutable_cmdack(dispatch, ctx)
+      %Sally.Dispatch{subsystem: "mut", category: "status"} -> add_mutable(dispatch, ctx)
     end
-    |> preprocess()
+    |> Sally.Message.Handler.Server.process(callback_mod)
+    |> then(fn dispatch -> %{dispatch: dispatch} end)
   end
 
   def add(_), do: :ok
@@ -36,7 +54,7 @@ defmodule Sally.DispatchAid do
       payload: Sally.HostAid.make_payload(:startup, opts),
       filter_extra: [host_profile]
     ]
-    |> then(fn fields -> %{dispatch: struct(base, fields)} end)
+    |> then(fn fields -> struct(base, fields) end)
   end
 
   # (1 of x) create a Sally.Dispatch for a host startup
@@ -44,7 +62,7 @@ defmodule Sally.DispatchAid do
     host_ident = if ctx[:host], do: ctx.host.ident, else: Sally.HostAid.unique(:ident)
 
     [ident: host_ident, payload: Sally.HostAid.make_payload(:startup, opts)]
-    |> then(fn fields -> %{dispatch: struct(base, fields)} end)
+    |> then(fn fields -> struct(base, fields) end)
   end
 
   def add_immutable(base, %{dispatch_add: opts} = ctx) do
@@ -52,10 +70,10 @@ defmodule Sally.DispatchAid do
     data = if(opts[:data], do: opts[:data], else: %{}) |> Map.merge(%{metrics: %{"read" => 3298}})
     fields = [filter_extra: [ctx.device.ident, status], data: data]
 
-    %{dispatch: add_known_host(base, ctx) |> struct(fields)}
+    add_known_host(base, ctx) |> struct(fields)
   end
 
-  def add_immutable(_), do: :ok
+  # def add_immutable(_), do: :ok
 
   def add_mutable(base, %{dispatch_add: opts} = ctx) do
     status = opts[:status] || "ok"
@@ -65,38 +83,56 @@ defmodule Sally.DispatchAid do
 
     fields = [filter_extra: [ctx.device.ident, status], data: data]
 
-    %{dispatch: add_known_host(base, ctx) |> struct(fields)}
+    add_known_host(base, ctx) |> struct(fields)
   end
 
-  def add_mutable_cmdack(base, %{dispatch_add: opts} = ctx) do
-    refid = ctx.command.refid
+  @sent_at_shift [microseconds: -333]
+  def add_mutable_cmdack(%{sent_at: sent_at} = base, %{dispatch_add: opts} = ctx) do
+    {cmd_add_opts, opts_rest} = Keyword.split(opts, [:cmd, :cmd_opts])
+    {track_cmd, opts_rest} = Keyword.pop(opts_rest, :track, true)
+
+    sent_at = Timex.shift(sent_at, @sent_at_shift)
+    cmd_add_opts = Keyword.merge([cmd: "on", sent_at: sent_at], cmd_add_opts)
+    cmd = Sally.Command.add(ctx.dev_alias, cmd_add_opts)
+    if(track_cmd, do: Sally.Command.track(cmd, opts_rest))
+
+    refid = cmd.refid
     fields = [filter_extra: [refid], data: opts[:data] || %{}]
-
-    %{dispatch: add_known_host(base, ctx) |> struct(fields)}
+    add_known_host(base, ctx) |> struct(fields)
   end
+
+  ##
+  ## Callback handling
+  ##
+
+  def callback_mod(what) do
+    case what do
+      :none -> __MODULE__
+      :mut -> Sally.Mutable.Handler
+      :immut -> Sally.Immutable.Handler
+      :host -> Sally.Host.Handler
+    end
+  end
+
+  def process(dispatch), do: dispatch
+  def post_process(dispatch), do: dispatch
 
   ##
   ## Test Assistance
   ##
 
-  defmacro assert_processed(x) do
-    quote location: :keep, bind_quoted: [x: x] do
-      base_valid_kv = [valid?: true, invalid_reason: :none]
+  defmacro assert_processed(dispatch) do
+    quote location: :keep, bind_quoted: [dispatch: dispatch] do
+      assert %Sally.Dispatch{valid?: true, invalid_reason: :none, results: %{} = results} = dispatch
+      assert %{device: %Sally.Device{}, aliases: aliases} = results
 
-      assert %Sally.Dispatch{
-               valid?: true,
-               invalid_reason: :none,
-               results: %{device: %Sally.Device{mutable: mutable?}}
-               # seen_list: []
-               #   seen_list: [_ | _] = seen_list
-             } = dispatch = x
+      nature = if(dispatch.subsystem == "mut", do: :cmds, else: :datapoints)
 
-      # validate the device processed established appropriate Alfred linkages
-      # want_struct = if mutable?, do: Alfred.MutableStatus, else: Alfred.ImmutableStatus
+      Enum.each(List.wrap(aliases), fn dev_alias ->
+        assert %Sally.DevAlias{name: name} = dev_alias
+        assert %{name: ^name, nature: ^nature} = Alfred.name_info(name)
+      end)
 
-      # Enum.all?(seen_list, fn name -> assert is_struct(Alfred.status(name), want_struct) end)
-
-      # return the processed dispatch
       dispatch
     end
   end
@@ -104,15 +140,4 @@ defmodule Sally.DispatchAid do
   defp add_known_host(base, ctx), do: struct(base, ident: ctx.host.ident, host: ctx.host)
 
   defp make_pins(count, cmd), do: for(pin <- 0..(count - 1), do: [pin, cmd])
-
-  defp preprocess(%{dispatch: %Sally.Dispatch{} = x}), do: %{dispatch: Sally.Dispatch.preprocess(x)}
-  defp preprocess(any), do: any
-
-  defp recv_at(opts), do: opts[:recv_at] || DateTime.utc_now()
-
-  @shift_opts [milliseconds: -2]
-  defp sent_at(opts) do
-    Keyword.get(opts, :sent_at, DateTime.utc_now())
-    |> Timex.shift(@shift_opts)
-  end
 end

@@ -1,4 +1,5 @@
 defmodule Sally.Message.Handler do
+  @moduledoc false
   alias Sally.Types, as: Types
 
   @callback child_spec(Types.child_spec_opts()) :: Supervisor.child_spec()
@@ -63,103 +64,67 @@ end
 defmodule Sally.Message.Handler.Opts do
   require Logger
 
-  alias __MODULE__
-  alias Sally.Types, as: Types
-
   defstruct server: %{id: nil, name: nil, genserver: []}, callback_mod: nil
 
-  @type t :: %Opts{server: Types.server_info_map(), callback_mod: Types.module_or_nil()}
+  @type t :: %__MODULE__{server: Sally.Types.server_info_map(), callback_mod: Sally.Types.module_or_nil()}
 
   def make_opts(mod, _start_opts, use_opts) do
-    log_final_opts = fn x ->
-      Logger.debug(["final opts:\n", inspect(x, pretty: true)])
-      x
-    end
-
     {id, rest} = Keyword.pop(use_opts, :id, mod)
     {name, genserver_opts} = Keyword.pop(rest, :name, mod)
 
-    %Opts{server: %{id: id, name: name, genserver: genserver_opts}, callback_mod: mod}
-    |> log_final_opts.()
+    [server: %{id: id, name: name, genserver: genserver_opts}, callback_mod: mod]
+    |> then(fn fields -> struct(__MODULE__, fields) end)
   end
-end
 
-defmodule Sally.Message.Handler.State do
-  alias __MODULE__
-  alias Sally.Message.Handler.Opts
-
-  defstruct opts: %Opts{}
-
-  @type t :: %State{opts: Opts.t()}
+  def server_opts(%__MODULE__{server: %{genserver: genserver_opts, name: name}}) do
+    Keyword.put_new(genserver_opts, :name, name)
+  end
 end
 
 defmodule Sally.Message.Handler.Server do
+  @moduledoc false
+
   require Logger
   use GenServer
 
-  alias Sally.Dispatch
-  alias Sally.Message.Handler.{Opts, Server, State}
-
   @impl true
-  def init(%Opts{} = opts) do
-    %State{opts: opts} |> reply_ok()
-  end
+  def init(%{} = opts), do: {:ok, _state = %{opts: opts}}
 
-  def start_link(%Opts{} = opts) do
+  def start_link(opts) do
     # assemble the genserver opts
-    genserver_opts = [name: opts.server.name] ++ opts.server.genserver
-    GenServer.start_link(Server, opts, genserver_opts)
+    Sally.Message.Handler.Opts.server_opts(opts)
+    |> then(fn server_opts -> GenServer.start_link(__MODULE__, opts, server_opts) end)
   end
 
   @impl true
-  def handle_cast(%Dispatch{} = x, %State{} = s) do
-    cb_mod = s.opts.callback_mod
+  def handle_cast(%Sally.Dispatch{} = dispatch, state) do
+    %{opts: %{callback_mod: callback_mod}} = state
 
-    %Dispatch{x | routed: :yes}
-    |> cb_mod.process()
-    |> post_process(cb_mod)
-    |> Dispatch.finalize()
+    # NOTE: return value ignored, pure side effects function
+    _ = process(dispatch, callback_mod)
 
-    noreply(s)
+    {:no_reply, state}
   end
 
   ##
   ## Private
   ##
 
-  defp post_process(%Dispatch{} = x, cb_mod) do
-    if function_exported?(cb_mod, :post_process, 1) and x.valid? do
-      cb_mod.post_process(x)
-    else
-      x
-    end
+  def process(%Sally.Dispatch{} = dispatch, callback_mod) do
+    dispatch
+    |> Sally.Dispatch.routed(callback_mod)
+    |> callback_mod.process()
+    |> Sally.Dispatch.check_txn()
+    # NOTE: post process does not change Sally.Dispatch
+    |> post_process(callback_mod)
+    |> Sally.Dispatch.finalize()
   end
 
-  ##
-  ## GenServer Instruct Helpers
-  ##
-
-  # (1 of 2) handle plain %State{}
-  defp noreply(%State{} = s), do: {:noreply, s}
-
-  # (2 of 2) support pipeline {%State{}, msg} -- return State and discard message
-  # defp noreply({%State{} = s, _msg}), do: {:noreply, s}
-
-  # (1 of 4) handle pipeline: %State{} first, result second
-  # defp reply(%State{} = s, res), do: {:reply, res, s}
-
-  # (2 of 4) handle pipeline: result is first, %State{} is second
-  # defp reply(res, %State{} = s), do: {:reply, res, s}
-
-  # (3 of 4) assembles a reply based on a tuple (State, result) and rc
-  # defp reply({%State{} = s, result}, rc), do: {:reply, {rc, result}, s}
-
-  # (4 of 4) assembles a reply based on a tuple {result, State}
-  # defp reply({%State{} = s, result}), do: {:reply, result, s}
-
-  defp reply_ok(%State{} = s) do
-    Logger.debug(["\n", inspect(s, pretty: true), "\n"])
-
-    {:ok, s}
+  def post_process(%Sally.Dispatch{} = dispatch, callback_mod) do
+    case dispatch do
+      %{valid?: false} -> dispatch
+      %{post_process?: true} -> callback_mod.post_process(dispatch)
+      _ -> dispatch
+    end
   end
 end

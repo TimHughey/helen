@@ -110,6 +110,15 @@ defmodule Alfred.NameTest do
     end
   end
 
+  describe "Alfred.Name.registered/0" do
+    @tag equipment_add: []
+    test "handles previously registered name", ctx do
+      name = assert_registered_name(ctx, :ok)
+
+      [^name] = Alfred.name_all_registered()
+    end
+  end
+
   describe "Alfred.Name.seen_at/1" do
     test "handles an unregistered name" do
       assert {:not_found, "foo"} = Alfred.Name.seen_at("foo")

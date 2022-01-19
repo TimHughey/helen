@@ -13,7 +13,17 @@ defmodule Sally.HostTest do
 
   describe "Sally.host_ota_live/1" do
     test "invokes an OTA for live hosts with default opts", %{host: _} do
-      assert [%Sally.Host.Instruct{} | _] = Sally.host_ota_live()
+      assert [%Sally.Host.Instruct{} | _] = Sally.host_ota_live(echo: true)
+
+      assert_receive {:echo,
+                      %Sally.Host.Instruct{
+                        data: %{file: <<"00"::binary, _::binary>>, valid_ms: 60_000},
+                        filters: ["ota"],
+                        ident: <<"host."::binary, _::binary>>,
+                        packed_length: 62,
+                        subsystem: "host"
+                      }},
+                     1
     end
   end
 

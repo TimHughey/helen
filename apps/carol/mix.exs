@@ -4,7 +4,7 @@ defmodule Carol.MixProject do
   def project do
     [
       app: :carol,
-      version: "0.3.10",
+      version: "0.3.11",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",

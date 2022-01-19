@@ -184,7 +184,7 @@ defmodule Alfred.Execute do
   def check(:track = what, checks_map, opts) do
     case checks_map do
       %{broom_module: :none = rc} -> rc
-      %{broom_module: module, execute: {:pending, er}} -> module.track(er, opts)
+      %{broom_module: module, execute: {:pending, cmd}} -> module.track(cmd, opts)
       _ -> :ok
     end
     |> put_what_rc_cont()

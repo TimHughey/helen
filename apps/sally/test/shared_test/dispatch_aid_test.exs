@@ -6,13 +6,13 @@ defmodule Sally.DispatchAidTest do
   setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw, :dispatch_add]
 
   describe "Sally.DispatchAid.add/1" do
-    @tag host_add: [], dispatch_add: [subsystem: "host", category: "startup"]
+    @tag host_add: [], dispatch_add: [callback: :none, subsystem: "host", category: "startup"]
     test "creates a host startup Dispatch for a known host", ctx do
       category = ctx.dispatch_add[:category]
       assert %Sally.Dispatch{valid?: true, category: ^category} = ctx.dispatch
     end
 
-    @tag dispatch_add: [subsystem: "host", category: "boot"]
+    @tag dispatch_add: [callback: :none, subsystem: "host", category: "boot"]
     test "creates a host boot Dispatch for a unique host", ctx do
       category = ctx.dispatch_add[:category]
       assert %Sally.Dispatch{valid?: true, category: ^category} = ctx.dispatch

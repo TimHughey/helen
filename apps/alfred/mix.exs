@@ -4,7 +4,7 @@ defmodule Alfred.MixProject do
   def project do
     [
       app: :alfred,
-      version: "0.3.0",
+      version: "0.3.1",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -53,7 +53,6 @@ defmodule Alfred.MixProject do
       {:ecto_sql, "~> 3.1"},
       {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
-      {:uuid, "~> 1.1"},
       {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
       {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false},

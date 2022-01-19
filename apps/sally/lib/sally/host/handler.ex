@@ -5,26 +5,24 @@ defmodule Sally.Host.Handler do
 
   alias Sally.Dispatch
   alias Sally.Host
-  alias Sally.Host.ChangeControl
+  # alias Sally.Host.ChangeControl
   alias Sally.Host.Instruct
 
   @impl true
   def process(%Dispatch{category: cat} = msg) when cat in ["startup", "boot", "run"] do
-    cc = assemble_change_control(msg)
+    {changes, replace_cols} = collect_changes(msg)
+    insert_opts = Sally.Host.insert_opts(replace_cols)
+    #  cc = assemble_change_control(msg)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.insert(:host, Host.changeset(cc), Host.insert_opts(cc.replace))
+    |> Ecto.Multi.insert(:host, Sally.Host.changeset(changes), insert_opts)
     |> Sally.Repo.transaction()
-    |> check_result(msg)
+    |> Sally.Dispatch.save_txn_info(msg)
   end
 
   @impl true
   def post_process(%Dispatch{category: "startup"} = msg) do
     profile = Host.boot_payload_data(msg.host)
-    pname = profile["meta"]["name"]
-    pdesc = profile["meta"]["description"]
-
-    Logger.debug("host=#{msg.host.name} startup; sending profile='#{pname}' description='#{pdesc}'")
 
     %Instruct{
       ident: msg.ident,
@@ -36,25 +34,22 @@ defmodule Sally.Host.Handler do
     }
     |> Instruct.send()
 
-    msg
+    Sally.Dispatch.valid(msg, :host_startup)
   end
 
   @impl true
   def post_process(%Dispatch{category: "boot"} = msg) do
-    Logger.debug(inspect(msg.data, pretty: true))
     boot_profile = List.first(msg.filter_extra, "unknown")
-    Logger.debug("host=#{msg.host.name} profile='#{boot_profile}' startup complete")
 
     stack_size = msg.data[:stack]["size"] || 1
     stack_hw = msg.data[:stack]["highwater"] || 1
     stack_used = (100.0 - stack_hw / stack_size * 100.0) |> Float.round(2)
 
-    # NOTE: return: msg signals msg should be passthrough
     [
-      return: msg,
       measurement: "host",
       tags: [ident: msg.host.ident, name: msg.host.name],
       fields: [
+        boot_profile: boot_profile,
         boot_elapsed_ms: msg.data[:elapsed_ms] || 0,
         tasks: msg.data[:tasks] || 0,
         stack_size: stack_size,
@@ -63,14 +58,13 @@ defmodule Sally.Host.Handler do
       ]
     ]
     |> Betty.write()
+
+    Sally.Dispatch.valid(msg, :host_boot)
   end
 
   @impl true
   def post_process(%Dispatch{category: "run"} = msg) do
-    Logger.debug(inspect(msg.data, pretty: true))
-
     [
-      return: msg,
       measurement: "host",
       tags: [ident: msg.host.ident, name: msg.host.name],
       fields: [
@@ -82,12 +76,35 @@ defmodule Sally.Host.Handler do
       ]
     ]
     |> Betty.write()
+
+    Sally.Dispatch.valid(msg, :host_boot)
   end
 
   # Dispatches for different categories define specific changes to the Host record
   # (1 of 2) startup messages
-  defp assemble_change_control(%Dispatch{category: "startup"} = msg) do
-    raw_changes = %{
+  # defp assemble_change_control(%Dispatch{category: "startup"} = msg) do
+  #   raw_changes = %{
+  #     ident: msg.ident,
+  #     name: msg.ident,
+  #     firmware_vsn: msg.data[:firmware_vsn],
+  #     idf_vsn: msg.data[:idf_vsn],
+  #     app_sha: msg.data[:app_sha],
+  #     build_at: make_build_datetime(msg.data),
+  #     last_start_at: msg.sent_at,
+  #     last_seen_at: msg.sent_at,
+  #     reset_reason: msg.data[:reset_reason]
+  #   }
+  #
+  #   %ChangeControl{
+  #     raw_changes: raw_changes,
+  #     required: Map.keys(raw_changes),
+  #     # never replace the ident, it is the conflict field
+  #     replace: raw_changes |> Map.drop([:ident, :name, :inserted_at]) |> Map.keys()
+  #   }
+  # end
+
+  defp collect_changes(%{category: "startup"} = msg) do
+    changes = %{
       ident: msg.ident,
       name: msg.ident,
       firmware_vsn: msg.data[:firmware_vsn],
@@ -99,36 +116,32 @@ defmodule Sally.Host.Handler do
       reset_reason: msg.data[:reset_reason]
     }
 
-    %ChangeControl{
-      raw_changes: raw_changes,
-      required: Map.keys(raw_changes),
-      # never replace the ident, it is the conflict field
-      replace: raw_changes |> Map.drop([:ident, :name, :inserted_at]) |> Map.keys()
-    }
+    {changes, Map.drop(changes, [:ident, :name]) |> Map.keys()}
   end
 
   # (2 of 2) boot and run time metrics
-  defp assemble_change_control(%Dispatch{category: cat} = msg) when cat in ["boot", "run"] do
-    raw_changes = %{
-      ident: msg.ident,
-      name: msg.ident,
-      last_start_at: msg.sent_at,
-      last_seen_at: msg.sent_at
-    }
+  # defp assemble_change_control(%Dispatch{category: cat} = msg) when cat in ["boot", "run"] do
+  #   raw_changes = %{
+  #     ident: msg.ident,
+  #     name: msg.ident,
+  #     last_start_at: msg.sent_at,
+  #     last_seen_at: msg.sent_at
+  #   }
+  #
+  #   %ChangeControl{
+  #     raw_changes: raw_changes,
+  #     required: Map.keys(raw_changes),
+  #     # never replace the ident, it is the conflict field
+  #     replace: [:last_seen_at]
+  #   }
+  # end
 
-    %ChangeControl{
-      raw_changes: raw_changes,
-      required: Map.keys(raw_changes),
-      # never replace the ident, it is the conflict field
-      replace: [:last_seen_at]
-    }
-  end
+  defp collect_changes(%{category: cat} = msg) when cat in ["boot", "run"] do
+    # NOTE: these are the columns to insert __OR__ update keeping in mind that a host may be running
+    # however we have no record of it in the database (edge case)
+    changes = %{ident: msg.ident, name: msg.ident, last_start_at: msg.sent_at, last_seen_at: msg.sent_at}
 
-  defp check_result(txn_result, %Dispatch{} = msg) do
-    case txn_result do
-      {:ok, results} -> %Dispatch{msg | host: results.host}
-      {:error, e} -> Dispatch.invalid(msg, e)
-    end
+    {changes, [:last_seen_at]}
   end
 
   @months ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -137,7 +150,7 @@ defmodule Sally.Host.Handler do
     month = Enum.find_index(@months, fn x -> x == month_bin end) + 1
 
     date = Date.new!(String.to_integer(year), month, String.to_integer(day))
-    time = Time.from_iso8601!("#{build_time}.049152Z")
+    time = Time.from_iso8601!("#{build_time}.49152Z")
 
     DateTime.new!(date, time, "America/New_York")
   end
