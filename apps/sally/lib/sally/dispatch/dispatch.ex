@@ -116,7 +116,7 @@ defmodule Sally.Dispatch do
     cond do
       msg_handler == :unknown -> invalid(dispatch, "undefined routing: #{subsystem}")
       not is_pid(pid) -> invalid(dispatch, "no server: #{msg_handler}")
-      true -> struct(dispatch, routed: GenServer.cast(pid, dispatch))
+      true -> struct(dispatch, routed: GenServer.cast(pid, route_now(dispatch)))
     end
   end
 
@@ -156,6 +156,8 @@ defmodule Sally.Dispatch do
       %Dispatch{valid?: false} = x -> x
     end
   end
+
+  def route_now(dispatch), do: struct(dispatch, routed: :ok)
 
   def routed(%{routed: :ok, valid?: true} = dispatch, callback_mod) when is_atom(callback_mod) do
     [post_process?: function_exported?(callback_mod, :post_process, 1)]

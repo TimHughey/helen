@@ -4,7 +4,7 @@ defmodule Sally.MixProject do
   def project do
     [
       app: :sally,
-      version: "0.5.30",
+      version: "0.5.31",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
