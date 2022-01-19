@@ -80,7 +80,7 @@ defmodule Sally.DevAlias do
       mismatch: true,
       reported_cmd: pin_cmd,
       local_cmd: Alfred.Status.get_cmd(status),
-      status_error: status.rc,
+      status_error: inspect(status.rc),
       name: status.name
     ]
     |> Betty.app_error_v2()

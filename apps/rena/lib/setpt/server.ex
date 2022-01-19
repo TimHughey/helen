@@ -80,7 +80,7 @@ defmodule Rena.SetPt.Server do
   @impl true
   def handle_info({Alfred, %Alfred.Broom{} = broom}, %State{} = s) do
     case broom do
-      %{rc: :ok} -> State.update_last_exec(broom.at.acked, s)
+      %{rc: :ok} -> State.update_last_exec(broom.at.released, s)
       %{rc: rc} -> ack_fail(s, ack_fail: true, rc: rc) |> State.update_last_exec(:failed)
     end
     |> noreply()
