@@ -11,12 +11,45 @@ defmodule Alfred.Execute do
   @callback execute_cmd(any(), opts :: list()) :: any()
   @callback execute(args :: any(), opts :: list) :: any()
 
+  defmacrop put_detail_rc(rc, detail) do
+    quote bind_quoted: [rc: rc, detail: detail] do
+      checks_map = var!(checks_map)
+      what = var!(what)
+
+      detail = Map.get(checks_map, :detail, %{}) |> Map.merge(detail)
+
+      {:halt, Map.merge(checks_map, %{what => rc, :rc => rc, :detail => detail})}
+    end
+  end
+
+  defmacrop put_status_detail_rc(rc) do
+    quote bind_quoted: [rc: rc] do
+      checks_map = var!(checks_map)
+      status = var!(status)
+      what = var!(what)
+
+      cmd = if(match?(%{detail: %{cmd: _}}, status), do: status.detail.cmd, else: "unknown")
+
+      merge_map = %{what => rc, rc: rc, cmd: cmd, detail: status.detail}
+
+      {:halt, Map.merge(checks_map, merge_map)}
+    end
+  end
+
+  defmacrop put_what_rc_cont(rc) do
+    quote bind_quoted: [rc: rc], do: {:cont, Map.put_new(var!(checks_map), var!(what), rc)}
+  end
+
+  defmacrop put_final_rc(rc) do
+    quote bind_quoted: [rc: rc], do: {:halt, Map.put_new(var!(checks_map), :rc, rc)}
+  end
+
   # Executing a command for a Name
   #
   #
 
   @doc since: "0.3.0"
-  @checks [:registered, :ttl_info, :status, :verify, :compare, :execute, :track, :finalize]
+
   # (aaa of bbb) accept a tuple of args and overrides
   def execute({[_ | _] = args, overrides}) when is_list(overrides) do
     Alfred.Execute.Args.auto({args, overrides}) |> Enum.into(%{}) |> execute()
@@ -34,21 +67,32 @@ defmodule Alfred.Execute do
     end
   end
 
+  @checks [:registered, :ttl_info, :status, :verify, :compare, :execute, :track, :finalize]
   def execute(args, module) when is_list(args) and is_atom(module) do
     name = Keyword.get(args, :name)
     {info, args_rest} = Keyword.pop(args, :__name_info__, Alfred.Name.info(name))
     opts = Keyword.merge([ref_dt: Timex.now()], args_rest)
 
-    overrides_map = overrides_map(module)
+    overrides = overrides_map(module)
 
-    force = if(get_in(opts, [:cmd_opts, :force]), do: true, else: false)
-
-    checks_map = %{info: info, name: name, force: force, broom_module: broom_module(module)}
+    checks_map = %{
+      info: info,
+      name: name,
+      force: if(get_in(opts, [:cmd_opts, :force]), do: true, else: false),
+      broom_module: broom_module(module)
+    }
 
     Enum.reduce_while(@checks, checks_map, fn
+      what, checks_map when is_map_key(overrides, what) -> module.check(what, checks_map, opts)
+      :registered = what, %{info: %{name: _}} -> put_what_rc_cont(:ok)
+      :registered, %{info: {:not_found = rc, _name}} -> put_final_rc(rc)
+      :ttl_info, checks_map -> ttl_check(checks_map, opts)
       :status, checks_map -> execute_status(checks_map, opts)
+      :verify, checks_map -> verify(checks_map)
+      :compare, checks_map -> compare(checks_map, opts)
       :execute, checks_map -> execute_cmd(checks_map, opts)
-      what, checks_map -> apply_check(what, checks_map, module, overrides_map, opts)
+      :track, checks_map -> track(checks_map, opts)
+      :finalize, checks_map -> finalize(checks_map)
     end)
     |> new_from_checks_accumulator()
   end
@@ -58,14 +102,10 @@ defmodule Alfred.Execute do
   end
 
   @doc since: "0.3.0"
-  def on(_name, _opts) do
-    :ok
-  end
+  def off(name, opts), do: execute([name: name, cmd: "off"], opts)
 
   @doc since: "0.3.0"
-  def off(_name, _opts) do
-    :ok
-  end
+  def on(name, opts), do: execute([name: name, cmd: "on"], opts)
 
   @doc since: "0.3.0"
   def toggle(_name, _opts) do
@@ -107,64 +147,9 @@ defmodule Alfred.Execute do
     |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
-  defmacrop put_detail_rc(rc, detail) do
-    quote bind_quoted: [rc: rc, detail: detail] do
-      checks_map = var!(checks_map)
-      what = var!(what)
-
-      detail = Map.get(checks_map, :detail, %{}) |> Map.merge(detail)
-
-      {:halt, Map.merge(checks_map, %{what => rc, :rc => rc, :detail => detail})}
-    end
-  end
-
-  defmacrop put_status_detail_rc(rc) do
-    quote bind_quoted: [rc: rc] do
-      checks_map = var!(checks_map)
-      status = var!(status)
-      what = var!(checks_map)
-
-      cmd = if(match?(%{detail: %{cmd: _}}, status), do: status.detail.cmd, else: "unknown")
-
-      merge_map = %{what => rc, rc: rc, cmd: cmd, detail: status.detail}
-
-      {:halt, Map.merge(checks_map, merge_map)}
-    end
-  end
-
-  defmacrop put_what_rc_cont(rc) do
-    quote bind_quoted: [rc: rc], do: {:cont, Map.put_new(var!(checks_map), var!(what), rc)}
-  end
-
-  defmacrop put_final_rc(rc) do
-    quote bind_quoted: [rc: rc], do: {:halt, Map.put_new(var!(checks_map), :rc, rc)}
-  end
-
   @doc false
-  def apply_check(what, checks_map, module, overrides, opts) do
-    case {what, overrides} do
-      {what, %{^what => true}} -> module.check(what, checks_map, opts)
-      {what, _overrides} -> check(what, checks_map, opts)
-    end
-  end
-
-  @doc false
-  def check(:registered = what, checks_map, _opts) do
-    case checks_map do
-      # name is registered
-      %{info: %{name: _}} -> put_what_rc_cont(:ok)
-      %{info: {:not_found = rc, _name}} -> put_final_rc(rc)
-    end
-  end
-
-  def check(:verify = what, %{status: status} = checks_map, _opts) do
-    case status do
-      %Alfred.Status{rc: :ok} -> put_what_rc_cont(:ok)
-      %Alfred.Status{rc: rc} = status -> put_status_detail_rc(rc)
-    end
-  end
-
-  def check(:compare = what, %{status: status, force: force} = checks_map, opts) do
+  def compare(%{status: status, force: force} = checks_map, opts) do
+    what = :compare
     want_cmd = opts[:cmd]
 
     case status do
@@ -173,7 +158,10 @@ defmodule Alfred.Execute do
     end
   end
 
-  def check(:finalize = what, checks_map, _opts) do
+  @doc false
+  def finalize(checks_map) do
+    what = :finalize
+
     %{execute: {rc, exec_result}, track: track_result} = checks_map
 
     detail = %{cmd: exec_result.cmd, __execute__: exec_result, __track__: track_result}
@@ -181,7 +169,10 @@ defmodule Alfred.Execute do
     put_detail_rc(rc, detail)
   end
 
-  def check(:track = what, checks_map, opts) do
+  @doc false
+  def track(checks_map, opts) do
+    what = :track
+
     case checks_map do
       %{broom_module: :none = rc} -> rc
       %{broom_module: module, execute: {:pending, cmd}} -> module.track(cmd, opts)
@@ -190,10 +181,14 @@ defmodule Alfred.Execute do
     |> put_what_rc_cont()
   end
 
-  def check(:ttl_info = what, %{info: info} = checks_map, opts) do
-    %{ttl_ms: ttl_ms, seen_at: at} = info
+  @doc false
+  def verify(%{status: status} = checks_map) do
+    what = :verify
 
-    ttl_check({at, ttl_ms}, what, checks_map, opts)
+    case status do
+      %Alfred.Status{rc: :ok} -> put_what_rc_cont(:ok)
+      %Alfred.Status{rc: rc} = status -> put_status_detail_rc(rc)
+    end
   end
 
   @doc false
@@ -217,7 +212,10 @@ defmodule Alfred.Execute do
   end
 
   @doc false
-  def ttl_check({at, ttl_ms}, what, checks_map, opts) do
+  def ttl_check(%{info: info} = checks_map, opts) do
+    what = :ttl_info
+    %{ttl_ms: ttl_ms, seen_at: at} = info
+
     ref_dt = Keyword.get(opts, :ref_dt)
     ttl_ms = Keyword.get(opts, :ttl_ms, ttl_ms)
 
