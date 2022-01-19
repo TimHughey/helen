@@ -11,37 +11,23 @@ defmodule Alfred.Execute do
   @callback execute_cmd(any(), opts :: list()) :: any()
   @callback execute(args :: any(), opts :: list) :: any()
 
-  defmacrop put_detail_rc(rc, detail) do
-    quote bind_quoted: [rc: rc, detail: detail] do
-      checks_map = var!(checks_map)
-      what = var!(what)
+  defmacrop continue(val) do
+    %{function: {what, _}} = __CALLER__
 
-      detail = Map.get(checks_map, :detail, %{}) |> Map.merge(detail)
-
-      {:halt, Map.merge(checks_map, %{what => rc, :rc => rc, :detail => detail})}
+    quote bind_quoted: [val: val, what: what] do
+      {:cont, Map.put(var!(checks_map), what, val)}
     end
   end
 
-  defmacrop put_status_detail_rc(rc) do
-    quote bind_quoted: [rc: rc] do
+  defmacrop halt(rc, detail) do
+    %{function: {what, _}} = __CALLER__
+
+    quote bind_quoted: [rc: rc, detail: detail, what: what] do
       checks_map = var!(checks_map)
-      status = var!(status)
-      what = var!(what)
+      detail = if(detail == :none, do: :none, else: Map.get(checks_map, :detail, %{}) |> Map.merge(detail))
 
-      cmd = if(match?(%{detail: %{cmd: _}}, status), do: status.detail.cmd, else: "unknown")
-
-      merge_map = %{what => rc, rc: rc, cmd: cmd, detail: status.detail}
-
-      {:halt, Map.merge(checks_map, merge_map)}
+      {:halt, Map.merge(checks_map, %{what => rc, rc: rc, detail: detail})}
     end
-  end
-
-  defmacrop put_what_rc_cont(rc) do
-    quote bind_quoted: [rc: rc], do: {:cont, Map.put_new(var!(checks_map), var!(what), rc)}
-  end
-
-  defmacrop put_final_rc(rc) do
-    quote bind_quoted: [rc: rc], do: {:halt, Map.put_new(var!(checks_map), :rc, rc)}
   end
 
   # Executing a command for a Name
@@ -67,7 +53,7 @@ defmodule Alfred.Execute do
     end
   end
 
-  @checks [:registered, :ttl_info, :status, :verify, :compare, :execute, :track, :finalize]
+  @checks [:registered, :ttl_info, :status, :verify, :compare, :execute_cmd, :track, :finalize]
   def execute(args, module) when is_list(args) and is_atom(module) do
     name = Keyword.get(args, :name)
     {info, args_rest} = Keyword.pop(args, :__name_info__, Alfred.Name.info(name))
@@ -84,13 +70,13 @@ defmodule Alfred.Execute do
 
     Enum.reduce_while(@checks, checks_map, fn
       what, checks_map when is_map_key(overrides, what) -> module.check(what, checks_map, opts)
-      :registered = what, %{info: %{name: _}} -> put_what_rc_cont(:ok)
-      :registered, %{info: {:not_found = rc, _name}} -> put_final_rc(rc)
-      :ttl_info, checks_map -> ttl_check(checks_map, opts)
-      :status, checks_map -> execute_status(checks_map, opts)
+      :registered, %{info: %{name: _}} -> continue(:ok)
+      :registered, %{info: {:not_found = rc, _name}} -> halt(rc, :none)
+      :ttl_info, checks_map -> ttl_info(checks_map, opts)
+      :status, checks_map -> status(checks_map, opts)
       :verify, checks_map -> verify(checks_map)
       :compare, checks_map -> compare(checks_map, opts)
-      :execute, checks_map -> execute_cmd(checks_map, opts)
+      :execute_cmd, checks_map -> execute_cmd(checks_map, opts)
       :track, checks_map -> track(checks_map, opts)
       :finalize, checks_map -> finalize(checks_map)
     end)
@@ -136,6 +122,44 @@ defmodule Alfred.Execute do
   ##
 
   @doc false
+  def compare(%{status: status, force: force} = checks_map, opts) do
+    want_cmd = opts[:cmd]
+
+    case status do
+      _status when force -> continue(:force)
+      %{detail: %{rc: rc} = detail} when rc in [:pending, :error] -> halt(rc, detail)
+      %{detail: %{cmd: ^want_cmd} = detail} -> halt(:ok, detail)
+      _ -> continue(:not_equal)
+    end
+  end
+
+  @doc false
+  def execute_cmd(checks_map, opts) do
+    %{status: status, info: %{callbacks: %{execute: {module, 2}}}} = checks_map
+
+    case module.execute_cmd(status, opts) do
+      {rc, result} when rc in [:ok, :pending] -> continue({rc, result})
+      {rc, result} -> halt(rc, result)
+    end
+  end
+
+  @doc false
+  def status(%{info: info} = checks_map, opts) do
+    %{callbacks: %{status: {module, 2}}} = info
+
+    module.status(info.name, opts) |> continue()
+  end
+
+  @doc false
+  def finalize(checks_map) do
+    %{execute_cmd: {rc, exec_result}, track: track_result} = checks_map
+
+    detail = %{cmd: exec_result.cmd, __execute__: exec_result, __track__: track_result}
+
+    halt(rc, detail)
+  end
+
+  @doc false
   def new_from_checks_accumulator({:cont, checks_map}) do
     new_from_checks_accumulator(checks_map)
   end
@@ -148,72 +172,7 @@ defmodule Alfred.Execute do
   end
 
   @doc false
-  def compare(%{status: status, force: force} = checks_map, opts) do
-    what = :compare
-    want_cmd = opts[:cmd]
-
-    case status do
-      %{detail: %{cmd: ^want_cmd}} when not force -> put_status_detail_rc(:ok)
-      _ -> put_what_rc_cont(:not_equal)
-    end
-  end
-
-  @doc false
-  def finalize(checks_map) do
-    what = :finalize
-
-    %{execute: {rc, exec_result}, track: track_result} = checks_map
-
-    detail = %{cmd: exec_result.cmd, __execute__: exec_result, __track__: track_result}
-
-    put_detail_rc(rc, detail)
-  end
-
-  @doc false
-  def track(checks_map, opts) do
-    what = :track
-
-    case checks_map do
-      %{broom_module: :none = rc} -> rc
-      %{broom_module: module, execute: {:pending, cmd}} -> module.track(cmd, opts)
-      _ -> :ok
-    end
-    |> put_what_rc_cont()
-  end
-
-  @doc false
-  def verify(%{status: status} = checks_map) do
-    what = :verify
-
-    case status do
-      %Alfred.Status{rc: :ok} -> put_what_rc_cont(:ok)
-      %Alfred.Status{rc: rc} = status -> put_status_detail_rc(rc)
-    end
-  end
-
-  @doc false
-  def execute_cmd(checks_map, opts) do
-    what = :execute
-    %{status: status, info: %{callbacks: %{execute: {module, 2}}}} = checks_map
-
-    case module.execute_cmd(status, opts) do
-      {rc, result} when rc in [:ok, :pending] -> put_what_rc_cont({rc, result})
-      {rc, result} -> put_detail_rc(rc, result)
-    end
-  end
-
-  @doc false
-  def execute_status(%{info: info} = checks_map, opts) do
-    what = :status
-
-    %{callbacks: %{status: {module, 2}}} = info
-
-    module.status(info.name, opts) |> put_what_rc_cont()
-  end
-
-  @doc false
-  def ttl_check(%{info: info} = checks_map, opts) do
-    what = :ttl_info
+  def ttl_info(%{info: info} = checks_map, opts) do
     %{ttl_ms: ttl_ms, seen_at: at} = info
 
     ref_dt = Keyword.get(opts, :ref_dt)
@@ -223,9 +182,27 @@ defmodule Alfred.Execute do
 
     # if either the device hasn't been seen or the DevAlias hasn't been updated then the ttl is expired
     if Timex.before?(ttl_start_at, at) do
-      put_what_rc_cont(:ok)
+      continue(:ok)
     else
-      put_final_rc({:ttl_expired, DateTime.diff(ref_dt, at, :millisecond)})
+      halt({:ttl_expired, DateTime.diff(ref_dt, at, :millisecond)}, :none)
+    end
+  end
+
+  @doc false
+  def track(checks_map, opts) do
+    case checks_map do
+      %{broom_module: :none = rc} -> rc
+      %{broom_module: module, execute_cmd: {:pending, cmd}} -> module.track(cmd, opts)
+      _ -> :ok
+    end
+    |> continue()
+  end
+
+  @doc false
+  def verify(%{status: status} = checks_map) do
+    case status do
+      %Alfred.Status{rc: :ok} -> continue(:ok)
+      %Alfred.Status{rc: rc, detail: detail} -> halt(rc, detail)
     end
   end
 

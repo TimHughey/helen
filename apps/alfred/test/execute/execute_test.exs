@@ -40,7 +40,7 @@ defmodule Alfred.ExecuteTest do
     test "handles cmd equal to status", ctx do
       name = get_name_from_ctx()
 
-      assert %Alfred.Execute{detail: %{cmd: "off"}, name: ^name} =
+      assert %Alfred.Execute{rc: :ok, detail: %{cmd: "off"}, name: ^name} =
                Alfred.Test.DevAlias.execute([name: name, cmd: "off"], [])
     end
 

@@ -110,12 +110,14 @@ defmodule Alfred.NameTest do
     end
   end
 
-  describe "Alfred.Name.registered/0" do
+  describe "Alfred.Name.all_registered/0" do
     @tag equipment_add: []
     test "handles previously registered name", ctx do
       name = assert_registered_name(ctx, :ok)
 
-      [^name] = Alfred.name_all_registered()
+      all = Alfred.name_all_registered()
+
+      assert Enum.any?(all, &match?(^name, &1))
     end
   end
 
