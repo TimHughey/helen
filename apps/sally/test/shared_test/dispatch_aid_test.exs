@@ -1,28 +1,70 @@
 defmodule Sally.DispatchAidTest do
   use ExUnit.Case, async: true
+  use Sally.TestAid
 
   @moduletag sally: true, sally_dispatch_aid: true
 
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw, :dispatch_add]
+  setup [:dispatch_add]
 
   describe "Sally.DispatchAid.add/1" do
-    @tag host_add: [], dispatch_add: [callback: :none, subsystem: "host", category: "startup"]
-    test "creates a host startup Dispatch for a known host", ctx do
+    @tag dispatch_add: [subsystem: "host", category: "startup", host: []]
+    test "creates a host startup Dispatch for an existing host", ctx do
       category = ctx.dispatch_add[:category]
-      assert %Sally.Dispatch{valid?: true, category: ^category} = ctx.dispatch
+
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{category: ^category, payload: <<136, _::binary>>} = dispatch
     end
 
-    @tag dispatch_add: [callback: :none, subsystem: "host", category: "boot"]
+    @tag dispatch_add: [subsystem: "host", category: "boot", host: [:ident_only]]
     test "creates a host boot Dispatch for a unique host", ctx do
       category = ctx.dispatch_add[:category]
-      assert %Sally.Dispatch{valid?: true, category: ^category} = ctx.dispatch
+
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{category: ^category, payload: <<133, _::binary>>} = dispatch
+    end
+
+    @tag dev_alias_opts: [auto: :pwm, cmds: [history: 1, latest: :pending]]
+    @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
+    test "creates a mutable cmdack Dispatch", ctx do
+      category = ctx.dispatch_add[:category]
+
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{category: ^category, payload: <<130, _::binary>>} = dispatch
+    end
+
+    @tag dev_alias_opts: [auto: :pwm, cmds: [history: 1]]
+    @tag dispatch_add: [subsystem: "mut", category: "status"]
+    test "creates a mutable status Dispatch", ctx do
+      category = ctx.dispatch_add[:category]
+
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{category: ^category, payload: <<131, _::binary>>} = dispatch
+    end
+
+    @tag dev_alias_opts: [auto: :ds, daps: [history: 5]]
+    @tag dispatch_add: [subsystem: "immut", category: "celsius"]
+    test "creates an immmutable status Dispatch (celsius)", ctx do
+      category = ctx.dispatch_add[:category]
+
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{category: ^category, payload: <<133, _::binary>>} = dispatch
     end
   end
 
-  def dispatch_add(ctx), do: Sally.DispatchAid.add(ctx)
-  def devalias_add(ctx), do: Sally.DevAliasAid.add(ctx)
-  def devalias_just_saw(ctx), do: Sally.DevAliasAid.just_saw(ctx)
-  def device_add(ctx), do: Sally.DeviceAid.add(ctx)
-  def host_add(ctx), do: Sally.HostAid.add(ctx)
-  def host_setup(ctx), do: Sally.HostAid.setup(ctx)
+  describe "Sally.DispatchAid.make_filter/1 creates the correct filter for" do
+    @tag dispatch_add: [subsystem: "host", category: "startup", host: []]
+    test "a host startup message", ctx do
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+
+      assert [_ | _] = Sally.DispatchAid.make_filter(dispatch)
+    end
+
+    @tag dev_alias_opts: [:prereqs, auto: :pwm, cmds: [history: 1, latest: :pending]]
+    @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
+    test "a mutable cmdack message", ctx do
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+
+      assert [_ | _] = Sally.DispatchAid.make_filter(dispatch)
+    end
+  end
 end

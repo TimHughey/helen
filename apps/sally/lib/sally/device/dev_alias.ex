@@ -37,6 +37,17 @@ defmodule Sally.DevAlias do
     timestamps(type: :utc_datetime_usec)
   end
 
+  def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
+      when is_map(raw_data) do
+    for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
+      {:ok, acc} ->
+        case Datapoint.add(repo, schema, raw_data, reading_at) do
+          {:ok, %Datapoint{} = x} -> {:ok, [x] ++ acc}
+          {:error, _reason} = rc -> rc
+        end
+    end
+  end
+
   def align_status(%{aliases: [_ | _] = aliases, data: %{pins: _} = data, seen_at: seen_at}) do
     Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi ->
       multi_name = String.to_atom("aligned_#{dev_alias.pio}")
@@ -73,38 +84,6 @@ defmodule Sally.DevAlias do
     end
   end
 
-  defp cmd_mismatch(%Alfred.Status{} = status, pin_cmd) do
-    [
-      module: Sally.Command,
-      align_status: true,
-      mismatch: true,
-      reported_cmd: pin_cmd,
-      local_cmd: Alfred.Status.get_cmd(status),
-      status_error: inspect(status.rc),
-      name: status.name
-    ]
-    |> Betty.app_error_v2()
-
-    :no_change
-  end
-
-  defp cmd_mismatch(status, pin_cmd) do
-    [pin_cmd, "\n", inspect(status, pretty: true)] |> Logger.warn()
-
-    :no_change
-  end
-
-  def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
-      when is_map(raw_data) do
-    for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
-      {:ok, acc} ->
-        case Datapoint.add(repo, schema, raw_data, reading_at) do
-          {:ok, %Datapoint{} = x} -> {:ok, [x] ++ acc}
-          {:error, _reason} = rc -> rc
-        end
-    end
-  end
-
   def changeset(changes) when is_list(changes) do
     {id, changes_rest} = Keyword.pop(changes, :id)
     required = Keyword.keys(changes)
@@ -125,6 +104,27 @@ defmodule Sally.DevAlias do
     |> Changeset.validate_length(:description, max: 128)
     |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
     |> Changeset.unique_constraint(:name, [:name])
+  end
+
+  defp cmd_mismatch(%Alfred.Status{} = status, pin_cmd) do
+    [
+      module: Sally.Command,
+      align_status: true,
+      mismatch: true,
+      reported_cmd: pin_cmd,
+      local_cmd: Alfred.Status.get_cmd(status),
+      status_error: inspect(status.rc),
+      name: status.name
+    ]
+    |> Betty.app_error_v2()
+
+    :no_change
+  end
+
+  defp cmd_mismatch(status, pin_cmd) do
+    [pin_cmd, "\n", inspect(status, pretty: true)] |> Logger.warn()
+
+    :no_change
   end
 
   # helpers for changeset columns
@@ -214,10 +214,10 @@ defmodule Sally.DevAlias do
     """
   end
 
-  def explain(name, :status, what, opts \\ [analyze: true, buffers: true]) do
-    {analyze, query_opts} = Keyword.pop(opts, :analyze, true)
-
-    explain_opts = [analyze: analyze]
+  @explain_defaults [analyze: true, buffers: true, wal: true]
+  def explain(name, :status, what, opts \\ @explain_defaults) do
+    opts = Keyword.merge(@explain_defaults, opts)
+    {explain_opts, query_opts} = Keyword.split(opts, Keyword.keys(@explain_defaults))
 
     module =
       case what do
@@ -319,12 +319,12 @@ defmodule Sally.DevAlias do
     Repo.preload(x, cmds: cmd_query)
   end
 
-  defp load_command_ids(schema_or_nil) do
+  def load_command_ids(schema_or_nil) do
     q = Ecto.Query.from(c in Command, select: [:id])
     Repo.preload(schema_or_nil, [cmds: q], force: true)
   end
 
-  defp load_datapoint_ids(schema_or_nil) do
+  def load_datapoint_ids(schema_or_nil) do
     q = Ecto.Query.from(dp in Datapoint, select: [:id])
     Repo.preload(schema_or_nil, [datapoints: q], force: true)
   end

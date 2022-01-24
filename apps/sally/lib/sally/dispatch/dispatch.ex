@@ -12,17 +12,18 @@ defmodule Sally.Dispatch do
             filter_extra: [],
             payload: nil,
             data: nil,
+            halt_reason: :none,
+            callback_mod: nil,
             sent_at: nil,
             recv_at: nil,
             log: [],
             routed: :no,
             host: :not_loaded,
             txn_info: :none,
-            results: %{},
-            seen_list: [],
             final_at: nil,
             valid?: false,
-            invalid_reason: "not processed"
+            invalid_reason: "not processed",
+            opts: []
 
   @type env() :: String.t()
   @type host_ident() :: String.t()
@@ -40,17 +41,18 @@ defmodule Sally.Dispatch do
           filter_extra: extras(),
           payload: payload(),
           data: map() | nil,
+          halt_reason: :none | String.t(),
+          callback_mod: nil | module(),
           sent_at: DateTime.t() | nil,
           recv_at: DateTime.t() | nil,
           log: list(),
           routed: :no | :ok,
           host: Ecto.Schema.t() | nil,
           txn_info: :none | {:ok, map()} | {:error, map()},
-          results: struct() | nil,
-          seen_list: [binary(), ...],
           final_at: DateTime.t() | nil,
           valid?: boolean(),
-          invalid_reason: String.t()
+          invalid_reason: String.t(),
+          opts: [] | [{:echo, boolean()}]
         }
 
   @doc """
@@ -74,41 +76,42 @@ defmodule Sally.Dispatch do
   @type accept_tuple() :: {topic_parts(), payload()}
   @spec accept(accept_tuple()) :: Dispatch.t()
   def accept({[env, ident, subsystem, category, extras], payload}) do
-    %Dispatch{
+    [
       env: env,
       subsystem: subsystem,
       category: category,
       ident: ident,
       filter_extra: extras,
       payload: payload
-    }
-    |> preprocess()
-  end
-
-  def accumulate_post_process_results(acc, %Dispatch{} = dispatch) do
-    results = Map.put_new(dispatch.results, :post_process, [])
-
-    struct(dispatch, results: %{results | post_process: [acc] ++ results.post_process})
+    ]
+    |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
   def check_txn(%Sally.Dispatch{} = dispatch) do
     case dispatch do
       # NOTE: filter out invalid Dispatch to avoid matching on valid? below
       %{valid?: false} -> dispatch
-      %{txn_info: {:ok, %{host: host} = txn_info}} -> struct(dispatch, host: host, txn_info: txn_info)
-      %{txn_info: {:ok, txn_info}} -> struct(dispatch, txn_info: txn_info)
-      %{txn_info: {:error, txn_error}} -> invalid(dispatch, txn_error)
+      %{txn_info: {:ok, %{host: host}}} -> valid([host: host, txn_info: :host], dispatch)
+      %{txn_info: {:ok, txn_info}} -> valid([txn_info: txn_info], dispatch)
+      %{txn_info: {:error, _multi_key, txn_error, _detail}} -> invalid(dispatch, txn_error)
       %{txn_info: :none} -> dispatch
     end
+    |> update(dispatch)
   end
 
   def finalize(dispatch) do
-    struct(dispatch, final_at: DateTime.utc_now())
+    [final_at: DateTime.utc_now()]
+    |> update(dispatch)
     |> tap(fn dispatch -> log_if_invalid(dispatch) end)
+  end
+
+  def halt_reason(<<_::binary>> = reason, %Sally.Dispatch{} = dispatch) do
+    [halt_reason: reason] |> update(dispatch)
   end
 
   @routing [host: Sally.Host.Handler, immut: Sally.Immutable.Handler, mut: Sally.Mutable.Handler]
   def handoff(%Sally.Dispatch{subsystem: subsystem} = dispatch) do
+    # NOTE: to aid with testing
     msg_handler = Keyword.get(@routing, String.to_atom(subsystem), :unknown)
 
     pid = GenServer.whereis(msg_handler)
@@ -116,57 +119,91 @@ defmodule Sally.Dispatch do
     cond do
       msg_handler == :unknown -> invalid(dispatch, "undefined routing: #{subsystem}")
       not is_pid(pid) -> invalid(dispatch, "no server: #{msg_handler}")
-      true -> struct(dispatch, routed: GenServer.cast(pid, route_now(dispatch)))
+      true -> struct(dispatch, routed: GenServer.call(pid, route_now(dispatch)))
     end
   end
 
-  def invalid(%Dispatch{} = d, reason), do: struct(d, valid?: false, invalid_reason: reason)
+  def invalid(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
+    Keyword.put(fields, :valid?, false) |> update(dispatch)
+  end
 
-  def load_host(%Dispatch{} = m) do
-    if m.valid? do
-      case Sally.Host.find_by_ident(m.ident) do
-        %Sally.Host{authorized: true} = host ->
-          %Dispatch{m | host: host}
+  def invalid(%Sally.Dispatch{} = dispatch, reason, fields) when is_list(fields) do
+    fields = Keyword.put(fields, :invalid_reason, invalid_reason(reason))
 
-        %Sally.Host{authorized: false} = host ->
-          %Dispatch{m | host: host, valid?: false, invalid_reason: "host not authorized"}
+    invalid(dispatch, fields)
+  end
 
-        nil ->
-          %Dispatch{m | valid?: false, invalid_reason: "unknown host"}
-      end
-    else
-      m
+  def invalid_reason(reason) do
+    case reason do
+      <<_::binary>> -> [invalid_reason: reason]
+      _ -> [invalid_reason: inspect(reason, pretty: true)]
     end
   end
+
+  @not_authorized "host not authorized"
+  @unknown_host "unknown host"
+  def load_host(%Sally.Dispatch{valid?: true, ident: host_ident} = dispatch) do
+    case Sally.Host.find_by_ident(host_ident) do
+      %Sally.Host{authorized: true} = host -> [host: host] |> valid(dispatch)
+      %Sally.Host{authorized: false} = host -> invalid(dispatch, @not_authorized, host: host)
+      nil -> invalid(dispatch, @unknown_host)
+    end
+  end
+
+  def load_host(%{valid?: false} = dispatch), do: dispatch
 
   def new(fields), do: struct(Sally.Dispatch, fields)
 
-  def preprocess(%Dispatch{} = m) do
-    with %Dispatch{valid?: true} = m <- check_metadata(m),
-         %Dispatch{valid?: true, data: data} = m <- unpack(m),
-         %Dispatch{valid?: true} = m <- check_sent_time(m) do
-      # transfer logging instructions from remote
-      log = [msg: data[:log] || false] ++ m.log
+  @data_prune [:mtime, :log, :echo]
+  def preprocess(%Dispatch{log: log, opts: opts} = dispatch) do
+    with %Dispatch{valid?: true} = dispatch <- check_metadata(dispatch),
+         %Dispatch{valid?: true, data: data} = dispatch <- unpack(dispatch),
+         %Dispatch{valid?: true} = dispatch <- check_sent_time(dispatch) do
+      # NOTE: ensure data is a map
+      data = data || %{}
 
-      # prune data fields already consumed
-      data = Map.drop(data, [:mtime, :log])
-
-      %Dispatch{m | data: data, log: log, invalid_reason: "none"}
+      [
+        # NOTE: prune consumed data keys
+        data: Map.drop(data, @data_prune),
+        log: Keyword.put(log, :log, Map.get(data, :log, false)),
+        opts: Keyword.put(opts, :echo, Map.get(data, :echo, false))
+      ]
+      |> update(dispatch)
     else
-      %Dispatch{valid?: false} = x -> x
+      dispatch -> dispatch
     end
   end
 
-  def route_now(dispatch), do: struct(dispatch, routed: :ok)
-
-  def routed(%{routed: :ok, valid?: true} = dispatch, callback_mod) when is_atom(callback_mod) do
-    [post_process?: function_exported?(callback_mod, :post_process, 1)]
-    |> then(fn fields -> struct(dispatch, fields) end)
+  def process(%Sally.Dispatch{category: "status", filter_extra: [_ident, "error"]} = dispatch) do
+    halt_reason("host reported status error", dispatch)
   end
 
-  def routed(%{} = dispatch), do: invalid(dispatch, :routing_failed) |> finalize()
+  def process(%Sally.Dispatch{callback_mod: callback_mod} = dispatch) do
+    callback_mod.process(dispatch)
+    |> save_txn_info(dispatch)
+  end
 
-  def save_txn_info(txn_info, %Sally.Dispatch{} = dispatch), do: struct(dispatch, txn_info: txn_info)
+  def post_process(%{callback_mod: callback_mod, post_process?: true} = dispatch) do
+    callback_mod.post_process(dispatch)
+    |> valid(:_post_process_, dispatch)
+  end
+
+  def post_process(%{} = dispatch), do: valid(:none, :_post_process_, dispatch)
+
+  def route_now(dispatch), do: update(dispatch, routed: :ok)
+
+  def routed(dispatch, callback_mod) when is_atom(callback_mod) do
+    exported? = function_exported?(callback_mod, :post_process, 1)
+
+    [callback_mod: callback_mod, post_process?: exported?]
+    |> update(dispatch)
+  end
+
+  def routed(%{} = dispatch, _), do: dispatch |> finalize()
+
+  def save_txn_info(txn_info, %{} = dispatch) do
+    [txn_info: txn_info] |> update(dispatch)
+  end
 
   def unpack(%Dispatch{payload: payload} = m) do
     if is_bitstring(payload) do
@@ -179,10 +216,34 @@ defmodule Sally.Dispatch do
     end
   end
 
-  def valid(%{txn_info: %{} = txn_info} = dispatch), do: valid(dispatch, txn_info)
+  def update(%Sally.Dispatch{} = dispatch), do: dispatch
 
-  def valid(%Dispatch{} = d, results \\ %{}) do
-    struct(d, valid?: true, results: results, invalid_reason: :none)
+  def update(fields, %Sally.Dispatch{} = dispatch) when is_list(fields) do
+    struct(dispatch, fields)
+  end
+
+  def update(%Sally.Dispatch{} = new, %Sally.Dispatch{} = _old), do: new
+
+  def update(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
+    update(fields, dispatch)
+  end
+
+  def valid(%Sally.Dispatch{} = dispatch) do
+    [valid?: true, invalid_reason: :none] |> update(dispatch)
+  end
+
+  def valid(fields, %Sally.Dispatch{} = dispatch) when is_list(fields) do
+    fields |> update(dispatch) |> valid()
+  end
+
+  def valid(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
+    Keyword.merge(fields, valid?: true, invalid_reason: :none)
+    |> update(dispatch)
+  end
+
+  def valid(val, key, %Sally.Dispatch{txn_info: txn_info} = dispatch) when is_atom(key) do
+    txn_info = if(is_map(txn_info), do: txn_info, else: %{})
+    [txn_info: Map.put(txn_info, key, val)] |> valid(dispatch)
   end
 
   # only atomze base map keys
@@ -209,19 +270,25 @@ defmodule Sally.Dispatch do
     recv_at = m.recv_at || DateTime.utc_now()
     sent_at = DateTime.from_unix!(data[:mtime] || 0, :millisecond)
 
-    m = %Dispatch{m | recv_at: recv_at, sent_at: sent_at}
+    m = update(m, recv_at: recv_at, sent_at: sent_at)
     ms_diff = DateTime.diff(recv_at, sent_at, :millisecond)
 
     cond do
       DateTime.compare(sent_at, DateTime.from_unix!(0)) == :eq -> invalid(m, "mtime is missing")
       ms_diff < @variance_ms * -1 -> invalid(m, "data is from the future #{ms_diff * -1}ms")
-      ms_diff < 0 -> %Dispatch{m | sent_at: m.recv_at}
+      ms_diff < 0 -> m
       ms_diff >= @variance_ms -> invalid(m, "data is #{ms_diff} old")
       true -> m
     end
   end
 
-  defp log_if_invalid(%{valid?: valid?} = dispatch) do
-    if valid? == false, do: Logger.warn(["\n", inspect(dispatch, pretty: true)]), else: :ok
+  defp log_if_invalid(%{valid?: true} = dispatch), do: dispatch
+
+  defp log_if_invalid(%{valid?: false, invalid_reason: invalid_reason}) do
+    case invalid_reason do
+      <<_::binary>> -> [invalid_reason]
+      _ -> ["\n", inspect(invalid_reason, pretty: true)]
+    end
+    |> tap(fn log -> Logger.warn(log) end)
   end
 end

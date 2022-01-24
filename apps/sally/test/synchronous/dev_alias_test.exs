@@ -6,10 +6,10 @@ defmodule Sally.Synchronous.DevAliasTest do
 
   setup_all do
     # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
+    {:ok, %{host_add: []}}
   end
 
-  setup [:host_add, :host_setup, :device_add]
+  setup [:host_add, :device_add]
 
   describe "Sally.device_add_alias/1" do
     @tag device_add: [auto: :ds]

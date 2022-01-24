@@ -4,24 +4,29 @@ defmodule SallyCommandTest do
 
   @moduletag sally: true, sally_command: true
 
-  setup_all do
-    # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
-  end
-
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
-  setup [:command_add, :datapoint_add, :dispatch_add]
+  setup [:dev_alias_add]
 
   describe "Sally.Command.broom_timeout/1" do
-    @tag device_add: [auto: :mcp23008], devalias_add: [], command_add: [cmd: "on"]
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 1, latest: :pending]]
     test "acks a command", ctx do
-      %{dev_alias: %Sally.DevAlias{id: id} = _dev_alias, command: %Sally.Command{dev_alias_id: id} = command} =
-        ctx
+      assert %{dev_alias: dev_alias, cmd_latest: [execute]} = ctx
 
-      broom = %Alfred.Broom{tracked_info: command}
+      assert %Sally.DevAlias{id: dev_alias_id} = dev_alias
+      assert %Alfred.Execute{rc: :pending, detail: %{} = detail} = execute
+      assert %{__execute__: %{dev_alias_id: ^dev_alias_id, refid: refid}} = detail
+      assert %{__track__: {:ok, broom_pid}} = detail
+      assert is_pid(broom_pid)
 
-      assert {:ok, %Sally.Command{acked: true, acked_at: %DateTime{}, orphaned: true, rt_latency_us: rt_us}} =
-               Sally.Command.broom_timeout(broom)
+      tracked_info = Sally.Command.tracked_info(refid)
+      assert %Sally.Command{} = tracked_info
+
+      broom = %Alfred.Broom{tracked_info: tracked_info}
+
+      assert {:ok, %Sally.Command{} = cmd} = Sally.Command.broom_timeout(broom)
+
+      assert %{acked: true, orphaned: true} = cmd
+      assert %{acked_at: %DateTime{}, rt_latency_us: rt_us} = cmd
+      assert %{dev_alias_id: ^dev_alias_id} = cmd
 
       assert is_integer(rt_us) and rt_us > 100
     end

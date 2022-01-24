@@ -24,22 +24,20 @@ defmodule Sally.DeviceAid do
     |> Map.merge(base)
     |> Sally.Device.changeset(device)
     |> Sally.Repo.insert(insert_opts)
-    |> then(fn insert_rc ->
-      case insert_rc do
-        {:ok, %Sally.Device{} = x} ->
-          %{device: x}
-
-        error ->
-          tap(error, fn -> inspect(error, pretty: true) |> IO.puts() end)
-          %{device: :failed}
-      end
-    end)
+    |> check_insert_rc()
   end
 
   def add(_), do: :ok
 
   def aliases(%Sally.Device{} = device) do
     Sally.Device.load_aliases(device)
+  end
+
+  def check_insert_rc(insert_rc) do
+    case insert_rc do
+      {:ok, %Sally.Device{} = x} -> %{device: x}
+      error -> raise(inspect(error, pretty: true))
+    end
   end
 
   def next_pio(%Sally.Device{} = device) do
@@ -51,10 +49,14 @@ defmodule Sally.DeviceAid do
     available_pios = all_pios -- used_pios
 
     case available_pios do
-      [] -> nil
+      [] -> raise("pios exhausted")
       [x | _] -> x
     end
   end
+
+  # NOTE: for use by other Sally test aid mdules
+  def split_opts(opts), do: Keyword.split(opts, supported_opts())
+  def supported_opts, do: [:auto, :pios]
 
   def unique(type) when is_atom(type) do
     x = Ecto.UUID.generate() |> String.split("-") |> Enum.at(4)

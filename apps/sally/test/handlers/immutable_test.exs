@@ -1,65 +1,49 @@
 defmodule Sally.ImmutableHandlerTest do
   use ExUnit.Case, async: true
   use Sally.TestAid
-  require Sally.DispatchAid
 
   @moduletag sally: true, sally_immutable_handler: true
 
-  setup_all do
-    # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
-  end
+  setup [:dispatch_add]
 
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :dispatch_add]
+  describe "Sally.Immutable.Handler processes" do
+    @tag dev_alias_opts: [auto: :ds, daps: [history: 1, echo: :dispatch]]
+    @tag dispatch_add: [subsystem: "immut", category: "celsius"]
+    test "a status message (celsius)", ctx do
+      assert %{dispatch: dispatch, dispatch_filter: filter} = ctx
+      assert %Sally.Dispatch{txn_info: %{} = create_info} = dispatch
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = create_info
+      assert %{dap_history: [_ | _]} = create_info
 
-  @setup_base device_add: [], devalias_add: []
+      status_before = Alfred.status(name, [])
+      assert %Alfred.Status{detail: before_detail, rc: :ok} = status_before
 
-  describe "Sally.ImmutableHandler.db_actions/1" do
-    @tag @setup_base
-    @tag dispatch_add: [subsystem: "immut", category: "celsius", data: %{temp_c: 21.2}]
-    test "processes a well-formed Sally.Dispatch", ctx do
-      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{payload: payload, filter_extra: filter_extra} = dispatch
+      assert [device_ident, "ok"] = filter_extra
+      device = Sally.Device.find(device_ident)
+      assert %Sally.Device{ident: ^device_ident} = device
 
-      assert {:ok,
-              %{
-                aliases: [%Sally.DevAlias{} | _],
-                datapoint: [%Sally.Datapoint{} | _],
-                device: %Sally.Device{}
-              }} = Sally.Immutable.Handler.db_actions(dispatch)
-    end
-  end
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-  describe "Sally.Immutable.Handler.process/1" do
-    @tag device_add: [auto: :ds], devalias_add: []
-    @tag dispatch_add: [subsystem: "immut", category: "celsius", data: %{temp_c: 21.5}]
-    test "handles a celsius Dispatch", ctx do
-      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert_receive(%Sally.Dispatch{} = dispatch, 100)
 
-      dispatch
-      |> Sally.Immutable.Handler.process()
-      |> Sally.DispatchAid.assert_processed()
-    end
+      assert %{invalid_reason: :none, subsystem: "immut", valid?: true} = dispatch
+      assert %{filter_extra: [^device_ident, "ok"]} = dispatch
+      assert %{txn_info: %{} = txn_info} = dispatch
 
-    @tag device_add: [auto: :ds], devalias_add: []
-    @tag dispatch_add: [subsystem: "immut", category: "celsius", status: "error", data: %{temp_c: 21.5}]
-    test "handles an error Dispatch", ctx do
-      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      # NOTE: txn_info validations
+      assert %{aliases: [%Sally.DevAlias{}]} = txn_info
+      assert %{datapoint: [%Sally.Datapoint{}]} = txn_info
+      assert %{device: %Sally.Device{}} = txn_info
+      assert %{just_saw_db: {1, [%Sally.DevAlias{}]}} = txn_info
+      assert %{_post_process_: post_process} = txn_info
+      assert [{<<_::binary>> = _dev_alias_name, :ok}] = post_process
 
-      assert %Sally.Dispatch{} = Sally.Immutable.Handler.process(dispatch)
-    end
-  end
+      status_after = Alfred.status(name, [])
+      assert %Alfred.Status{detail: after_detail, rc: :ok} = status_after
 
-  describe "Sally.Immutable.Handler.post_process/1" do
-    @tag device_add: [auto: :ds], devalias_add: []
-    @tag dispatch_add: [subsystem: "immut", category: "relhum", data: %{temp_c: 21.5, relhum: 54.3}]
-    test "handles a valid Dispatch with datapoints", ctx do
-      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
-
-      dispatch
-      |> Sally.Immutable.Handler.process()
-      |> Sally.DispatchAid.assert_processed()
-      |> Sally.Immutable.Handler.post_process()
-      |> Sally.DispatchAid.assert_processed()
+      # NOTE: ensure the status detail has changed
+      refute before_detail == after_detail
     end
   end
 end

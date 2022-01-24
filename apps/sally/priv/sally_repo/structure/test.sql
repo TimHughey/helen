@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 13.3
--- Dumped by pg_dump version 13.3
+-- Dumped from database version 13.5
+-- Dumped by pg_dump version 14.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -28,7 +28,7 @@ CREATE TABLE public.command (
     id bigint NOT NULL,
     dev_alias_id bigint,
     cmd character varying(32) NOT NULL,
-    refid character varying(8) NOT NULL,
+    refid character varying(48) NOT NULL,
     acked boolean DEFAULT false NOT NULL,
     orphaned boolean DEFAULT false NOT NULL,
     sent_at timestamp without time zone NOT NULL,
@@ -388,3 +388,4 @@ ALTER TABLE ONLY public.device
 INSERT INTO public."schema_migrations" (version) VALUES (20210526202613);
 INSERT INTO public."schema_migrations" (version) VALUES (20211101114631);
 INSERT INTO public."schema_migrations" (version) VALUES (20211129190841);
+INSERT INTO public."schema_migrations" (version) VALUES (20220123142033);

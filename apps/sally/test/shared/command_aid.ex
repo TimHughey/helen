@@ -3,57 +3,44 @@ defmodule Sally.CommandAid do
   Supporting functionality for creating Sally.Command for testing
   """
 
-  def add(%{command_add: opts, dev_alias: %Sally.DevAlias{}} = ctx) when is_list(opts) do
-    case Enum.into(opts, %{}) do
-      %{count: x} when is_integer(x) -> add_many(ctx.dev_alias, opts)
-      _ -> %{command: add_one(ctx.dev_alias, opts)}
-    end
+  def cmd_from_opts(pin, pin_opts) do
+    Enum.reduce(pin_opts, random_cmd(), fn {pin_num, cmd}, acc ->
+      if(pin == pin_num, do: cmd, else: acc)
+    end)
   end
 
-  def add(%{command_add: opts, dev_alias: [%Sally.DevAlias{} | _]} = ctx) when is_list(opts) do
-    dev_aliases = ctx.dev_alias
+  def dispatch(%{category: "cmdack"}, opts_map) do
+    unless is_map_key(opts_map, :cmd_latest), do: raise(":cmd_latest is missing")
 
-    for dev_alias <- dev_aliases, reduce: %{command: []} do
-      %{command: _} = acc -> add_one(dev_alias, opts) |> accumulate(acc)
-    end
+    execute = Enum.random(opts_map.cmd_latest)
+
+    if not match?(%{rc: :pending}, execute), do: raise("cmd is not pending")
+
+    # NOTE: pattern match because there are structs
+    %{rc: :pending, detail: %{__execute__: %{refid: refid}}} = execute
+
+    filter_extra = [refid]
+    data = %{}
+
+    [filter_extra: filter_extra, data: data]
   end
 
-  def add(_), do: :ok
+  def dispatch(%{category: "status"}, opts_map) do
+    unless is_map_key(opts_map, :device), do: raise(":device missing")
 
-  defp accumulate(%Sally.Command{} = cmd, %{command: acc}), do: %{command: [cmd] ++ acc}
+    %{device: %{pios: pin_count, ident: device_ident}, opts: opts} = opts_map
 
-  defp add_one(%Sally.DevAlias{} = dev_alias, opts) when is_list(opts) do
-    {track_cmd, opts_rest} = Keyword.pop(opts, :track, true)
+    status = opts[:status] || "ok"
+    cmd_args = opts[:cmds] || []
+    pins = cmd_args[:pins] || []
+    data = %{pins: make_pins(pin_count, pins)}
 
-    cmd_add_opts = Keyword.put_new(opts_rest, :cmd, "on")
-
-    Sally.Command.add(dev_alias, cmd_add_opts)
-    |> tap(fn cmd -> if track_cmd, do: Sally.Command.track(cmd, opts_rest) end)
+    [filter_extra: [device_ident, status], data: data]
   end
 
-  defp add_many(dev_alias, opts) do
-    {count, opts_rest} = Keyword.pop(opts, :count)
-    {shift_unit, opts_rest} = Keyword.pop(opts_rest, :shift_unit, :minutes)
-    {shift_increment, opts_rest} = Keyword.pop(opts_rest, :shift_increment, -1)
-    {cmd, opts_rest} = Keyword.pop(opts_rest, :cmd, "on")
-
-    final_opts = Keyword.put_new(opts_rest, :ack, :immediate)
-
-    dt_base = Timex.now()
-
-    for num <- count..1, reduce: %{command: []} do
-      %{command: _} = acc ->
-        cmd_num = [cmd, Integer.to_string(num) |> String.pad_leading(4, "0")] |> Enum.join(" ")
-        shift_opts = [{shift_unit, num * shift_increment}]
-        sent_at = Timex.shift(dt_base, shift_opts)
-
-        cmd_opts = Keyword.merge([sent_at: sent_at, cmd: cmd_num], final_opts)
-
-        cmd = Sally.Command.add(dev_alias, cmd_opts)
-
-        Sally.Command.track(cmd, cmd_opts)
-
-        accumulate(cmd, acc)
-    end
+  def make_pins(count, pin_opts) do
+    Enum.map(0..(count - 1), fn pin -> [pin, cmd_from_opts(pin, pin_opts)] end)
   end
+
+  def random_cmd, do: Ecto.UUID.generate() |> String.split("-") |> Enum.at(2)
 end

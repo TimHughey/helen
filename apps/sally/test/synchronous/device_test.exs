@@ -4,15 +4,10 @@ defmodule Sally.Synchronous.DeviceTest do
 
   @moduletag sally: true, sally_synchronous_device: true
 
-  setup_all do
-    # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
-  end
-
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
+  setup [:dev_alias_add]
 
   describe "Sally.device_move_aliases/1" do
-    @tag device_add: [auto: :mcp23008], devalias_add: [count: 8]
+    @tag dev_alias_add: [auto: :mcp23008, count: 8]
     test "moves aliases from src to dest ident", ctx do
       %{host: host, device: %Sally.Device{ident: src_ident}} = ctx
 
@@ -36,7 +31,7 @@ defmodule Sally.Synchronous.DeviceTest do
       assert Enum.all?(all_equal, fn x -> x end)
     end
 
-    @tag device_add: [auto: :mcp23008], devalias_add: [count: 8]
+    @tag dev_alias_add: [auto: :mcp23008, count: 8]
     test "moves aliases to the latest device created", ctx do
       %{host: host, device: %Sally.Device{ident: src_ident}} = ctx
 

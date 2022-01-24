@@ -6,23 +6,22 @@ defmodule Sally.HostTest do
 
   setup_all do
     # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
+    {:ok, %{host_add: []}}
   end
 
-  setup [:host_add, :host_setup]
+  setup [:host_add]
 
   describe "Sally.host_ota_live/1" do
     test "invokes an OTA for live hosts with default opts", %{host: _} do
-      assert [%Sally.Host.Instruct{} | _] = Sally.host_ota_live(echo: true)
+      assert [%Sally.Host.Instruct{} | _] = Sally.host_ota_live(echo: :instruct)
 
-      assert_receive {:echo,
-                      %Sally.Host.Instruct{
-                        data: %{file: <<"00"::binary, _::binary>>, valid_ms: 60_000},
-                        filters: ["ota"],
-                        ident: <<"host."::binary, _::binary>>,
-                        packed_length: 62,
-                        subsystem: "host"
-                      }},
+      assert_receive %Sally.Host.Instruct{
+                       data: %{file: <<"00"::binary, _::binary>>, valid_ms: 60_000},
+                       filters: ["ota"],
+                       ident: <<"host."::binary, _::binary>>,
+                       packed_length: 62,
+                       subsystem: "host"
+                     },
                      1
     end
   end
@@ -37,7 +36,7 @@ defmodule Sally.HostTest do
   describe "Sally.host_rename/1 handles" do
     test "when the to name is taken", %{host: host} do
       # create a second host
-      %{host: host2} = host_add(%{host_add: [], host_setup: []})
+      host2 = host_add([])
 
       taken_name = host2.name
       opts = [from: host.name, to: taken_name]

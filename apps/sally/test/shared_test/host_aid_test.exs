@@ -3,7 +3,7 @@ defmodule Sally.HostAidTest do
 
   @moduletag sally: true, sally_host_aid: true
 
-  setup [:host_add, :host_setup]
+  setup [:host_add]
 
   describe "HostAid.add/1" do
     @tag host_add: []
@@ -18,13 +18,12 @@ defmodule Sally.HostAidTest do
 
   describe "HostAid.setup/1" do
     @tag host_add: []
-    @tag host_setup: []
     test "setups a host", ctx do
       assert %{host: %Sally.Host{authorized: true}} = ctx
     end
 
-    @tag host_add: []
-    test "does nothing when :host_setup not present in context", ctx do
+    @tag host_add: [setup: false]
+    test "does not setup a host when opts = [step: false]", ctx do
       assert %{host: %Sally.Host{authorized: false}} = ctx
     end
   end

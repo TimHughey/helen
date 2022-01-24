@@ -3,71 +3,123 @@ defmodule Sally.HostAid do
   Supporting functionality for creating Sally.Host for testing
   """
 
-  # NOTE:
-  # all functions are intended for use in ExUnit.Case setup functions
-  #
-  # returns either a map to merge into the context or :ok
-
-  def add(%{host_add: opts}) do
-    ident = opts[:ident] || unique(:ident)
-    start_at = opts[:start_at] || DateTime.utc_now()
-    seen_at = opts[:seen_at] || DateTime.utc_now()
-
-    changes = %{ident: ident, last_start_at: start_at, last_seen_at: seen_at, name: ident}
-    replace_cols = [:ident, :last_start_at, :last_seen_at, :name]
-
-    changeset = Sally.Host.changeset(changes)
-
-    case Sally.Repo.insert(changeset, Sally.Host.insert_opts(replace_cols)) do
-      {:ok, %Sally.Host{} = host} -> %{host: host}
-      _ -> :fail
+  defmacrop put_host(val) do
+    quote bind_quoted: [val: val] do
+      Map.put(var!(ctrl_map), :host, val)
     end
+  end
+
+  # NOTE: ExUnit.Case setup function
+  def add(%{host_add: opts}), do: %{host: add(opts)}
+
+  @add_order [:ident_only, :create, :setup]
+  def add(opts) when is_list(opts) do
+    {ctrl_map, opts} = split_opts(opts, :ctrl_map)
+
+    Enum.reduce(@add_order, ctrl_map, fn
+      _action, %{ident_only: true, host: <<_::binary>>} = ctrl_map -> ctrl_map
+      :ident_only, %{ident_only: true} = ctrl_map -> unique(:ident) |> put_host()
+      :create, %{create: true} = ctrl_map -> add_one(opts) |> put_host()
+      :setup, %{setup: true, host: host} = ctrl_map -> setup(host, opts) |> put_host()
+      _action, ctrl_map -> ctrl_map
+    end)
+    |> Map.get(:host)
   end
 
   def add(_ctx), do: :ok
 
-  def make_payload(:boot, opts) do
+  def add_one(opts) when is_list(opts) do
+    ident = unique(:ident)
     start_at = opts[:start_at] || DateTime.utc_now()
-    mtime = DateTime.to_unix(start_at, :millisecond) - 3
+    seen_at = opts[:seen_at] || DateTime.utc_now()
 
-    %{
-      mtime: mtime,
-      elapsed_ms: 5981,
-      tasks: 12,
-      stack: %{size: 4096, highwater: 1024}
-    }
-    # NOTE: must use iodata: false since we're simulating in bound data
-    |> Msgpax.pack!(iodata: false)
+    changes = %{ident: ident, last_start_at: start_at, last_seen_at: seen_at, name: ident}
+
+    changeset = Sally.Host.changeset(changes)
+    replace_cols = [:ident, :last_start_at, :last_seen_at, :name]
+    insert_opts = Sally.Host.insert_opts(replace_cols)
+
+    case Sally.Repo.insert(changeset, insert_opts) do
+      {:ok, %Sally.Host{} = host} -> host
+      error -> raise(inspect(error, pretty: true))
+    end
   end
 
-  def make_payload(:startup, opts) do
-    start_at = opts[:start_at] || DateTime.utc_now()
-    mtime = DateTime.to_unix(start_at, :millisecond) - 3
+  def dispatch(%{category: "boot"}, opts_map) do
+    data = %{elapsed_ms: 5981, tasks: 12, stack: %{size: 4096, highwater: 1024}}
 
-    %{
-      mtime: mtime,
+    profile = profile_from_opts(opts_map)
+
+    [filter_extra: [profile], data: data]
+  end
+
+  def dispatch(%{category: "run"}, _opts_map) do
+    data = %{
+      ap: %{pri_chan: 11, rssi: -54},
+      heap: %{min: 161_000, max_alloc: 65_536, free: 158_000}
+    }
+
+    [filter_extra: [], data: data]
+  end
+
+  def dispatch(%{category: "startup"}, _opts_map) do
+    data = %{
       firmware_vsn: "00.00.00",
       idf_vsn: "v4.3.1",
       app_sha: "01abcdef",
-      build_date: "Jul 1 2021",
-      build_time: "13:23",
+      build_date: "Jul  1 2021",
+      build_time: "13:23:00",
       reset_reason: "power on"
     }
-    # NOTE: must use iodata: false since we're simulating in bound data
-    |> Msgpax.pack!(iodata: false)
+
+    [filter_extra: [], data: data]
   end
 
-  def setup(%{host_setup: opts, host: %Sally.Host{} = host}) do
+  def profile_from_opts(opts_map) do
+    case opts_map do
+      %{host: %{profile: profile}} -> profile
+      %{host: <<_::binary>>} -> "generic"
+      _ -> raise("unable to discover profile")
+    end
+  end
+
+  defmacro put_ctrl_map(val) do
+    quote bind_quoted: [val: val] do
+      {Map.put(var!(ctrl_map), var!(key), val), var!(opts_rest)}
+    end
+  end
+
+  defmacro put_opts_rest(val) do
+    quote bind_quoted: [val: val] do
+      {var!(ctrl_map), Keyword.put(var!(opts_rest), var!(key), val)}
+    end
+  end
+
+  @default_ctrl_map %{ident_only: false, create: true, setup: true}
+  def split_opts(opts, :ctrl_map) do
+    Enum.reduce(opts, {@default_ctrl_map, _opts_rest = []}, fn
+      {key, val}, {ctrl_map, opts_rest} when is_map_key(ctrl_map, key) -> put_ctrl_map(val)
+      key, {ctrl_map, opts_rest} when is_map_key(ctrl_map, key) -> put_ctrl_map(true)
+      {key, val}, {ctrl_map, opts_rest} when is_atom(key) -> put_opts_rest(val)
+      key, {_ctrl_map, _opts_rest} -> unknown_opt(key, opts)
+    end)
+  end
+
+  def setup(%Sally.Host{} = host, opts) do
     name = opts[:name] || unique(:name)
     profile = opts[:profile] || "generic"
 
     case Sally.Host.setup(host, name: name, profile: profile) do
-      {:ok, %Sally.Host{} = host} -> %{host: host}
-      _ -> :fail
+      {:ok, %Sally.Host{} = host} -> host
+      error -> raise(inspect(error, pretty: true))
     end
   end
 
   def setup(_ctx), do: :ok
+
+  # NOTE: for use by other Sally test aid mdules
+  def split_opts(opts), do: Keyword.split(opts, supported_opts())
+  def supported_opts, do: [:profile, :start_at, :seen_at, :setup]
 
   def unique(what) when is_atom(what) do
     unique = Ecto.UUID.generate() |> String.split("-") |> Enum.at(4)
@@ -76,5 +128,9 @@ defmodule Sally.HostAid do
       :ident -> "host.#{unique}"
       :name -> "hostname_#{unique}"
     end
+  end
+
+  def unknown_opt(key, opts) do
+    ["unknown opt: [", inspect(key), "] in ", inspect(opts)] |> IO.iodata_to_binary() |> raise()
   end
 end

@@ -4,14 +4,8 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
   @moduletag sally: true, sally_alfred_integration: true
 
-  setup_all do
-    # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
-  end
-
   # NOTE: devalias_add/1 automatically registers the name via Sally.DevAlias.just_saw/2
   # ** if this behaviour is NOT desired include register: false in devalias_add opts
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :command_add, :datapoint_add]
 
   defmacro assert_dev_alias do
     quote do
@@ -22,24 +16,29 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
     end
   end
 
+  setup [:dev_alias_add]
+
   describe "Alfred.status/2 integration with Sally.DevAlias" do
-    @tag device_add: [auto: :mcp23008], devalias_add: []
+    @tag dev_alias_add: [auto: :mcp23008]
     test "returns well formed Alfred.status for new mutable DevAlias (no cmds)", ctx do
       {_dev_alias, name} = assert_dev_alias()
 
-      # NOTE: cmd == "unknown" because this DevAlias did not have any commands
-      # Sally.DevAlias.Command.status/2 automatically adds an unknown command when the DevAlias does
-      # not have any commands
+      # NOTE: cmd == "unknown" because this DevAlias did not have commands
+      # Sally.DevAlias.Command.status/2 automatically adds an unknown command
+      # when the DevAlias does not have any commands
       assert %Alfred.Status{rc: :ok, detail: %{cmd: "unknown"}} = Alfred.status(name, [])
     end
 
-    @tag device_add: [auto: :mcp23008],
-         devalias_add: [],
-         command_add: [cmd: "on", cmd_opts: [ack: :immediate]]
-    test "returns well formed Alfred.status for new mutable DevAlias (cmd == on)", ctx do
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :pending, echo: :instruct]]
+    test "returns well formed Alfred.status for new mutable DevAlias (with one cmd)", ctx do
+      # NOTE: confirm the cmd was sent
+      assert_receive(%Sally.Host.Instruct{}, 10)
+
       {_dev_alias, name} = assert_dev_alias()
 
-      assert %Alfred.Status{rc: :ok, detail: %{cmd: "on"}} = Alfred.status(name, [])
+      # NOTE: confirm attempt to exevute another cmd is prevented due to pending status
+      assert %{cmd_latest: [%{rc: :pending, detail: %{cmd: cmd}}]} = ctx
+      assert %Alfred.Status{rc: :pending, detail: %{cmd: ^cmd}} = Alfred.status(name, [])
     end
   end
 end

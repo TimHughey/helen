@@ -3,52 +3,82 @@ defmodule Sally.DatapointAid do
   Supporting functionality for creating Sally.Datapoint for testing
   """
 
-  def add(%{datapoint_add: opts, dev_alias: %Sally.DevAlias{}} = ctx) when is_list(opts) do
-    case Enum.into(opts, %{}) do
-      %{count: x} when is_integer(x) -> add_many(ctx.dev_alias, opts)
-      _ -> %{datapoint: add_one(ctx.dev_alias, opts)}
-    end
+  def dispatch(%{category: category}, opts_map) do
+    unless is_map_key(opts_map, :device), do: raise(":device is missing")
+
+    %{device: %{ident: device_ident}, opts: opts} = opts_map
+
+    status = opts[:status] || "ok"
+    data = random_dap(category)
+
+    [filter_extra: [device_ident, status], data: data]
   end
 
-  def add(%{datapoint_add: opts, dev_alias: [%Sally.DevAlias{} | _]} = ctx) when is_list(opts) do
-    dev_aliases = ctx.dev_alias
+  def historical(%Sally.DevAlias{name: name} = dev_alias, opts_map) do
+    %{history: count} = opts_map
+    daps = Enum.map(1..count, fn _ -> random_dap() end)
+    ref_dt = Timex.now()
 
-    for dev_alias <- dev_aliases, reduce: %{datapoint: []} do
-      %{datapoint: _} = acc -> add_one(dev_alias, opts) |> accumulate(acc)
-    end
+    String.to_atom(name) |> Process.put(ref_dt)
+
+    (count - 1)..0
+    |> Enum.zip_with(daps, fn num, dap -> {shift(name, num, opts_map), dap} end)
+    |> Enum.each(fn {reading_at, data} ->
+      Ecto.Multi.new()
+      |> Ecto.Multi.put(:aliases, [dev_alias])
+      |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, [data, reading_at])
+      |> Sally.Repo.transaction()
+      |> detuple_txn_result()
+    end)
+
+    # NOTE: return the created datapoints
+    daps
   end
 
-  def add(_), do: :ok
+  def random_dap do
+    relhum = random_float(40, 30)
+    temp_c = random_float(19, 4)
+    temp_f = temp_c * 9 / 5 + 32
 
-  defp accumulate(%Sally.Datapoint{} = cmd, %{datapoint: acc}), do: %{datapoint: [cmd] ++ acc}
-
-  defp add_one(%Sally.DevAlias{} = dev_alias, opts) when is_list(opts) do
-    {data, opts_rest} = Keyword.pop(opts, :data, %{temp_c: 21.1, relhum: 54.2})
-    {reading_at, _opts_rest} = Keyword.pop(opts_rest, :reading_at, Timex.now())
-
-    Ecto.Multi.new()
-    |> Ecto.Multi.put(:aliases, [dev_alias])
-    |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, [data, reading_at])
-    |> Sally.Repo.transaction()
-    |> detuple_txn_result()
+    %{temp_c: temp_c, temp_f: Float.round(temp_f, 2), relhum: relhum}
   end
 
-  defp add_many(dev_alias, opts) do
-    {count, opts_rest} = Keyword.pop(opts, :count)
-    {shift_unit, opts_rest} = Keyword.pop(opts_rest, :shift_unit, :minutes)
-    {shift_increment, _opts_rest} = Keyword.pop(opts_rest, :shift_increment, -1)
+  def random_dap(category) do
+    read_us = :rand.uniform(3000) + 1000
 
-    dt_base = Timex.now()
+    random_dap()
+    |> Map.put(:metrics, %{read: read_us})
+    |> random_dap_finalize(category)
+  end
 
-    for num <- count..1, reduce: %{datapoint: []} do
-      %{datapoint: _} = acc ->
-        shift_opts = [{shift_unit, num * shift_increment}]
-        reading_at = Timex.shift(dt_base, shift_opts)
+  def random_dap_finalize(data, category) do
+    if(category == "celsius", do: Map.drop(data, [:relhum]), else: data)
+  end
 
-        revised_opts = Keyword.put(opts, :reading_at, reading_at)
+  def random_float(low, range) do
+    whole = :rand.uniform(range) + low
+    decimal = :rand.uniform(99)
+    decimal = if(decimal == 0, do: decimal, else: decimal / 100)
 
-        add_one(dev_alias, revised_opts) |> accumulate(acc)
+    whole + decimal
+  end
+
+  @shifts [:hours, :minutes, :seconds, :milliseconds]
+  @shift_default [minutes: -1]
+  def shift(name, num, opts_map) do
+    name_atom = String.to_atom(name)
+    ref_dt = Process.get(name_atom)
+    shift_opts = shift_opts(num, opts_map)
+
+    Timex.shift(ref_dt, shift_opts)
+  end
+
+  def shift_opts(num, opts_map) do
+    case Map.take(opts_map, @shifts) do
+      x when is_map(x) and map_size(x) == 0 -> @shift_default
+      shifts -> shifts |> Enum.into([])
     end
+    |> Enum.map(fn {key, val} -> {key, num * val} end)
   end
 
   defp detuple_txn_result({:ok, map}), do: map.datapoint |> List.first()

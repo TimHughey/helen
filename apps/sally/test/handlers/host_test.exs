@@ -2,51 +2,93 @@ defmodule SallyHostHandlerTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
+  use Sally.TestAid
 
   @moduletag sally: true, sally_host_handler: true
 
-  setup [:setup_filter, :setup_payload_and_packed]
+  setup [:dispatch_add]
 
-  @tag setup: true
-  @tag category: "boot"
-  @tag host_ident: "sally.hostprocessor000"
-  @tag host_name: "sally.hostprocessor000"
-  test "can Host Handler can process a boot message", ctx do
-    # simulare the steps taken by Sally.Mqtt.Handler.handle_message/3 and Host.Handler.process/1
-    dispatch = Sally.Dispatch.accept({ctx.filter, ctx.packed}) |> Sally.Host.Handler.process()
-    host_ident = ctx.host_ident
+  describe "Sally.Host.Handler processes" do
+    @tag dispatch_add: [subsystem: "host", category: "startup", host: []]
+    test "a host startup message for a previously seen host", ctx do
+      assert %{dispatch: %Sally.Dispatch{payload: payload} = dispatch} = ctx
+      assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
 
-    assert %Sally.Dispatch{
-             valid?: true,
-             category: "boot",
-             data: %{},
-             host: :not_loaded,
-             invalid_reason: "none",
-             sent_at: %DateTime{} = sent_at,
-             payload: :unpacked,
-             recv_at: %DateTime{} = recv_at,
-             txn_info: {:ok, %{host: %Sally.Host{ident: ^host_ident}}},
-             routed: :no
-           } = dispatch
+      # NOTE: Sally.DispatchAid.add/2 adds echo option
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-    assert DateTime.compare(recv_at, sent_at) == :gt
-  end
+      assert_receive(
+        %Sally.Dispatch{
+          data: %{},
+          filter_extra: [],
+          final_at: %DateTime{},
+          # NOTE: duplicate variable names in a pattern match must be equal
+          host: %Sally.Host{ident: host_ident},
+          ident: host_ident,
+          invalid_reason: :none,
+          payload: :unpacked,
+          recv_at: %DateTime{},
+          routed: :ok,
+          sent_at: %DateTime{},
+          txn_info: %{},
+          valid?: true
+        },
+        100
+      )
+    end
 
-  # NOTE: the filter created is the reduced filter created by Mqtt.Handler.handle_message/3
-  # and is intended for consumption by Sally.Dispatch.accept/1
-  defp setup_filter(%{category: "boot"} = ctx) do
-    %{filter: ["test", ctx[:host_ident], "host", ctx.category, []]}
-  end
+    @tag dispatch_add: [subsystem: "host", category: "run", host: []]
+    test "a host run message for a previously seen host", ctx do
+      assert %{dispatch: %Sally.Dispatch{payload: payload} = dispatch} = ctx
+      assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
 
-  defp setup_filter(%{category: _}), do: %{filter: ["test"]}
+      # NOTE: Sally.DispatchAid.add/2 adds echo option
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-  # NOTE! must use iodata: false since this packed data won't be sent. rather, we're simulating the
-  # receipt of the packed data
-  defp setup_payload_and_packed(ctx) do
-    payload = Map.merge(%{mtime: System.os_time(:millisecond)}, ctx[:payload] || %{})
+      assert_receive(
+        %Sally.Dispatch{
+          data: %{},
+          filter_extra: [],
+          final_at: %DateTime{},
+          # NOTE: duplicate variable names in a pattern match must be equal
+          host: %Sally.Host{ident: host_ident},
+          ident: host_ident,
+          invalid_reason: :none,
+          payload: :unpacked,
+          recv_at: %DateTime{},
+          routed: :ok,
+          sent_at: %DateTime{},
+          txn_info: %{},
+          valid?: true
+        },
+        100
+      )
+    end
 
-    packed = Msgpax.pack!(payload, iodata: false)
+    @tag dispatch_add: [subsystem: "host", category: "boot", host: [:ident_only]]
+    test "a host boot message for a previously unseen host", ctx do
+      assert %{dispatch: %Sally.Dispatch{payload: payload} = dispatch} = ctx
+      assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
 
-    %{payload: payload, packed: packed}
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
+
+      assert_receive(
+        %Sally.Dispatch{
+          data: %{},
+          filter_extra: ["generic"],
+          final_at: %DateTime{},
+          host: %Sally.Host{ident: host_ident},
+          ident: host_ident,
+          invalid_reason: :none,
+          payload: :unpacked,
+          recv_at: %DateTime{},
+          routed: :ok,
+          sent_at: %DateTime{},
+          txn_info: %{},
+          valid?: true
+        },
+        100
+      )
+    end
   end
 end

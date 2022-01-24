@@ -25,38 +25,41 @@ defmodule Sally.Mqtt.Handler do
     |> reply_ok_next_action(s)
   end
 
-  def connection(:down, s) do
-    reply_ok(s)
-  end
+  def connection(:down, s), do: reply_ok(s)
+  def connection(:terminated, s), do: reply_ok(s)
 
-  def connection(:terminated, s) do
-    reply_ok(s)
-  end
-
+  # NOTE: match 'odd' messages (e.g. payload is not a bitstring) first
   def handle_message(_topic, payload, s) when not is_bitstring(payload) do
     # TODO: log payload error
 
     reply_ok(s)
   end
 
-  def handle_message([env, "r2", host_ident, subsystem, category | extra], payload, s) do
-    alias Sally.Dispatch
-
-    store_last = fn x -> put_in(s, [:last], x) end
-
-    {[env, host_ident, subsystem, category, extra], payload}
-    |> Dispatch.accept()
-    |> Dispatch.handoff()
-    |> store_last.()
+  def handle_message([_env, "r2", _host, _subsys, _cat | _extra] = filter, payload, s) do
+    process_dispatch(filter, payload)
+    |> then(fn last_dispatch -> Map.put(s, :last, last_dispatch) end)
     |> reply_ok()
   end
 
   def handle_message(topic_filters, payload, s) do
     unpacked = Msgpax.unpack(payload)
-    Logger.info("unhandled message: #{Enum.join(topic_filters, "/")}\n#{inspect(unpacked, pretty: true)}")
-    Logger.info(inspect(topic_filters))
+
+    [
+      "\nunhandled filter:\n  ",
+      Enum.join(topic_filters, "/"),
+      "\npayload:\n  ",
+      inspect(unpacked, pretty: true)
+    ]
+    |> Logger.info()
 
     reply_ok(s)
+  end
+
+  def process_dispatch([env, "r2", host_ident, subsystem, category | extra], payload) do
+    {[env, host_ident, subsystem, category, extra], payload}
+    |> Sally.Dispatch.accept()
+    |> Sally.Dispatch.preprocess()
+    |> Sally.Dispatch.handoff()
   end
 
   def subscription(:up, topic_filter, s) do
@@ -73,11 +76,6 @@ defmodule Sally.Mqtt.Handler do
     :ok
   end
 
-  defp reply_ok(s) when is_map(s) do
-    {:ok, s}
-  end
-
-  defp reply_ok_next_action(actions, s) when is_list(actions) and is_map(s) do
-    {:ok, s, actions}
-  end
+  defp reply_ok(%{} = s) when is_map(s), do: {:ok, s}
+  defp reply_ok_next_action(actions, %{} = s) when is_list(actions), do: {:ok, s, actions}
 end

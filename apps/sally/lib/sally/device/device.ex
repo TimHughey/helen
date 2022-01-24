@@ -164,6 +164,14 @@ defmodule Sally.Device do
     end
   end
 
+  def name_registration_opts(%Schema{} = device, opts) do
+    case device do
+      %{mutable: true} -> :cmds
+      %{mutable: false} -> :datapoints
+    end
+    |> then(fn nature -> [{:nature, nature} | opts] end)
+  end
+
   def pio_check(schema, opts) when is_list(opts) do
     case schema do
       %Schema{mutable: true} -> opts[:pio]
@@ -187,6 +195,15 @@ defmodule Sally.Device do
   def pios(%Schema{pios: pios}), do: pios
 
   def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
+
+  def seen_at_cs(%{aliases: dev_aliases, seen_at: seen_at} = _multi_changes) do
+    case dev_aliases do
+      [%Sally.DevAlias{device_id: id} | _] -> id
+      %Sally.DevAlias{device_id: id} -> id
+      _ -> raise("could not find device id in: #{inspect(dev_aliases)}")
+    end
+    |> seen_at_cs(seen_at)
+  end
 
   def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
     struct(__MODULE__, id: id) |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])

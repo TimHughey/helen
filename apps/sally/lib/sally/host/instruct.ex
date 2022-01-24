@@ -40,7 +40,14 @@ defmodule Sally.Host.Instruct do
   ## Public API
   ##
 
-  def echo?(%__MODULE__{opts: opts}), do: Keyword.get(opts, :echo, false)
+  def echo_if_requested(%__MODULE__{opts: opts} = instruct, caller_pid) do
+    case opts do
+      %{echo: :instruct} -> Process.send(caller_pid, instruct, [])
+      _ -> :ok
+    end
+
+    instruct
+  end
 
   def send(%Instruct{} = msg) do
     {:send, msg |> add_mtime() |> set_qos()}
@@ -50,10 +57,10 @@ defmodule Sally.Host.Instruct do
   def send(%{} = fields), do: Enum.into(fields, []) |> send()
 
   def send([_ | _] = fields) do
-    {opts, fields_rest} = Keyword.pop(fields, :opts, [])
-    {cmd_opts, fields_clean} = Keyword.pop(fields_rest, :cmd_opts, [])
+    opts = Keyword.get(fields, :opts, []) |> Enum.into(%{})
 
-    Keyword.put(fields_clean, :opts, Keyword.merge(opts, cmd_opts))
+    fields
+    |> Keyword.put(:opts, Enum.into(opts, %{}))
     |> then(fn fields -> struct(__MODULE__, fields) end)
     |> send()
   end
@@ -74,7 +81,7 @@ defmodule Sally.Host.Instruct do
     Tortoise.publish(msg.client_id, make_filter(msg), packed, qos: msg.qos)
     |> save_pub_rc(msg)
     |> save_packed_length(IO.iodata_length(packed))
-    |> tap(fn sent_msg -> if(echo?(sent_msg), do: Process.send(caller_pid, {:echo, sent_msg}, [])) end)
+    |> echo_if_requested(caller_pid)
     |> State.save_last_pub(s)
     |> reply()
   end

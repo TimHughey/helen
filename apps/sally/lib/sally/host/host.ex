@@ -36,6 +36,13 @@ defmodule Sally.Host do
     [profiles_path(), "#{h.profile}.toml"]
     |> Path.join()
     |> Toml.decode_file!()
+    # NOTE: ensure meta data is in the map and must use binary keys
+    |> Map.put_new("meta", %{})
+    |> boot_payload_data_prune()
+  end
+
+  def boot_payload_data_prune(%{"meta" => meta} = profile) do
+    Map.put(profile, "meta", Map.drop(meta, ["description"]))
   end
 
   # NOTE: used by Sally.Host.Handler.process/1
@@ -63,29 +70,6 @@ defmodule Sally.Host do
     changeset(schema, changes, required) |> Changeset.unique_constraint(:name)
   end
 
-  def columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
-
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  def columns(:cast), do: columns(:all)
-  def columns(:required), do: columns_all(only: [:ident, :name, :last_seen_at, :last_start_at])
-  def columns(:replace), do: columns_all(drop: [:ident, :name, :profile, :authorized, :inserted_at])
-
-  def columns_all(opts) when is_list(opts) do
-    case opts do
-      [drop: x] ->
-        keep_set = columns(:all) |> MapSet.new()
-        drop_set = x |> MapSet.new()
-
-        MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
-
-      [only: keep] ->
-        keep
-    end
-  end
-
   def deauthorize(name), do: authorize(name, false)
 
   def find_by(opts) when is_list(opts), do: Repo.get_by(Schema, opts)
@@ -106,8 +90,8 @@ defmodule Sally.Host do
     |> Repo.all()
   end
 
-  def insert_opts(replace_columns \\ columns(:replace)) do
-    [on_conflict: {:replace, replace_columns}, returning: true, conflict_target: [:ident]]
+  def insert_opts(replace_cols) when is_list(replace_cols) do
+    [on_conflict: {:replace, replace_cols}, returning: true, conflict_target: [:ident]]
   end
 
   def latest(opts) do

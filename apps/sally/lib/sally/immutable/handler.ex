@@ -4,69 +4,33 @@ defmodule Sally.Immutable.Handler do
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
-  alias __MODULE__
-  alias Sally.{Datapoint, DevAlias, Device}
-  alias Sally.Dispatch
-
-  def db_actions(%Dispatch{} = msg) do
-    alias Ecto.Multi
-    alias Sally.Repo
-
-    Multi.new()
-    |> Multi.put(:seen_at, msg.sent_at)
-    |> Multi.insert(:device, Device.changeset(msg, msg.host), Device.insert_opts())
-    |> Multi.run(:aliases, DevAlias, :load_aliases, [])
-    |> Multi.run(:datapoint, DevAlias, :add_datapoint, [msg.data, msg.sent_at])
-    |> Multi.update_all(:just_saw_db, fn x -> DevAlias.just_saw_db(x) end, [])
-    |> Repo.transaction()
-  end
-
-  @categories ["celsius", "relhum"]
-
   @impl true
-  def process(%Dispatch{category: x, filter_extra: [_ident, "ok"]} = msg) when x in @categories do
-    case db_actions(msg) do
-      {:ok, txn} ->
-        :ok = Sally.DevAlias.just_saw(txn.aliases, seen_at: msg.sent_at)
+  # NOTE: filter_extra: [_ident, "error"] are handled upstream
+  def process(%{filter_extra: [_ident, "ok"]} = msg) do
+    device_changes = Sally.Device.changeset(msg, msg.host)
+    device_insert_opts = Sally.Device.insert_opts()
+    add_datapoint_opts = [msg.data, msg.sent_at]
 
-        Dispatch.valid(msg, txn)
-
-      {:error, :datapoint, error, _db_results} ->
-        Dispatch.invalid(msg, error)
-    end
-  end
-
-  # ident encountered an error
-  @impl true
-  def process(%Dispatch{category: x, filter_extra: [ident, "error"]} = msg) when x in @categories do
-    Betty.app_error(__MODULE__, ident: ident, immutable: true, hostname: msg.host.name)
-
-    Dispatch.valid(msg)
+    Ecto.Multi.new()
+    |> Ecto.Multi.put(:seen_at, msg.sent_at)
+    |> Ecto.Multi.insert(:device, device_changes, device_insert_opts)
+    |> Ecto.Multi.run(:aliases, Sally.DevAlias, :load_aliases, [])
+    |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, add_datapoint_opts)
+    |> Ecto.Multi.update_all(:just_saw_db, &Sally.DevAlias.just_saw_db(&1), [])
+    |> Sally.Repo.transaction()
   end
 
   @impl true
-  def post_process(%Dispatch{valid?: true, results: results} = msg)
-      when is_map_key(results, :aliases)
-      when is_map_key(results, :datapoint)
-      when is_map_key(results, :device) do
-    aliases_and_datapoints = Enum.zip(results.aliases, results.datapoint)
+  @want_keys [:aliases, :datapoint, :device]
+  # NOTE: the dispatch is guaranteed to be valid
+  def post_process(%{txn_info: txn} = dispatch) do
+    %{aliases: aliases, device: device, seen_at: seen_at} = txn
 
-    measurement = "immutables"
+    register_opts = Sally.Device.name_registration_opts(device, seen_at: seen_at)
+    :ok = Sally.DevAlias.just_saw(aliases, register_opts)
 
-    for {%DevAlias{} = dev_alias, %Datapoint{} = dp} <- aliases_and_datapoints, reduce: msg do
-      %Dispatch{} = acc ->
-        tags = [name: dev_alias.name, family: results.device.family]
-        temp_f = (dp.temp_c * 9 / 5 + 32) |> Float.round(3)
-        fields = [temp_c: dp.temp_c, temp_f: temp_f, read_us: msg.data.metrics["read"]]
-
-        case dp do
-          %Datapoint{relhum: nil} -> Betty.metric(measurement, fields, tags)
-          %Datapoint{} -> Betty.metric(measurement, [relhum: dp.relhum] ++ fields, tags)
-        end
-        |> Dispatch.accumulate_post_process_results(acc)
-    end
+    Map.take(txn, @want_keys)
+    |> Map.put(:data, dispatch.data)
+    |> Sally.Datapoint.write_metrics()
   end
-
-  @impl true
-  def post_process(dispatch), do: dispatch
 end

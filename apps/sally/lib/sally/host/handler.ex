@@ -3,42 +3,32 @@ defmodule Sally.Host.Handler do
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
-  alias Sally.Dispatch
-  alias Sally.Host
-  # alias Sally.Host.ChangeControl
-  alias Sally.Host.Instruct
-
   @impl true
-  def process(%Dispatch{category: cat} = msg) when cat in ["startup", "boot", "run"] do
+  # NOTE: current message categories: ["startup", "boot", "run"]
+  def process(%Sally.Dispatch{} = msg) do
     {changes, replace_cols} = collect_changes(msg)
+    changeset = Sally.Host.changeset(changes)
     insert_opts = Sally.Host.insert_opts(replace_cols)
-    #  cc = assemble_change_control(msg)
 
     Ecto.Multi.new()
-    |> Ecto.Multi.insert(:host, Sally.Host.changeset(changes), insert_opts)
+    |> Ecto.Multi.insert(:host, changeset, insert_opts)
     |> Sally.Repo.transaction()
-    |> Sally.Dispatch.save_txn_info(msg)
   end
 
   @impl true
-  def post_process(%Dispatch{category: "startup"} = msg) do
-    profile = Host.boot_payload_data(msg.host)
-
-    %Instruct{
+  def post_process(%Sally.Dispatch{category: "startup"} = msg) do
+    [
       ident: msg.ident,
       name: msg.host.name,
       subsystem: "host",
-      # the description could be long, don't send it
-      data: %{profile | "meta" => Map.delete(profile["meta"], :description)},
+      data: Sally.Host.boot_payload_data(msg.host),
       filters: ["profile", msg.host.name]
-    }
-    |> Instruct.send()
-
-    Sally.Dispatch.valid(msg, :host_startup)
+    ]
+    |> Sally.Host.Instruct.send()
   end
 
   @impl true
-  def post_process(%Dispatch{category: "boot"} = msg) do
+  def post_process(%Sally.Dispatch{category: "boot"} = msg) do
     boot_profile = List.first(msg.filter_extra, "unknown")
 
     stack_size = msg.data[:stack]["size"] || 1
@@ -58,12 +48,10 @@ defmodule Sally.Host.Handler do
       ]
     ]
     |> Betty.write()
-
-    Sally.Dispatch.valid(msg, :host_boot)
   end
 
   @impl true
-  def post_process(%Dispatch{category: "run"} = msg) do
+  def post_process(%Sally.Dispatch{category: "run"} = msg) do
     [
       measurement: "host",
       tags: [ident: msg.host.ident, name: msg.host.name],
@@ -76,32 +64,7 @@ defmodule Sally.Host.Handler do
       ]
     ]
     |> Betty.write()
-
-    Sally.Dispatch.valid(msg, :host_boot)
   end
-
-  # Dispatches for different categories define specific changes to the Host record
-  # (1 of 2) startup messages
-  # defp assemble_change_control(%Dispatch{category: "startup"} = msg) do
-  #   raw_changes = %{
-  #     ident: msg.ident,
-  #     name: msg.ident,
-  #     firmware_vsn: msg.data[:firmware_vsn],
-  #     idf_vsn: msg.data[:idf_vsn],
-  #     app_sha: msg.data[:app_sha],
-  #     build_at: make_build_datetime(msg.data),
-  #     last_start_at: msg.sent_at,
-  #     last_seen_at: msg.sent_at,
-  #     reset_reason: msg.data[:reset_reason]
-  #   }
-  #
-  #   %ChangeControl{
-  #     raw_changes: raw_changes,
-  #     required: Map.keys(raw_changes),
-  #     # never replace the ident, it is the conflict field
-  #     replace: raw_changes |> Map.drop([:ident, :name, :inserted_at]) |> Map.keys()
-  #   }
-  # end
 
   defp collect_changes(%{category: "startup"} = msg) do
     changes = %{
@@ -118,23 +81,6 @@ defmodule Sally.Host.Handler do
 
     {changes, Map.drop(changes, [:ident, :name]) |> Map.keys()}
   end
-
-  # (2 of 2) boot and run time metrics
-  # defp assemble_change_control(%Dispatch{category: cat} = msg) when cat in ["boot", "run"] do
-  #   raw_changes = %{
-  #     ident: msg.ident,
-  #     name: msg.ident,
-  #     last_start_at: msg.sent_at,
-  #     last_seen_at: msg.sent_at
-  #   }
-  #
-  #   %ChangeControl{
-  #     raw_changes: raw_changes,
-  #     required: Map.keys(raw_changes),
-  #     # never replace the ident, it is the conflict field
-  #     replace: [:last_seen_at]
-  #   }
-  # end
 
   defp collect_changes(%{category: cat} = msg) when cat in ["boot", "run"] do
     # NOTE: these are the columns to insert __OR__ update keeping in mind that a host may be running
@@ -154,4 +100,6 @@ defmodule Sally.Host.Handler do
 
     DateTime.new!(date, time, "America/New_York")
   end
+
+  defp make_build_datetime(_), do: nil
 end

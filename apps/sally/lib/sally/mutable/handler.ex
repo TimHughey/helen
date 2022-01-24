@@ -6,29 +6,23 @@ defmodule Sally.Mutable.Handler do
 
   use Sally.Message.Handler, restart: :permanent, shutdown: 1000
 
-  @type db_actions() :: {:ok, map()} | {:error, map()}
-
-  # the ident encountered an error
   @impl true
-  def process(%Sally.Dispatch{category: "status", filter_extra: [ident, "error"]} = msg) do
-    Betty.app_error(__MODULE__, ident: ident, mutable: true, hostname: msg.host.name)
-
-    msg
-  end
-
-  @impl true
+  # NOTE: filter_extra: [_ident, "error"] are handled upstream
   def process(%Sally.Dispatch{category: "status", filter_extra: [_ident, "ok"]} = msg) do
+    device_changes = Sally.Device.changeset(msg, msg.host)
+    device_insert_opts = Sally.Device.insert_opts()
+
     Ecto.Multi.new()
     |> Ecto.Multi.put(:data, msg.data)
     |> Ecto.Multi.put(:seen_at, msg.sent_at)
-    |> Ecto.Multi.insert(:device, Sally.Device.changeset(msg, msg.host), Sally.Device.insert_opts())
+    |> Ecto.Multi.insert(:device, device_changes, device_insert_opts)
     |> Ecto.Multi.run(:aliases, Sally.DevAlias, :load_aliases, [])
     |> Ecto.Multi.merge(Sally.DevAlias, :align_status, [])
-    |> Ecto.Multi.update_all(:just_saw_db, fn x -> Sally.DevAlias.just_saw_db(x) end, [])
+    |> Ecto.Multi.update_all(:just_saw_db, &Sally.DevAlias.just_saw_db(&1), [])
     |> Sally.Repo.transaction()
-    |> Sally.Dispatch.save_txn_info(msg)
   end
 
+  @return [returning: true]
   @impl true
   def process(%Sally.Dispatch{category: "cmdack", filter_extra: [refid | _]} = msg) do
     cmd = Sally.Command.tracked_info(refid)
@@ -38,41 +32,27 @@ defmodule Sally.Mutable.Handler do
     |> Ecto.Multi.put(:seen_at, msg.sent_at)
     |> Ecto.Multi.put(:sent_at, msg.sent_at)
     |> Ecto.Multi.put(:recv_at, msg.recv_at)
-    |> Ecto.Multi.update(:command, fn x -> Sally.Command.ack_now_cs(x, :ack) end, returning: true)
-    |> Ecto.Multi.update(:aliases, fn x -> Sally.DevAlias.mark_updated(x, :command) end, returning: true)
-    |> Ecto.Multi.update(:device, fn x -> device_last_seen_cs(x) end, returning: true)
+    |> Ecto.Multi.update(:command, &Sally.Command.ack_now_cs(&1, :ack), @return)
+    |> Ecto.Multi.update(:aliases, &Sally.DevAlias.mark_updated(&1, :command), @return)
+    |> Ecto.Multi.update(:device, &Sally.Device.seen_at_cs(&1), @return)
     |> Sally.Repo.transaction()
-    |> Sally.Dispatch.save_txn_info(msg)
   end
 
   @impl true
-  def post_process(%{category: "status", filter_extra: [_ident, "ok"], txn_info: txn} = dispatch) do
-    :ok = Sally.DevAlias.just_saw(txn.aliases, register_opts(dispatch))
+  def post_process(%{category: "status", filter_extra: [_ident, "ok"], txn_info: txn}) do
+    %{aliases: aliases, device: device, seen_at: seen_at} = txn
 
-    Sally.Dispatch.valid(dispatch)
+    register_opts = Sally.Device.name_registration_opts(device, seen_at: seen_at)
+    :ok = Sally.DevAlias.just_saw(aliases, register_opts)
   end
 
   @impl true
-  def post_process(%{category: "cmdack", filter_extra: [refid | _], txn_info: txn} = dispatch) do
+  def post_process(%{category: "cmdack", filter_extra: [refid | _], txn_info: txn}) do
     :ok = Sally.Command.release(refid, [])
-    :ok = Sally.DevAlias.just_saw(txn.aliases, register_opts(dispatch))
 
-    Sally.Dispatch.valid(dispatch)
-  end
+    %{aliases: aliases, device: device, seen_at: seen_at} = txn
 
-  @impl true
-  def post_process(dispatch), do: Sally.Dispatch.invalid(dispatch, :not_matched)
-
-  ##
-  ## Private
-  ##
-
-  def register_opts(%{sent_at: seen_at}), do: [seen_at: seen_at, nature: :cmds]
-
-  defp device_last_seen_cs(multi_changes) do
-    %{aliases: aliases, seen_at: at} = multi_changes
-
-    Sally.DevAlias.device_id(aliases)
-    |> Sally.Device.seen_at_cs(at)
+    register_opts = Sally.Device.name_registration_opts(device, seen_at: seen_at)
+    :ok = Sally.DevAlias.just_saw(aliases, register_opts)
   end
 end

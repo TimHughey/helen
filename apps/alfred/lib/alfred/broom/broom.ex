@@ -83,7 +83,7 @@ defmodule Alfred.Broom do
   defdelegate use_opts(module), to: __MODULE__, as: :get_attribute
 
   def make_refid do
-    Ecto.UUID.generate() |> String.split("-") |> List.first()
+    Ecto.UUID.generate() |> String.split("-") |> Enum.take(4) |> Enum.join("-")
   end
 
   def release(refid, module, opts) do
@@ -100,6 +100,10 @@ defmodule Alfred.Broom do
       [{pid, _}] when is_pid(pid) -> true
       _ -> false
     end
+  end
+
+  def tracked_info(pid) when is_pid(pid) do
+    GenServer.call(pid, {:tracked_info, []})
   end
 
   def tracked_info(refid, module) do
@@ -166,6 +170,11 @@ defmodule Alfred.Broom do
   @impl true
   # NOTE: duplicate variables in the pattern are matched
   def handle_call({:tracked_info, refid, _opts}, _from, %{refid: refid} = state) do
+    state.tracked_info |> reply(state)
+  end
+
+  @impl true
+  def handle_call({:tracked_info, _opts}, _from, state) do
     state.tracked_info |> reply(state)
   end
 

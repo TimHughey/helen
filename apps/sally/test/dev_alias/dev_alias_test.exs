@@ -4,13 +4,7 @@ defmodule SallyDevAliasTest do
 
   @moduletag sally: true, sally_dev_alias: true
 
-  setup_all do
-    # always create and setup a host
-    {:ok, %{host_add: [], host_setup: []}}
-  end
-
-  setup [:host_add, :host_setup, :device_add, :devalias_add, :devalias_just_saw]
-  setup [:command_add, :datapoint_add, :dispatch_add]
+  setup [:host_add, :device_add, :dev_alias_add]
 
   defmacro assert_execution_us(elapsed, expected_us) do
     quote bind_quoted: [elapsed: elapsed, expected_us: expected_us] do
@@ -19,7 +13,7 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.device_add_alias/1" do
-    @tag device_add: [auto: :mcp23008]
+    @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
     test "detects missing options", %{device: device} do
       assert {:error, text} = Sally.device_add_alias(name: Sally.DevAliasAid.unique(:devalias))
       assert text =~ ~r/:device missing/
@@ -40,13 +34,13 @@ defmodule SallyDevAliasTest do
       assert text =~ ~r/ds.missing/
     end
 
-    @tag device_add: [auto: :mcp23008]
+    @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
     test "handles changeset errors", %{device: device} do
       opts = [device: device.ident, name: Sally.DevAliasAid.unique(:dev_alias), pio: -1]
       assert {:error, [{:pio, _}]} = Sally.device_add_alias(opts)
     end
 
-    @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
+    @tag dev_alias_add: [auto: :pwm]
     test "detects duplicate name", %{device: device, dev_alias: dev_alias} do
       taken_name = dev_alias.name
 
@@ -56,9 +50,8 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.devalias_delete/1" do
-    @tag skip: true
-    @tag device_add: [auto: :mcp23008], devalias_add: [], just_saw: []
-    @tag command_add: [count: 250, shift_unit: :days, shift_increment: -1]
+    @tag skip: false
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 100, minutes: -11]]
     test "deletes a mutable DevAlias name", ctx do
       assert %Sally.DevAlias{name: to_delete_name} = ctx.dev_alias
 
@@ -66,9 +59,8 @@ defmodule SallyDevAliasTest do
                Sally.devalias_delete(to_delete_name)
     end
 
-    @tag skip: true
-    @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
-    @tag datapoint_add: [count: 250, shift_unit: :days, shift_increment: -1]
+    @tag skip: false
+    @tag dev_alias_add: [auto: :ds, daps: [history: 100, minutes: -11]]
     test "deletes an immutable DevAlias name", ctx do
       assert %Sally.DevAlias{name: to_delete_name} = ctx.dev_alias
 
@@ -77,7 +69,7 @@ defmodule SallyDevAliasTest do
     end
   end
 
-  @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
+  @tag dev_alias_add: [auto: :ds]
   test "Sally.devalias_info/2 returns summarized and raw results", ctx do
     assert %{device: device, host: host} = ctx
 
@@ -112,14 +104,14 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.devalias_rename/1 handles" do
-    @tag device_add: [auto: :mcp23008], devalias_add: [count: 2], just_saw: []
+    @tag dev_alias_add: [auto: :mcp23008, count: 2]
     test "when the to name is taken", %{dev_alias: dev_aliases} do
       assert [%Sally.DevAlias{name: from}, %Sally.DevAlias{name: to}] = dev_aliases
 
       assert {:name_taken, ^to} = Sally.devalias_rename(from: from, to: to)
     end
 
-    @tag device_add: [auto: :ds], devalias_add: [], just_saw: []
+    @tag device_add: [auto: :ds], devalias_add: []
     test "when the new name is available", %{dev_alias: dev_alias} do
       # first, test Host performs the rename
       new_name = Sally.DevAliasAid.unique(:dev_alias)
@@ -143,8 +135,7 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.DevAlias.status_lookup/3" do
-    @tag device_add: [auto: :mcp23008], devalias_add: []
-    @tag command_add: [count: 50, shift_unit: :minutes, shift_increment: -1]
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50, minutes: -1]]
     test "handles a DevAlias with Commands", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
@@ -159,10 +150,10 @@ defmodule SallyDevAliasTest do
       assert [%Sally.Command{}] = dev_alias.cmds
     end
 
-    @tag device_add: [auto: :ds], devalias_add: []
-    @tag datapoint_add: [count: 100, shift_unit: :seconds, shift_increment: -7]
+    @tag dev_alias_add: [auto: :ds, daps: [history: 50, seconds: -7]]
     test "handles DevAlias with Datapoints", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+      assert %{name_registration: %{name: ^name}} = ctx
 
       name_map = %{name: name, nature: :datapoints}
       {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
@@ -180,8 +171,7 @@ defmodule SallyDevAliasTest do
   end
 
   describe "Sally.DevAlias.execute_cmd/2" do
-    @tag device_add: [auto: :mcp23008], devalias_add: []
-    @tag command_add: [count: 3, shift_unit: :minutes, shift_increment: -1]
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
     test "creates new pending command from Sally.DevAlias", ctx do
       assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
 
@@ -190,26 +180,24 @@ defmodule SallyDevAliasTest do
       # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
       # for validation
       {:pending, %Sally.Command{cmd: ^cmd, refid: refid}} =
-        Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, echo: true)
+        Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, cmd_opts: [echo: :instruct])
 
-      assert_receive {:echo,
-                      %Sally.Host.Instruct{
-                        client_id: "sally_test",
-                        data: %{ack: true, cmd: ^cmd, pio: 0},
-                        filters: [^device_ident, ^refid],
-                        ident: <<"host"::binary, _::binary>>,
-                        name: <<"hostname"::binary, _::binary>>,
-                        packed_length: 33,
-                        subsystem: "i2c"
-                      }},
-                     1
+      assert_receive %Sally.Host.Instruct{
+                       client_id: "sally_test",
+                       data: %{ack: true, cmd: ^cmd, pio: 0},
+                       filters: [^device_ident, ^refid],
+                       ident: <<"host"::binary, _::binary>>,
+                       name: <<"hostname"::binary, _::binary>>,
+                       packed_length: 33,
+                       subsystem: "i2c"
+                     },
+                     100
 
       # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
       refute Alfred.Broom.tracked?(refid)
     end
 
-    @tag device_add: [auto: :mcp23008], devalias_add: []
-    @tag command_add: [count: 3, shift_unit: :minutes, shift_increment: -1]
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
     test "creates new acked command from Sally.DevAlias", ctx do
       assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
 
@@ -223,31 +211,8 @@ defmodule SallyDevAliasTest do
     end
   end
 
-  describe "Sally.DevAlias EXPLAIN" do
-    @tag device_add: [auto: :mcp23008], devalias_add: []
-    @tag command_add: [count: 50, shift_unit: :minutes, shift_increment: -1]
-    test "for join of last Sally.Command", ctx do
-      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
-
-      explain_output = Sally.DevAlias.explain(name, :status, :cmds, [])
-
-      assert explain_output =~ ~r/Index Scan/
-      assert explain_output =~ ~r/Sort Method: top-N heapsort/
-    end
-
-    @tag device_add: [auto: :ds], devalias_add: []
-    @tag datapoint_add: [count: 40, shift_unit: :seconds, shift_increment: -7]
-    test "for join of recent Sally.Datapoint", ctx do
-      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
-
-      explain_output = Sally.DevAlias.explain(name, :status, :datapoints, [])
-      assert explain_output =~ ~r/(Join Filter).|\s+(Index Scan).|\s+(Rows Removed)/
-    end
-  end
-
   describe "Sally.DevAlias.multi_just_saw/1" do
-    @tag device_add: [auto: :mcp23008], devalias_add: [count: 4]
-    @tag command_add: [count: 2, shift_unit: :minutes, shift_increment: -1]
+    @tag dev_alias_add: [auto: :mcp23008, count: 4, cmds: [history: 4, minutes: -1]]
     test "updates updated_at", ctx do
       assert %{dev_alias: dev_aliases, device: %Sally.Device{} = device} = ctx
 

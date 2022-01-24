@@ -93,20 +93,25 @@ defmodule Sally.Datapoint do
     end
   end
 
-  def reduce_to_avgs(%DevAlias{datapoints: [%Sally.Datapoint{} | _] = datapoints} = dev_alias) do
-    Enum.reduce(datapoints, {0, %{}}, fn %Sally.Datapoint{} = datapoint, {count, sums} ->
-      {count + 1,
-       Map.take(datapoint, [:temp_c, :relhum])
-       |> Enum.reduce(%{}, fn
-         {key, val}, acc -> if(val, do: Map.put(acc, key, Map.get(sums, key, 0) + val), else: acc)
-       end)}
-    end)
-    |> then(fn {count, sums} -> Enum.into(sums, %{}, fn {key, val} -> {key, val / count} end) end)
-    |> then(fn avgs -> Map.put(avgs, :temp_f, Map.get(avgs, :temp_c) * 1.8 + 32) end)
-    |> then(fn avgs -> struct(dev_alias, datapoints: [avgs]) end)
+  def reduce_to_avgs(%DevAlias{datapoints: [%{} | _] = daps} = dev_alias) do
+    struct(dev_alias, datapoints: [reduce_to_avgs(daps)])
   end
 
-  def reduce_to_avgs(dev_alias), do: dev_alias
+  def reduce_to_avgs(datapoints) when is_list(datapoints) do
+    Enum.reduce(datapoints, {0, %{}}, fn %{} = datapoint, {count, sums} ->
+      Enum.reduce(Map.take(datapoint, [:temp_c, :relhum]), %{}, fn
+        {k, v}, a -> if(v, do: Map.put(a, k, Map.get(sums, k, 0) + v), else: a)
+      end)
+      |> then(fn sum_map -> {count + 1, sum_map} end)
+    end)
+    |> reduce_sums_to_avgs()
+  end
+
+  def reduce_sums_to_avgs({count, sums}) do
+    avgs = Enum.into(sums, %{}, fn {k, v} -> {k, Float.round(v / count, 2)} end)
+
+    Map.put(avgs, :temp_f, Float.round(Map.get(avgs, :temp_c) * 1.8 + 32, 2))
+  end
 
   def status(name, opts) do
     status_query(name, opts)
@@ -129,11 +134,32 @@ defmodule Sally.Datapoint do
             where: [dev_alias_id: parent_as(:dev_alias).id],
             where: datapoint.reading_at >= ago(^since_ms, "millisecond"),
             order_by: [desc: :reading_at],
-            select: [:id]
+            group_by: [:id, :dev_alias_id, :reading_at]
+            # select: [:id]
           )
         ),
       on: latest_datapoints.id == datapoints.id,
       preload: [datapoints: datapoints]
     )
+  end
+
+  # NOTE: assume the caller (Sally.Immutable.Handler has verified the map)
+  @measurement "immutables"
+  def write(%{aliases: []}), do: []
+
+  def write_metrics(%{} = map) do
+    family = map.device.family
+    read_us = map.data.metrics["read"]
+
+    zipped = Enum.zip(map.aliases, map.datapoint)
+
+    Enum.into(zipped, [], fn {%{name: name}, dap} ->
+      tags = [name: name, family: family]
+      fields = reduce_to_avgs([dap]) |> Map.put(:read_us, read_us) |> Enum.into([])
+
+      Betty.metric(@measurement, fields, tags)
+
+      {name, :ok}
+    end)
   end
 end

@@ -97,6 +97,12 @@ defmodule Sally.Message.Handler.Server do
   end
 
   @impl true
+  def handle_call(%Sally.Dispatch{} = dispatch, {caller_pid, _ref}, state) do
+    # NOTE: reply quickly to free up MQTT handler, do the heavy lifting in the server
+    {:reply, :ok, state, {:continue, {dispatch, caller_pid}}}
+  end
+
+  @impl true
   def handle_cast(%Sally.Dispatch{} = dispatch, state) do
     %{opts: %{callback_mod: callback_mod}} = state
 
@@ -106,25 +112,29 @@ defmodule Sally.Message.Handler.Server do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_continue({%{opts: opts} = dispatch, caller_pid}, state) do
+    %{opts: %{callback_mod: callback_mod}} = state
+
+    dispatch = process(dispatch, callback_mod)
+
+    if opts[:echo] == "dispatch", do: Process.send(caller_pid, dispatch, [])
+
+    {:noreply, state}
+  end
+
   ##
   ## Private
   ##
 
+  @order [:routed, :process, :check_txn, :post_process, :finalize, :finished]
   def process(%Sally.Dispatch{} = dispatch, callback_mod) do
-    dispatch
-    |> Sally.Dispatch.routed(callback_mod)
-    |> callback_mod.process()
-    |> Sally.Dispatch.check_txn()
-    # NOTE: post process does not change Sally.Dispatch
-    |> post_process(callback_mod)
-    |> Sally.Dispatch.finalize()
-  end
-
-  def post_process(%Sally.Dispatch{} = dispatch, callback_mod) do
-    case dispatch do
-      %{valid?: false} -> dispatch
-      %{post_process?: true} -> callback_mod.post_process(dispatch)
-      _ -> dispatch
-    end
+    Enum.reduce_while(@order, dispatch, fn
+      _function, %{valid?: false} = dispatch -> {:halt, Sally.Dispatch.finalize(dispatch)}
+      _function, %{halt_reason: <<_::binary>>} -> {:halt, Sally.Dispatch.finalize(dispatch)}
+      :finished, dispatch -> {:halt, dispatch}
+      :routed, dispatch -> {:cont, Sally.Dispatch.routed(dispatch, callback_mod)}
+      function, dispatch -> {:cont, apply(Sally.Dispatch, function, [dispatch])}
+    end)
   end
 end
