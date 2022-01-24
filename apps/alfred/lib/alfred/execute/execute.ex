@@ -64,7 +64,7 @@ defmodule Alfred.Execute do
     checks_map = %{
       info: info,
       name: name,
-      force: if(get_in(opts, [:cmd_opts, :force]), do: true, else: false),
+      force: if(get_in(opts, [:cmd_opts, :force]) == true, do: true, else: false),
       broom_module: broom_module(module)
     }
 
