@@ -168,7 +168,7 @@ defmodule Carol.Server do
   @impl true
   def handle_info({Alfred, %Alfred.Broom{} = broom}, %{exec_result: execute} = s) do
     case {broom, execute} do
-      {%{refid: refid}, %{detail: %{__execute__: %{refid: refid}}}} -> State.save_cmd(execute, s)
+      {%{refid: refid}, %{detail: %{refid: refid}}} -> State.save_cmd(execute, s)
       mismatch -> tap(s, fn _ -> log_refid_mismatch(mismatch, s) end)
     end
     |> noreply(:timeout)
