@@ -166,11 +166,8 @@ defmodule Carol.Server do
   end
 
   @impl true
-  def handle_info({Alfred, %Alfred.Broom{} = broom}, %{exec_result: execute} = s) do
-    case {broom, execute} do
-      {%{refid: refid}, %{detail: %{refid: refid}}} -> State.save_cmd(execute, s)
-      mismatch -> tap(s, fn _ -> log_refid_mismatch(mismatch, s) end)
-    end
+  def handle_info({Alfred, %Alfred.Broom{}}, %{exec_result: execute} = s) do
+    State.save_cmd(execute, s)
     |> noreply(:timeout)
   end
 
@@ -207,21 +204,21 @@ defmodule Carol.Server do
     |> Carol.Episode.execute_args(:active, episodes)
   end
 
-  @indent 40
-  def log_refid_mismatch({broom, execute}, state) do
-    %{refid: b_refid} = broom
-    %{detail: %{refid: e_refid}} = execute
-    %{episodes: [episode | _]} = state
-    active_id = Carol.Episode.active_id(episode)
-    active_id = if(is_binary(active_id), do: active_id, else: inspect(active_id))
-
-    details = Enum.map([b_refid, e_refid], fn x -> ["\n", String.pad_leading(x, @indent)] end)
-    episode = ["\n", String.pad_leading(active_id, @indent)]
-    execute = ["\n", inspect(execute, pretty: true)]
-
-    ["refid mismatch", details, episode, execute]
-    |> Logger.warn()
-  end
+  # @indent 40
+  # def log_refid_mismatch({broom, execute}, state) do
+  #   %{refid: b_refid} = broom
+  #   %{detail: %{refid: e_refid}} = execute
+  #   %{episodes: episodes} = state
+  #   active_id = Carol.Episode.active_id(episodes)
+  #   active_id = if(is_binary(active_id), do: active_id, else: inspect(active_id))
+  #
+  #   details = Enum.map([b_refid, e_refid], fn x -> ["\n", String.pad_leading(x, @indent)] end)
+  #   episode = ["\n", String.pad_leading(active_id, @indent)]
+  #   execute = ["\n", inspect(execute, pretty: true)]
+  #
+  #   ["refid mismatch", details, episode, execute]
+  #   |> Logger.warn()
+  # end
 
   # GenServer reply helpers
 
