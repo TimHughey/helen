@@ -114,18 +114,7 @@ defmodule Sally.DevAliasAid do
   end
 
   def make_historical(:cmds, %Sally.DevAlias{} = dev_alias, opts_map) do
-    %{history: count, _cmds_: cmd_args} = opts_map
-    echo_opts = Map.take(cmd_args, [:echo]) |> Enum.into([])
-
-    Enum.each(count..1, fn _x ->
-      cmd_args = [cmd: random_cmd(), cmd_opts: [ack: :immediate]] ++ echo_opts
-
-      case Sally.DevAlias.execute_cmd(dev_alias, cmd_args) do
-        {:ok, %{acked: true} = execute} -> execute
-        error_rc -> raise("execute error: #{inspect(error_rc, pretty: true)}")
-      end
-      |> tap(fn _execute -> Process.sleep(10) end)
-    end)
+    Sally.CommandAid.historical(dev_alias, opts_map)
   end
 
   def make_historical(:daps, %Sally.DevAlias{} = dev_alias, opts_map) do

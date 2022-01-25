@@ -25,7 +25,7 @@ defmodule Sally.ImmutableHandlerTest do
 
       assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-      assert_receive(%Sally.Dispatch{} = dispatch, 100)
+      assert_receive(%Sally.Dispatch{} = dispatch, 200)
 
       assert %{invalid_reason: :none, subsystem: "immut", valid?: true} = dispatch
       assert %{filter_extra: [^device_ident, "ok"]} = dispatch

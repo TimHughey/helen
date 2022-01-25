@@ -50,7 +50,7 @@ defmodule Sally.MutableHandlerTest do
 
       assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-      assert_receive(%Sally.Dispatch{} = dispatch, 100)
+      assert_receive(%Sally.Dispatch{} = dispatch, 150)
 
       assert %{invalid_reason: :none, subsystem: "mut", valid?: true} = dispatch
       assert %{filter_extra: [_device_ident, "ok"]} = dispatch

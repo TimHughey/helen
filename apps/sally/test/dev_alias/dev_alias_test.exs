@@ -12,6 +12,117 @@ defmodule SallyDevAliasTest do
     end
   end
 
+  describe "Sally.DevAlias.status_lookup/3" do
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50, minutes: -1]]
+    test "handles a DevAlias with Commands", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+
+      name_map = %{name: name, nature: :cmds}
+      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
+      assert_execution_us(elapsed, 15_000)
+
+      assert %Sally.DevAlias{} = dev_alias
+      assert Ecto.assoc_loaded?(dev_alias.cmds)
+      assert Ecto.assoc_loaded?(dev_alias.datapoints)
+
+      assert [%Sally.Command{}] = dev_alias.cmds
+    end
+
+    @tag dev_alias_add: [auto: :ds, daps: [history: 50, seconds: -7]]
+    test "handles DevAlias with Datapoints", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+      assert %{name_registration: %{name: ^name}} = ctx
+
+      name_map = %{name: name, nature: :datapoints}
+      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
+      assert_execution_us(elapsed, 15_000)
+
+      assert %Sally.DevAlias{} = dev_alias
+      assert Ecto.assoc_loaded?(dev_alias.cmds)
+      assert Ecto.assoc_loaded?(dev_alias.datapoints)
+
+      assert [%{temp_f: temp_f, temp_c: temp_c, relhum: relhum}] = dev_alias.datapoints
+      assert is_float(temp_f)
+      assert is_float(temp_c)
+      assert is_float(relhum)
+    end
+  end
+
+  describe "Sally.DevAlias.execute_cmd/2" do
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
+    test "creates new pending command from Sally.DevAlias", ctx do
+      assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
+
+      cmd = "on"
+
+      # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
+      # for validation
+      {:pending, %Sally.Command{cmd: ^cmd, refid: refid}} =
+        Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, cmd_opts: [echo: :instruct])
+
+      assert_receive %Sally.Host.Instruct{
+                       client_id: "sally_test",
+                       data: %{ack: true, cmd: ^cmd, pio: 0},
+                       filters: [^device_ident, ^refid],
+                       ident: <<"host"::binary, _::binary>>,
+                       name: <<"hostname"::binary, _::binary>>,
+                       packed_length: 33,
+                       subsystem: "i2c"
+                     },
+                     100
+
+      # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
+      refute Alfred.Broom.tracked?(refid)
+    end
+
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
+    test "creates new acked command from Sally.DevAlias", ctx do
+      assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
+
+      cmd = "on"
+      opts = [cmd: cmd, cmd_opts: [ack: :immediate]]
+
+      {elapsed, {:ok, %Sally.Command{cmd: ^cmd}}} =
+        Timex.Duration.measure(Sally.DevAlias, :execute_cmd, [dev_alias, opts])
+
+      assert_execution_us(elapsed, 25_000)
+    end
+  end
+
+  describe "Sally.DevAlias.multi_just_saw/1" do
+    @tag dev_alias_add: [auto: :mcp23008, count: 4, cmds: [history: 4, minutes: -1]]
+    test "updates updated_at", ctx do
+      assert %{dev_alias: dev_aliases, device: %Sally.Device{} = device} = ctx
+
+      device = struct(device, aliases: dev_aliases)
+
+      dispatch_sim = %{sent_at: Timex.now()}
+
+      assert {:ok, %{check: {4, updated_aliases}}} =
+               Ecto.Multi.new()
+               |> Ecto.Multi.put(:device, device)
+               |> Ecto.Multi.put(:dispatch, dispatch_sim)
+               |> Ecto.Multi.update_all(:check, fn x -> Sally.DevAlias.just_saw_db(x) end, [])
+               |> Sally.Repo.transaction()
+
+      {sort_dev_aliases(dev_aliases), sort_dev_aliases(updated_aliases)}
+      |> then(fn {l1, l2} -> Enum.zip_with(l1, l2, fn e1, e2 -> {e1, e2} end) end)
+      |> Enum.each(fn {original, updated} ->
+        assert %Sally.DevAlias{id: original_id, updated_at: original_at} = original
+        assert %Sally.DevAlias{id: updated_id, updated_at: updated_at} = updated
+
+        assert ^updated_id = original_id
+        assert Timex.after?(updated_at, original_at)
+      end)
+
+      # pretty_puts(updated_aliases)
+    end
+  end
+
+  ##
+  ## Tests via Sally top-level API
+  ##
+
   describe "Sally.device_add_alias/1" do
     @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
     test "detects missing options", %{device: device} do
@@ -131,111 +242,6 @@ defmodule SallyDevAliasTest do
 
     test "when opts are invalid" do
       assert {:bad_args, _} = Sally.devalias_rename([])
-    end
-  end
-
-  describe "Sally.DevAlias.status_lookup/3" do
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50, minutes: -1]]
-    test "handles a DevAlias with Commands", ctx do
-      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
-
-      name_map = %{name: name, nature: :cmds}
-      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
-      assert_execution_us(elapsed, 15_000)
-
-      assert %Sally.DevAlias{} = dev_alias
-      assert Ecto.assoc_loaded?(dev_alias.cmds)
-      assert Ecto.assoc_loaded?(dev_alias.datapoints)
-
-      assert [%Sally.Command{}] = dev_alias.cmds
-    end
-
-    @tag dev_alias_add: [auto: :ds, daps: [history: 50, seconds: -7]]
-    test "handles DevAlias with Datapoints", ctx do
-      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
-      assert %{name_registration: %{name: ^name}} = ctx
-
-      name_map = %{name: name, nature: :datapoints}
-      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
-      assert_execution_us(elapsed, 15_000)
-
-      assert %Sally.DevAlias{} = dev_alias
-      assert Ecto.assoc_loaded?(dev_alias.cmds)
-      assert Ecto.assoc_loaded?(dev_alias.datapoints)
-
-      assert [%{temp_f: temp_f, temp_c: temp_c, relhum: relhum}] = dev_alias.datapoints
-      assert is_float(temp_f)
-      assert is_float(temp_c)
-      assert is_float(relhum)
-    end
-  end
-
-  describe "Sally.DevAlias.execute_cmd/2" do
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
-    test "creates new pending command from Sally.DevAlias", ctx do
-      assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
-
-      cmd = "on"
-
-      # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
-      # for validation
-      {:pending, %Sally.Command{cmd: ^cmd, refid: refid}} =
-        Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, cmd_opts: [echo: :instruct])
-
-      assert_receive %Sally.Host.Instruct{
-                       client_id: "sally_test",
-                       data: %{ack: true, cmd: ^cmd, pio: 0},
-                       filters: [^device_ident, ^refid],
-                       ident: <<"host"::binary, _::binary>>,
-                       name: <<"hostname"::binary, _::binary>>,
-                       packed_length: 33,
-                       subsystem: "i2c"
-                     },
-                     100
-
-      # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
-      refute Alfred.Broom.tracked?(refid)
-    end
-
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
-    test "creates new acked command from Sally.DevAlias", ctx do
-      assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
-
-      cmd = "on"
-      opts = [cmd: cmd, cmd_opts: [ack: :immediate]]
-
-      {elapsed, {:ok, %Sally.Command{cmd: ^cmd}}} =
-        Timex.Duration.measure(Sally.DevAlias, :execute_cmd, [dev_alias, opts])
-
-      assert_execution_us(elapsed, 25_000)
-    end
-  end
-
-  describe "Sally.DevAlias.multi_just_saw/1" do
-    @tag dev_alias_add: [auto: :mcp23008, count: 4, cmds: [history: 4, minutes: -1]]
-    test "updates updated_at", ctx do
-      assert %{dev_alias: dev_aliases, device: %Sally.Device{} = device} = ctx
-
-      device = struct(device, aliases: dev_aliases)
-
-      assert {:ok, %{check: {4, updated_aliases}}} =
-               Ecto.Multi.new()
-               |> Ecto.Multi.put(:device, device)
-               |> Ecto.Multi.put(:seen_at, DateTime.utc_now())
-               |> Ecto.Multi.update_all(:check, fn x -> Sally.DevAlias.just_saw_db(x) end, [])
-               |> Sally.Repo.transaction()
-
-      {sort_dev_aliases(dev_aliases), sort_dev_aliases(updated_aliases)}
-      |> then(fn {l1, l2} -> Enum.zip_with(l1, l2, fn e1, e2 -> {e1, e2} end) end)
-      |> Enum.each(fn {original, updated} ->
-        assert %Sally.DevAlias{id: original_id, updated_at: original_at} = original
-        assert %Sally.DevAlias{id: updated_id, updated_at: updated_at} = updated
-
-        assert ^updated_id = original_id
-        assert Timex.after?(updated_at, original_at)
-      end)
-
-      # pretty_puts(updated_aliases)
     end
   end
 

@@ -219,6 +219,26 @@ defmodule CarolServerTest do
 
       assert cmd_live =~ ~r/^PENDING\s\{on\}/
     end
+
+    @tag skip: false
+    @tag equipment_add: [cmd: "on", rc: :pending]
+    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
+    @tag state_add: [bootstrap: true]
+    test "TrackerEntry with mismatched refid", ctx do
+      # NOTE: handle_continue/2 call required to trigger execute
+
+      noreply_tuple = Carol.Server.handle_continue(:tick, ctx.state)
+
+      assert {:noreply, %Carol.State{} = new_state, _timeout} = noreply_tuple
+
+      execute = new_state.exec_result
+      broom = %Alfred.Broom{tracked_info: %{cmd: execute.detail.cmd}, refid: "1234"}
+
+      assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
+               Carol.Server.handle_info({Alfred, broom}, new_state)
+
+      assert cmd_live =~ ~r/^PENDING\s\{on\}/
+    end
   end
 
   defp equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)

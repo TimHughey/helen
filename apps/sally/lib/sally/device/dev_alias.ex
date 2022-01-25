@@ -48,41 +48,58 @@ defmodule Sally.DevAlias do
     end
   end
 
-  def align_status(%{aliases: [_ | _] = aliases, data: %{pins: _} = data, seen_at: seen_at}) do
-    Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi ->
-      multi_name = String.to_atom("aligned_#{dev_alias.pio}")
+  # def align_status(%{aliases: [_ | _] = aliases, data: %{pins: _} = data, seen_at: seen_at}) do
+  #   Enum.reduce(aliases, Ecto.Multi.new(), fn %{name: name} = dev_alias, multi ->
+  #     multi_id = {:aligned, name}
+  #
+  #     case align_status_one(dev_alias, data, seen_at) do
+  #       %Ecto.Changeset{} = cs -> Ecto.Multi.insert(multi, multi_id, cs, @returned)
+  #       :no_change -> multi
+  #     end
+  #   end)
+  # end
 
-      case align_status_one(dev_alias, data, seen_at) do
-        %Ecto.Changeset{} = cs -> Ecto.Multi.insert(multi, multi_name, cs, returning: true)
-        :no_change -> multi
-      end
+  def align_status(%{aliases: []} = _multi_changes), do: Ecto.Multi.new()
+
+  def align_status(%{aliases: aliases} = multi_read_only) do
+    # NOTE: reduce a entirely new Ecto.Multi to merge into the overall Ecto.Multi
+    Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi_acc ->
+      align_status_one(dev_alias, multi_acc, multi_read_only)
     end)
   end
 
-  def align_status(_changes), do: Ecto.Multi.new()
+  def align_status_one(dev_alias, multi_acc, multi_read_only) do
+    cmd = Sally.Command.latest(dev_alias, :id)
+    pin_cmd = Sally.Command.pin_cmd(multi_read_only.dispatch.data.pins, dev_alias.pio)
 
-  def align_status_one(%{pio: pio} = dev_alias, %{pins: pins}, seen_at) do
-    pin_cmd = Enum.reduce(pins, :no_pin, fn [pin, cmd], acc -> if(pin == pio, do: cmd, else: acc) end)
-
-    case status(dev_alias, nature: :cmds) do
-      status when pin_cmd == :no_pin ->
-        cmd_mismatch(status, "bad_pin")
-
-      %{rc: :pending} ->
-        :no_change
-
-      %{rc: :ok, detail: %{cmd: ^pin_cmd}} ->
-        :no_change
-
-      # NOTE: special case when DevAlias doesn't have any commands yet
-      %{rc: :error} ->
-        Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
-
-      status ->
-        cmd_mismatch(status, pin_cmd)
-        Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
+    case cmd do
+      # NOTE: never step on a pending commmand
+      %{acked: false} -> multi_acc
+      # latest acked command == pin cmd
+      %{acked: true, cmd: ^pin_cmd} -> multi_acc
+      # pin_cmd different, fix the mismatch
+      %{cmd: asis_cmd} -> align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
+      # dev_alias without cmd history, strange but possible
+      nil -> align_now(dev_alias, pin_cmd, "unknown", multi_acc, multi_read_only)
     end
   end
+
+  def align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only) do
+    Sally.Command.align_cmd(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
+  end
+
+  # def align_status(_changes), do: Ecto.Multi.new()
+
+  # def align_status_one(%{pio: pio} = dev_alias, %{pins: pins}, seen_at) do
+  #   case status(dev_alias, nature: :cmds) do
+  #     status when pin_cmd == :no_pin -> cmd_mismatch(status, "bad_pin", dev_alias, seen_at)
+  #     %{rc: :pending, detail: detail} -> tap(:no_change, fn _ -> Sally.Command.check_stale(detail) end)
+  #     %{rc: :ok, detail: %{cmd: ^pin_cmd}} -> :no_change
+  #     # NOTE: special case when DevAlias doesn't have any commands yet
+  #     %{rc: :error} -> Sally.Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
+  #     status -> cmd_mismatch(status, pin_cmd, dev_alias, seen_at)
+  #   end
+  # end
 
   def changeset(changes) when is_list(changes) do
     {id, changes_rest} = Keyword.pop(changes, :id)
@@ -106,26 +123,26 @@ defmodule Sally.DevAlias do
     |> Changeset.unique_constraint(:name, [:name])
   end
 
-  defp cmd_mismatch(%Alfred.Status{} = status, pin_cmd) do
-    [
-      module: Sally.Command,
-      align_status: true,
-      mismatch: true,
-      reported_cmd: pin_cmd,
-      local_cmd: Alfred.Status.get_cmd(status),
-      status_error: inspect(status.rc),
-      name: status.name
-    ]
-    |> Betty.app_error_v2()
+  # defp cmd_mismatch(%Alfred.Status{} = status, pin_cmd, dev_alias, seen_at) do
+  #   [
+  #     module: Sally.Command,
+  #     align_status: true,
+  #     mismatch: true,
+  #     reported_cmd: pin_cmd,
+  #     local_cmd: Alfred.Status.get_cmd(status),
+  #     status_error: inspect(status.rc),
+  #     name: status.name
+  #   ]
+  #   |> Betty.app_error_v2()
+  #
+  #   Sally.Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
+  # end
 
-    :no_change
-  end
-
-  defp cmd_mismatch(status, pin_cmd) do
-    [pin_cmd, "\n", inspect(status, pretty: true)] |> Logger.warn()
-
-    :no_change
-  end
+  # defp cmd_mismatch(status, pin_cmd) do
+  #   [pin_cmd, "\n", inspect(status, pretty: true)] |> Logger.warn()
+  #
+  #   :no_change
+  # end
 
   # helpers for changeset columns
   def columns(:all) do
@@ -172,13 +189,6 @@ defmodule Sally.DevAlias do
     end
   end
 
-  @doc """
-  Get the `Sally.Device` id from a `DevAlias` or list of `DevAlias`
-  """
-  @spec device_id(list_or_schema) :: pos_integer()
-  def device_id([%Schema{} = x | _]), do: device_id(x)
-  def device_id(%Schema{device_id: x}), do: x
-
   def exists?(name_or_id) do
     case find(name_or_id) do
       %Schema{} -> true
@@ -208,14 +218,29 @@ defmodule Sally.DevAlias do
     """
       iex> Sally.DevAlias.explain(name, what, opts)
 
-     name: name of a Sally.DevAlias
-     what: :status (currently only option)
+     name:      name of a Sally.DevAlias
+     category: :status | :cmdack (only for type: :cmds)
+     type:     :cmds or :datapoints
      opts: explain opts (default: [analyze: true, buffers: true])
     """
   end
 
   @explain_defaults [analyze: true, buffers: true, wal: true]
-  def explain(name, :status, what, opts \\ @explain_defaults) do
+  def explain(name, category, what, opts \\ @explain_defaults)
+
+  def explain(name, :cmdack, :cmds, opts) do
+    explain_opts = Keyword.merge(@explain_defaults, opts)
+
+    module = Sally.Command
+
+    find(name)
+    |> module.latest_query(:id)
+    |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
+    |> then(fn output -> ["\n", inspect(module), ".latest_query/1", "\n", output] end)
+    |> IO.iodata_to_binary()
+  end
+
+  def explain(name, :status, what, opts) do
     opts = Keyword.merge(@explain_defaults, opts)
     {explain_opts, query_opts} = Keyword.split(opts, Keyword.keys(@explain_defaults))
 
@@ -250,8 +275,6 @@ defmodule Sally.DevAlias do
 
   def find_by_name(name) when is_binary(name), do: find(name: name)
 
-  # def for_pio?(%Schema{pio: alias_pio}, pio), do: alias_pio == pio
-
   # @doc """
   #   Mark a list of DevAlias as just seen within an Ecto.Multi sequence
   #
@@ -284,7 +307,7 @@ defmodule Sally.DevAlias do
   # end
 
   def just_saw_db(%{} = multi_changes) do
-    %{device: %{id: device_id}, seen_at: seen_at} = multi_changes
+    %{device: %{id: device_id}, dispatch: %{sent_at: seen_at}} = multi_changes
 
     Ecto.Query.from(dev_alias in Sally.DevAlias,
       update: [set: [updated_at: ^seen_at]],
@@ -376,7 +399,7 @@ defmodule Sally.DevAlias do
 
   def status_lookup(%{name: name, nature: nature}, opts) do
     case nature do
-      :cmds -> Sally.Command.status(name, opts)
+      :cmds -> find(name) |> Sally.Command.status(opts)
       :datapoints -> Sally.Datapoint.status(name, opts)
     end
     |> status_lookup_finalize()

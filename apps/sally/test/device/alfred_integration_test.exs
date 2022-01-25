@@ -2,6 +2,8 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
   use ExUnit.Case, async: true
   use Sally.TestAid
 
+  import ExUnit.CaptureLog
+
   @moduletag sally: true, sally_alfred_integration: true
 
   # NOTE: devalias_add/1 automatically registers the name via Sally.DevAlias.just_saw/2
@@ -26,7 +28,11 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       # NOTE: cmd == "unknown" because this DevAlias did not have commands
       # Sally.DevAlias.Command.status/2 automatically adds an unknown command
       # when the DevAlias does not have any commands
-      assert %Alfred.Status{rc: :ok, detail: %{cmd: "unknown"}} = Alfred.status(name, [])
+
+      {status, log} = with_log(fn -> Alfred.status(name, []) end)
+      assert %Alfred.Status{rc: :ok, detail: %{cmd: "unknown"}} = status
+
+      assert log =~ ~r/correcting missing cmd/
     end
 
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :pending, echo: :instruct]]
@@ -39,6 +45,28 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       # NOTE: confirm attempt to exevute another cmd is prevented due to pending status
       assert %{cmd_latest: [%{rc: :pending, detail: %{cmd: cmd}}]} = ctx
       assert %Alfred.Status{rc: :pending, detail: %{cmd: ^cmd}} = Alfred.status(name, [])
+    end
+  end
+
+  describe "Alfred.execute/2 integration with Sally.DevAlias" do
+    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
+    test "does not issue a cmd/instruction to the remote host when same cmd", ctx do
+      assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
+
+      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
+      assert %Sally.DevAlias{name: dev_alias_name} = dev_alias
+      assert cmd_status = Sally.Command.status(dev_alias, [])
+      assert %Sally.DevAlias{cmds: [%Sally.Command{} = raw_cmd]} = cmd_status
+      assert %{id: before_id} = raw_cmd
+
+      assert %Alfred.Status{rc: :ok, detail: detail} = Alfred.status(dev_alias_name, [])
+      assert %{cmd: before_cmd, id: ^before_id} = detail
+
+      cmd_opts = [name: dev_alias_name, cmd: before_cmd, echo: :instruct]
+      execute = Alfred.execute(cmd_opts, [])
+
+      assert %Alfred.Execute{rc: :ok, name: ^dev_alias_name, detail: detail} = execute
+      assert %{acked: true, cmd: ^before_cmd, id: ^before_id} = detail
     end
   end
 end

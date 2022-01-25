@@ -8,13 +8,12 @@ defmodule Sally.Mutable.Handler do
 
   @impl true
   # NOTE: filter_extra: [_ident, "error"] are handled upstream
-  def process(%Sally.Dispatch{category: "status", filter_extra: [_ident, "ok"]} = msg) do
-    device_changes = Sally.Device.changeset(msg, msg.host)
+  def process(%Sally.Dispatch{category: "status", filter_extra: [_ident, "ok"]} = dispatch) do
+    device_changes = Sally.Device.changeset(dispatch, dispatch.host)
     device_insert_opts = Sally.Device.insert_opts()
 
     Ecto.Multi.new()
-    |> Ecto.Multi.put(:data, msg.data)
-    |> Ecto.Multi.put(:seen_at, msg.sent_at)
+    |> Ecto.Multi.put(:dispatch, dispatch)
     |> Ecto.Multi.insert(:device, device_changes, device_insert_opts)
     |> Ecto.Multi.run(:aliases, Sally.DevAlias, :load_aliases, [])
     |> Ecto.Multi.merge(Sally.DevAlias, :align_status, [])
@@ -39,20 +38,21 @@ defmodule Sally.Mutable.Handler do
   end
 
   @impl true
-  def post_process(%{category: "status", filter_extra: [_ident, "ok"], txn_info: txn}) do
-    %{aliases: aliases, device: device, seen_at: seen_at} = txn
+  def post_process(%{category: "status", filter_extra: [_ident, "ok"]} = dispatch) do
+    %{aliases: aliases, device: device} = dispatch.txn_info
 
-    register_opts = Sally.Device.name_registration_opts(device, seen_at: seen_at)
+    register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.sent_at)
     :ok = Sally.DevAlias.just_saw(aliases, register_opts)
   end
 
   @impl true
-  def post_process(%{category: "cmdack", filter_extra: [refid | _], txn_info: txn}) do
+  def post_process(%{category: "cmdack"} = dispatch) do
+    %{filter_extra: [refid | _]} = dispatch
     :ok = Sally.Command.release(refid, [])
 
-    %{aliases: aliases, device: device, seen_at: seen_at} = txn
+    %{aliases: aliases, device: device} = dispatch.txn_info
 
-    register_opts = Sally.Device.name_registration_opts(device, seen_at: seen_at)
+    register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.sent_at)
     :ok = Sally.DevAlias.just_saw(aliases, register_opts)
   end
 end

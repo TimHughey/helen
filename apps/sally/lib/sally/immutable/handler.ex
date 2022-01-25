@@ -6,13 +6,13 @@ defmodule Sally.Immutable.Handler do
 
   @impl true
   # NOTE: filter_extra: [_ident, "error"] are handled upstream
-  def process(%{filter_extra: [_ident, "ok"]} = msg) do
-    device_changes = Sally.Device.changeset(msg, msg.host)
+  def process(%{filter_extra: [_ident, "ok"]} = dispatch) do
+    device_changes = Sally.Device.changeset(dispatch, dispatch.host)
     device_insert_opts = Sally.Device.insert_opts()
-    add_datapoint_opts = [msg.data, msg.sent_at]
+    add_datapoint_opts = [dispatch.data, dispatch.sent_at]
 
     Ecto.Multi.new()
-    |> Ecto.Multi.put(:seen_at, msg.sent_at)
+    |> Ecto.Multi.put(:dispatch, dispatch)
     |> Ecto.Multi.insert(:device, device_changes, device_insert_opts)
     |> Ecto.Multi.run(:aliases, Sally.DevAlias, :load_aliases, [])
     |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, add_datapoint_opts)
@@ -23,13 +23,13 @@ defmodule Sally.Immutable.Handler do
   @impl true
   @want_keys [:aliases, :datapoint, :device]
   # NOTE: the dispatch is guaranteed to be valid
-  def post_process(%{txn_info: txn} = dispatch) do
-    %{aliases: aliases, device: device, seen_at: seen_at} = txn
+  def post_process(%{} = dispatch) do
+    %{aliases: aliases, device: device} = dispatch.txn_info
 
-    register_opts = Sally.Device.name_registration_opts(device, seen_at: seen_at)
+    register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.sent_at)
     :ok = Sally.DevAlias.just_saw(aliases, register_opts)
 
-    Map.take(txn, @want_keys)
+    Map.take(dispatch.txn_info, @want_keys)
     |> Map.put(:data, dispatch.data)
     |> Sally.Datapoint.write_metrics()
   end

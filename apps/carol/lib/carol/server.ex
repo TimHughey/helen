@@ -158,7 +158,7 @@ defmodule Carol.Server do
   end
 
   @impl true
-  def handle_info({Alfred, _memo}, %State{} = state) do
+  def handle_info({Alfred, %Alfred.Memo{}}, %State{} = state) do
     # NOTE: reuse :tick to ensure appropriate episode is active
     state
     |> State.update_notify_at()
@@ -168,10 +168,9 @@ defmodule Carol.Server do
   @impl true
   def handle_info({Alfred, %Alfred.Broom{} = broom}, %{exec_result: execute} = s) do
     case {broom, execute} do
-      {%{refid: refid}, %{refid: refid}} -> execute
-      {_, %{refid: refid}} -> {:unexpected_refid, refid}
+      {%{refid: refid}, %{detail: %{__execute__: %{refid: refid}}}} -> State.save_cmd(execute, s)
+      mismatch -> tap(s, fn _ -> log_refid_mismatch(mismatch, s) end)
     end
-    |> State.save_cmd(s)
     |> noreply(:timeout)
   end
 
@@ -206,6 +205,22 @@ defmodule Carol.Server do
 
     [equipment: equipment, notify: true, force: force]
     |> Carol.Episode.execute_args(:active, episodes)
+  end
+
+  @indent 40
+  def log_refid_mismatch({broom, execute}, state) do
+    %{refid: b_refid} = broom
+    %{detail: %{refid: e_refid}} = execute
+    %{episodes: [episode | _]} = state
+    active_id = Carol.Episode.active_id(episode)
+    active_id = if(is_binary(active_id), do: active_id, else: inspect(active_id))
+
+    details = Enum.map([b_refid, e_refid], fn x -> ["\n", String.pad_leading(x, @indent)] end)
+    episode = ["\n", String.pad_leading(active_id, @indent)]
+    execute = ["\n", inspect(execute, pretty: true)]
+
+    ["refid mismatch", details, episode, execute]
+    |> Logger.warn()
   end
 
   # GenServer reply helpers

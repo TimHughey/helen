@@ -68,6 +68,30 @@ defmodule Sally.Command do
     |> Repo.insert!(returning: true)
   end
 
+  @returned [returning: true]
+  def align_cmd(%Sally.DevAlias{} = dev_alias, cmd, asis_cmd, multi_acc, multi_read_only) do
+    log_cmd_mismatch(dev_alias, cmd, asis_cmd)
+
+    multi_id = {:aligned, dev_alias.name, dev_alias.pio}
+    align_cs = align_cmd_cs(dev_alias, cmd, multi_read_only)
+
+    Ecto.Multi.insert(multi_acc, multi_id, align_cs, @returned)
+  end
+
+  def align_cmd_cs(dev_alias, cmd, multi_read_only) do
+    align_cmd = Ecto.build_assoc(dev_alias, :cmds)
+
+    %{
+      refid: make_refid(),
+      cmd: cmd,
+      acked: true,
+      acked_at: Timex.now(),
+      sent_at: multi_read_only.dispatch.sent_at,
+      rt_latency_us: 1000
+    }
+    |> changeset(align_cmd)
+  end
+
   # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
   @impl true
   def broom_timeout(%Alfred.Broom{tracked_info: %{id: id}}) do
@@ -90,11 +114,52 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
-  def columns(:cast), do: [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
+  def log_cmd_mismatch(dev_alias, pin_cmd, asis_cmd) do
+    [
+      module: __MODULE__,
+      name: dev_alias.name,
+      align_status: true,
+      mismatch: true,
+      asis_cmd: asis_cmd,
+      reported_cmd: pin_cmd
+    ]
+    |> Betty.app_error_v2()
+  end
+
+  @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
+  def columns(:cast), do: @cast_cols
+
+  def check_stale(%{refid: refid} = cmd) do
+    tracked_info = tracked_info(refid)
+
+    case tracked_info do
+      %{refid: ^refid} -> :tracked
+      _ -> ack_orphan_now(cmd)
+    end
+  end
 
   @doc false
   def include_rt_latency(%{acked_at: ack_at} = changes, %{sent_at: sent_at} = _cmd) do
     changes |> Map.put(:rt_latency_us, Timex.diff(ack_at, sent_at))
+  end
+
+  def latest(%Sally.DevAlias{} = dev_alias, :id) do
+    latest_query(dev_alias, :id) |> Sally.Repo.one()
+  end
+
+  def latest_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
+    Ecto.Query.from(cmd in Schema,
+      # distinct: cmd.dev_alias_id,
+      where: [dev_alias_id: ^dev_alias_id],
+      order_by: [desc: :sent_at],
+      limit: 1
+    )
+  end
+
+  @default_pin [0, "no pin"]
+  def pin_cmd(pin_data, pio) do
+    # NOTE: pin data shape: [[pin_num, pin_cmd], ...]
+    Enum.find(pin_data, @default_pin, &match?([^pio, _], &1)) |> Enum.at(1)
   end
 
   # @doc """
@@ -139,24 +204,30 @@ defmodule Sally.Command do
     |> changeset(reported_cmd)
   end
 
-  def status(name, opts) do
-    query = status_query(name, opts)
+  def status(%Sally.DevAlias{} = dev_alias, opts) do
+    query = latest_query(dev_alias, :id)
 
     case Sally.Repo.one(query) do
-      %Sally.DevAlias{} = dev_alias -> dev_alias
-      nil -> status_fix_missing_cmd(name, opts) |> status(opts)
+      %Sally.Command{} = cmd -> cmd
+      nil -> status_fix_missing_cmd(dev_alias, opts)
     end
+    |> status_finalize(dev_alias)
+  end
+
+  def status_finalize(%Sally.Command{} = cmd, %Sally.DevAlias{} = dev_alias) do
+    fields = Map.take(dev_alias, [:id | Sally.DevAlias.columns(:all)])
+
+    Sally.Repo.load(Sally.DevAlias, fields)
+    |> struct(cmds: [cmd])
   end
 
   @doc false
-  def status_fix_missing_cmd(name, opts) do
-    ["correcting missing cmd [#{name}]"] |> Logger.warn()
+  def status_fix_missing_cmd(%Sally.DevAlias{} = dev_alias, opts) do
+    ["\n         correcting missing cmd [#{dev_alias.name}]"] |> Logger.warn()
 
     opts = Keyword.merge(opts, cmd: "unknown", cmd_opts: [ack: :immediate])
 
-    Sally.DevAlias.find(name) |> add(opts)
-
-    name
+    add(dev_alias, opts)
   end
 
   def status_query(<<_::binary>> = name, _opts) do
@@ -172,8 +243,8 @@ defmodule Sally.Command do
             where: [dev_alias_id: parent_as(:dev_alias).id],
             order_by: [desc: :sent_at],
             group_by: [:id, :dev_alias_id, :sent_at],
-            limit: 1
-            # select: [:id]
+            limit: 1,
+            select: [:id]
           )
         ),
       on: latest_cmd.id == cmd.id,

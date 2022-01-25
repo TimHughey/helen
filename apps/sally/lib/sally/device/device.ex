@@ -142,7 +142,7 @@ defmodule Sally.Device do
     end)
   end
 
-  def load_aliases(device) do
+  def load_aliases(%Schema{} = device) do
     Repo.preload(device, [:aliases])
   end
 
