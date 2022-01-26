@@ -165,10 +165,6 @@ defmodule Alfred.Notify do
 
   @impl true
   def handle_cast({:just_saw, %{name: x, seen_at: seen_at}, _opts}, %{name: x} = state) do
-    sleep_ms = :rand.uniform(100) + 50
-
-    Process.sleep(sleep_ms)
-
     state
     |> update_at(:seen, seen_at)
     |> send_notify_if_needed()

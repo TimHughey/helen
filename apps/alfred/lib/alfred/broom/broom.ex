@@ -80,7 +80,7 @@ defmodule Alfred.Broom do
   end
 
   @doc false
-  defdelegate use_opts(module), to: __MODULE__, as: :get_attribute
+  def use_opts(module), do: get_attribute(module)
 
   def make_refid do
     Ecto.UUID.generate() |> String.split("-") |> Enum.take(4) |> Enum.join("-")
