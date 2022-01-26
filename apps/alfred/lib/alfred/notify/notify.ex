@@ -8,7 +8,6 @@ defmodule Alfred.Notify do
             ref: nil,
             pid: nil,
             at: %{missing: nil, seen: :never, notified: :never},
-            notified_at: :none,
             opts: %{ms: %{interval: 60_000, missing: 60_000}, send_missing_msg: false}
 
   @doc since: "0.3.0"
@@ -166,6 +165,10 @@ defmodule Alfred.Notify do
 
   @impl true
   def handle_cast({:just_saw, %{name: x, seen_at: seen_at}, _opts}, %{name: x} = state) do
+    sleep_ms = :rand.uniform(100) + 50
+
+    Process.sleep(sleep_ms)
+
     state
     |> update_at(:seen, seen_at)
     |> send_notify_if_needed()
