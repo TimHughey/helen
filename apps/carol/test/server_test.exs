@@ -201,7 +201,7 @@ defmodule CarolServerTest do
 
   describe "Carol.Server.handle_info/2 handles Alfred.Broom" do
     @tag skip: false
-    @tag equipment_add: [cmd: "on", rc: :pending]
+    @tag equipment_add: [cmd: "on", rc: :busy]
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
     test "TrackerEntry with matching refid", ctx do
@@ -217,11 +217,11 @@ defmodule CarolServerTest do
       assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
                Carol.Server.handle_info({Alfred, broom}, new_state)
 
-      assert cmd_live =~ ~r/^PENDING\s\{on\}/
+      assert cmd_live =~ ~r/^BUSY\s\{on\}/
     end
 
     @tag skip: false
-    @tag equipment_add: [cmd: "on", rc: :pending]
+    @tag equipment_add: [cmd: "on", rc: :busy]
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true]
     test "TrackerEntry with mismatched refid", ctx do
@@ -237,7 +237,7 @@ defmodule CarolServerTest do
       assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
                Carol.Server.handle_info({Alfred, broom}, new_state)
 
-      assert cmd_live =~ ~r/^PENDING\s\{on\}/
+      assert cmd_live =~ ~r/^BUSY\s\{on\}/
     end
   end
 
