@@ -37,15 +37,23 @@ defmodule Sally.DevAlias do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
-      when is_map(raw_data) do
-    for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
-      {:ok, acc} ->
-        case Datapoint.add(repo, schema, raw_data, reading_at) do
-          {:ok, %Datapoint{} = x} -> {:ok, [x] ++ acc}
-          {:error, _reason} = rc -> rc
-        end
-    end
+  @returned [returning: true]
+
+  # def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
+  #     when is_map(raw_data) do
+  #   for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
+  #     {:ok, acc} ->
+  #       case Datapoint.add(repo, schema, raw_data, reading_at) do
+  #         {:ok, %Datapoint{} = x} -> {:ok, [x] ++ acc}
+  #         {:error, _reason} = rc -> rc
+  #       end
+  #   end
+  # end
+
+  def add_datapoint([_ | _] = dev_aliases, raw_data, %DateTime{} = reading_at) do
+    Enum.map(dev_aliases, fn dev_alias ->
+      Sally.Datapoint.add(dev_alias, raw_data, reading_at)
+    end)
   end
 
   # def align_status(%{aliases: [_ | _] = aliases, data: %{pins: _} = data, seen_at: seen_at}) do
@@ -59,41 +67,55 @@ defmodule Sally.DevAlias do
   #   end)
   # end
 
-  def align_status(%{aliases: []} = _multi_changes), do: Ecto.Multi.new()
+  def align_status(%Sally.DevAlias{pio: pio} = dev_alias, dispatch) do
+    %{data: %{pins: pin_data}, recv_at: align_at} = dispatch
+    pin_cmd = Sally.Command.pin_cmd(pio, pin_data)
 
-  def align_status(%{aliases: aliases} = multi_read_only) do
-    # NOTE: reduce a entirely new Ecto.Multi to merge into the overall Ecto.Multi
-    Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi_acc ->
-      align_status_one(dev_alias, multi_acc, multi_read_only)
-    end)
-  end
+    latest_cmd = Sally.Command.saved(dev_alias)
 
-  def align_status_one(dev_alias, multi_acc, multi_read_only) do
-    cmd = Sally.Command.latest(dev_alias, :id)
-    pin_cmd = Sally.Command.pin_cmd(multi_read_only.dispatch.data.pins, dev_alias.pio)
-
-    case cmd do
-      # NOTE: never step on a pending commmand
-      %{acked: false} -> multi_acc
-      # latest acked command == pin cmd
-      %{acked: true, cmd: ^pin_cmd} -> multi_acc
-      # pin_cmd different, fix the mismatch
-      %{cmd: asis_cmd} -> align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
-      # dev_alias without cmd history, strange but possible
-      nil -> align_now(dev_alias, pin_cmd, "unknown", multi_acc, multi_read_only)
+    case latest_cmd do
+      %{acked: false, acked_at: nil} -> :busy
+      %{acked: true, cmd: ^pin_cmd} -> :aligned
+      %{acked: true} -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
+      nil -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
     end
   end
 
-  def align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only) do
-    Sally.Command.align_cmd(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
-  end
+  # def align_status(%{aliases: []} = _multi_changes), do: Ecto.Multi.new()
+  #
+  # def align_status(%{aliases: aliases} = multi_read_only) do
+  #   # NOTE: reduce a entirely new Ecto.Multi to merge into the overall Ecto.Multi
+  #   Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi_acc ->
+  #     align_status_one(dev_alias, multi_acc, multi_read_only)
+  #   end)
+  # end
+  #
+  # def align_status_one(dev_alias, multi_acc, multi_read_only) do
+  #   cmd = Sally.Command.latest(dev_alias, :id)
+  #   pin_cmd = Sally.Command.pin_cmd(multi_read_only.dispatch.data.pins, dev_alias.pio)
+  #
+  #   case cmd do
+  #     # NOTE: never step on a busy commmand
+  #     %{acked: false} -> multi_acc
+  #     # latest acked command == pin cmd
+  #     %{acked: true, cmd: ^pin_cmd} -> multi_acc
+  #     # pin_cmd different, fix the mismatch
+  #     %{cmd: asis_cmd} -> align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
+  #     # dev_alias without cmd history, strange but possible
+  #     nil -> align_now(dev_alias, pin_cmd, "unknown", multi_acc, multi_read_only)
+  #   end
+  # end
+
+  # def align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only) do
+  #   Sally.Command.align_cmd(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
+  # end
 
   # def align_status(_changes), do: Ecto.Multi.new()
 
   # def align_status_one(%{pio: pio} = dev_alias, %{pins: pins}, seen_at) do
   #   case status(dev_alias, nature: :cmds) do
   #     status when pin_cmd == :no_pin -> cmd_mismatch(status, "bad_pin", dev_alias, seen_at)
-  #     %{rc: :pending, detail: detail} -> tap(:no_change, fn _ -> Sally.Command.check_stale(detail) end)
+  #     %{rc: :busy, detail: detail} -> tap(:no_change, fn _ -> Sally.Command.check_stale(detail) end)
   #     %{rc: :ok, detail: %{cmd: ^pin_cmd}} -> :no_change
   #     # NOTE: special case when DevAlias doesn't have any commands yet
   #     %{rc: :error} -> Sally.Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
@@ -104,9 +126,9 @@ defmodule Sally.DevAlias do
   def changeset(changes) when is_list(changes) do
     {id, changes_rest} = Keyword.pop(changes, :id)
     required = Keyword.keys(changes)
+    schema = Sally.Repo.load(Schema, id: id)
 
-    Enum.into(changes_rest, %{})
-    |> changeset(struct(__MODULE__, id: id), required: required)
+    Enum.into(changes_rest, %{}) |> changeset(schema, required: required)
   end
 
   def changeset(changes, %Schema{} = a, opts \\ []) do
@@ -202,7 +224,7 @@ defmodule Sally.DevAlias do
   def execute_cmd(%Sally.DevAlias{} = dev_alias, opts) do
     new_cmd = Sally.Command.add(dev_alias, opts)
 
-    rc = if(new_cmd.acked, do: :ok, else: :pending)
+    rc = if(new_cmd.acked, do: :ok, else: :busy)
 
     preloads = [dev_alias: [device: [:host]]]
     Sally.Repo.preload(new_cmd, preloads) |> Sally.Command.Payload.send_cmd(opts)
@@ -330,6 +352,11 @@ defmodule Sally.DevAlias do
   #   end
   # end
 
+  def load_aliases(%Sally.Device{id: device_id}) do
+    Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
+    |> Sally.Repo.all()
+  end
+
   def load_aliases(repo, multi_changes) do
     %{device: %{id: device_id}} = multi_changes
 
@@ -383,6 +410,10 @@ defmodule Sally.DevAlias do
     |> Repo.all()
   end
 
+  def preload_query do
+    Ecto.Query.from(a in Schema, order_by: [asc: a.pio])
+  end
+
   def rename(opts) when is_list(opts) do
     with {:opts, from} when is_binary(from) <- {:opts, opts[:from]},
          {:opts, to} when is_binary(to) <- {:opts, opts[:to]},
@@ -415,4 +446,14 @@ defmodule Sally.DevAlias do
   end
 
   def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
+
+  def ttl_reset(%Sally.Command{dev_alias_id: id, acked_at: ttl_at}) do
+    Sally.Repo.load(Schema, id: id) |> ttl_reset(ttl_at)
+  end
+
+  def ttl_reset(%Sally.DevAlias{} = dev_alias, ttl_at) do
+    cs = changeset(%{updated_at: ttl_at}, dev_alias, required: [:updated_at])
+
+    Sally.Repo.update!(cs, @returned)
+  end
 end

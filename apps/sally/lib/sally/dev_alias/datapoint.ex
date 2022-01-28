@@ -20,33 +20,39 @@ defmodule Sally.Datapoint do
     belongs_to(:dev_alias, DevAlias)
   end
 
-  def add(repo, %DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
+  @returned [returning: true]
+
+  # def add(repo, %DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
+  #   raw_data
+  #   |> Map.take([:temp_c, :relhum])
+  #   |> Map.put(:reading_at, at)
+  #   |> changeset(Ecto.build_assoc(a, :datapoints))
+  #   |> repo.insert(returning: true)
+  # end
+
+  def add([_ | _] = aliases, raw_data, at), do: Enum.map(aliases, &add(&1, raw_data, at))
+
+  def add(%DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
     raw_data
     |> Map.take([:temp_c, :relhum])
     |> Map.put(:reading_at, at)
     |> changeset(Ecto.build_assoc(a, :datapoints))
-    |> repo.insert(returning: true)
+    |> Sally.Repo.insert!(@returned)
   end
 
   def changeset(changes, %Schema{} = dp) when is_map(changes), do: changeset(dp, changes)
 
+  @cast_columns [:temp_c, :relhum, :reading_at]
+  @required_columns [:temp_c, :reading_at, :dev_alias_id]
+  @validate_temp_c [greater_than: -30.0, less_than: 80.0]
+  @validate_relhum [greater_than: 0.0, less_than_or_equal_to: 100.0]
   def changeset(%Schema{} = dp, changes) when is_map(changes) do
-    alias Ecto.Changeset
-
     dp
-    |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required([:temp_c, :reading_at, :dev_alias_id])
-    |> Changeset.validate_number(:temp_c, greater_than: -30.0, less_than: 80.0)
-    |> Changeset.validate_number(:relhum, greater_than: 0.0, less_than_or_equal_to: 100.0)
+    |> Ecto.Changeset.cast(changes, @cast_columns)
+    |> Ecto.Changeset.validate_required(@required_columns)
+    |> Ecto.Changeset.validate_number(:temp_c, @validate_temp_c)
+    |> Ecto.Changeset.validate_number(:relhum, @validate_relhum)
   end
-
-  def columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
-
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  def columns(:cast), do: columns(:all)
 
   @since_ms_default 1000 * 60 * 5
   def preload_avg(nil, _opts), do: nil
@@ -143,7 +149,7 @@ defmodule Sally.Datapoint do
     )
   end
 
-  # NOTE: assume the caller (Sally.Immutable.Handler has verified the map)
+  # NOTE: assume the caller (Sally.Immutable.Dispatch has verified the map)
   @measurement "immutables"
   def write(%{aliases: []}), do: []
 
@@ -151,7 +157,7 @@ defmodule Sally.Datapoint do
     family = map.device.family
     read_us = map.data.metrics["read"]
 
-    zipped = Enum.zip(map.aliases, map.datapoint)
+    zipped = Enum.zip(map.aliases, map.datapoints)
 
     Enum.into(zipped, [], fn {%{name: name}, dap} ->
       tags = [name: name, family: family]

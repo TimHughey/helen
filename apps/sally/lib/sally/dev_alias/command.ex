@@ -2,7 +2,7 @@ defmodule Sally.Command do
   @moduledoc false
 
   require Logger
-
+  use Agent
   use Ecto.Schema
   use Alfred.Broom, timeout_after: "PT3.3S"
 
@@ -23,16 +23,28 @@ defmodule Sally.Command do
     belongs_to(:dev_alias, DevAlias)
   end
 
-  def ack_now_cs(multi_changes, disposition) do
-    %{cmd_to_ack: cmd, recv_at: ack_at} = multi_changes
+  @returned [returning: true]
 
+  def ack_now(%{id: _id} = cmd) do
+    ack_now_cs(cmd, :ack, Timex.now())
+    |> Sally.Repo.update!(@returned)
+    # NOTE: updated the busy Command with the just acked Command
+    |> save()
+  end
+
+  def ack_now_cs(%{cmd_to_ack: cmd} = multi_changes, disposition) do
+    ack_at = Map.get(multi_changes, :recv_at, Timex.now())
+
+    ack_now_cs(cmd, disposition, ack_at)
+  end
+
+  def ack_now_cs(%{id: id} = cmd, disposition, %DateTime{} = ack_at) do
     orphaned = disposition == :orphan
 
     changes = %{acked: true, acked_at: ack_at, orphaned: orphaned} |> include_rt_latency(cmd)
     required = Map.keys(changes)
 
-    Sally.Repo.load(__MODULE__, id: cmd.id)
-    |> Ecto.Changeset.cast(changes, required)
+    Sally.Repo.load(__MODULE__, id: id) |> Ecto.Changeset.cast(changes, required)
   end
 
   def ack_orphan_now(nil), do: {:ok, :already_acked}
@@ -66,31 +78,40 @@ defmodule Sally.Command do
     |> Map.merge(fields_map)
     |> changeset(new_cmd)
     |> Repo.insert!(returning: true)
+    |> save()
   end
 
-  @returned [returning: true]
-  def align_cmd(%Sally.DevAlias{} = dev_alias, cmd, asis_cmd, multi_acc, multi_read_only) do
-    log_cmd_mismatch(dev_alias, cmd, asis_cmd)
-
-    multi_id = {:aligned, dev_alias.name, dev_alias.pio}
-    align_cs = align_cmd_cs(dev_alias, cmd, multi_read_only)
-
-    Ecto.Multi.insert(multi_acc, multi_id, align_cs, @returned)
+  def align_cmd(dev_alias, pin_cmd, align_at) do
+    add(dev_alias, cmd: pin_cmd, ref_dt: align_at)
   end
 
-  def align_cmd_cs(dev_alias, cmd, multi_read_only) do
-    align_cmd = Ecto.build_assoc(dev_alias, :cmds)
+  # def align_cmd(%Sally.DevAlias{} = dev_alias, cmd, asis_cmd, multi_acc, multi_read_only) do
+  #   log_cmd_mismatch(dev_alias, cmd, asis_cmd)
+  #
+  #   multi_id = {:aligned, dev_alias.name, dev_alias.pio}
+  #   align_cs = align_cmd_cs(dev_alias, cmd, multi_read_only)
+  #
+  #   Ecto.Multi.insert(multi_acc, multi_id, align_cs, @returned)
+  # end
 
-    %{
-      refid: make_refid(),
-      cmd: cmd,
-      acked: true,
-      acked_at: Timex.now(),
-      sent_at: multi_read_only.dispatch.sent_at,
-      rt_latency_us: 1000
-    }
-    |> changeset(align_cmd)
-  end
+  # def align_cmd_cs(dev_alias, cmd, %{} = multi_changes) do
+  #   ack_at = Map.get(multi_changes, :recv_at, Timex.now())
+  #   align_cmd_cs(dev_alias, cmd, ack_at)
+  # end
+  #
+  # def align_cmd_cs(dev_alias, cmd, %DateTime{} = ack_at) do
+  #   align_cmd = Ecto.build_assoc(dev_alias, :cmds)
+  #
+  #   %{
+  #     refid: make_refid(),
+  #     cmd: cmd,
+  #     acked: true,
+  #     acked_at: ack_at,
+  #     sent_at: ack_at,
+  #     rt_latency_us: 1000
+  #   }
+  #   |> changeset(align_cmd)
+  # end
 
   # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
   @impl true
@@ -129,14 +150,14 @@ defmodule Sally.Command do
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
-  def check_stale(%{refid: refid} = cmd) do
-    tracked_info = tracked_info(refid)
-
-    case tracked_info do
-      %{refid: ^refid} -> :tracked
-      _ -> ack_orphan_now(cmd)
-    end
-  end
+  # def check_stale(%{refid: refid} = cmd) do
+  #   tracked_info = tracked_info(refid)
+  #
+  #   case tracked_info do
+  #     %{refid: ^refid} -> :tracked
+  #     _ -> ack_orphan_now(cmd)
+  #   end
+  # end
 
   @doc false
   def include_rt_latency(%{acked_at: ack_at} = changes, %{sent_at: sent_at} = _cmd) do
@@ -157,9 +178,10 @@ defmodule Sally.Command do
   end
 
   @default_pin [0, "no pin"]
-  def pin_cmd(pin_data, pio) do
+  def pin_cmd(pio, pin_data) do
     # NOTE: pin data shape: [[pin_num, pin_cmd], ...]
-    Enum.find(pin_data, @default_pin, &match?([^pio, _], &1)) |> Enum.at(1)
+    Enum.find(pin_data, @default_pin, &match?([^pio, _], &1))
+    |> Enum.at(1)
   end
 
   # @doc """
@@ -192,17 +214,17 @@ defmodule Sally.Command do
     from(c in Schema, distinct: c.dev_alias_id, order_by: [desc: c.sent_at])
   end
 
-  def reported_cmd_changeset(%DevAlias{} = da, cmd, reported_at) do
-    reported_cmd = Ecto.build_assoc(da, :cmds)
-
-    [refid | _] = Ecto.UUID.generate() |> String.split("-")
-
-    # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
-    utc_now = DateTime.utc_now()
-
-    %{refid: refid, cmd: cmd, acked: true, orphan: false, acked_at: utc_now, sent_at: reported_at}
-    |> changeset(reported_cmd)
-  end
+  # def reported_cmd_changeset(%DevAlias{} = da, cmd, reported_at) do
+  #   reported_cmd = Ecto.build_assoc(da, :cmds)
+  #
+  #   [refid | _] = Ecto.UUID.generate() |> String.split("-")
+  #
+  #   # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
+  #   utc_now = DateTime.utc_now()
+  #
+  #   %{refid: refid, cmd: cmd, acked: true, orphan: false, acked_at: utc_now, sent_at: reported_at}
+  #   |> changeset(reported_cmd)
+  # end
 
   def status(%Sally.DevAlias{} = dev_alias, opts) do
     query = latest_query(dev_alias, :id)
@@ -259,4 +281,52 @@ defmodule Sally.Command do
   def summary([%Schema{} = x | _]), do: summary(x)
 
   def summary([]), do: %{}
+
+  ##
+  ## Agent
+  ##
+
+  def start_link(_), do: Agent.start_link(fn -> [] end, name: __MODULE__)
+
+  def agent(action, args) do
+    case action do
+      :find -> Agent.get(__MODULE__, __MODULE__, :__find, [args])
+      :save -> Agent.update(__MODULE__, __MODULE__, :__save, [args])
+      :all -> Agent.get(__MODULE__, fn cmds -> cmds end)
+    end
+  end
+
+  def busy(what) do
+    case agent(:find, what) do
+      %{acked: false, acked_at: nil} = cmd -> cmd
+      _ -> nil
+    end
+  end
+
+  def busy?(what), do: busy(what) |> is_struct()
+  def save(%Sally.Command{} = cmd), do: tap(cmd, fn cmd -> agent(:save, cmd) end)
+  def saved(%Sally.DevAlias{} = dev_alias), do: agent(:find, dev_alias)
+  def saved(<<_::binary>> = refid), do: agent(:find, refid)
+  def saved_count, do: agent(:all, []) |> length()
+
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
+
+  def cmd_match?(what, cmd) do
+    compare = compare(what)
+
+    compare == Map.take(cmd, Map.keys(compare))
+  end
+
+  def compare(id) when is_integer(id), do: %{dev_alias_id: id}
+  def compare(%Sally.DevAlias{id: id}), do: %{dev_alias_id: id}
+  def compare(%Sally.Command{} = cmd), do: Map.take(cmd, [:id, :refid])
+  def compare(<<_::binary>> = refid), do: %{refid: refid}
+
+  # NOTE: double underscore functions can only be called by the Agent
+  def __find(cmds, <<_::binary>> = refid), do: Enum.find(cmds, &match?(%{refid: ^refid}, &1))
+  def __find(cmds, what), do: Enum.find(cmds, &cmd_match?(what, &1))
+  def __save(cmds, %{dev_alias_id: id} = cmd), do: [cmd | remove_saved(cmds, id)]
+  def remove_saved(cmds, id), do: Enum.reject(cmds, &cmd_match?(id, &1))
 end

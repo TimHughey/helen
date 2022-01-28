@@ -1,7 +1,14 @@
 defmodule Sally.Dispatch do
   require Logger
+  use GenServer
 
-  alias __MODULE__
+  alias Sally.Types, as: Types
+
+  @callback child_spec(Types.child_spec_opts()) :: Supervisor.child_spec()
+  @callback process(struct()) :: struct()
+  @callback process_many(any(), struct()) :: {:ok, map()} | {:error, map()}
+  @callback post_process(struct()) :: struct()
+  @optional_callbacks [process_many: 2, post_process: 1]
 
   # @derive {Inspect, only: [:valid?, :subsystem, :category]}
   defstruct env: nil,
@@ -55,6 +62,106 @@ defmodule Sally.Dispatch do
           opts: [] | [{:echo, boolean()}]
         }
 
+  defmacro __using__(use_opts) do
+    quote bind_quoted: [use_opts: use_opts] do
+      subsystem = Keyword.get(use_opts, :subsystem, :none)
+      if subsystem == :none, do: raise("must include subsystem: String.t() in use opts")
+
+      Sally.Dispatch.attribute(:put, {__MODULE__, use_opts})
+      @behaviour Sally.Dispatch
+
+      @doc false
+      @impl true
+      def child_spec(_) do
+        use_opts = Sally.Dispatch.attribute(:get, __MODULE__)
+        subsystem = Keyword.get(use_opts, :subsystem)
+        state = Enum.into(use_opts, %{callback_mod: __MODULE__})
+
+        # NOTE: we use a Registry for routing Dispatch(es) to the correct handlers
+        name = Sally.Dispatch.server(subsystem)
+        start_args = {name, state}
+
+        %{id: __MODULE__, start: {Sally.Dispatch, :start_link, [start_args]}}
+      end
+    end
+  end
+
+  @mod_attribute :sally_dispatch_use_opts
+
+  @doc false
+  def attribute(what, opts \\ []) do
+    case opts do
+      module when is_atom(module) and what == :get ->
+        module.__info__(:attributes) |> Keyword.get(@mod_attribute, [])
+
+      {module, [_ | _] = opts} when is_atom(module) and what == :put ->
+        Module.register_attribute(module, @mod_attribute, persist: true)
+        Module.put_attribute(module, @mod_attribute, opts)
+    end
+  end
+
+  @impl true
+  def init(%{} = opts), do: {:ok, _state = %{opts: opts}}
+
+  def start_link({name, state}) do
+    GenServer.start_link(__MODULE__, state, name: name)
+  end
+
+  @doc false
+  @registry Sally.Dispatch.Supervisor.registry()
+  def server(%Sally.Dispatch{} = dispatch), do: dispatch.subsystem |> server()
+  def server(<<_::binary>> = subsystem), do: {:via, Registry, {@registry, subsystem}}
+
+  @doc false
+  def call(msg, mod) when is_tuple(msg) and is_atom(mod) do
+    case GenServer.whereis(mod) do
+      x when is_pid(x) -> GenServer.call(x, msg)
+      _ -> {:no_server, mod}
+    end
+  end
+
+  @doc false
+  def cast(msg, mod) when is_tuple(msg) and is_atom(mod) do
+    # returns:
+    # 1. {:ok, original msg}
+    # 2. {:no_server, original_msg}
+    case GenServer.whereis(mod) do
+      x when is_pid(x) -> {GenServer.cast(x, msg), msg}
+      _ -> {:no_server, mod}
+    end
+  end
+
+  @impl true
+  def handle_call(%__MODULE__{} = dispatch, {caller_pid, _ref}, state) do
+    # NOTE: reply quickly to free up MQTT handler, do the heavy lifting in the server
+    {:reply, :ok, state, {:continue, {dispatch, caller_pid}}}
+  end
+
+  @impl true
+  def handle_cast(%__MODULE__{} = dispatch, state) do
+    %{opts: %{callback_mod: callback_mod}} = state
+
+    # NOTE: return value ignored, pure side effects function
+    _ = reduce(dispatch, callback_mod)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_continue({%{opts: opts} = dispatch, caller_pid}, state) do
+    %{opts: %{callback_mod: callback_mod}} = state
+
+    dispatch = reduce(dispatch, callback_mod)
+
+    if opts[:echo] == "dispatch", do: Process.send(caller_pid, dispatch, [])
+
+    {:noreply, state}
+  end
+
+  ##
+  ## Private
+  ##
+
   @doc """
   Accepts a topic filter parts and payload to create a `%Dispatch{}`
 
@@ -74,7 +181,7 @@ defmodule Sally.Dispatch do
   @doc since: "0.5.10"
   @type topic_parts() :: [String.t(), ...]
   @type accept_tuple() :: {topic_parts(), payload()}
-  @spec accept(accept_tuple()) :: Dispatch.t()
+  @spec accept(accept_tuple()) :: Sally.Dispatch.t()
   def accept({[env, ident, subsystem, category, extras], payload}) do
     [
       env: env,
@@ -109,19 +216,7 @@ defmodule Sally.Dispatch do
     [halt_reason: reason] |> update(dispatch)
   end
 
-  @routing [host: Sally.Host.Handler, immut: Sally.Immutable.Handler, mut: Sally.Mutable.Handler]
-  def handoff(%Sally.Dispatch{subsystem: subsystem} = dispatch) do
-    # NOTE: to aid with testing
-    msg_handler = Keyword.get(@routing, String.to_atom(subsystem), :unknown)
-
-    pid = GenServer.whereis(msg_handler)
-
-    cond do
-      msg_handler == :unknown -> invalid(dispatch, "undefined routing: #{subsystem}")
-      not is_pid(pid) -> invalid(dispatch, "no server: #{msg_handler}")
-      true -> struct(dispatch, routed: GenServer.call(pid, route_now(dispatch)))
-    end
-  end
+  def handoff(%Sally.Dispatch{} = dispatch), do: route_now(dispatch)
 
   def invalid(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
     Keyword.put(fields, :valid?, false) |> update(dispatch)
@@ -155,10 +250,10 @@ defmodule Sally.Dispatch do
   def new(fields), do: struct(Sally.Dispatch, fields)
 
   @data_prune [:mtime, :log, :echo]
-  def preprocess(%Dispatch{log: log, opts: opts} = dispatch) do
-    with %Dispatch{valid?: true} = dispatch <- check_metadata(dispatch),
-         %Dispatch{valid?: true, data: data} = dispatch <- unpack(dispatch),
-         %Dispatch{valid?: true} = dispatch <- check_sent_time(dispatch) do
+  def preprocess(%Sally.Dispatch{log: log, opts: opts} = dispatch) do
+    with %{valid?: true} = dispatch <- check_metadata(dispatch),
+         %{valid?: true, data: data} = dispatch <- unpack(dispatch),
+         %{valid?: true} = dispatch <- check_sent_time(dispatch) do
       # NOTE: ensure data is a map
       data = data || %{}
 
@@ -179,9 +274,38 @@ defmodule Sally.Dispatch do
   end
 
   def process(%Sally.Dispatch{callback_mod: callback_mod} = dispatch) do
+    # NOTE: support process/1 returning either a database result tuple _OR_ a map
+    # when we get a map merge it into the existing txn_info
+
     callback_mod.process(dispatch)
     |> save_txn_info(dispatch)
   end
+
+  # def process_many(dispatch) do
+  #   %{callback_mod: mod, category: category, txn_info: txn_info} = dispatch
+  #
+  #   manys = attribute(mod) |> Keyword.get(:process_many, [])
+  #   category = String.to_atom(category)
+  #
+  #   if function_exported?(mod, :process_many, 1) do
+  #     Enum.reduce(manys, txn_info, fn
+  #       {^category, txn_key}, txn_info when is_map_key(txn_info, txn_key) ->
+  #         many = Map.get(txn_info, txn_key)
+  #
+  #         # NOTE process_many/2 returns a {key, val} pair to add to txn_info
+  #         # and returns the updated txn_info as the accumulator
+  #         Enum.into(many, txn_info, fn item -> mod.process_many(item, dispatch) end)
+  #
+  #       # NOTE: category doesn't match or key doesn't exist in txn_info
+  #       _, txn_info ->
+  #         txn_info
+  #     end)
+  #     # NOTE: updated txn_info is the result of the reduction, store the latest
+  #     |> then(fn txn_info -> [txn_info: txn_info] |> update(dispatch) end)
+  #   else
+  #     dispatch
+  #   end
+  # end
 
   def post_process(%{callback_mod: callback_mod, post_process?: true} = dispatch) do
     callback_mod.post_process(dispatch)
@@ -190,7 +314,21 @@ defmodule Sally.Dispatch do
 
   def post_process(%{} = dispatch), do: valid(:none, :_post_process_, dispatch)
 
-  def route_now(dispatch), do: update(dispatch, routed: :ok)
+  @order [:routed, :process, :check_txn, :post_process, :finalize, :finished]
+  def reduce(%Sally.Dispatch{} = dispatch, callback_mod) do
+    Enum.reduce_while(@order, dispatch, fn
+      _function, %{valid?: false} = dispatch -> {:halt, Sally.Dispatch.finalize(dispatch)}
+      _function, %{halt_reason: <<_::binary>>} -> {:halt, Sally.Dispatch.finalize(dispatch)}
+      :finished, dispatch -> {:halt, dispatch}
+      :routed, dispatch -> {:cont, Sally.Dispatch.routed(dispatch, callback_mod)}
+      function, dispatch -> {:cont, apply(Sally.Dispatch, function, [dispatch])}
+    end)
+  end
+
+  def route_now(%{} = dispatch) do
+    update(dispatch, routed: :ok)
+    |> tap(fn dispatch -> GenServer.call(server(dispatch), dispatch) end)
+  end
 
   def routed(dispatch, callback_mod) when is_atom(callback_mod) do
     exported? = function_exported?(callback_mod, :post_process, 1)
@@ -205,15 +343,10 @@ defmodule Sally.Dispatch do
     [txn_info: txn_info] |> update(dispatch)
   end
 
-  def unpack(%Dispatch{payload: payload} = m) do
-    if is_bitstring(payload) do
-      case Msgpax.unpack(payload) do
-        {:ok, data} -> %Dispatch{m | valid?: true, data: atomize_keys(data), payload: :unpacked}
-        {:error, e} -> invalid(m, e)
-      end
-    else
-      invalid(m, "unknown payload")
-    end
+  def unpack(%{payload: payload} = dispatch) do
+    valid(dispatch, data: Msgpax.unpack!(payload) |> atomize_keys(), payload: :unpacked)
+  catch
+    _, _ -> invalid(dispatch, "payload is not a bitstring")
   end
 
   def update(%Sally.Dispatch{} = dispatch), do: dispatch
@@ -255,7 +388,7 @@ defmodule Sally.Dispatch do
 
   @host_categories ["startup", "boot", "run", "ota", "log"]
   @subsystems ["immut", "mut"]
-  defp check_metadata(%Dispatch{} = m) do
+  defp check_metadata(%{} = m) do
     case {m.subsystem, m.category} do
       {"host", cat} when cat in @host_categories -> valid(m)
       {subsystem, _cat} when subsystem in @subsystems -> valid(m) |> load_host()
@@ -263,10 +396,9 @@ defmodule Sally.Dispatch do
     end
   end
 
-  @variance_opt [Sally.Message.Handler, :mtime_variance_ms]
+  @variance_opt [Sally.Dispatch.Handler, :mtime_variance_ms]
   @variance_ms Application.compile_env(:sally, @variance_opt, 10_000)
-
-  defp check_sent_time(%Dispatch{data: data} = m) do
+  defp check_sent_time(%{data: data} = m) do
     recv_at = m.recv_at || DateTime.utc_now()
     sent_at = DateTime.from_unix!(data[:mtime] || 0, :millisecond)
 
