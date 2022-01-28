@@ -24,6 +24,8 @@ defmodule Sally.Device do
     timestamps(type: :utc_datetime_usec)
   end
 
+  @returned [returning: true]
+
   def changeset(struct, %Host{} = host) when is_struct(struct) do
     p = Map.from_struct(struct)
 
@@ -210,6 +212,12 @@ defmodule Sally.Device do
   end
 
   def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
+
+  def ttl_reset(%Sally.DevAlias{device_id: id, updated_at: ttl_at}) do
+    Sally.Repo.load(Schema, id: id)
+    |> Ecto.Changeset.cast(%{last_seen_at: ttl_at}, [:last_seen_at])
+    |> Sally.Repo.update!(@returned)
+  end
 
   def type(schema_or_id) do
     case schema_or_id do

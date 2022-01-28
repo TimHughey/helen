@@ -41,6 +41,17 @@ defmodule Alfred.Broom.Metrics do
   end
 
   @impl true
+  @metric_fields [:tracked, :released, :timeout, :errors]
+  def handle_continue(:report_metrics, state) do
+    fields = Map.take(state, @metric_fields) |> Enum.into([])
+
+    _ = Betty.runtime_metric([module: __MODULE__], _tags = [], fields)
+
+    struct(state, last_report_at: Timex.now())
+    |> noreply()
+  end
+
+  @impl true
   def handle_cast({:count, broom}, state) do
     case broom do
       %{at: %{timeout: %DateTime{}}} -> update_count(:timeout, state)
@@ -55,7 +66,7 @@ defmodule Alfred.Broom.Metrics do
   def handle_info(:timeout, state) do
     state = struct(state, last_report_at: now())
 
-    noreply(state)
+    {:noreply, state, {:continue, :report_metrics}}
   end
 
   # Count Updaters
@@ -78,7 +89,16 @@ defmodule Alfred.Broom.Metrics do
   end
 
   @doc false
-  def noreply(state), do: {:noreply, state, timeout_ms(state)}
+  def noreply(state) do
+    timeout_ms = timeout_ms(state)
+
+    # NOTE: ensure that a report is performed in case the server is flooded
+    if timeout_ms == 0 do
+      {:noreply, state, {:continue, :timeout}}
+    else
+      {:noreply, state, timeout_ms}
+    end
+  end
 
   @doc false
   def reply(rc, %__MODULE__{} = state), do: {:reply, rc, state, timeout_ms(state)}

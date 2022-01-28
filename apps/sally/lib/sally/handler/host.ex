@@ -1,7 +1,7 @@
-defmodule Sally.Host.Handler do
+defmodule Sally.Host.Dispatch do
   require Logger
 
-  use Sally.Message.Handler, restart: :permanent, shutdown: 1000
+  use Sally.Dispatch, subsystem: "host"
 
   @impl true
   # NOTE: current message categories: ["startup", "boot", "run"]

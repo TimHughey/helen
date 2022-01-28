@@ -10,84 +10,49 @@ defmodule SallyDevAliasAlignTest do
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
     test "makes no change when the reported cmd is the same as local cmd", ctx do
       assert %{device: %Sally.Device{} = device, dev_alias: [_ | _] = dev_aliases} = ctx
+      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
 
       data = %{pins: Sally.CommandAid.make_pins(device, %{pins: [:from_status]})}
-      dispatch = %{data: data, sent_at: Timex.now()}
-      sim_multi_changes = %{aliases: dev_aliases, dispatch: dispatch}
+      dispatch = %{data: data, recv_at: Timex.now()}
 
-      multi = Sally.DevAlias.align_status(sim_multi_changes)
-
-      # NOTE: empty txn results signals no changes
-      assert {:ok, %{} = changes} = Sally.Repo.transaction(multi)
-      assert map_size(changes) == 0
+      assert :aligned == Sally.DevAlias.align_status(dev_alias, dispatch)
     end
 
-    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1, cmd_latest: :pending]]
-    test "does nothing when Sally.DevAlias has a pending command", ctx do
+    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 3, latest: :busy]]
+    test "does nothing when Sally.DevAlias has a busy command", ctx do
       assert %{device: %Sally.Device{} = device, dev_alias: [_ | _] = dev_aliases} = ctx
+      dev_alias = Enum.find(dev_aliases, &Sally.Command.busy?(&1))
+      assert %Sally.DevAlias{} = dev_alias
 
-      # NOTE: Sally.CommandAid.make_pins/2 creates a random pin cmd when a Sally.Command is pending
+      assert Sally.Command.busy?(dev_alias)
+
+      # NOTE: Sally.CommandAid.make_pins/2 creates a random pin cmd when a Sally.Command is busy
       pins = Sally.CommandAid.make_pins(device, %{pins: [:from_status]})
-      dispatch = %{data: %{pins: pins}, sent_at: Timex.now()}
-      sim_multi_changes = %{aliases: dev_aliases, dispatch: dispatch}
+      dispatch = %{data: %{pins: pins}, recv_at: Timex.now()}
 
-      multi = Sally.DevAlias.align_status(sim_multi_changes)
-
-      # NOTE: empty txn results signals no changes
-      assert {:ok, changes} = Sally.Repo.transaction(multi)
-      assert map_size(changes) == 0
+      assert :busy == Sally.DevAlias.align_status(dev_alias, dispatch)
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3]
     test "handles Sally.DevAlias without cmd history", ctx do
       assert %{device: %Sally.Device{} = device, dev_alias: [_ | _] = dev_aliases} = ctx
+      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
 
       data = %{pins: Sally.CommandAid.make_pins(device, %{pins: [:random]})}
-      dispatch = %{data: data, sent_at: Timex.now()}
-      sim_multi_changes = %{aliases: dev_aliases, dispatch: dispatch}
+      dispatch = %{data: data, recv_at: Timex.now()}
 
-      # multi = Sally.DevAlias.align_status(sim_multi_changes)
-      #
-      # # NOTE: empty txn results signals no changes
-      # assert {:ok, result} = Sally.Repo.transaction(multi)
-      # result |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.warn() end)
-
-      assert %Ecto.Multi{} = multi = Sally.DevAlias.align_status(sim_multi_changes)
-      assert {:ok, txn} = Sally.Repo.transaction(multi)
-
-      Enum.each(txn, fn {key, val} ->
-        # NOTE: multi change "name" (aka map key)
-        assert {:aligned, <<_::binary>> = dev_alias_name, pio} = key
-
-        # NOTE: multi change value
-        assert %Sally.Command{acked: true, dev_alias_id: dev_alias_id} = val
-
-        # NOTE: validate the original dev aliases were aligned
-        assert Enum.find(dev_aliases, &match?(%{name: ^dev_alias_name, id: ^dev_alias_id, pio: ^pio}, &1))
-      end)
+      assert %Sally.Command{} = Sally.DevAlias.align_status(dev_alias, dispatch)
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
     test "corrects cmd mismatch", ctx do
       assert %{device: %Sally.Device{} = device, dev_alias: [_ | _] = dev_aliases} = ctx
+      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
 
       data = %{pins: Sally.CommandAid.make_pins(device, %{pins: [:random]})}
-      dispatch = %{data: data, sent_at: Timex.now()}
-      sim_multi_changes = %{aliases: dev_aliases, dispatch: dispatch}
+      dispatch = %{data: data, recv_at: Timex.now()}
 
-      assert %Ecto.Multi{} = multi = Sally.DevAlias.align_status(sim_multi_changes)
-      assert {:ok, txn} = Sally.Repo.transaction(multi)
-
-      Enum.each(txn, fn {key, val} ->
-        # NOTE: multi change "name" (aka map key)
-        assert {:aligned, <<_::binary>> = dev_alias_name, pio} = key
-
-        # NOTE: multi change value
-        assert %Sally.Command{acked: true, dev_alias_id: dev_alias_id} = val
-
-        # NOTE: validate the original dev aliases were aligned
-        assert Enum.find(dev_aliases, &match?(%{name: ^dev_alias_name, id: ^dev_alias_id, pio: ^pio}, &1))
-      end)
+      assert %Sally.Command{} = Sally.DevAlias.align_status(dev_alias, dispatch)
     end
   end
 end

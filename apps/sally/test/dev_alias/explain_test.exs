@@ -14,7 +14,7 @@ defmodule SallyDevAliasExplainTest do
       explain_output = Sally.DevAlias.explain(name, :status, :cmds, [])
 
       assert explain_output =~ ~r/Index Scan/
-      assert explain_output =~ ~r/Sort Method: top-N heapsort/
+      assert explain_output =~ ~r/Sort Method/
     end
 
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 100]]
@@ -22,7 +22,7 @@ defmodule SallyDevAliasExplainTest do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
       explain_output = Sally.DevAlias.explain(name, :cmdack, :cmds, [])
-      assert explain_output =~ ~r/Sort Method: top-N heapsort/
+      assert explain_output =~ ~r/Sort Method/
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Index Cond/
     end
@@ -34,7 +34,7 @@ defmodule SallyDevAliasExplainTest do
       explain_output = Sally.DevAlias.explain(name, :status, :datapoints, [])
       assert explain_output =~ ~r/Join Filter/
       assert explain_output =~ ~r/Index Scan/
-      assert explain_output =~ ~r/Sort Method: quicksort/
+      assert explain_output =~ ~r/Sort Method/
     end
   end
 end

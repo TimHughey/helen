@@ -49,7 +49,7 @@ defmodule Alfred.ExecuteTest do
       name = get_name_from_ctx()
       execute_args = [name: name, cmd: "on"]
 
-      assert %Alfred.Execute{detail: %{cmd: "on", __execute__: %{refid: refid}}, name: ^name, rc: :pending} =
+      assert %Alfred.Execute{detail: %{cmd: "on", __execute__: %{refid: refid}}, name: ^name, rc: :busy} =
                Alfred.Test.DevAlias.execute(execute_args, [])
 
       assert Alfred.Broom.tracked?(refid)

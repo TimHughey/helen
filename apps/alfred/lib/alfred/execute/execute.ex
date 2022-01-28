@@ -106,7 +106,7 @@ defmodule Alfred.Execute do
   def to_binary(%{name: name} = execute, _opts \\ []) do
     case execute do
       %{rc: :ok, detail: %{cmd: cmd}} -> ["OK", "{#{cmd}}"]
-      %{rc: :pending, detail: %{cmd: cmd, refid: refid}} -> ["PENDING", "{#{cmd}}", "@#{refid}"]
+      %{rc: :busy, detail: %{cmd: cmd, refid: refid}} -> ["BUSY", "{#{cmd}}", "@#{refid}"]
       %{rc: :not_found} -> ["NOT_FOUND"]
       %{rc: {:ttl_expired, ms}} -> ["TTL_EXPIRED", "+#{ms}ms"]
       %{rc: {:orphaned, ms}} -> ["ORPHANED", "+#{ms}ms"]
@@ -127,7 +127,7 @@ defmodule Alfred.Execute do
 
     case status do
       _status when force -> continue(:force)
-      %{detail: %{rc: rc} = detail} when rc in [:pending, :error] -> halt(rc, detail)
+      %{detail: %{rc: rc} = detail} when rc in [:busy, :error] -> halt(rc, detail)
       %{detail: %{cmd: ^want_cmd} = detail} -> halt(:ok, detail)
       _ -> continue(:not_equal)
     end
@@ -138,7 +138,7 @@ defmodule Alfred.Execute do
     %{status: status, info: %{callbacks: %{execute: {module, 2}}}} = checks_map
 
     case module.execute_cmd(status, opts) do
-      {rc, result} when rc in [:ok, :pending] -> continue({rc, result})
+      {rc, result} when rc in [:ok, :busy] -> continue({rc, result})
       {rc, result} -> halt(rc, result)
     end
   end
@@ -192,7 +192,7 @@ defmodule Alfred.Execute do
   def track(checks_map, opts) do
     case checks_map do
       %{broom_module: :none = rc} -> rc
-      %{broom_module: module, execute_cmd: {:pending, cmd}} -> module.track(cmd, opts)
+      %{broom_module: module, execute_cmd: {:busy, cmd}} -> module.track(cmd, opts)
       _ -> :ok
     end
     |> continue()

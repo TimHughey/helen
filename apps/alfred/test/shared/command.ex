@@ -27,13 +27,13 @@ defmodule Alfred.Test.Command do
     {cmd_opts, _opts_rest} = Keyword.pop(opts_rest, :cmd_opts)
     {ack, _cmd_opts_rest} = Keyword.pop(cmd_opts, :ack)
 
-    parts = %{rc: (ack == :immediate && :ok) || :pending, cmd: cmd}
+    parts = %{rc: (ack == :immediate && :ok) || :busy, cmd: cmd}
 
     inserted_cmd = new(parts, at)
 
     case parts do
       %{rc: :ok} -> {:ok, inserted_cmd}
-      %{rc: :pending} -> {:pending, inserted_cmd}
+      %{rc: :busy} -> {:busy, inserted_cmd}
       _ -> {:error, inserted_cmd}
     end
   end
@@ -45,7 +45,7 @@ defmodule Alfred.Test.Command do
   def new(%{cmd: cmd} = parts, at) when is_map(parts) do
     case parts do
       %{rc: :ok} -> [acked: true, acked_at: at]
-      %{rc: :pending} -> [acked: false]
+      %{rc: :busy} -> [acked: false]
       %{rc: :orphaned} -> [acked: true, orphaned: true, acked_at: shift_ms(at, 1)]
       %{rc: :expired} -> [acked: true, orphaned: false, acked_at: shift_ms(at, -1000)]
       _ -> []

@@ -20,7 +20,7 @@ config :sally, Sally.Host.Firmware,
     file_regex: ~r/\d\d\.\d\d\.\d\d.+-ruth\.bin$/
   ]
 
-config :sally, Sally.Host.Instruct, publish: [prefix: "#{config_env()}", qos: 0]
+config :sally, Sally.Host.Instruct, publish: [prefix: "#{config_env()}"]
 
 if config_env() in [:dev, :test] do
   import_config "test.exs"

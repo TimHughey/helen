@@ -23,7 +23,7 @@ defmodule Sally.DispatchAidTest do
       assert %{category: ^category, payload: <<133, _::binary>>} = dispatch
     end
 
-    @tag dev_alias_opts: [auto: :pwm, cmds: [history: 1, latest: :pending]]
+    @tag dev_alias_opts: [auto: :pwm, cmds: [history: 2, latest: :busy]]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "creates a mutable cmdack Dispatch", ctx do
       category = ctx.dispatch_add[:category]
@@ -59,7 +59,7 @@ defmodule Sally.DispatchAidTest do
       assert [_ | _] = Sally.DispatchAid.make_filter(dispatch)
     end
 
-    @tag dev_alias_opts: [:prereqs, auto: :pwm, cmds: [history: 1, latest: :pending]]
+    @tag dev_alias_opts: [:prereqs, auto: :pwm, cmds: [history: 1, latest: :busy]]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "a mutable cmdack message", ctx do
       assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx

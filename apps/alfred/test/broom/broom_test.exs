@@ -24,7 +24,7 @@ defmodule Alfred.BroomTest do
     end
   end
 
-  describe "Alfred.Server.handle_info/2 (timeout)" do
+  describe "Alfred.Broom.handle_info/2 (timeout)" do
     test "handles function not available" do
       refid = Alfred.Broom.make_refid()
 
@@ -44,7 +44,7 @@ defmodule Alfred.BroomTest do
     end
   end
 
-  describe "Alfred.Server" do
+  describe "Alfred.Broom" do
     test "sends msg when refid released" do
       refid = Alfred.Broom.make_refid()
       # NOTE: create a unique cmd and name for validation of Betty metric
@@ -64,7 +64,7 @@ defmodule Alfred.BroomTest do
 
       Process.sleep(200)
 
-      tag_values = Betty.measurement("command", :tag_values)
+      tag_values = Betty.measurement("runtime", :tag_values)
 
       assert Enum.any?(tag_values[:name], fn {_key, val} -> val == name end)
       assert Enum.any?(tag_values[:cmd], fn {_key, val} -> val == cmd end)

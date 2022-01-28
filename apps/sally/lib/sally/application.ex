@@ -5,7 +5,6 @@ defmodule Sally.Application do
 
   use Application
 
-  @mqtt_connection Application.compile_env!(:sally, :mqtt_connection)
   @config_all Application.get_all_env(:sally)
 
   @impl true
@@ -13,11 +12,8 @@ defmodule Sally.Application do
     children = [
       {Sally.Config.Agent, @config_all},
       {Sally.Repo, []},
-      {Tortoise.Connection, @mqtt_connection},
-      {Sally.Immutable.Handler, []},
-      {Sally.Mutable.Handler, []},
-      {Sally.Host.Instruct, []},
-      {Sally.Host.Handler, []}
+      {Sally.Command, []},
+      {Sally.Dispatch.Supervisor, []}
     ]
 
     opts = [strategy: :one_for_one, name: Sally.Supervisor, max_restarts: 10, max_seconds: 5]

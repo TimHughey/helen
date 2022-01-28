@@ -50,15 +50,15 @@ defmodule SallyDevAliasTest do
 
   describe "Sally.DevAlias.execute_cmd/2" do
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
-    test "creates new pending command from Sally.DevAlias", ctx do
+    test "creates new busy command from Sally.DevAlias", ctx do
       assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
 
       cmd = "on"
 
       # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
       # for validation
-      {:pending, %Sally.Command{cmd: ^cmd, refid: refid}} =
-        Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, cmd_opts: [echo: :instruct])
+      assert {:busy, %Sally.Command{cmd: ^cmd, refid: refid}} =
+               Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, cmd_opts: [echo: :instruct])
 
       assert_receive %Sally.Host.Instruct{
                        client_id: "sally_test",

@@ -22,11 +22,11 @@ defmodule AlfredNamesAidTest do
       assert %{name: ^name, rc: :ok, cmd: "on", type: :mut} = parts
     end
 
-    @tag name_add: [type: :mut, rc: :pending, cmd: "on"]
-    test "makes mutable name with rc pending and cmd on", %{name: name, parts: parts} do
-      assert_binaries(name, ["mutable", "pending", "on"])
+    @tag name_add: [type: :mut, rc: :busy, cmd: "on"]
+    test "makes mutable name with rc busy and cmd on", %{name: name, parts: parts} do
+      assert_binaries(name, ["mutable", "busy", "on"])
 
-      assert %{name: ^name, rc: :pending, cmd: "on", type: :mut} = parts
+      assert %{name: ^name, rc: :busy, cmd: "on", type: :mut} = parts
     end
 
     @tag name_add: [type: :mut, rc: :orphaned, cmd: "on"]

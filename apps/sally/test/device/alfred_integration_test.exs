@@ -35,16 +35,18 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert log =~ ~r/correcting missing cmd/
     end
 
-    @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :pending, echo: :instruct]]
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :busy, echo: :instruct]]
     test "returns well formed Alfred.status for new mutable DevAlias (with one cmd)", ctx do
       # NOTE: confirm the cmd was sent
       assert_receive(%Sally.Host.Instruct{}, 10)
 
       {_dev_alias, name} = assert_dev_alias()
 
-      # NOTE: confirm attempt to exevute another cmd is prevented due to pending status
-      assert %{cmd_latest: [%{rc: :pending, detail: %{cmd: cmd}}]} = ctx
-      assert %Alfred.Status{rc: :pending, detail: %{cmd: ^cmd}} = Alfred.status(name, [])
+      # NOTE: confirm attempt to exevute another cmd is prevented due to busy status
+      assert %{cmd_latest: %{acked: false, acked_at: nil, cmd: cmd}} = ctx
+
+      status = Alfred.status(name, [])
+      assert %Alfred.Status{rc: :busy, detail: %{cmd: ^cmd}} = status
     end
   end
 

@@ -8,9 +8,11 @@ defmodule Alfred.Broom do
 
   @timeout_ms_default 3300
 
+  @at_map %{sent: nil, tracked: nil, complete: nil, released: nil, timeout: nil}
+
   defstruct refid: nil,
             tracked_info: nil,
-            at: %{sent: nil, tracked: nil, released: nil, timeout: nil},
+            at: @at_map,
             rc: :none,
             module: nil,
             notify_pid: nil,
@@ -35,16 +37,19 @@ defmodule Alfred.Broom do
           opts: list()
         }
 
+  @type status_opt() :: :complete
+
   @callback broom_timeout(Alfred.Broom.t()) :: any()
   @callback make_refid() :: String.t()
   @callback now() :: DateTime.t()
   @callback release(refid :: String.t(), opts :: list()) :: :ok
   @callback track(schema :: map(), opts :: list()) :: Broom.t()
+  @callback track(status_opt(), schema :: map(), DateTime.t()) :: :ok
   @callback tracked_info(refid :: String.t()) :: any()
 
   # coveralls-ignore-start
   defmacro __using__(use_opts) do
-    quote bind_quoted: [use_opts: use_opts] do
+    quote location: :keep, bind_quoted: [use_opts: use_opts] do
       # NOTE: capture use opts for Alfred.Broom
       Alfred.Broom.put_attribute(__MODULE__, use_opts)
       @behaviour Alfred.Broom
@@ -54,9 +59,10 @@ defmodule Alfred.Broom do
       @doc false
       def now, do: Alfred.Broom.now()
 
-      def release(refid, opts), do: Alfred.Broom.release(refid, __MODULE__, opts)
+      def release(what, opts), do: Alfred.Broom.release(what, __MODULE__, opts)
 
       def track(exec_result, opts), do: Alfred.Broom.track(exec_result, __MODULE__, opts)
+      def track(status, refid, at), do: Alfred.Broom.track({status, refid}, __MODULE__, at)
 
       def tracked_info(refid), do: Alfred.Broom.tracked_info(refid, __MODULE__)
     end
@@ -86,13 +92,18 @@ defmodule Alfred.Broom do
     Ecto.UUID.generate() |> String.split("-") |> Enum.take(4) |> Enum.join("-")
   end
 
-  def release(refid, module, opts) do
+  def release(<<_::binary>> = refid, module, opts) do
     {:release, refid, opts_final(module, opts)} |> call(refid)
   end
 
   def track(%{refid: refid} = exec_result, module, opts) do
     [tracked_info: exec_result, module: module, opts: opts_final(module, opts), caller_pid: self()]
     |> then(fn args -> GenServer.start_link(__MODULE__, args, name: server(refid)) end)
+  end
+
+  @status [:complete]
+  def track({status, <<_::binary>> = refid}, module, %DateTime{} = at) when status in @status do
+    {:status, refid, status, at, opts_final(module, [])} |> call(refid)
   end
 
   def tracked?(refid) do
@@ -158,13 +169,23 @@ defmodule Alfred.Broom do
   def handle_call({:release, refid, opts}, _from, %{refid: refid} = state) do
     release_at = Keyword.get(opts, :ref_dt, now())
 
-    state = update_at(state, :released, release_at) |> notify_if_requested(:ok)
+    # NOTE: ensure complete at is set.
+    # update_at/3 won't override previous value when passed a list of keys
+    at_list = [released: release_at, complete: release_at]
+    state = update_at(state, at_list) |> notify_if_requested(:ok)
 
     :ok = record_metrics(state)
     :ok = Alfred.Broom.Metrics.count(state)
 
     # :normal exit won't restart the linked process
     {:stop, :normal, :ok, state}
+  end
+
+  @impl true
+  # NOTE: duplicate variables in the pattern are matched
+  def handle_call({:status, refid, status, at, _opts}, _from, %{refid: refid} = state) do
+    update_at(state, status, at)
+    |> reply(:ok)
   end
 
   @impl true
@@ -222,17 +243,19 @@ defmodule Alfred.Broom do
 
   @doc false
   def record_metrics(state) do
-    %{opts: opts, module: module, at: at} = state
+    %{opts: opts, at: at} = state
 
-    [
-      measurement: "command",
-      tags: [module: module, name: opts[:name], cmd: opts[:cmd]],
-      fields: [
-        cmd_roundtrip_us: Timex.diff(at.released, at.tracked),
-        cmd_total_us: Timex.diff(at.released, at.sent)
-      ]
+    tags = [name: opts[:name], cmd: opts[:cmd]]
+
+    fields = [
+      track_us: safe_diff_dt(at.tracked, at.sent),
+      roundtrip_us: safe_diff_dt(at.complete, at.sent),
+      release_us: safe_diff_dt(at.released, at.complete),
+      timeout_us: safe_diff_dt(now(), at.sent)
     ]
-    |> Betty.write()
+
+    # NOTE: Betty.runtime_metric/3 will extract module from state
+    Betty.runtime_metric(state, tags, fields)
 
     :ok
   end
@@ -305,6 +328,13 @@ defmodule Alfred.Broom do
   def reply(%__MODULE__{} = state, rc), do: {:reply, rc, state}
 
   @doc false
+  def safe_diff_dt(early_dt, later_dt) do
+    Timex.diff(later_dt, early_dt, :microseconds)
+  catch
+    _, _ -> nil
+  end
+
+  @doc false
   def timeout_ms(%{at: %{tracked: at}, timeout_ms: timeout_ms}) do
     elapsed_ms = Timex.diff(now(), at, :milliseconds)
 
@@ -312,17 +342,34 @@ defmodule Alfred.Broom do
   end
 
   @doc false
-  def update_at(state, [_ | _] = keys, at) do
-    Enum.reduce(keys, state, fn key, acc -> update_at(acc, key, at) end)
+  def to_ms(<<"PT"::binary, _rest::binary>> = iso8601) do
+    Timex.Duration.parse!(iso8601)
+    |> Timex.Duration.to_milliseconds(truncate: true)
   end
 
-  @at_keys [:sent, :tracked, :released, :timeout]
-  def update_at(state, key, %DateTime{} = at) when key in @at_keys do
-    struct(state, at: Map.put(state.at, key, at))
+  @at_keys Map.keys(@at_map)
+
+  @doc false
+  def update_at(state, [_ | _] = kv_pairs) do
+    updates = Enum.into(kv_pairs, %{})
+
+    # NOTE: existing at values never replaced
+    Map.merge(updates, state.at, fn
+      _key, lhs, nil -> lhs
+      _key, _lhs, rhs -> rhs
+    end)
+    |> then(fn at_map -> struct(state, at: at_map) end)
   end
 
   @doc false
-  def to_ms(<<"PT"::binary, _rest::binary>> = iso8601) do
-    Timex.Duration.parse!(iso8601) |> Timex.Duration.to_milliseconds(truncate: true)
+  def update_at(state, [_ | _] = keys, at) do
+    # NOTE: never override a previously set at key
+    keys = Enum.filter(keys, fn key -> Map.get(state.at, key) == nil end)
+
+    Enum.reduce(keys, state, fn key, acc -> update_at(acc, key, at) end)
+  end
+
+  def update_at(state, key, %DateTime{} = at) when key in @at_keys do
+    struct(state, at: Map.put(state.at, key, at))
   end
 end

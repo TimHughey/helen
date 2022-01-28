@@ -25,7 +25,7 @@ defmodule Sally.DevAliasAid do
       :count, %{count: 1} = acc -> add_one(acc, opts)
       :count, %{count: _} = acc -> add_many(acc, opts)
       :cmds, %{cmds: cmd_args} = acc when is_list(cmd_args) -> add_cmds(acc, cmd_args)
-      :daps, %{daps: dp_args} = acc when is_list(dp_args) -> add_datapoints(acc, dp_args)
+      :daps, %{daps: dp_args} = acc when is_list(dp_args) -> add_daps(acc, dp_args)
       _no_match, acc -> acc
     end)
     |> Map.take(@return_keys)
@@ -48,19 +48,19 @@ defmodule Sally.DevAliasAid do
 
     Enum.reduce(@add_cmds_order, ctrl_map, fn
       # NOTE: must use acc for collect/1 macro
-      :cmd_history = key, acc -> make_historical(:cmds, ctrl_map, opts_map) |> collect()
-      :cmd_latest = key, acc -> make_pending(ctrl_map, opts_map) |> collect()
+      :cmd_history = key, acc -> make_hist(:cmds, ctrl_map, opts_map) |> collect()
+      :cmd_latest = key, acc -> Sally.CommandAid.latest(acc) |> collect()
       _, ctrl_map -> ctrl_map
     end)
   end
 
-  @add_datapoints_order [:dap_history]
-  def add_datapoints(ctrl_map, opts) do
+  @add_daps_order [:dap_history]
+  def add_daps(ctrl_map, opts) do
     opts_map = Enum.into(opts, %{})
 
-    Enum.reduce(@add_datapoints_order, ctrl_map, fn
+    Enum.reduce(@add_daps_order, ctrl_map, fn
       # NOTE: must use acc for collect/1 macro
-      :dap_history = key, acc -> make_historical(:daps, ctrl_map, opts_map) |> collect()
+      :dap_history = key, acc -> make_hist(:daps, ctrl_map, opts_map) |> collect()
       _, ctrl_map -> ctrl_map
     end)
   end
@@ -94,6 +94,10 @@ defmodule Sally.DevAliasAid do
     Map.put(ctrl_map, :dev_alias, dev_aliases)
   end
 
+  def description do
+    Ecto.UUID.generate() |> String.replace("-", " ")
+  end
+
   @defaults %{prereqs: true, count: 1, cmds: false, daps: false}
   def ensure_keywords(opts) do
     Enum.reduce(opts, @defaults, fn
@@ -103,58 +107,38 @@ defmodule Sally.DevAliasAid do
     end)
   end
 
-  def find_pending([%Sally.DevAlias{} | _] = dev_aliases) do
-    Enum.find(dev_aliases, fn %{name: name} -> match?(%{rc: :pending}, Alfred.status(name, [])) end)
+  def find_busy([%Sally.DevAlias{} | _] = dev_aliases) do
+    Enum.find(dev_aliases, fn %{name: name} -> match?(%{rc: :busy}, Alfred.status(name, [])) end)
   end
 
-  def find_pending(_dev_aliases), do: raise("not a list of Sally.DevAlias")
+  def find_busy(_dev_aliases), do: raise("not a list of Sally.DevAlias")
 
-  def description do
-    Ecto.UUID.generate() |> String.replace("-", " ")
+  def latest_cmd(ctrl_map) do
+    Map.get(ctrl_map, :cmd_history, []) |> Enum.reverse() |> List.first(:none)
   end
 
-  def make_historical(:cmds, %Sally.DevAlias{} = dev_alias, opts_map) do
+  def make_hist(:cmds, %Sally.DevAlias{} = dev_alias, opts_map) do
     Sally.CommandAid.historical(dev_alias, opts_map)
   end
 
-  def make_historical(:daps, %Sally.DevAlias{} = dev_alias, opts_map) do
+  def make_hist(:daps, %Sally.DevAlias{} = dev_alias, opts_map) do
     Sally.DatapointAid.historical(dev_alias, opts_map)
   end
 
-  def make_historical(what, ctrl_map, %{history: _} = opts_map) do
+  def make_hist(what, ctrl_map, %{history: _} = opts_map) do
     case ctrl_map do
       %{dev_alias: x} when is_list(x) ->
-        Enum.map(x, fn dev_alias -> make_historical(what, dev_alias, opts_map) end)
+        Enum.map(x, fn dev_alias -> make_hist(what, dev_alias, opts_map) end)
 
       %{dev_alias: %Sally.DevAlias{} = dev_alias} ->
-        make_historical(what, dev_alias, opts_map)
+        make_hist(what, dev_alias, opts_map)
 
       ctrl_map ->
         raise("can make historical:\n#{inspect(ctrl_map, pretty: true)}")
     end
   end
 
-  def make_historical(_what, ctrl_map, _opts_map), do: ctrl_map
-
-  @pending %{latest: :pending}
-  def make_pending(%{dev_alias: dev_alias}, %{_cmds_: cmd_args}) do
-    dev_aliases = List.wrap(dev_alias)
-
-    case cmd_args do
-      @pending -> Enum.map(dev_aliases, &make_pending(&1, cmd_args))
-      _ -> []
-    end
-  end
-
-  def make_pending(%Sally.DevAlias{name: name}, cmd_args) do
-    echo_opts = Map.take(cmd_args, [:echo]) |> Enum.into([])
-    cmd_opts = [cmd: random_cmd(), name: name, cmd_opts: [ack: :host]]
-
-    Alfred.execute(cmd_opts, echo_opts)
-    |> sleep(10)
-  end
-
-  def make_pending(ctrl_map, _cmd_args), do: ctrl_map
+  def make_hist(_what, ctrl_map, _opts_map), do: ctrl_map
 
   def normalize_opts(opts, :as_map) do
     opts_map = ensure_keywords(opts)

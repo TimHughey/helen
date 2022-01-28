@@ -13,7 +13,7 @@ defmodule Alfred.Status do
   @type status_mutable :: map()
   @type status_immutable :: map()
   @type status_detail :: status_mutable | status_immutable
-  @type status_rc :: :ok | {:not_found, String.t()} | :pending | :orphan | {:ttl_expired, pos_integer()}
+  @type status_rc :: :ok | {:not_found, String.t()} | :busy | :orphan | {:ttl_expired, pos_integer()}
 
   @type t :: %__MODULE__{name: String.t(), detail: status_detail(), rc: status_rc()}
 
@@ -74,7 +74,7 @@ defmodule Alfred.Status do
   #  2. Lookup the name via status_lookup/3 (requires name, nature and opts)
   #     a. confirm the name exists (low probability fail if Alfred.Name exists and TTL isn't expired)
   #     b. confirm the ttl isn't expired (similar fail probability)
-  #     c. nature == :cmds: check if the command is pending
+  #     c. nature == :cmds: check if the command is busy
   #     d. nature == :cmds: check if the command is orphaned
   #     e. confirm the status is good comprised of nature dependent checks
   #     f. assemble the status detail
@@ -84,9 +84,9 @@ defmodule Alfred.Status do
   # Handling of failed or intermediate checks
   #
   #  1. When a check fails Alfred.Status :name and :rc are populated
-  #  2. Intermediate status results (e.g. pending) __may__ populate detail
+  #  2. Intermediate status results (e.g. busy) __may__ populate detail
   #  3. Successful status populate :rc, :name and :detail
-  #     a. :detail varies depending on the nature of the name (e.g. cmds vs. datapoints)
+  #     a. :detail varies wthh the nature of the name (e.g. cmds vs. datapoints)
   #     b. the caller is responsible for interpreting the detail
   #
 
@@ -96,7 +96,7 @@ defmodule Alfred.Status do
     |> then(fn opts -> status(name, module, opts) end)
   end
 
-  @checks [:registered, :ttl_info, :lookup, :ttl_lookup, :pending, :orphan, :finalize]
+  @checks [:registered, :ttl_info, :lookup, :ttl_lookup, :busy, :orphan, :finalize]
   # (aaa of bbb) invoked via status/2 injected into using module
   def status(<<_::binary>> = name, module, opts) do
     {info, opts_rest} = Keyword.pop(opts, :__name_info__, Alfred.Name.info(name))
@@ -249,18 +249,18 @@ defmodule Alfred.Status do
     end
   end
 
-  @pending_keys [:cmd, :refid, :sent_at]
-  def check(:pending = what, checks_map, _opts) do
+  @busy_keys [:cmd, :refid, :sent_at]
+  def check(:busy = what, checks_map, _opts) do
     %{lookup: %{cmds: cmds}} = checks_map
 
     case cmds do
-      [%{acked: false} = cmd] -> put_detail_rc(:pending, Map.take(cmd, @pending_keys))
+      [%{acked: false} = cmd] -> put_detail_rc(:busy, Map.take(cmd, @busy_keys))
       _ -> put_what_rc_cont(:ok)
     end
   end
 
-  # def check(:pending, %{lookup: %{cmds: [%{acked: false} = cmd]}}, _opts) do
-  #   {:pending, %{detail: Map.take(cmd, [:cmd, :refid, :sent_at])}}
+  # def check(:busy, %{lookup: %{cmds: [%{acked: false} = cmd]}}, _opts) do
+  #   {:busy, %{detail: Map.take(cmd, [:cmd, :refid, :sent_at])}}
   # end
 
   def check(:registered = what, checks_map, _opts) do
@@ -303,64 +303,6 @@ defmodule Alfred.Status do
       put_what_rc_cont(:ok)
     end
   end
-
-  # NOTE: lists used by checks_map_put/3
-  # @auto_merge_status [:registered]
-  # @exception_rc [:pending, :orphan]
-  # @unmatched_ok [:pending, :orphan]
-  #
-  # @doc false
-  # # NOTE: checks_map_put/3 returns the next accumulator value for the status check reduction
-  # def checks_map_put(result, what, checks_map) do
-  #   case {result, what} do
-  #     # check success, merge result into base check map
-  #     {{:ok, %{} = merge}, what} when what in @auto_merge_status ->
-  #       # signal the check (aka what) was successful
-  #       Map.put(merge, what, :ok)
-  #       # then merge the result map into the base of the check map
-  #       |> then(fn override_map -> Map.merge(checks_map, override_map) end)
-  #       |> then(fn checks_map -> {:ok, checks_map} end)
-  #
-  #     # not found from registered or lookup or
-  #     {{:not_found = rc, _name}, what} ->
-  #       {:halt, Map.merge(checks_map, %{what => rc, :rc => rc})}
-  #
-  #     # simple successful check by putting the rc in the check key
-  #     {:ok, what} ->
-  #       {:ok, Map.put(checks_map, what, :ok)}
-  #
-  #     # handle status_lookup/3 success by putting the lookup result in check map base
-  #     {%{} = result, :lookup} ->
-  #       {:ok, Map.put(checks_map, :lookup, result)}
-  #
-  #     # handle intermediate status result with detail provided (e.g. pending, orphan)
-  #     {{rc, %{detail: _} = merge}, what} when rc in @exception_rc ->
-  #       merge
-  #       |> Map.put_new(what, rc)
-  #       |> Map.put_new(:rc, rc)
-  #       # wrapped in then/1 so merge is handled as overrides to checks_map
-  #       |> then(fn merge -> Map.merge(checks_map, merge) end)
-  #       |> then(fn checks_map -> {rc, checks_map} end)
-  #
-  #     # checks that default to :ok when not matched via check/3
-  #     {_rc, what} when what in @unmatched_ok ->
-  #       {:ok, Map.put(checks_map, what, :ok)}
-  #
-  #     # handle detail success
-  #     {{rc, result}, :detail} ->
-  #       checks_map
-  #       |> Map.put_new(:detail, result)
-  #       |> Map.put_new(:rc, rc)
-  #       |> then(fn checks_map -> {rc, checks_map} end)
-  #
-  #     {{:ttl_expired, _ms} = rc, what} ->
-  #       {:halt, Map.merge(checks_map, %{what => rc, rc: rc})}
-  #
-  #     # handle failed status checks (including lookup failures)
-  #     {result, what} ->
-  #       {:halt, Map.merge(checks_map, %{what => result, :rc => :error})}
-  #   end
-  # end
 
   @doc false
   def ttl_check({at, ttl_ms}, what, checks_map, opts) do

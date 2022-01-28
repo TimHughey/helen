@@ -45,7 +45,7 @@ defmodule Sally.Host do
     Map.put(profile, "meta", Map.drop(meta, ["description"]))
   end
 
-  # NOTE: used by Sally.Host.Handler.process/1
+  # NOTE: used by Sally.Host.Dispatch.process/1
   def changeset(%{} = changes), do: changeset(struct(__MODULE__), changes, Map.keys(changes))
 
   # (2 of 2) traditional implementation accepting a Schema, changes and what's required

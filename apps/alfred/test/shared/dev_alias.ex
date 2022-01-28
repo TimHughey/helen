@@ -115,7 +115,7 @@ defmodule Alfred.Test.DevAlias do
     case parts do
       %{rc: :ok} -> {5_000, 0}
       %{rc: :expired, expired_ms: ms} -> {ms, (ms + 100) * -1}
-      %{rc: :pending} -> {5_000, -100}
+      %{rc: :busy} -> {5_000, -100}
       %{rc: :orphaned} -> {5_000, -1000}
     end
     |> then(fn {ttl_ms, ms} -> [{:ttl_ms, ttl_ms} | timestamps(fields, ms)] end)

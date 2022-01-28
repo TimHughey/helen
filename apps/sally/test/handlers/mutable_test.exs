@@ -1,4 +1,4 @@
-defmodule Sally.MutableHandlerTest do
+defmodule Sally.MutableDispatchTest do
   use ExUnit.Case, async: true
   use Sally.TestAid
   require Sally.DispatchAid
@@ -7,23 +7,26 @@ defmodule Sally.MutableHandlerTest do
 
   setup [:dispatch_add]
 
-  describe "Sally.Mutable.Handler processes" do
-    @tag dev_alias_opts: [auto: :mcp23008, count: 5, cmds: [history: 5, latest: :pending, echo: :dispatch]]
+  describe "Sally.Mutable.Dispatch processes" do
+    @tag dev_alias_opts: [auto: :mcp23008, count: 5, cmds: [history: 5, latest: :busy, echo: :dispatch]]
     @tag dispatch_add: [subsystem: "mut", category: "cmdack"]
     test "a cmdack message", ctx do
       assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
       assert %{payload: payload, filter_extra: [<<_::binary>> = refid]} = dispatch
       assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
 
-      tracked_cmd = Sally.Command.tracked_info(refid)
-      assert %Sally.Command{id: cmd_id, cmd: cmd, refid: refid} = tracked_cmd
+      busy_cmd = Sally.Command.saved(refid)
 
-      dev_alias = Sally.DevAlias.find(tracked_cmd.dev_alias_id)
+      # NOTE: validate the command is tracked AND saved as latest
+      assert %Sally.Command{refid: ^refid} = Sally.Command.tracked_info(refid)
+      assert %Sally.Command{id: cmd_id, cmd: cmd, refid: ^refid} = busy_cmd
+
+      dev_alias = Sally.DevAlias.find(busy_cmd.dev_alias_id)
       assert %{name: name} = dev_alias
 
       assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-      assert_receive(%Sally.Dispatch{} = dispatch, 100)
+      assert_receive(%Sally.Dispatch{} = dispatch, 500)
 
       assert %{invalid_reason: :none, subsystem: "mut", valid?: true} = dispatch
       assert %{filter_extra: [^refid]} = dispatch
@@ -55,7 +58,11 @@ defmodule Sally.MutableHandlerTest do
       assert %{invalid_reason: :none, subsystem: "mut", valid?: true} = dispatch
       assert %{filter_extra: [_device_ident, "ok"]} = dispatch
       assert %{txn_info: %{} = txn_info} = dispatch
-      assert %{just_saw_db: {2, [%Sally.DevAlias{} | _]}} = txn_info
+
+      aligned = Enum.filter(txn_info, fn {key, _v} -> match?({:aligned, _}, key) end)
+      :ok = Enum.each(aligned, fn kv -> assert {{:aligned, <<_::binary>>}, %{}} = kv end)
+
+      assert Enum.count(aligned) == 2
     end
   end
 end

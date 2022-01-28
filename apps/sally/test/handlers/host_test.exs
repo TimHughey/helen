@@ -1,4 +1,4 @@
-defmodule SallyHostHandlerTest do
+defmodule Sally.HostDispatchTest do
   @moduledoc false
 
   use ExUnit.Case, async: true
@@ -8,7 +8,7 @@ defmodule SallyHostHandlerTest do
 
   setup [:dispatch_add]
 
-  describe "Sally.Host.Handler processes" do
+  describe "Sally.Host.Dispatch processes" do
     @tag dispatch_add: [subsystem: "host", category: "startup", host: []]
     test "a host startup message for a previously seen host", ctx do
       assert %{dispatch: %Sally.Dispatch{payload: payload} = dispatch} = ctx
@@ -61,7 +61,7 @@ defmodule SallyHostHandlerTest do
           txn_info: %{},
           valid?: true
         },
-        100
+        500
       )
     end
 
@@ -87,7 +87,7 @@ defmodule SallyHostHandlerTest do
           txn_info: %{},
           valid?: true
         },
-        100
+        500
       )
     end
   end

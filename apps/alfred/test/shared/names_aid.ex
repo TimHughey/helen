@@ -228,7 +228,7 @@ defmodule Alfred.NamesAid do
   defp add_rc(opts_map) do
     case opts_map do
       %{expired_ms: _} -> "expired"
-      %{pending: true} -> "pending"
+      %{busy: true} -> "busy"
       %{orphaned: true} -> "orphaned"
       %{rc: rc} when is_atom(rc) -> Atom.to_string(rc)
       %{rc: rc} when is_binary(rc) -> rc

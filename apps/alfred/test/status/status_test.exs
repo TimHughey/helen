@@ -31,9 +31,9 @@ defmodule Alfred.StatusTest do
       assert %Alfred.Status{name: ^name, detail: %{cmd: "on"}, rc: :ok} = Alfred.Status.status(name, [])
     end
 
-    @tag equipment_add: [cmd: "on", pending: true]
-    test "handles pending equipment", %{equipment: name} do
-      assert %Alfred.Status{name: ^name, detail: %{cmd: "on"}, rc: :pending} = Alfred.Status.status(name, [])
+    @tag equipment_add: [cmd: "on", busy: true]
+    test "handles busy equipment", %{equipment: name} do
+      assert %Alfred.Status{name: ^name, detail: %{cmd: "on"}, rc: :busy} = Alfred.Status.status(name, [])
     end
 
     @tag equipment_add: [cmd: "on", orphaned: true]

@@ -21,7 +21,7 @@ defmodule Sally.Host.Instruct do
   alias Sally.Host.Instruct.State
 
   @client_id Application.compile_env!(:sally, [:mqtt_connection, :client_id])
-  @qos_default Application.compile_env!(:sally, [Instruct, :publish, :qos])
+  @qos_default 0
   @prefix Application.compile_env!(:sally, [Instruct, :publish, :prefix])
 
   defstruct client_id: @client_id,
@@ -78,7 +78,7 @@ defmodule Sally.Host.Instruct do
   def handle_call({:send, %Instruct{} = msg}, {caller_pid, _term}, %State{} = s) do
     packed = Map.put(msg.data, :mtime, msg.mtime) |> Msgpax.pack!()
 
-    Tortoise.publish(msg.client_id, make_filter(msg), packed, qos: msg.qos)
+    Tortoise.publish(msg.client_id, make_filter(msg), packed, qos: msg.qos, timeout: 200)
     |> save_pub_rc(msg)
     |> save_packed_length(IO.iodata_length(packed))
     |> echo_if_requested(caller_pid)
@@ -87,7 +87,8 @@ defmodule Sally.Host.Instruct do
   end
 
   @impl true
-  def handle_info({{Tortoise, _client_id}, _ref, _res}, %State{} = s) do
+  def handle_info({{Tortoise, _client_id}, _ref, res}, %State{} = s) do
+    res |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.warn() end)
     s |> noreply()
   end
 

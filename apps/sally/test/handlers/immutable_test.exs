@@ -1,4 +1,4 @@
-defmodule Sally.ImmutableHandlerTest do
+defmodule Sally.ImmutableDispatchTest do
   use ExUnit.Case, async: true
   use Sally.TestAid
 
@@ -6,7 +6,7 @@ defmodule Sally.ImmutableHandlerTest do
 
   setup [:dispatch_add]
 
-  describe "Sally.Immutable.Handler processes" do
+  describe "Sally.Immutable.Dispatch processes" do
     @tag dev_alias_opts: [auto: :ds, daps: [history: 1, echo: :dispatch]]
     @tag dispatch_add: [subsystem: "immut", category: "celsius"]
     test "a status message (celsius)", ctx do
@@ -25,7 +25,7 @@ defmodule Sally.ImmutableHandlerTest do
 
       assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
-      assert_receive(%Sally.Dispatch{} = dispatch, 200)
+      assert_receive(%Sally.Dispatch{} = dispatch, 500)
 
       assert %{invalid_reason: :none, subsystem: "immut", valid?: true} = dispatch
       assert %{filter_extra: [^device_ident, "ok"]} = dispatch
@@ -33,9 +33,8 @@ defmodule Sally.ImmutableHandlerTest do
 
       # NOTE: txn_info validations
       assert %{aliases: [%Sally.DevAlias{}]} = txn_info
-      assert %{datapoint: [%Sally.Datapoint{}]} = txn_info
+      assert %{datapoints: [%Sally.Datapoint{}]} = txn_info
       assert %{device: %Sally.Device{}} = txn_info
-      assert %{just_saw_db: {1, [%Sally.DevAlias{}]}} = txn_info
       assert %{_post_process_: post_process} = txn_info
       assert [{<<_::binary>> = _dev_alias_name, :ok}] = post_process
 

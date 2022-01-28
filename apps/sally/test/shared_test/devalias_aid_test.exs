@@ -34,21 +34,22 @@ defmodule Sally.DevAliasAidTest do
       assert length(dev_aliases) == 8
     end
 
-    @tag devalias_add: [auto: :mcp23008, count: 5, cmds: [history: 5, latest: :pending]]
-    test "creates many DevAlias, with historical cmds and one pending", ctx do
+    @tag devalias_add: [auto: :mcp23008, count: 5, cmds: [history: 5, latest: :busy]]
+    test "creates many DevAlias, with historical cmds and one busy", ctx do
       assert %{
                dev_alias: [%Sally.DevAlias{} = dev_alias | _] = dev_aliases,
                device: %Sally.Device{family: "i2c", mutable: true, pios: 8},
-               cmd_latest: [%Alfred.Execute{} | _] = cmd_latest
+               cmd_latest: [%Sally.Command{} | _] = cmd_latest
              } = ctx
 
-      assert Enum.all?(cmd_latest, fn execute -> match?(%{rc: :pending}, execute) end)
+      assert Enum.all?(cmd_latest, fn execute -> match?(%{acked: false}, execute) end)
 
       assert %Sally.DevAlias{cmds: cmds} = Sally.DevAlias.load_command_ids(dev_alias)
 
-      assert length(cmds) == 6
+      # NOTE: only busy (aka busy) commands are returned 
+      assert length(cmds) == 1
 
-      assert %Sally.DevAlias{} = Sally.DevAliasAid.find_pending(dev_aliases)
+      assert %Sally.DevAlias{} = Sally.DevAliasAid.find_busy(dev_aliases)
     end
 
     @tag devalias_add: [auto: :ds, daps: [history: 5]]

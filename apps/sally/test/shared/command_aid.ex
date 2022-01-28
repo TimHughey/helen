@@ -23,14 +23,11 @@ defmodule Sally.CommandAid do
   def dispatch(%{category: "cmdack"}, opts_map) do
     unless is_map_key(opts_map, :cmd_latest), do: raise(":cmd_latest is missing")
 
-    execute = Enum.random(opts_map.cmd_latest)
+    cmd = find_busy(opts_map.cmd_latest)
 
-    if not match?(%{rc: :pending}, execute), do: raise("cmd is not pending")
+    if not match?(%{acked: false}, cmd), do: raise("cmd should be busy")
 
-    # NOTE: pattern match because there are structs
-    %{rc: :pending, detail: %{__execute__: %{refid: refid}}} = execute
-
-    filter_extra = [refid]
+    filter_extra = [cmd.refid]
     data = %{}
 
     [filter_extra: filter_extra, data: data]
@@ -49,34 +46,53 @@ defmodule Sally.CommandAid do
     [filter_extra: [device_ident, status], data: data]
   end
 
-  def historical(%Sally.DevAlias{} = dev_alias, opts_map) do
-    %{history: count, _cmds_: cmd_args} = opts_map
-
-    echo_opts = Map.take(cmd_args, [:echo]) |> Enum.into([])
-
-    Enum.each(count..1, fn num ->
-      cmd_opts = historical_cmd_opts(num, opts_map)
-      cmd_args = [cmd: random_cmd(), cmd_opts: cmd_opts] ++ echo_opts
-
-      case Sally.DevAlias.execute_cmd(dev_alias, cmd_args) do
-        {:ok, %{acked: true} = execute} -> execute
-        {:pending, %{acked: false}} = execute when num == 1 -> execute
-        error_rc -> raise("execute error: #{inspect(error_rc, pretty: true)}")
-      end
-      |> tap(fn _execute -> Process.sleep(10) end)
-    end)
-  end
-
-  @pending_kinds [:pending, :orphaned]
-
-  def historical_cmd_opts(1 = _num, opts_map) do
-    case opts_map do
-      %{_cmds_: %{cmd_latest: kind}} when kind in @pending_kinds -> []
-      _ -> [ack: :immediate]
+  def find_busy(cmds) do
+    case cmds do
+      [_ | _] -> Enum.random(cmds)
+      %{acked: false, acked_at: nil} = cmd -> cmd
+      _ -> nil
     end
   end
 
-  def historical_cmd_opts(_num, _opts_map), do: [ack: :immediate]
+  def historical(%Sally.DevAlias{} = dev_alias, opts_map) do
+    history = get_in(opts_map, [:cmds, :history]) || 1
+
+    Enum.map(1..history, fn num ->
+      Process.sleep(10)
+
+      type = if num == history, do: :last, else: :history
+
+      cmd_opts = historical_cmd_opts(type, opts_map)
+      cmd_args = [cmd: random_cmd(), cmd_opts: cmd_opts]
+
+      case Sally.DevAlias.execute_cmd(dev_alias, cmd_args) do
+        {:ok, %{acked: true}} = rc -> rc
+        # NOTE: verify only the latest command is busy (aka busy)
+        {:busy, %{acked: false}} = rc when num == history -> rc
+        error_rc -> raise("execute error: #{inspect(error_rc, pretty: true)}")
+      end
+      |> track(cmd_args)
+      |> send_payload(cmd_args)
+    end)
+  end
+
+  @latest_kinds [:busy, :orphaned]
+  def historical_cmd_opts(type, %{_cmds_: cmd_args}) do
+    echo_opts = Map.take(cmd_args, [:echo]) |> Enum.into([])
+
+    case cmd_args do
+      %{latest: kind} when kind in @latest_kinds and type == :last -> []
+      _cmd_args -> [ack: :immediate]
+    end
+    |> Keyword.merge(echo_opts)
+  end
+
+  def latest(%{dev_alias: dev_alias}) do
+    case dev_alias do
+      %{} -> Sally.Command.saved(dev_alias)
+      [_ | _] = many -> Enum.map(many, fn dev_alias -> Sally.Command.saved(dev_alias) end)
+    end
+  end
 
   @make_pin_opts [:from_status, :random]
   def make_pin(source, pin_num, [kind]) when kind in @make_pin_opts do
@@ -102,4 +118,31 @@ defmodule Sally.CommandAid do
   end
 
   def random_cmd, do: Enum.take_random(?a..?z, 8) |> to_string()
+
+  def send_payload(cmd, opts) do
+    preloads = [dev_alias: [device: [:host]]]
+    Sally.Repo.preload(cmd, preloads) |> Sally.Command.Payload.send_cmd(opts)
+
+    cmd
+  end
+
+  def track(exec_rc, cmd_args) do
+    case exec_rc do
+      {:busy, %Sally.Command{} = cmd} -> track_now(cmd, cmd_args)
+      {:ok, cmd} -> cmd
+    end
+  end
+
+  def track_now(%Sally.Command{} = cmd, args) do
+    rc = Sally.Command.track(cmd, args)
+
+    unless match?({:ok, pid} when is_pid(pid), rc) do
+      raise("track failed: #{inspect(rc)}")
+    end
+
+    cmd
+  end
+
+  def detuple({_, cmd}), do: cmd
+  def detuple(cmd), do: cmd
 end

@@ -23,13 +23,14 @@ defmodule Sally.DatapointAid do
 
     (count - 1)..0
     |> Enum.zip_with(daps, fn num, dap -> {shift(name, num, opts_map), dap} end)
-    |> Enum.each(fn {reading_at, data} ->
-      Ecto.Multi.new()
-      |> Ecto.Multi.put(:aliases, [dev_alias])
-      |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, [data, reading_at])
-      |> Sally.Repo.transaction()
-      |> detuple_txn_result()
-    end)
+    |> Enum.each(fn {reading_at, data} -> Sally.Datapoint.add(dev_alias, data, reading_at) end)
+
+    #   Ecto.Multi.new()
+    #   |> Ecto.Multi.put(:aliases, [dev_alias])
+    #   |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, [data, reading_at])
+    #   |> Sally.Repo.transaction()
+    #   |> detuple_txn_result()
+    # end)
 
     # NOTE: return the created datapoints
     daps
@@ -80,7 +81,4 @@ defmodule Sally.DatapointAid do
     end
     |> Enum.map(fn {key, val} -> {key, num * val} end)
   end
-
-  defp detuple_txn_result({:ok, map}), do: map.datapoint |> List.first()
-  defp detuple_txn_result({:error, _}), do: nil
 end
