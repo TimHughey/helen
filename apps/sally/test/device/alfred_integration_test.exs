@@ -32,7 +32,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       {status, log} = with_log(fn -> Alfred.status(name, []) end)
       assert %Alfred.Status{rc: :ok, detail: %{cmd: "unknown"}} = status
 
-      assert log =~ ~r/correcting missing cmd/
+      assert log =~ ~r/cmd is unknown/
     end
 
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :busy, echo: :instruct]]

@@ -4,13 +4,14 @@ defmodule Sally.Immutable.Dispatch do
 
   use Sally.Dispatch, subsystem: "immut"
 
+  def accumulate(what, map) do
+    Enum.reduce(what, map, fn {key, val}, acc -> %{acc | key => [val | acc[key]]} end)
+  end
+
   @impl true
   # NOTE: filter_extra: [_ident, "error"] are handled upstream
-  def process(%{filter_extra: [_ident, "ok"]} = dispatch) do
-    device_changes = Sally.Device.changeset(dispatch, dispatch.host)
-    device_insert_opts = Sally.Device.insert_opts()
-
-    device = Sally.Repo.insert!(device_changes, device_insert_opts)
+  def process(%{filter_extra: [ident, "ok"]} = dispatch) do
+    device = Sally.Device.create(ident, dispatch.recv_at, dispatch)
     aliases = Sally.DevAlias.load_aliases(device)
 
     txn_info = %{device: device, aliases: [], datapoints: []}
@@ -21,19 +22,11 @@ defmodule Sally.Immutable.Dispatch do
         aliases: Sally.DevAlias.ttl_reset(dev_alias, dispatch.recv_at)
       ]
       # NOTE: accumulate the db results
-      |> Enum.reduce(acc, fn {key, val}, acc2 -> Map.put(acc2, key, [val | Map.get(acc2, key)]) end)
+      |> accumulate(acc)
     end)
     # NOTE: all database operations would have raised on failure so
     # wrap results in an ok tuple to signal success
     |> then(fn txn_info -> {:ok, txn_info} end)
-
-    # Ecto.Multi.new()
-    # |> Ecto.Multi.put(:dispatch, dispatch)
-    # |> Ecto.Multi.insert(:device, device_changes, device_insert_opts)
-    # |> Ecto.Multi.run(:aliases, Sally.DevAlias, :load_aliases, [])
-    # |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, add_datapoint_opts)
-    # |> Ecto.Multi.update_all(:just_saw_db, &Sally.DevAlias.just_saw_db(&1), [])
-    # |> Sally.Repo.transaction()
   end
 
   @impl true

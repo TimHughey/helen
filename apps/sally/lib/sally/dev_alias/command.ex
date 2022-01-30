@@ -32,28 +32,19 @@ defmodule Sally.Command do
     |> save()
   end
 
-  def ack_now_cs(%{cmd_to_ack: cmd} = multi_changes, disposition) do
-    ack_at = Map.get(multi_changes, :recv_at, Timex.now())
-
-    ack_now_cs(cmd, disposition, ack_at)
-  end
-
-  def ack_now_cs(%{id: id} = cmd, disposition, %DateTime{} = ack_at) do
+  def ack_now_cs(%{id: _id} = cmd, disposition, %DateTime{} = ack_at) do
     orphaned = disposition == :orphan
 
-    changes = %{acked: true, acked_at: ack_at, orphaned: orphaned} |> include_rt_latency(cmd)
+    changes = %{acked: true, acked_at: ack_at, orphaned: orphaned} |> rt_latency_put(cmd)
     required = Map.keys(changes)
 
-    Sally.Repo.load(__MODULE__, id: id) |> Ecto.Changeset.cast(changes, required)
+    cmd |> Ecto.Changeset.cast(changes, required)
   end
 
   def ack_orphan_now(nil), do: {:ok, :already_acked}
 
   def ack_orphan_now(%Schema{} = cmd) do
-    changes = %{acked: true, acked_at: now(), orphaned: true} |> include_rt_latency(cmd)
-    required = Map.keys(changes)
-
-    Ecto.Changeset.cast(cmd, changes, required) |> Sally.Repo.update()
+    ack_now_cs(cmd, :orphan, now()) |> Sally.Repo.update()
   end
 
   def add(%DevAlias{} = da, opts) do
@@ -81,37 +72,18 @@ defmodule Sally.Command do
     |> save()
   end
 
+  @add_unknown_cmd [cmd: "unknown", cmd_opts: [ack: :immediate]]
+  def add_unknown(<<_::binary>> = name, opts) do
+    Sally.Repo.get_by(Sally.DevAlias, name: name) |> add_unknown(opts)
+  end
+
+  def add_unknown(%Sally.DevAlias{} = dev_alias, opts) do
+    add(dev_alias, Keyword.merge(opts, @add_unknown_cmd))
+  end
+
   def align_cmd(dev_alias, pin_cmd, align_at) do
     add(dev_alias, cmd: pin_cmd, ref_dt: align_at)
   end
-
-  # def align_cmd(%Sally.DevAlias{} = dev_alias, cmd, asis_cmd, multi_acc, multi_read_only) do
-  #   log_cmd_mismatch(dev_alias, cmd, asis_cmd)
-  #
-  #   multi_id = {:aligned, dev_alias.name, dev_alias.pio}
-  #   align_cs = align_cmd_cs(dev_alias, cmd, multi_read_only)
-  #
-  #   Ecto.Multi.insert(multi_acc, multi_id, align_cs, @returned)
-  # end
-
-  # def align_cmd_cs(dev_alias, cmd, %{} = multi_changes) do
-  #   ack_at = Map.get(multi_changes, :recv_at, Timex.now())
-  #   align_cmd_cs(dev_alias, cmd, ack_at)
-  # end
-  #
-  # def align_cmd_cs(dev_alias, cmd, %DateTime{} = ack_at) do
-  #   align_cmd = Ecto.build_assoc(dev_alias, :cmds)
-  #
-  #   %{
-  #     refid: make_refid(),
-  #     cmd: cmd,
-  #     acked: true,
-  #     acked_at: ack_at,
-  #     sent_at: ack_at,
-  #     rt_latency_us: 1000
-  #   }
-  #   |> changeset(align_cmd)
-  # end
 
   # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
   @impl true
@@ -135,18 +107,6 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
-  def log_cmd_mismatch(dev_alias, pin_cmd, asis_cmd) do
-    [
-      module: __MODULE__,
-      name: dev_alias.name,
-      align_status: true,
-      mismatch: true,
-      asis_cmd: asis_cmd,
-      reported_cmd: pin_cmd
-    ]
-    |> Betty.app_error_v2()
-  end
-
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
@@ -159,21 +119,15 @@ defmodule Sally.Command do
   #   end
   # end
 
-  @doc false
-  def include_rt_latency(%{acked_at: ack_at} = changes, %{sent_at: sent_at} = _cmd) do
-    changes |> Map.put(:rt_latency_us, Timex.diff(ack_at, sent_at))
-  end
-
   def latest(%Sally.DevAlias{} = dev_alias, :id) do
     latest_query(dev_alias, :id) |> Sally.Repo.one()
   end
 
   def latest_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
     Ecto.Query.from(cmd in Schema,
-      # distinct: cmd.dev_alias_id,
+      distinct: [desc: cmd.sent_at],
       where: [dev_alias_id: ^dev_alias_id],
-      order_by: [desc: :sent_at],
-      limit: 1
+      order_by: [desc: :sent_at]
     )
   end
 
@@ -214,42 +168,46 @@ defmodule Sally.Command do
     from(c in Schema, distinct: c.dev_alias_id, order_by: [desc: c.sent_at])
   end
 
-  # def reported_cmd_changeset(%DevAlias{} = da, cmd, reported_at) do
-  #   reported_cmd = Ecto.build_assoc(da, :cmds)
-  #
-  #   [refid | _] = Ecto.UUID.generate() |> String.split("-")
-  #
-  #   # grab the current time for sent_at and possibly acked_at (when ack: :immediate)
-  #   utc_now = DateTime.utc_now()
-  #
-  #   %{refid: refid, cmd: cmd, acked: true, orphan: false, acked_at: utc_now, sent_at: reported_at}
-  #   |> changeset(reported_cmd)
-  # end
+  @doc false
+  def rt_latency_put(changes, cmd) do
+    Map.put(changes, :rt_latency_us, Timex.diff(changes.acked_at, cmd.sent_at))
+  end
 
-  def status(%Sally.DevAlias{} = dev_alias, opts) do
-    query = latest_query(dev_alias, :id)
+  def status(<<_::binary>> = name, opts) do
+    Sally.Repo.get_by(Sally.DevAlias, name: name) |> status(opts)
+  end
+
+  def status(%Sally.DevAlias{name: name} = dev_alias, opts) do
+    case saved(dev_alias) do
+      %Sally.Command{} = cmd -> cmd
+      nil -> add_unknown(name, opts)
+    end
+    |> status_log_unknown(name)
+    |> then(fn cmd -> struct(dev_alias, cmds: [cmd], status: cmd) end)
+  end
+
+  # def status_from_db(%{name: <<_::binary>> = name}, opts), do: status_from_db(name, opts)
+
+  def status_from_db(<<_::binary>> = name, opts) do
+    query = status_query(name, opts)
 
     case Sally.Repo.one(query) do
-      %Sally.Command{} = cmd -> cmd
-      nil -> status_fix_missing_cmd(dev_alias, opts)
+      %Sally.DevAlias{} = dev_alias -> dev_alias
+      nil -> add_unknown(name, opts) |> then(fn _x -> status_from_db(name, opts) end)
     end
-    |> status_finalize(dev_alias)
+    |> status_log_unknown(name)
+    |> then(fn %{cmds: [cmd]} = dev_alias -> struct(dev_alias, status: cmd) end)
   end
 
-  def status_finalize(%Sally.Command{} = cmd, %Sally.DevAlias{} = dev_alias) do
-    fields = Map.take(dev_alias, [:id | Sally.DevAlias.columns(:all)])
+  @unknown %{cmd: "unknown", acked: true}
+  def status_log_unknown(what, name) do
+    case what do
+      @unknown -> Logger.warn(~s("#{name}" --> cmd is unknown))
+      %{cmds: [@unknown]} -> Logger.warn(~s("#{name}" --> cmd is unknown))
+      _ -> :ok
+    end
 
-    Sally.Repo.load(Sally.DevAlias, fields)
-    |> struct(cmds: [cmd])
-  end
-
-  @doc false
-  def status_fix_missing_cmd(%Sally.DevAlias{} = dev_alias, opts) do
-    ["\n         correcting missing cmd [#{dev_alias.name}]"] |> Logger.warn()
-
-    opts = Keyword.merge(opts, cmd: "unknown", cmd_opts: [ack: :immediate])
-
-    add(dev_alias, opts)
+    what
   end
 
   def status_query(<<_::binary>> = name, _opts) do
@@ -261,11 +219,10 @@ defmodule Sally.Command do
       join: cmd in assoc(dev_alias, :cmds),
       inner_lateral_join:
         latest_cmd in subquery(
-          Ecto.Query.from(Sally.Command,
+          Ecto.Query.from(cmd in Schema,
+            distinct: [desc: cmd.sent_at],
             where: [dev_alias_id: parent_as(:dev_alias).id],
             order_by: [desc: :sent_at],
-            group_by: [:id, :dev_alias_id, :sent_at],
-            limit: 1,
             select: [:id]
           )
         ),

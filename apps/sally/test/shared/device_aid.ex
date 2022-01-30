@@ -3,54 +3,46 @@ defmodule Sally.DeviceAid do
   Supporting functionality for creating Sally.Device for testing
   """
 
-  def add(%{device_add: opts, host: %Sally.Host{} = host}) when is_list(opts) do
-    device = Ecto.build_assoc(host, :devices)
-    type = opts[:auto] || :ds
-    ident = opts[:ident] || unique(type)
-
-    base = %{last_seen_at: DateTime.utc_now()}
-
-    insert_opts = [
-      on_conflict: {:replace, Sally.Device.columns(:replace)},
-      returning: true,
-      conflict_target: [:ident]
-    ]
-
-    case type do
-      :mcp23008 -> %{ident: ident, pios: 8, family: "i2c", mutable: true}
-      :ds -> %{ident: ident, family: "ds", pios: 1, mutable: false}
-      :pwm -> %{ident: ident, family: "pwm", pios: 4, mutable: true}
-    end
-    |> Map.merge(base)
-    |> Sally.Device.changeset(device)
-    |> Sally.Repo.insert(insert_opts)
-    |> check_insert_rc()
+  # NOTE: test context support
+  def add(%{device_add: opts, host: %{id: _} = host}) when is_list(opts) do
+    %{device: add(opts, host)}
   end
 
   def add(_), do: :ok
 
-  def aliases(%Sally.Device{} = device) do
-    Sally.Device.load_aliases(device)
+  def add(opts, %Sally.Host{} = host) when is_list(opts) do
+    type = opts[:auto] || :ds
+    ident = opts[:ident] || unique(type)
+    create_at = DateTime.utc_now()
+
+    params = %{data: %{pins: pin_data(ident)}, host: host, subsystem: subsystem(ident)}
+
+    Sally.Device.create(ident, create_at, params)
   end
 
-  def check_insert_rc(insert_rc) do
-    case insert_rc do
-      {:ok, %Sally.Device{} = x} -> %{device: x}
-      error -> raise(inspect(error, pretty: true))
+  def aliases(%Sally.Device{} = device), do: Sally.Device.load_aliases(device)
+
+  def next_pio(%Sally.Device{pios: pios} = device) do
+    pios = 0..(pios - 1)
+    next = Enum.find(pios, :none, fn pio -> not Sally.Device.pio_aliased?(device, pio) end)
+
+    if is_integer(next), do: next, else: raise("pios exhausted")
+  end
+
+  def pin_data(ident) do
+    case ident do
+      <<"ds"::binary, _::binary>> -> 0..0
+      <<"i2c"::binary, _::binary>> -> 0..7
+      <<"pwm"::binary, _::binary>> -> 0..3
     end
+    |> Enum.map(fn n -> {n, "z"} end)
   end
 
-  def next_pio(%Sally.Device{} = device) do
-    device = Sally.Device.load_aliases(device)
-
-    all_pios = 0..(device.pios - 1) |> Enum.to_list()
-    used_pios = for %Sally.DevAlias{pio: x} <- device.aliases, do: x
-
-    available_pios = all_pios -- used_pios
-
-    case available_pios do
-      [] -> raise("pios exhausted")
-      [x | _] -> x
+  def subsystem(ident) do
+    case ident do
+      <<"ds"::binary, _::binary>> -> "immut"
+      <<"i2c"::binary, _::binary>> -> "mut"
+      <<"pwm"::binary, _::binary>> -> "mut"
     end
   end
 

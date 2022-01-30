@@ -1,128 +1,79 @@
 defmodule Rena.SetPt.Cmd do
   alias Rena.Sensor.Result
 
-  def effectuate(make_result, opts) do
-    case make_result do
-      {action, cmd_args} when action in [:activate, :deactivate] ->
-        execute(cmd_args, opts) |> log_execute_result(action, opts)
+  def effectuate(%{action: :no_change}, _opts), do: :no_change
 
-      {:datapoint_error = x, _} ->
-        Betty.app_error(opts, [{x, true}])
-        :failed
-
-      {:error, reason} ->
-        Betty.app_error(opts, [{reason, true}])
-        :failed
-
-      {:equipment_error, %{name: name, rc: {:ttl_expired, ms}}} ->
-        Betty.app_error(opts, equipment: name, equipment_error: "ttl_expired #{ms}ms")
-        :failed
-
-      {:equipment_error, %{name: name, rc: {:orphaned, ms}}} ->
-        Betty.app_error(opts, equipment: name, equipment_error: "orphaned #{ms}ms")
-        :failed
-
-      {:equipment_error, %{name: name, rc: rc}} ->
-        Betty.app_error(opts, equipment: name, equipment_error: rc)
-        :failed
-
-      {:no_change, _status} ->
-        :no_change
-    end
+  def effectuate(%{action: action} = make_result, opts) do
+    execute(make_result, opts) |> tap(fn x -> log_execute_result(x, action, opts) end)
   end
 
-  def execute(cmd_args, opts) do
+  def effectuate(error, opts) do
+    case error do
+      {:datapoint_error = x, _} -> Betty.app_error(opts, [{x, true}])
+      {:equipment_error = x, %{name: name}} -> Betty.app_error(opts, [{x, true} | [name: name]])
+    end
+
+    :failed
+  end
+
+  def execute(%{equipment: equipment, next_cmd: next_cmd}, opts) do
     alfred = opts[:alfred] || Alfred
 
-    cmd_args = Enum.into(cmd_args, [])
+    cmd_args = [equipment: equipment, cmd: next_cmd]
 
-    case alfred.execute({cmd_args, []}) do
-      %Alfred.Execute{rc: rc} = execute when rc in [:ok, :pending] -> {:ok, execute}
-      %Alfred.Execute{} = execute -> {:failed, execute}
-    end
+    alfred.execute({cmd_args, notify: true})
   end
 
-  def log_execute_result({rc, %{name: name} = execute}, action, opts) do
+  def log_execute_result(%{rc: rc, name: name}, action, opts) do
     tags = [equipment: name]
 
     # always log that an action was performed (even if it failed)
     Betty.runtime_metric(opts, tags, [{action, true}])
 
-    if rc == :failed do
-      Betty.app_error(opts, [{:cmd_fail, true} | tags])
-    end
-
-    # pass through the execute result
-    execute
+    unless rc == :ok, do: Betty.app_error(opts, [{:cmd_fail, true} | tags])
   end
 
+  def put(what, key, acc), do: {:cont, Map.put(acc, key, what)}
+  def put_ok(acc, key), do: {:cont, Map.put(acc, key, :ok)}
+
+  def put_status(status, acc) do
+    case status do
+      %{rc: rc, detail: %{cmd: cmd}} -> %{rc: rc, cmd: cmd}
+      %{rc: rc} -> %{rc: rc}
+    end
+    |> Map.put(:status, status)
+    |> then(fn merge -> {:cont, Map.merge(acc, merge)} end)
+  end
+
+  def activate(acc), do: {:cont, Map.merge(acc, %{next_cmd: "on", action: :activate})}
+  def deactivate(acc), do: {:cont, Map.merge(acc, %{next_cmd: "off", action: :deactivate})}
+  def no_change(acc), do: {:cont, Map.merge(acc, %{next_cmd: acc.cmd, action: :no_change})}
+
+  @result_parts [:gt_high, :lt_low, :lt_mid, :total, :valid]
   def make(name, %Result{} = result, opts \\ []) do
     alfred = opts[:alfred] || Alfred
-    cmd_args = %{name: name, cmd_opts: [notify_when_released: true]}
 
-    active_cmd_args = opts[:active_cmd] || Map.put(cmd_args, :cmd, "on")
-    inactive_cmd_args = opts[:inactive_cmd] || Map.put(cmd_args, :cmd, "off")
+    # active_cmd = "on"
+    # inactive_cmd = "off"
 
-    with {:datapoints, true} <- sufficient_datapoints?(result),
-         {:active_cmd, active_cmd_args} <- {:active_cmd, active_cmd_args},
-         {:inactive_cmd, inactive_cmd_args} <- {:inactive_cmd, inactive_cmd_args},
-         %Alfred.Status{rc: :ok} = full_status <- alfred.status(name) do
-      status = simple_status(full_status, active_cmd_args)
+    base = %{equipment: name, result: result}
+    result_parts = Map.take(result, @result_parts)
+    initial_acc = Map.merge(base, result_parts)
+    steps = [:datapoints, :status, :good, :want_cmd, :action, :default]
 
-      activate? = status == :inactive and should_be_active?(result)
-      deactivate? = status == :active and should_be_inactive?(result)
-
-      cond do
-        activate? -> {:activate, active_cmd_args}
-        deactivate? -> {:deactivate, inactive_cmd_args}
-        true -> {:no_change, status}
-      end
-    else
-      {:datapoints, false} -> {:datapoint_error, result}
-      {:active_cmd, _} -> {:error, :invalid_active_cmd}
-      {:inactive_cmd, _} -> {:error, :invalid_inactive_cmd}
-      %Alfred.Status{} = status -> {:equipment_error, status}
-    end
+    Enum.reduce_while(steps, initial_acc, fn
+      :datapoints = key, %{valid: x, total: y} = acc when x >= 3 and y >= 3 -> put_ok(acc, key)
+      :datapoints, acc -> {:halt, {:datapoint_error, acc.result}}
+      :status, acc -> alfred.status(name) |> put_status(acc)
+      :good, %{rc: :ok} = acc -> {:cont, acc}
+      :good, %{rc: :busy} = acc -> no_change(acc)
+      :good, %{rc: _} = acc -> {:halt, {:equipment_error, acc.status}}
+      :want_cmd, %{cmd: "on", gt_high: x} = acc when x >= 1 -> deactivate(acc)
+      :want_cmd, %{cmd: "off", lt_low: x} = acc when x >= 1 -> activate(acc)
+      :want_cmd, %{cmd: "off", lt_mid: x} = acc when x >= 2 -> activate(acc)
+      :want_cmd, acc -> no_change(acc)
+      :action, %{next_cmd: _, action: _} = acc -> {:halt, acc}
+      _, acc -> {:cont, acc}
+    end)
   end
-
-  # safety first is the priority so we will always error on the side of inactive
-  #
-  # safety checks (e.g. sufficient valid data points) are performed prior to
-  # determining active vs inactive
-  #
-  # should_be_active? and should_be_inactive? are closely related however do not
-  # mirror each other exactly
-  #
-  # system is inactive when:
-  #  1. one or more sensors are gt_high (prcent over temp)
-  #
-  # system is active when:
-  #  1. one or more sensors are lt_low (prevent low temperature)
-  #  2. two or more sensors are lt_mid (prevent temperature from dropping below low)
-
-  defp should_be_active?(result) do
-    case result do
-      %Result{gt_high: x} when x >= 1 -> false
-      %Result{lt_low: x} when x >= 1 -> true
-      %Result{lt_mid: x} when x >= 2 -> true
-      _ -> false
-    end
-  end
-
-  defp should_be_inactive?(result) do
-    case result do
-      %Result{gt_high: x} when x >= 1 -> true
-      _ -> false
-    end
-  end
-
-  defp simple_status(status, cmd_args) when is_list(cmd_args) do
-    simple_status(status, Enum.into(cmd_args, %{}))
-  end
-
-  defp simple_status(%Alfred.Status{detail: %{cmd: have}}, %{cmd: want}) when have == want, do: :active
-  defp simple_status(%Alfred.Status{detail: %{cmd: have}}, %{cmd: want}) when have != want, do: :inactive
-
-  defp sufficient_datapoints?(%Result{valid: x, total: y}) when x >= 3 and y >= 3, do: {:datapoints, true}
-  defp sufficient_datapoints?(%Result{}), do: {:datapoints, false}
 end

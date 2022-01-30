@@ -26,35 +26,13 @@ defmodule Sally.Device do
 
   @returned [returning: true]
 
-  def changeset(struct, %Host{} = host) when is_struct(struct) do
-    p = Map.from_struct(struct)
-
-    ident = List.first(p.filter_extra)
-    mutable? = p.subsystem == "mut"
-    device = Ecto.build_assoc(host, :devices)
-    pios = if(mutable?, do: length(p.data[:pins]), else: 1)
-
-    %{
-      ident: ident,
-      family: determine_family(ident),
-      mutable: mutable?,
-      pios: pios,
-      last_seen_at: p[:sent_at]
-    }
-    |> changeset(device)
-  end
-
   def changeset(changes, %Host{} = host) when is_map(changes) do
     Ecto.build_assoc(host, :devices) |> changeset(changes)
   end
 
-  def changeset(p, %Schema{} = device) when is_map(p) do
-    changeset(device, p)
-  end
-
-  def changeset(%Schema{} = device, p) when is_map(p) do
+  def changeset(%Schema{} = device, %{} = params) do
     device
-    |> Changeset.cast(p, columns(:cast))
+    |> Changeset.cast(params, columns(:cast))
     |> Changeset.validate_required(columns(:required))
     |> Changeset.validate_format(:ident, ~r/^[a-z~]{1,}[[:alnum:]][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:ident, max: 128)
@@ -62,12 +40,29 @@ defmodule Sally.Device do
     |> Changeset.validate_number(:pios, greater_than_or_equal_to: 1)
   end
 
-  @columns_all [:ident, :family, :mutable, :pios, :last_seen_at, :updated_at, :inserted_at]
-  def columns(:cast), do: @columns_all
-  def columns(:required), do: columns_exclude([:inserted_at, :updated_at])
-  def columns(:replace), do: columns_exclude([:last_seen_at, :updated_at])
+  @columns [:id, :ident, :family, :mutable, :pios, :last_seen_at, :updated_at, :inserted_at]
+  @not_required [:id, :inserted_at, :updated_at]
+  @required Enum.reject(@columns, fn x -> x in @not_required end)
 
-  def columns_exclude(cols), do: Enum.reject(@columns_all, fn key -> key in cols end)
+  def columns(:cast), do: @columns
+  def columns(:required), do: @required
+
+  # def columns(:required), do: columns_exclude([:inserted_at, :updated_at])
+  # def columns(:replace), do: columns_exclude([:last_seen_at, :updated_at])
+  #
+  # def columns_exclude(cols), do: Enum.reject(@columns_all, fn key -> key in cols end)
+
+  def create(<<_::binary>> = ident, create_at, %{} = params) do
+    %{
+      ident: ident,
+      family: determine_family(ident),
+      mutable: params.subsystem == "mut",
+      pios: pios_from_pin_data(params.data),
+      last_seen_at: create_at
+    }
+    |> changeset(params.host)
+    |> Sally.Repo.insert!(insert_opts())
+  end
 
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
@@ -86,14 +81,6 @@ defmodule Sally.Device do
     end
   end
 
-  # def find_alias(%Schema{aliases: aliases}, pio) when is_integer(pio) and pio >= 0 do
-  #   Enum.find(aliases, nil, fn dev_alias -> DevAlias.for_pio?(dev_alias, pio) end)
-  # end
-  #
-  # def get_aliases(%Schema{id: id}) do
-  #   Repo.all(DevAlias, device_id: id)
-  # end
-
   def idents_begin_with(pattern) when is_binary(pattern) do
     import Ecto.Query, only: [from: 2]
 
@@ -107,20 +94,10 @@ defmodule Sally.Device do
     |> Repo.all()
   end
 
-  def insert_opts do
-    [on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:ident]]
-  end
-
-  # def last_seen_at_cs(id, last_seen_at \\ nil) do
-  #   alias Ecto.Changeset
-  #
-  #   at = if(is_nil(id), do: DateTime.utc_now(), else: last_seen_at)
-  #
-  #   changes = %{id: id, last_seen_at: at}
-  #
-  #   %Schema{}
-  #   |> Changeset.cast(changes, Map.keys(changes))
-  # end
+  @dont_replace [:id, :last_seen_at, :updated_at]
+  @replace Enum.reject(@columns, fn x -> x in @dont_replace end)
+  @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:ident]] ++ @returned
+  def insert_opts, do: @insert_opts
 
   def latest(opts) do
     import Ecto.Query, only: [from: 2]
@@ -144,9 +121,7 @@ defmodule Sally.Device do
     end)
   end
 
-  def load_aliases(%Schema{} = device) do
-    Repo.preload(device, [:aliases])
-  end
+  def load_aliases(%Schema{} = device), do: Repo.preload(device, [:aliases])
 
   def load_host(device) do
     Repo.preload(device, [:host])
@@ -183,33 +158,23 @@ defmodule Sally.Device do
   end
 
   def pio_aliased?(%Schema{pios: pios} = device, pio) when pio < pios do
-    import Ecto.Query, only: [from: 2]
+    device = load_aliases(device)
 
-    device
-    |> Repo.reload()
-    |> Repo.preload(aliases: from(a in DevAlias, where: a.pio == ^pio))
-    |> then(fn
-      %Schema{aliases: []} -> false
-      %Schema{aliases: x} when is_list(x) -> true
-    end)
+    dev_alias = Enum.find(device.aliases, &match?(%{pio: ^pio}, &1))
+
+    match?(%Sally.DevAlias{}, dev_alias)
   end
 
   def pios(%Schema{pios: pios}), do: pios
 
-  def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
-
-  def seen_at_cs(%{aliases: dev_aliases, seen_at: seen_at} = _multi_changes) do
-    case dev_aliases do
-      [%Sally.DevAlias{device_id: id} | _] -> id
-      %Sally.DevAlias{device_id: id} -> id
-      _ -> raise("could not find device id in: #{inspect(dev_aliases)}")
+  def pios_from_pin_data(data) do
+    case data do
+      %{pins: pin_data} -> Enum.count(pin_data)
+      _no_pin_data -> 1
     end
-    |> seen_at_cs(seen_at)
   end
 
-  def seen_at_cs(id, %DateTime{} = at) when is_integer(id) do
-    struct(__MODULE__, id: id) |> Changeset.cast(%{last_seen_at: at}, [:last_seen_at])
-  end
+  def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
 
   def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
 
@@ -217,14 +182,6 @@ defmodule Sally.Device do
     Sally.Repo.load(Schema, id: id)
     |> Ecto.Changeset.cast(%{last_seen_at: ttl_at}, [:last_seen_at])
     |> Sally.Repo.update!(@returned)
-  end
-
-  def type(schema_or_id) do
-    case schema_or_id do
-      %Schema{} = x -> if(x.mutable, do: :mutable, else: :immutable)
-      x when is_integer(x) -> Repo.get(Schema, x) |> type()
-      x when is_nil(x) -> :unknown
-    end
   end
 
   defp determine_family(ident) do

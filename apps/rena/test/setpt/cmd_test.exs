@@ -6,7 +6,7 @@ defmodule Rena.SetPt.CmdTest do
   import Alfred.NamesAid, only: [equipment_add: 1]
 
   defmacro assert_exec_cmd(ctx, :datapoint_error) do
-    quote location: :keep, bind_quoted: [ctx: ctx] do
+    quote bind_quoted: [ctx: ctx] do
       %{equipment: equipment, result: result} = ctx
 
       cmd_result = Rena.SetPt.Cmd.make(equipment, result, alfred: AlfredSim)
@@ -15,15 +15,16 @@ defmodule Rena.SetPt.CmdTest do
   end
 
   defmacro assert_exec_cmd(ctx, action) do
-    quote location: :keep, bind_quoted: [ctx: ctx, action: action] do
+    quote bind_quoted: [ctx: ctx, action: action] do
       %{equipment: equipment, result: result} = ctx
-
-      cmd_result = Rena.SetPt.Cmd.make(equipment, result, alfred: AlfredSim)
 
       expect_cmd = if(action == :activate, do: "on", else: "off")
 
+      make_result = Rena.SetPt.Cmd.make(equipment, result, alfred: AlfredSim)
+
       # assert {^action, [{:cmd, ^expect_cmd}, {:name, ^equipment} | _]} = cmd_result
-      assert {^action, %{cmd: ^expect_cmd, name: equipment}} = cmd_result
+      #   assert {^action, %{cmd: ^expect_cmd, name: equipment}} = cmd_result
+      assert %{action: ^action, next_cmd: ^expect_cmd, equipment: ^equipment} = make_result
     end
   end
 
@@ -51,7 +52,8 @@ defmodule Rena.SetPt.CmdTest do
     @tag equipment_add: [cmd: "on"]
     @tag result_opts: [lt_mid: 2, gt_mid: 1]
     test "no change when result below mid range value and active", ctx do
-      assert {:no_change, :active} = Rena.SetPt.Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
+      make_result = Rena.SetPt.Cmd.make(ctx.equipment, ctx.result, alfred: AlfredSim)
+      assert %{action: :no_change} = make_result
     end
 
     @tag equipment_add: [rc: :error, cmd: "unknown"]
@@ -69,9 +71,9 @@ defmodule Rena.SetPt.CmdTest do
       assert :failed = Rena.SetPt.Cmd.effectuate({:datapoint_error, :foo}, opts)
     end
 
-    test "handles general error", %{opts: opts} do
-      assert :failed = Rena.SetPt.Cmd.effectuate({:error, :foo}, opts)
-    end
+    # test "handles general error", %{opts: opts} do
+    #   assert :failed = Rena.SetPt.Cmd.effectuate({:error, :foo}, opts)
+    # end
 
     test "handles equipment ttl expired", %{opts: opts} do
       assert :failed =
@@ -90,7 +92,8 @@ defmodule Rena.SetPt.CmdTest do
     end
 
     test "handles no change", %{opts: opts} do
-      assert :no_change = Rena.SetPt.Cmd.effectuate({:no_change, :foo}, opts)
+      make_result = %{action: :no_change}
+      assert :no_change = Rena.SetPt.Cmd.effectuate(make_result, opts)
     end
   end
 
@@ -99,20 +102,34 @@ defmodule Rena.SetPt.CmdTest do
 
     @tag equipment_add: [cmd: "on"]
     test "handles equipment status :ok", ctx do
-      assert {:ok, %Alfred.Execute{rc: :ok, detail: %{cmd: "on"}}} =
-               Rena.SetPt.Cmd.execute([name: ctx.equipment, cmd: "on"], ctx.opts)
+      cmd_args = %{equipment: ctx.equipment, next_cmd: "on"}
+
+      execute = Rena.SetPt.Cmd.execute(cmd_args, ctx.opts)
+      assert %Alfred.Execute{rc: :ok, detail: %{cmd: "on"}} = execute
     end
 
-    @tag equipment_add: [pending: true, cmd: "on"]
-    test "handles equipment status is :pending", ctx do
-      assert {:ok, %Alfred.Execute{rc: :pending, detail: %{cmd: "on"}}} =
-               Rena.SetPt.Cmd.execute([name: ctx.equipment, cmd: "on"], ctx.opts)
+    @tag equipment_add: [busy: true, cmd: "on"]
+    test "handles equipment status is :busy", ctx do
+      cmd_args = %{equipment: ctx.equipment, next_cmd: "on"}
+
+      execute = Rena.SetPt.Cmd.execute(cmd_args, ctx.opts)
+      assert %Alfred.Execute{rc: :busy} = execute
+    end
+
+    @tag equipment_add: [busy: true, cmd: "on"]
+    test "handles equipment status is :busy and next cmd is diff", ctx do
+      cmd_args = %{equipment: ctx.equipment, next_cmd: "off"}
+
+      execute = Rena.SetPt.Cmd.execute(cmd_args, ctx.opts)
+      assert %Alfred.Execute{rc: :busy} = execute
     end
 
     @tag equipment_add: [expired_ms: 10_000]
     test "handles when equipment status is :ttl_expired", ctx do
-      assert {:failed, %Alfred.Execute{rc: {:ttl_expired, ms}}} =
-               Rena.SetPt.Cmd.execute([name: ctx.equipment, cmd: "on"], ctx.opts)
+      cmd_args = %{equipment: ctx.equipment, next_cmd: "on"}
+
+      execute = Rena.SetPt.Cmd.execute(cmd_args, ctx.opts)
+      assert %Alfred.Execute{rc: {:ttl_expired, ms}} = execute
 
       assert_in_delta(ms, 10_000, 1000)
     end

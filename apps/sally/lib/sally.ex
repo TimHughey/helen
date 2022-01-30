@@ -225,6 +225,8 @@ defmodule Sally do
     end
   end
 
+  defdelegate explain(name, category, what, opts \\ []), to: Sally.DevAlias.Explain, as: :query
+
   def host_devices(name) do
     host = Host.find_by_name(name) |> Repo.preload(:devices)
 
@@ -363,27 +365,4 @@ defmodule Sally do
       _ -> {:not_found, ident}
     end
   end
-
-  # @doc """
-  #
-  # """
-  # @doc since: "0.5.10"
-  # def just_saw(%Device{} = device, dev_aliases) when is_list(dev_aliases) do
-  #   alias Alfred.{JustSaw, SeenName}
-  #
-  #   type = Device.type(device)
-  #
-  #   JustSaw.new(type, dev_aliases, &SeenName.from_schema/1, {:module, __MODULE__})
-  #   |> Alfred.just_saw()
-  # end
-
-  # required as callback from Alfred
-  # function head
-  # def status(type, name, opts \\ [])
-  #
-  # # (1 of 2) handle mutable devices
-  # def status(:mut_status, name, opts), do: Sally.Mutable.status(name, opts)
-  #
-  # # (2 of 2) handle immutable devices
-  # def status(:imm_status, name, opts), do: Sally.Immutable.status(name, opts)
 end

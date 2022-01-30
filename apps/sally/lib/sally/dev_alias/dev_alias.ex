@@ -34,36 +34,16 @@ defmodule Sally.DevAlias do
     has_many(:cmds, Command, foreign_key: :dev_alias_id, preload_order: [desc: :sent_at])
     has_many(:datapoints, Datapoint, foreign_key: :dev_alias_id, preload_order: [desc: :reading_at])
 
+    field(:status, :map, virtual: true, default: %{})
+
     timestamps(type: :utc_datetime_usec)
   end
 
   @returned [returning: true]
 
-  # def add_datapoint(repo, %{aliases: dev_aliases}, raw_data, %DateTime{} = reading_at)
-  #     when is_map(raw_data) do
-  #   for %Schema{} = schema <- dev_aliases, reduce: {:ok, []} do
-  #     {:ok, acc} ->
-  #       case Datapoint.add(repo, schema, raw_data, reading_at) do
-  #         {:ok, %Datapoint{} = x} -> {:ok, [x] ++ acc}
-  #         {:error, _reason} = rc -> rc
-  #       end
-  #   end
-  # end
-
-  def add_datapoint([_ | _] = dev_aliases, raw_data, %DateTime{} = reading_at) do
-    Enum.map(dev_aliases, fn dev_alias ->
-      Sally.Datapoint.add(dev_alias, raw_data, reading_at)
-    end)
-  end
-
-  # def align_status(%{aliases: [_ | _] = aliases, data: %{pins: _} = data, seen_at: seen_at}) do
-  #   Enum.reduce(aliases, Ecto.Multi.new(), fn %{name: name} = dev_alias, multi ->
-  #     multi_id = {:aligned, name}
-  #
-  #     case align_status_one(dev_alias, data, seen_at) do
-  #       %Ecto.Changeset{} = cs -> Ecto.Multi.insert(multi, multi_id, cs, @returned)
-  #       :no_change -> multi
-  #     end
+  # def add_datapoint([_ | _] = dev_aliases, raw_data, %DateTime{} = reading_at) do
+  #   Enum.map(dev_aliases, fn dev_alias ->
+  #     Sally.Datapoint.add(dev_alias, raw_data, reading_at)
   #   end)
   # end
 
@@ -76,67 +56,22 @@ defmodule Sally.DevAlias do
     case latest_cmd do
       %{acked: false, acked_at: nil} -> :busy
       %{acked: true, cmd: ^pin_cmd} -> :aligned
-      %{acked: true} -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
-      nil -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
+      _ -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
     end
   end
 
-  # def align_status(%{aliases: []} = _multi_changes), do: Ecto.Multi.new()
+  # def changeset(changes) when is_list(changes) do
+  #   {id, changes_rest} = Keyword.pop(changes, :id)
+  #   required = Keyword.keys(changes)
+  #   schema = Sally.Repo.load(Schema, id: id)
   #
-  # def align_status(%{aliases: aliases} = multi_read_only) do
-  #   # NOTE: reduce a entirely new Ecto.Multi to merge into the overall Ecto.Multi
-  #   Enum.reduce(aliases, Ecto.Multi.new(), fn dev_alias, multi_acc ->
-  #     align_status_one(dev_alias, multi_acc, multi_read_only)
-  #   end)
+  #   Enum.into(changes_rest, %{}) |> changeset(schema, required: required)
   # end
-  #
-  # def align_status_one(dev_alias, multi_acc, multi_read_only) do
-  #   cmd = Sally.Command.latest(dev_alias, :id)
-  #   pin_cmd = Sally.Command.pin_cmd(multi_read_only.dispatch.data.pins, dev_alias.pio)
-  #
-  #   case cmd do
-  #     # NOTE: never step on a busy commmand
-  #     %{acked: false} -> multi_acc
-  #     # latest acked command == pin cmd
-  #     %{acked: true, cmd: ^pin_cmd} -> multi_acc
-  #     # pin_cmd different, fix the mismatch
-  #     %{cmd: asis_cmd} -> align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
-  #     # dev_alias without cmd history, strange but possible
-  #     nil -> align_now(dev_alias, pin_cmd, "unknown", multi_acc, multi_read_only)
-  #   end
-  # end
-
-  # def align_now(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only) do
-  #   Sally.Command.align_cmd(dev_alias, pin_cmd, asis_cmd, multi_acc, multi_read_only)
-  # end
-
-  # def align_status(_changes), do: Ecto.Multi.new()
-
-  # def align_status_one(%{pio: pio} = dev_alias, %{pins: pins}, seen_at) do
-  #   case status(dev_alias, nature: :cmds) do
-  #     status when pin_cmd == :no_pin -> cmd_mismatch(status, "bad_pin", dev_alias, seen_at)
-  #     %{rc: :busy, detail: detail} -> tap(:no_change, fn _ -> Sally.Command.check_stale(detail) end)
-  #     %{rc: :ok, detail: %{cmd: ^pin_cmd}} -> :no_change
-  #     # NOTE: special case when DevAlias doesn't have any commands yet
-  #     %{rc: :error} -> Sally.Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
-  #     status -> cmd_mismatch(status, pin_cmd, dev_alias, seen_at)
-  #   end
-  # end
-
-  def changeset(changes) when is_list(changes) do
-    {id, changes_rest} = Keyword.pop(changes, :id)
-    required = Keyword.keys(changes)
-    schema = Sally.Repo.load(Schema, id: id)
-
-    Enum.into(changes_rest, %{}) |> changeset(schema, required: required)
-  end
 
   def changeset(changes, %Schema{} = a, opts \\ []) do
-    required = opts[:required] || columns(:required)
-
     a
     |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required(required)
+    |> Changeset.validate_required(opts[:required] || columns(:required))
     |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
     |> Changeset.validate_length(:name, max: 128)
     |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
@@ -145,46 +80,13 @@ defmodule Sally.DevAlias do
     |> Changeset.unique_constraint(:name, [:name])
   end
 
-  # defp cmd_mismatch(%Alfred.Status{} = status, pin_cmd, dev_alias, seen_at) do
-  #   [
-  #     module: Sally.Command,
-  #     align_status: true,
-  #     mismatch: true,
-  #     reported_cmd: pin_cmd,
-  #     local_cmd: Alfred.Status.get_cmd(status),
-  #     status_error: inspect(status.rc),
-  #     name: status.name
-  #   ]
-  #   |> Betty.app_error_v2()
-  #
-  #   Sally.Command.reported_cmd_changeset(dev_alias, pin_cmd, seen_at)
-  # end
+  @columns [:id, :name, :pio, :description, :ttl_ms, :device_id, :inserted_at, :updated_at]
+  @required [:device_id, :name, :pio]
 
-  # defp cmd_mismatch(status, pin_cmd) do
-  #   [pin_cmd, "\n", inspect(status, pretty: true)] |> Logger.warn()
-  #
-  #   :no_change
-  # end
+  def columns(:cast), do: @columns
+  def columns(:required), do: @required
 
-  # helpers for changeset columns
-  def columns(:all) do
-    these_cols = [:__meta__, __schema__(:associations), __schema__(:primary_key)] |> List.flatten()
-
-    %Schema{} |> Map.from_struct() |> Map.drop(these_cols) |> Map.keys() |> List.flatten()
-  end
-
-  def columns(:cast), do: columns(:all)
-  def columns(:required), do: columns_all(only: [:device_id, :name, :pio])
-  def columns(:replace), do: columns_all(drop: [:name, :inserted_at])
-
-  def columns_all(opts) when is_list(opts) do
-    keep_set = MapSet.new(opts[:only] || columns(:all))
-    drop_set = MapSet.new(opts[:drop] || columns(:all))
-
-    MapSet.difference(keep_set, drop_set) |> MapSet.to_list()
-  end
-
-  def create(%Device{} = device, opts) do
+  def create(%Sally.Device{} = device, opts) do
     dev_alias = Ecto.build_assoc(device, :aliases)
 
     %{
@@ -194,7 +96,7 @@ defmodule Sally.DevAlias do
       ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
     }
     |> changeset(dev_alias)
-    |> Repo.insert(on_conflict: {:replace, columns(:replace)}, returning: true, conflict_target: [:name])
+    |> Repo.insert(insert_opts())
   end
 
   def delete(name_or_id) do
@@ -232,52 +134,6 @@ defmodule Sally.DevAlias do
     {rc, new_cmd}
   end
 
-  @doc """
-  SQL Explain for status queries
-  """
-  @spec explain(name :: String.t(), :status, opts :: list()) :: :ok
-  def explain do
-    """
-      iex> Sally.DevAlias.explain(name, what, opts)
-
-     name:      name of a Sally.DevAlias
-     category: :status | :cmdack (only for type: :cmds)
-     type:     :cmds or :datapoints
-     opts: explain opts (default: [analyze: true, buffers: true])
-    """
-  end
-
-  @explain_defaults [analyze: true, buffers: true, wal: true]
-  def explain(name, category, what, opts \\ @explain_defaults)
-
-  def explain(name, :cmdack, :cmds, opts) do
-    explain_opts = Keyword.merge(@explain_defaults, opts)
-
-    module = Sally.Command
-
-    find(name)
-    |> module.latest_query(:id)
-    |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
-    |> then(fn output -> ["\n", inspect(module), ".latest_query/1", "\n", output] end)
-    |> IO.iodata_to_binary()
-  end
-
-  def explain(name, :status, what, opts) do
-    opts = Keyword.merge(@explain_defaults, opts)
-    {explain_opts, query_opts} = Keyword.split(opts, Keyword.keys(@explain_defaults))
-
-    module =
-      case what do
-        :cmds -> Sally.Command
-        :datapoints -> Sally.Datapoint
-      end
-
-    module.status_query(name, query_opts)
-    |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
-    |> then(fn output -> ["\n", inspect(module), ".status_query/2", "\n", output] end)
-    |> IO.iodata_to_binary()
-  end
-
   # (1 of 2) find with proper opts
   def find(opts) when is_list(opts) and opts != [] do
     case Repo.get_by(Schema, opts) do
@@ -296,6 +152,11 @@ defmodule Sally.DevAlias do
   end
 
   def find_by_name(name) when is_binary(name), do: find(name: name)
+
+  @dont_replace [:id, :last_seen_at, :updated_at]
+  @replace Enum.reject(@columns, fn x -> x in @dont_replace end)
+  @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
+  def insert_opts, do: @insert_opts
 
   # @doc """
   #   Mark a list of DevAlias as just seen within an Ecto.Multi sequence
@@ -357,12 +218,12 @@ defmodule Sally.DevAlias do
     |> Sally.Repo.all()
   end
 
-  def load_aliases(repo, multi_changes) do
-    %{device: %{id: device_id}} = multi_changes
-
-    Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
-    |> then(fn query -> {:ok, repo.all(query)} end)
-  end
+  # def load_aliases(repo, multi_changes) do
+  #   %{device: %{id: device_id}} = multi_changes
+  #
+  #   Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
+  #   |> then(fn query -> {:ok, repo.all(query)} end)
+  # end
 
   def load_cmd_last(%Schema{} = x) do
     cmd_query = Command.query_preload_latest_cmd()
@@ -391,13 +252,13 @@ defmodule Sally.DevAlias do
     schema |> Repo.preload(device: [:host]) |> load_cmd_last()
   end
 
-  def mark_updated(%{} = multi_changes, source_key) do
-    %{:seen_at => seen_at, ^source_key => source} = multi_changes
-
-    case source do
-      %{dev_alias_id: id} -> changeset(id: id, updated_at: seen_at)
-    end
-  end
+  # def mark_updated(%{} = multi_changes, source_key) do
+  #   %{:seen_at => seen_at, ^source_key => source} = multi_changes
+  #
+  #   case source do
+  #     %{dev_alias_id: id} -> changeset(id: id, updated_at: seen_at)
+  #   end
+  # end
 
   def names do
     Ecto.Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()

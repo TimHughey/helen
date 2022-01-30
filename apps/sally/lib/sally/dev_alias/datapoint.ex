@@ -22,14 +22,6 @@ defmodule Sally.Datapoint do
 
   @returned [returning: true]
 
-  # def add(repo, %DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
-  #   raw_data
-  #   |> Map.take([:temp_c, :relhum])
-  #   |> Map.put(:reading_at, at)
-  #   |> changeset(Ecto.build_assoc(a, :datapoints))
-  #   |> repo.insert(returning: true)
-  # end
-
   def add([_ | _] = aliases, raw_data, at), do: Enum.map(aliases, &add(&1, raw_data, at))
 
   def add(%DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do

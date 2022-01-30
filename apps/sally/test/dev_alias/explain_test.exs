@@ -11,17 +11,20 @@ defmodule SallyDevAliasExplainTest do
     test "for join of last Sally.Command", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-      explain_output = Sally.DevAlias.explain(name, :status, :cmds, [])
+      explain_output = Sally.explain(name, :status, :cmds, [])
 
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Sort Method/
     end
 
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 100]]
+    @tag dev_alias_add: [auto: :mcp23008, count: 3, cmds: [history: 100]]
     test "for latest Sally.Command", ctx do
-      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+      assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 
-      explain_output = Sally.DevAlias.explain(name, :cmdack, :cmds, [])
+      %{name: name} = Sally.DevAliasAid.random_pick(dev_aliases)
+
+      explain_output = Sally.explain(name, :cmdack, :cmds, [])
+
       assert explain_output =~ ~r/Sort Method/
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Index Cond/
@@ -31,7 +34,7 @@ defmodule SallyDevAliasExplainTest do
     test "for join of recent Sally.Datapoint", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-      explain_output = Sally.DevAlias.explain(name, :status, :datapoints, [])
+      explain_output = Sally.explain(name, :status, :datapoints, [])
       assert explain_output =~ ~r/Join Filter/
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Sort Method/

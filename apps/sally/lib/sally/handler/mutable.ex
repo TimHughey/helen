@@ -8,11 +8,8 @@ defmodule Sally.Mutable.Dispatch do
 
   @impl true
   # NOTE: filter_extra: [_ident, "error"] are handled upstream
-  def process(%{category: "status", filter_extra: [_ident, "ok"]} = dispatch) do
-    device_changes = Sally.Device.changeset(dispatch, dispatch.host)
-    device_insert_opts = Sally.Device.insert_opts()
-
-    device = Sally.Repo.insert!(device_changes, device_insert_opts)
+  def process(%{category: "status", filter_extra: [ident, "ok"]} = dispatch) do
+    device = Sally.Device.create(ident, dispatch.recv_at, dispatch)
     aliases = Sally.DevAlias.load_aliases(device)
 
     txn_info = %{device: device, aliases: []}
@@ -20,7 +17,6 @@ defmodule Sally.Mutable.Dispatch do
     Enum.reduce(aliases, txn_info, fn dev_alias, acc ->
       align_key = {:aligned, dev_alias.name}
       aligned_cmd = Sally.DevAlias.align_status(dev_alias, dispatch)
-
       dev_alias = Sally.DevAlias.ttl_reset(dev_alias, dispatch.recv_at)
 
       acc
@@ -30,17 +26,6 @@ defmodule Sally.Mutable.Dispatch do
     # NOTE: all database operations would have raised on failure so
     # wrap results in an ok tuple to signal success
     |> then(fn txn_info -> {:ok, txn_info} end)
-
-    # # NOTE: returns txn_info
-    # %{aliases: aliases, device: device}
-    #
-    # Ecto.Multi.new()
-    # |> Ecto.Multi.put(:dispatch, dispatch)
-    # |> Ecto.Multi.put(:device, device)
-    # |> Ecto.Multi.put(:aliases, aliases)
-    # |> Ecto.Multi.merge(Sally.DevAlias, :align_status, [])
-    # |> Ecto.Multi.update_all(:just_saw_db, &Sally.DevAlias.just_saw_db(&1), [])
-    # |> Sally.Repo.transaction()
   end
 
   # @return [returning: true]
@@ -54,16 +39,6 @@ defmodule Sally.Mutable.Dispatch do
     device = Sally.Device.ttl_reset(dev_alias)
 
     {:ok, %{command: cmd, aliases: dev_alias, device: device}}
-
-    # Ecto.Multi.new()
-    # |> Ecto.Multi.put(:cmd_to_ack, cmd)
-    # |> Ecto.Multi.put(:seen_at, msg.sent_at)
-    # |> Ecto.Multi.put(:sent_at, msg.sent_at)
-    # |> Ecto.Multi.put(:recv_at, msg.recv_at)
-    # |> Ecto.Multi.update(:command, &Sally.Command.ack_now_cs(&1, :ack), @return)
-    # |> Ecto.Multi.update(:aliases, &Sally.DevAlias.mark_updated(&1, :command), @return)
-    # |> Ecto.Multi.update(:device, &Sally.Device.seen_at_cs(&1), @return)
-    # |> Sally.Repo.transaction()
   end
 
   @impl true

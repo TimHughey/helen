@@ -26,7 +26,10 @@ defmodule BettyTest do
 
   describe "Betty schema exploration" do
     test "measurement/2 returns a list of tags" do
-      assert [:ack_fail, :align_status, :cmd | _] = Betty.measurement(:app_error, :tags)
+      [_ | _] = tags = Betty.measurement(:app_error, :tags)
+
+      want_tags = [:ack_fail, :align_status, :cmd]
+      Enum.each(want_tags, fn tag -> assert tag in tags end)
     end
 
     test "measurement/2 returns a list of fields" do
