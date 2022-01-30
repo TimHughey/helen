@@ -4,7 +4,7 @@ defmodule Carol.MixProject do
   def project do
     [
       app: :carol,
-      version: "0.3.15",
+      version: "0.3.16",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -42,9 +42,9 @@ defmodule Carol.MixProject do
       {:betty, in_umbrella: true},
       {:timex, "~> 3.7"},
       {:solar, in_umbrella: true},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      # {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
-      {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:should, in_umbrella: true, only: :test}
     ]
   end

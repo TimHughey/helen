@@ -4,7 +4,7 @@ defmodule Betty.MixProject do
   def project do
     [
       app: :betty,
-      version: "0.2.10",
+      version: "0.2.11",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -30,9 +30,9 @@ defmodule Betty.MixProject do
   defp deps do
     [
       {:instream, "~> 1.0"},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      #  {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
-      {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.21", only: :test, runtime: false},
       {:should, in_umbrella: true, only: :test}
     ]
   end

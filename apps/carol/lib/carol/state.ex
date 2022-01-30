@@ -78,7 +78,7 @@ defmodule Carol.State do
   def start_notifies(%State{ticket: ticket} = state) do
     case ticket do
       x when x in [:none, :pause] ->
-        [name: state.equipment, frequency: :all, link: true]
+        [name: state.equipment, interval_ms: :all]
         |> alfred().notify_register()
         |> save_ticket(state)
 

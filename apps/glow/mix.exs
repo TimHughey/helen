@@ -4,7 +4,7 @@ defmodule Glow.MixProject do
   def project do
     [
       app: :glow,
-      version: "0.3.2",
+      version: "0.3.3",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -40,9 +40,9 @@ defmodule Glow.MixProject do
   defp deps do
     [
       {:carol, in_umbrella: true},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      #  {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
-      {:ex_doc, "~> 0.21", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:should, in_umbrella: true, only: :test}
     ]
   end

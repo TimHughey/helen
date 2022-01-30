@@ -41,32 +41,20 @@ defmodule Sally.DevAlias do
 
   @returned [returning: true]
 
-  # def add_datapoint([_ | _] = dev_aliases, raw_data, %DateTime{} = reading_at) do
-  #   Enum.map(dev_aliases, fn dev_alias ->
-  #     Sally.Datapoint.add(dev_alias, raw_data, reading_at)
-  #   end)
-  # end
-
   def align_status(%Sally.DevAlias{pio: pio} = dev_alias, dispatch) do
     %{data: %{pins: pin_data}, recv_at: align_at} = dispatch
     pin_cmd = Sally.Command.pin_cmd(pio, pin_data)
 
-    latest_cmd = Sally.Command.saved(dev_alias)
+    # latest_cmd = Sally.Command.saved(dev_alias)
+
+    latest_cmd = Sally.Command.latest(dev_alias, :id)
 
     case latest_cmd do
       %{acked: false, acked_at: nil} -> :busy
-      %{acked: true, cmd: ^pin_cmd} -> :aligned
+      %{acked: true, cmd: ^pin_cmd, orphaned: false} -> :aligned
       _ -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
     end
   end
-
-  # def changeset(changes) when is_list(changes) do
-  #   {id, changes_rest} = Keyword.pop(changes, :id)
-  #   required = Keyword.keys(changes)
-  #   schema = Sally.Repo.load(Schema, id: id)
-  #
-  #   Enum.into(changes_rest, %{}) |> changeset(schema, required: required)
-  # end
 
   def changeset(changes, %Schema{} = a, opts \\ []) do
     a
@@ -251,14 +239,6 @@ defmodule Sally.DevAlias do
   def load_info(%Schema{} = schema) do
     schema |> Repo.preload(device: [:host]) |> load_cmd_last()
   end
-
-  # def mark_updated(%{} = multi_changes, source_key) do
-  #   %{:seen_at => seen_at, ^source_key => source} = multi_changes
-  #
-  #   case source do
-  #     %{dev_alias_id: id} -> changeset(id: id, updated_at: seen_at)
-  #   end
-  # end
 
   def names do
     Ecto.Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()

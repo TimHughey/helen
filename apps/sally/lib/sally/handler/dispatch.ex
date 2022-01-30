@@ -218,6 +218,10 @@ defmodule Sally.Dispatch do
 
   def handoff(%Sally.Dispatch{} = dispatch), do: route_now(dispatch)
 
+  def invalid(%Sally.Dispatch{} = dispatch, <<_::binary>> = reason) do
+    invalid(dispatch, reason, [])
+  end
+
   def invalid(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
     Keyword.put(fields, :valid?, false) |> update(dispatch)
   end
@@ -269,7 +273,7 @@ defmodule Sally.Dispatch do
     end
   end
 
-  def process(%Sally.Dispatch{category: "status", filter_extra: [_ident, "error"]} = dispatch) do
+  def process(%Sally.Dispatch{filter_extra: [_ident, "error"]} = dispatch) do
     halt_reason("host reported status error", dispatch)
   end
 
@@ -280,32 +284,6 @@ defmodule Sally.Dispatch do
     callback_mod.process(dispatch)
     |> save_txn_info(dispatch)
   end
-
-  # def process_many(dispatch) do
-  #   %{callback_mod: mod, category: category, txn_info: txn_info} = dispatch
-  #
-  #   manys = attribute(mod) |> Keyword.get(:process_many, [])
-  #   category = String.to_atom(category)
-  #
-  #   if function_exported?(mod, :process_many, 1) do
-  #     Enum.reduce(manys, txn_info, fn
-  #       {^category, txn_key}, txn_info when is_map_key(txn_info, txn_key) ->
-  #         many = Map.get(txn_info, txn_key)
-  #
-  #         # NOTE process_many/2 returns a {key, val} pair to add to txn_info
-  #         # and returns the updated txn_info as the accumulator
-  #         Enum.into(many, txn_info, fn item -> mod.process_many(item, dispatch) end)
-  #
-  #       # NOTE: category doesn't match or key doesn't exist in txn_info
-  #       _, txn_info ->
-  #         txn_info
-  #     end)
-  #     # NOTE: updated txn_info is the result of the reduction, store the latest
-  #     |> then(fn txn_info -> [txn_info: txn_info] |> update(dispatch) end)
-  #   else
-  #     dispatch
-  #   end
-  # end
 
   def post_process(%{callback_mod: callback_mod, post_process?: true} = dispatch) do
     callback_mod.post_process(dispatch)
@@ -409,7 +387,7 @@ defmodule Sally.Dispatch do
       DateTime.compare(sent_at, DateTime.from_unix!(0)) == :eq -> invalid(m, "mtime is missing")
       ms_diff < @variance_ms * -1 -> invalid(m, "data is from the future #{ms_diff * -1}ms")
       ms_diff < 0 -> m
-      ms_diff >= @variance_ms -> invalid(m, "data is #{ms_diff} old")
+      ms_diff >= @variance_ms -> invalid(m, "data is #{ms_diff}ms old")
       true -> m
     end
   end

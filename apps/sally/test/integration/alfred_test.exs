@@ -22,7 +22,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
   describe "Alfred.status/2 integration with Sally.DevAlias" do
     @tag dev_alias_add: [auto: :mcp23008]
-    test "returns well formed Alfred.status for new mutable DevAlias (no cmds)", ctx do
+    test "Alfred.status/2 for new mutable DevAlias (no cmds) rc: :ok", ctx do
       {_dev_alias, name} = assert_dev_alias()
 
       # NOTE: cmd == "unknown" because this DevAlias did not have commands
@@ -36,7 +36,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
     end
 
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :busy, echo: :instruct]]
-    test "returns well formed Alfred.status for new mutable DevAlias (with one cmd)", ctx do
+    test "Alfred.status/2 for new mutable DevAlias (with one cmd) :busy", ctx do
       # NOTE: confirm the cmd was sent
       assert_receive(%Sally.Host.Instruct{}, 10)
 
@@ -47,6 +47,21 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
       status = Alfred.status(name, [])
       assert %Alfred.Status{rc: :busy, detail: %{cmd: ^cmd}} = status
+    end
+
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :orphan, echo: :instruct]]
+    test "Alfred.status/2 for new mutable DevAlias (with orphaned cmd)", ctx do
+      # NOTE: confirm the cmd was sent
+      assert_receive(%Sally.Host.Instruct{}, 10)
+      Process.sleep(2)
+
+      {dev_alias, name} = assert_dev_alias()
+
+      # NOTE: confirm attempt to exevute another cmd is prevented due to busy status
+      assert %{acked: true, orphaned: true, cmd: cmd} = Sally.Command.saved(dev_alias)
+
+      status = Alfred.status(name, [])
+      assert %Alfred.Status{rc: :orphan, detail: %{cmd: ^cmd}} = status
     end
   end
 

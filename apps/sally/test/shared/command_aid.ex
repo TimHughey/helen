@@ -46,6 +46,10 @@ defmodule Sally.CommandAid do
     [filter_extra: [device_ident, status], data: data]
   end
 
+  def echo_opts(cmd_args) do
+    Map.take(cmd_args, [:echo]) |> Enum.into([])
+  end
+
   def find_busy(cmds) do
     case cmds do
       [_ | _] -> Enum.random(cmds)
@@ -62,11 +66,11 @@ defmodule Sally.CommandAid do
 
       type = if num == history, do: :last, else: :history
 
-      cmd_opts = historical_cmd_opts(type, opts_map)
+      cmd_opts = historical_cmd_opts(type, opts_map) ++ echo_opts(opts_map)
       cmd_args = [cmd: random_cmd(), cmd_opts: cmd_opts]
 
       case Sally.DevAlias.execute_cmd(dev_alias, cmd_args) do
-        {:ok, %{acked: true}} = rc -> rc
+        {:ok, %{acked: true, acked_at: %DateTime{}, orphaned: false}} = rc -> rc
         # NOTE: verify only the latest command is busy (aka busy)
         {:busy, %{acked: false}} = rc when num == history -> rc
         error_rc -> raise("execute error: #{inspect(error_rc, pretty: true)}")
@@ -76,16 +80,19 @@ defmodule Sally.CommandAid do
     end)
   end
 
-  @latest_kinds [:busy, :orphaned]
-  def historical_cmd_opts(type, %{_cmds_: cmd_args}) do
-    echo_opts = Map.take(cmd_args, [:echo]) |> Enum.into([])
+  @immediate [ack: :immediate]
+  def historical_cmd_opts(:last, %{_cmds_: cmd_args}) do
+    latest_args = Map.take(cmd_args, [:latest])
 
-    case cmd_args do
-      %{latest: kind} when kind in @latest_kinds and type == :last -> []
-      _cmd_args -> [ack: :immediate]
+    case latest_args do
+      %{latest: :busy} -> []
+      %{latest: :orphan} -> [timeout_ms: 0]
+      %{} = latest_args when map_size(latest_args) == 0 -> @immediate
+      bad_args -> raise("bad args; #{inspect(bad_args)}")
     end
-    |> Keyword.merge(echo_opts)
   end
+
+  def historical_cmd_opts(_type, _), do: @immediate
 
   def latest(%{dev_alias: dev_alias}) do
     case dev_alias do

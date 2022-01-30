@@ -12,7 +12,7 @@ defmodule SallyCommandTest do
     test "acks a command", ctx do
       assert %{dev_alias: dev_alias, cmd_latest: cmd} = ctx
 
-      assert %Sally.DevAlias{id: dev_alias_id} = dev_alias
+      assert %Sally.DevAlias{id: dev_alias_id, name: name} = dev_alias
       assert %Sally.Command{acked: false, refid: refid} = cmd
 
       {:error, {:already_started, _pid}} = Sally.Command.track(cmd, [])
@@ -22,13 +22,15 @@ defmodule SallyCommandTest do
 
       broom = %Alfred.Broom{tracked_info: tracked_info}
 
-      assert {:ok, %Sally.Command{} = cmd} = Sally.Command.broom_timeout(broom)
+      assert %Sally.Command{cmd: acked_cmd} = cmd = Sally.Command.broom_timeout(broom)
 
       assert %{acked: true, orphaned: true} = cmd
       assert %{acked_at: %DateTime{}, rt_latency_us: rt_us} = cmd
       assert %{dev_alias_id: ^dev_alias_id} = cmd
 
       assert is_integer(rt_us) and rt_us > 100
+
+      assert %{rc: :orphan, detail: %{cmd: ^acked_cmd}} = Alfred.status(name)
     end
   end
 

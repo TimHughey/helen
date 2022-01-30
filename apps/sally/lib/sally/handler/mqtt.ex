@@ -6,9 +6,11 @@ defmodule Sally.Mqtt.Handler do
   require Logger
   use Tortoise.Handler
 
+  @env Application.compile_env(:sally, [:mqtt_connection, :filter_env])
+
   def init(args) do
     Logger.debug("#{inspect(args, pretty: true)}")
-    %{seen: %{hosts: MapSet.new()}, args: args} |> reply_ok()
+    %{env: @env, seen: %{hosts: MapSet.new()}, args: args} |> reply_ok()
   end
 
   @doc """
@@ -35,7 +37,9 @@ defmodule Sally.Mqtt.Handler do
     reply_ok(s)
   end
 
-  def handle_message([_env, "r2", _host, _subsys, _cat | _extra] = filter, payload, s) do
+  # NOTE: filter levels: [@filter_env, "r2", _host, _subsys, _cat | _extra]
+  # NOTE: duplicato variables in a pattern match must be equal
+  def handle_message([@env, "r2" | _rest] = filter, payload, s) do
     process_dispatch(filter, payload)
     |> then(fn last_dispatch -> Map.put(s, :last, last_dispatch) end)
     |> reply_ok()

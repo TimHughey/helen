@@ -47,7 +47,11 @@ defmodule Sally.Command.Payload do
 
     opts = [{:params, params} | cmd_opts]
 
-    Enum.reduce(opts, %{pio: pio, cmd: cmd}, fn
+    # NOTE: Ruth hosts require :pin, :cmd and :ack.  include :pio for future capability
+    #       when Ruth is updated to use :pio for consistency with Sally
+    required = %{pin: pio, pio: pio, cmd: cmd}
+
+    Enum.reduce(opts, required, fn
       {:ack = key, :immediate}, acc -> put_key(false)
       {:ack = key, _val}, acc -> put_key(true)
       {:params = key, %{} = params}, acc -> put_key(params)

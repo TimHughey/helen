@@ -44,7 +44,9 @@ defmodule Sally.Command do
   def ack_orphan_now(nil), do: {:ok, :already_acked}
 
   def ack_orphan_now(%Schema{} = cmd) do
-    ack_now_cs(cmd, :orphan, now()) |> Sally.Repo.update()
+    :ok = log_orphan_cmd(cmd)
+
+    ack_now_cs(cmd, :orphan, now()) |> Sally.Repo.update!(@returned) |> save()
   end
 
   def add(%DevAlias{} = da, opts) do
@@ -72,7 +74,8 @@ defmodule Sally.Command do
     |> save()
   end
 
-  @add_unknown_cmd [cmd: "unknown", cmd_opts: [ack: :immediate]]
+  @immediate [ack: :immediate]
+  @add_unknown_cmd [cmd: "unknown", cmd_opts: @immediate]
   def add_unknown(<<_::binary>> = name, opts) do
     Sally.Repo.get_by(Sally.DevAlias, name: name) |> add_unknown(opts)
   end
@@ -82,15 +85,16 @@ defmodule Sally.Command do
   end
 
   def align_cmd(dev_alias, pin_cmd, align_at) do
-    add(dev_alias, cmd: pin_cmd, ref_dt: align_at)
+    :ok = log_aligned_cmd(dev_alias, pin_cmd)
+
+    add(dev_alias, cmd: pin_cmd, ref_dt: align_at, cmd_opts: @immediate)
   end
 
   # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
   @impl true
   def broom_timeout(%Alfred.Broom{tracked_info: %{id: id}}) do
     # NOTE: there could be a race condition, only retrieve unacked cmd
-    Ecto.Query.from(cmd in __MODULE__, where: [id: ^id, acked: false])
-    |> Sally.Repo.one()
+    Sally.Repo.get_by(__MODULE__, id: id)
     |> ack_orphan_now()
   end
 
@@ -107,17 +111,17 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
+  def check_latest(%Sally.DevAlias{} = dev_alias) do
+    saved_cmd = saved(dev_alias)
+    db_cmd = latest(dev_alias, :id)
+
+    unless saved_cmd == db_cmd do
+      ["saved[", to_binary(saved_cmd), "] db[", to_binary(db_cmd), "]"] |> Logger.info()
+    end
+  end
+
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
-
-  # def check_stale(%{refid: refid} = cmd) do
-  #   tracked_info = tracked_info(refid)
-  #
-  #   case tracked_info do
-  #     %{refid: ^refid} -> :tracked
-  #     _ -> ack_orphan_now(cmd)
-  #   end
-  # end
 
   def latest(%Sally.DevAlias{} = dev_alias, :id) do
     latest_query(dev_alias, :id) |> Sally.Repo.one()
@@ -125,10 +129,22 @@ defmodule Sally.Command do
 
   def latest_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
     Ecto.Query.from(cmd in Schema,
-      distinct: [desc: cmd.sent_at],
       where: [dev_alias_id: ^dev_alias_id],
-      order_by: [desc: :sent_at]
+      order_by: [desc: :sent_at],
+      limit: 1
     )
+  end
+
+  def log_aligned_cmd(dev_alias, pin_cmd) do
+    [~s("), dev_alias.name, ~s("), " [", pin_cmd, "]"]
+    |> Logger.info()
+  end
+
+  def log_orphan_cmd(%{id: _} = cmd) do
+    cmd = Sally.Repo.preload(cmd, [:dev_alias])
+
+    [~s("), cmd.dev_alias.name, ~s("), " [", cmd.cmd, "]"]
+    |> Logger.info()
   end
 
   @default_pin [0, "no pin"]
@@ -178,7 +194,7 @@ defmodule Sally.Command do
   end
 
   def status(%Sally.DevAlias{name: name} = dev_alias, opts) do
-    case saved(dev_alias) do
+    case latest(dev_alias, :id) do
       %Sally.Command{} = cmd -> cmd
       nil -> add_unknown(name, opts)
     end
@@ -202,8 +218,8 @@ defmodule Sally.Command do
   @unknown %{cmd: "unknown", acked: true}
   def status_log_unknown(what, name) do
     case what do
-      @unknown -> Logger.warn(~s("#{name}" --> cmd is unknown))
-      %{cmds: [@unknown]} -> Logger.warn(~s("#{name}" --> cmd is unknown))
+      @unknown -> Logger.warn(~s("#{name}"))
+      %{cmds: [@unknown]} -> Logger.warn(~s("#{name}"))
       _ -> :ok
     end
 
@@ -244,6 +260,13 @@ defmodule Sally.Command do
   ##
 
   def start_link(_), do: Agent.start_link(fn -> [] end, name: __MODULE__)
+
+  def to_binary(schema) do
+    case schema do
+      %{cmd: cmd} -> cmd
+      _ -> "unknown"
+    end
+  end
 
   def agent(action, args) do
     case action do

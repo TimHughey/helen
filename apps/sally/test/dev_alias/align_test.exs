@@ -52,7 +52,7 @@ defmodule SallyDevAliasAlignTest do
       data = %{pins: Sally.CommandAid.make_pins(device, %{pins: [:random]})}
       dispatch = %{data: data, recv_at: Timex.now()}
 
-      assert %Sally.Command{} = Sally.DevAlias.align_status(dev_alias, dispatch)
+      assert %Sally.Command{acked: true} = Sally.DevAlias.align_status(dev_alias, dispatch)
     end
   end
 end

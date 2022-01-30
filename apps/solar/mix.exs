@@ -4,7 +4,7 @@ defmodule Solar.MixProject do
   def project do
     [
       app: :solar,
-      version: "0.1.4",
+      version: "0.1.5",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -32,7 +32,7 @@ defmodule Solar.MixProject do
   defp deps do
     [
       {:timex, "~> 3.0"},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      #  {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:should, in_umbrella: true, only: :test},
       {:excoveralls, "~> 0.10", only: :test}
     ]

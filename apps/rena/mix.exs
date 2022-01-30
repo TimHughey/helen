@@ -4,7 +4,7 @@ defmodule Rena.MixProject do
   def project do
     [
       app: :rena,
-      version: "0.2.4",
+      version: "0.2.5",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -31,7 +31,7 @@ defmodule Rena.MixProject do
       {:alfred, in_umbrella: true},
       {:betty, in_umbrella: true},
       {:timex, "~> 3.0"},
-      {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
+      # {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test, runtime: false},
       {:should, in_umbrella: true, only: :test, runtime: false}
     ]

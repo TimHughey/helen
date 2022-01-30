@@ -7,7 +7,7 @@ defmodule Alfred.Notify do
   defstruct name: nil,
             ref: nil,
             pid: nil,
-            at: %{missing: nil, seen: :never, notified: :never},
+            at: %{missing: nil, missing_seen: :never, notified: :never},
             opts: %{ms: %{interval: 60_000, missing: 60_000}, send_missing_msg: false}
 
   @doc since: "0.3.0"
@@ -187,7 +187,8 @@ defmodule Alfred.Notify do
     :ok = log_missing(state)
     :ok = send_missing_if_needed(state)
 
-    noreply(state)
+    update_at(state, :missing, now())
+    |> noreply()
   end
 
   @impl true
