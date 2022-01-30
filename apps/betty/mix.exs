@@ -32,7 +32,7 @@ defmodule Betty.MixProject do
       {:instream, "~> 1.0"},
       #  {:credo, "~> 1.5", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.10", only: :test},
-      {:ex_doc, "~> 0.21", only: :test, runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:should, in_umbrella: true, only: :test}
     ]
   end
