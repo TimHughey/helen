@@ -140,8 +140,9 @@ defmodule Alfred.Broom do
     state = make_state(caller_pid, opts_rest)
 
     :ok = Alfred.Broom.Metrics.count(state)
+    _ = Process.send_after(self(), :timeout, timeout_ms(state))
 
-    {:ok, state, timeout_ms(state)}
+    {:ok, state}
   end
 
   @doc false
@@ -292,7 +293,8 @@ defmodule Alfred.Broom do
 
   @doc false
   def opt(opts, :timeout_ms) do
-    get_in(opts, [:cmd_opts, :timeout_ms]) || Keyword.get(opts, :timeout_ms, @timeout_ms_default)
+    default = Keyword.get(opts, :timeout_ms, @timeout_ms_default)
+    get_in(opts, [:cmd_opts, :timeout_ms]) || default
   end
 
   @doc false
