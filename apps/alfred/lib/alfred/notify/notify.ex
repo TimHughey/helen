@@ -167,7 +167,7 @@ defmodule Alfred.Notify do
   def handle_cast({:just_saw, %{name: x, seen_at: seen_at}, _opts}, %{name: x} = state) do
     state
     |> update_at(:seen, seen_at)
-    |> send_notify_if_needed()
+    |> notify()
     |> noreply()
   end
 
@@ -260,24 +260,27 @@ defmodule Alfred.Notify do
   def now, do: DateTime.utc_now()
 
   @doc false
-  def send_notify_if_needed(%{at: %{notified: :never}} = state) do
-    state
-    |> update_at(:notified, DateTime.from_unix!(0))
-    |> send_notify_if_needed()
+  def notify(%{at: at_map, opts: opts} = state) do
+    notified = get_in(at_map, [:notified])
+    ms = get_in(opts, [:ms, :interval])
+
+    cond do
+      ms == :all -> true
+      is_integer(ms) and since_ms(notified) >= ms -> true
+      true -> false
+    end
+    |> notify_now(state)
+    |> update_at(:notified, now())
   end
 
-  def send_notify_if_needed(%{at: %{notified: %DateTime{} = notified_at}} = state) do
-    since_ms = Timex.diff(now(), notified_at)
+  def notify_now(true = _send?, state), do: tap(state, &Alfred.Memo.send(&1, []))
+  def notify_now(false = _send?, state), do: state
 
-    case state.opts do
-      %{ms: %{interval: x}} when since_ms >= x ->
-        :ok = Alfred.Memo.send(state, [])
+  @doc false
+  def since_ms(last_at) do
+    last_at = if(last_at == :never, do: DateTime.from_unix!(0), else: last_at)
 
-        update_at(state, :notified, now())
-
-      _ ->
-        state
-    end
+    Timex.diff(now(), last_at)
   end
 
   @doc false
