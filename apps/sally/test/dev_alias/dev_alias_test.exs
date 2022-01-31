@@ -66,10 +66,12 @@ defmodule SallyDevAliasTest do
                        filters: [^device_ident, ^refid],
                        ident: <<"host"::binary, _::binary>>,
                        name: <<"hostname"::binary, _::binary>>,
-                       packed_length: 33,
+                       packed_length: packed_length,
                        subsystem: "i2c"
                      },
                      100
+
+      assert packed_length < 45
 
       # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
       refute Alfred.Broom.tracked?(refid)
@@ -86,36 +88,6 @@ defmodule SallyDevAliasTest do
         Timex.Duration.measure(Sally.DevAlias, :execute_cmd, [dev_alias, opts])
 
       assert_execution_us(elapsed, 25_000)
-    end
-  end
-
-  describe "Sally.DevAlias.multi_just_saw/1" do
-    @tag dev_alias_add: [auto: :mcp23008, count: 4, cmds: [history: 4, minutes: -1]]
-    test "updates updated_at", ctx do
-      assert %{dev_alias: dev_aliases, device: %Sally.Device{} = device} = ctx
-
-      device = struct(device, aliases: dev_aliases)
-
-      dispatch_sim = %{sent_at: Timex.now()}
-
-      assert {:ok, %{check: {4, updated_aliases}}} =
-               Ecto.Multi.new()
-               |> Ecto.Multi.put(:device, device)
-               |> Ecto.Multi.put(:dispatch, dispatch_sim)
-               |> Ecto.Multi.update_all(:check, fn x -> Sally.DevAlias.just_saw_db(x) end, [])
-               |> Sally.Repo.transaction()
-
-      {sort_dev_aliases(dev_aliases), sort_dev_aliases(updated_aliases)}
-      |> then(fn {l1, l2} -> Enum.zip_with(l1, l2, fn e1, e2 -> {e1, e2} end) end)
-      |> Enum.each(fn {original, updated} ->
-        assert %Sally.DevAlias{id: original_id, updated_at: original_at} = original
-        assert %Sally.DevAlias{id: updated_id, updated_at: updated_at} = updated
-
-        assert ^updated_id = original_id
-        assert Timex.after?(updated_at, original_at)
-      end)
-
-      # pretty_puts(updated_aliases)
     end
   end
 

@@ -34,6 +34,7 @@ defmodule SallyDevAliasAlignTest do
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3]
+    @tag capture_log: true
     test "handles Sally.DevAlias without cmd history", ctx do
       assert %{device: %Sally.Device{} = device, dev_alias: [_ | _] = dev_aliases} = ctx
       dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
@@ -45,6 +46,7 @@ defmodule SallyDevAliasAlignTest do
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
+    @tag capture_log: true
     test "corrects cmd mismatch", ctx do
       assert %{device: %Sally.Device{} = device, dev_alias: [_ | _] = dev_aliases} = ctx
       dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)

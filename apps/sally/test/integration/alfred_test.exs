@@ -32,7 +32,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       {status, log} = with_log(fn -> Alfred.status(name, []) end)
       assert %Alfred.Status{rc: :ok, detail: %{cmd: "unknown"}} = status
 
-      assert log =~ ~r/cmd is unknown/
+      assert log =~ ~r(mfa=Sally.Command.status_log_unknown/2)
     end
 
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :busy, echo: :instruct]]
@@ -53,7 +53,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
     test "Alfred.status/2 for new mutable DevAlias (with orphaned cmd)", ctx do
       # NOTE: confirm the cmd was sent
       assert_receive(%Sally.Host.Instruct{}, 10)
-      Process.sleep(2)
+      Process.sleep(10)
 
       {dev_alias, name} = assert_dev_alias()
 

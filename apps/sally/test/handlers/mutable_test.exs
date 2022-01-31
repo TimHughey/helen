@@ -15,13 +15,12 @@ defmodule Sally.MutableDispatchTest do
       assert %{payload: payload, filter_extra: [<<_::binary>> = refid]} = dispatch
       assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
 
-      busy_cmd = Sally.Command.saved(refid)
+      # NOTE: validate the command is tracked
+      tracked_cmd = Sally.Command.tracked_info(refid)
 
-      # NOTE: validate the command is tracked AND saved as latest
-      assert %Sally.Command{refid: ^refid} = Sally.Command.tracked_info(refid)
-      assert %Sally.Command{id: cmd_id, cmd: cmd, refid: ^refid} = busy_cmd
+      assert %Sally.Command{id: cmd_id, cmd: cmd, refid: ^refid} = tracked_cmd
 
-      dev_alias = Sally.DevAlias.find(busy_cmd.dev_alias_id)
+      dev_alias = Sally.DevAlias.find(tracked_cmd.dev_alias_id)
       assert %{name: name} = dev_alias
 
       assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
@@ -44,6 +43,7 @@ defmodule Sally.MutableDispatchTest do
              } = status
     end
 
+    @tag capture_log: true
     @tag dev_alias_opts: [auto: :pwm, count: 2, cmds: [history: 3, echo: :dispatch]]
     @tag dispatch_add: [subsystem: "mut", category: "status"]
     test "a status message", ctx do

@@ -8,8 +8,9 @@ defmodule SallyCommandTest do
   setup [:dev_alias_add]
 
   describe "Sally.Command.broom_timeout/1" do
+    @tag capture_log: true
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 2, latest: :busy]]
-    test "acks a command", ctx do
+    test "acks a command as an orphan", ctx do
       assert %{dev_alias: dev_alias, cmd_latest: cmd} = ctx
 
       assert %Sally.DevAlias{id: dev_alias_id, name: name} = dev_alias
@@ -86,6 +87,7 @@ defmodule SallyCommandTest do
   end
 
   describe "Sally.Command elapsed" do
+    @tag skip: true
     @tag output: false
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 100]]
     test "status/2 vs. status_from_db2", ctx do

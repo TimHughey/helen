@@ -123,69 +123,43 @@ defmodule Sally.DevAlias do
   end
 
   # (1 of 2) find with proper opts
-  def find(opts) when is_list(opts) and opts != [] do
-    case Repo.get_by(Schema, opts) do
-      %Schema{} = x -> load_device(x) |> load_cmd_last()
-      x when is_nil(x) -> nil
-    end
-  end
+  # def find(opts) when is_list(opts) and opts != [] do
+  #   case Repo.get_by(Schema, opts) do
+  #     %Schema{} = x -> load_device(x) |> load_cmd_last()
+  #     x when is_nil(x) -> nil
+  #   end
+  # end
 
   # (2 of 2) validate param and build opts for find/2
-  def find(id_or_schema) do
-    case id_or_schema do
-      x when is_binary(x) -> find(name: x)
-      x when is_integer(x) -> find(id: x)
-      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
-    end
-  end
+  # def find(id_or_schema) do
+  #   case id_or_schema do
+  #     x when is_binary(x) -> find(name: x)
+  #     x when is_integer(x) -> find(id: x)
+  #     x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
+  #   end
+  # end
 
-  def find_by_name(name) when is_binary(name), do: find(name: name)
+  def find(id) when is_integer(id), do: Sally.Repo.get_by(__MODULE__, id: id)
+  def find(<<_::binary>> = name), do: Sally.Repo.get_by(__MODULE__, name: name)
+
+  # def find_by_name(name) when is_binary(name), do: find(name: name)
+
+  # def get_by(<<_::binary>> = name), do: Sally.Repo.get_by(__MODULE__, name: name)
 
   @dont_replace [:id, :last_seen_at, :updated_at]
   @replace Enum.reject(@columns, fn x -> x in @dont_replace end)
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
   def insert_opts, do: @insert_opts
 
-  # @doc """
-  #   Mark a list of DevAlias as just seen within an Ecto.Multi sequence
+  # def just_saw_db(%{} = multi_changes) do
+  #   %{device: %{id: device_id}, dispatch: %{sent_at: seen_at}} = multi_changes
   #
-  #   Returns:
-  #   ```
-  #   {:ok, [%DevAlias{} | []]}  # success
-  #   {:error, error}            # update failed for one DevAlias
-  #   ```
-  #
-  # """
-  # @doc since: "0.5.10"
-  # @type multi_changes :: %{aliases: [Ecto.Schema.t(), ...]}
-  # @type ok_tuple :: {:ok, Ecto.Schema.t()}
-  # @type error_tuple :: {:error, any()}
-  # @type db_result :: ok_tuple() | error_tuple()
-  # @spec just_saw(Ecto.Repo.t(), multi_changes(), DateTime.t()) :: db_result()
-  # def just_saw(repo, %{aliases: schemas}, %DateTime{} = seen_at) when is_list(schemas) do
-  #   for %Schema{} = schema <- schemas, reduce: {:ok, []} do
-  #     {:ok, acc} ->
-  #       cs = changeset(%{updated_at: seen_at}, schema)
-  #
-  #       case repo.update(cs, returning: true) do
-  #         {:ok, %Schema{} = x} -> {:ok, [x | acc]}
-  #         {:error, error} -> {:error, error}
-  #       end
-  #
-  #     {:error, _} = acc ->
-  #       acc
-  #   end
+  #   Ecto.Query.from(dev_alias in Sally.DevAlias,
+  #     update: [set: [updated_at: ^seen_at]],
+  #     where: [device_id: ^device_id],
+  #     select: [:id, :name, :ttl_ms, :updated_at]
+  #   )
   # end
-
-  def just_saw_db(%{} = multi_changes) do
-    %{device: %{id: device_id}, dispatch: %{sent_at: seen_at}} = multi_changes
-
-    Ecto.Query.from(dev_alias in Sally.DevAlias,
-      update: [set: [updated_at: ^seen_at]],
-      where: [device_id: ^device_id],
-      select: [:id, :name, :ttl_ms, :updated_at]
-    )
-  end
 
   # @doc """
   #   Mark a single DevAlias (by id) as just seen
@@ -205,13 +179,6 @@ defmodule Sally.DevAlias do
     Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
     |> Sally.Repo.all()
   end
-
-  # def load_aliases(repo, multi_changes) do
-  #   %{device: %{id: device_id}} = multi_changes
-  #
-  #   Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
-  #   |> then(fn query -> {:ok, repo.all(query)} end)
-  # end
 
   def load_cmd_last(%Schema{} = x) do
     cmd_query = Command.query_preload_latest_cmd()
@@ -258,7 +225,7 @@ defmodule Sally.DevAlias do
   def rename(opts) when is_list(opts) do
     with {:opts, from} when is_binary(from) <- {:opts, opts[:from]},
          {:opts, to} when is_binary(to) <- {:opts, opts[:to]},
-         {:found, %Schema{} = x} <- {:found, find_by_name(from)},
+         {:found, %Schema{} = x} <- {:found, find(from)},
          cs <- changeset(%{name: to}, x, [:name]),
          {:ok, %Schema{} = updated_schema} <- Repo.update(cs, returning: true) do
       updated_schema
