@@ -340,7 +340,7 @@ defmodule Alfred.Broom do
   def reply(%__MODULE__{} = state, rc), do: {:reply, rc, state}
 
   @doc false
-  def safe_diff_dt(early_dt, later_dt) do
+  def safe_diff_dt(later_dt, early_dt) do
     Timex.diff(later_dt, early_dt, :microseconds)
   catch
     _, _ -> nil

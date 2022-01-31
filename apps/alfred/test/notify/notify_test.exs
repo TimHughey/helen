@@ -115,7 +115,7 @@ defmodule Alfred.NotifyTest do
 
       # NOTE: the minimum allowed missing ms is 100
       assert_receive({Alfred, memo}, 200)
-      assert %Alfred.Memo{name: ^name, pid: ^pid, ref: ^ref, seen_at: :never, missing?: true} = memo
+      assert %Alfred.Memo{name: ^name, pid: ^pid, ref: ^ref, missing?: true} = memo
     end
   end
 

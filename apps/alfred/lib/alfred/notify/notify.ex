@@ -7,7 +7,7 @@ defmodule Alfred.Notify do
   defstruct name: nil,
             ref: nil,
             pid: nil,
-            at: %{missing: nil, missing_seen: :never, notified: :never},
+            at: %{missing: nil, seen: :never, notified: :never},
             opts: %{ms: %{interval: 60_000, missing: 60_000}, send_missing_msg: false}
 
   @doc since: "0.3.0"
