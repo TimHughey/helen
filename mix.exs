@@ -52,7 +52,6 @@ defmodule Helen.MixProject do
         "Alfred Test Aids": ~r/^AlfredSim$|^Alfred.*Aid$/,
         "Alfred Test Mockups": ~r/^Alfred\.Test.*$/,
         Betty: ~r/Betty.*$/,
-        Broom: ~r/^Broom.*$/,
         Carol: ~r/^Carol.*$/,
         Farm: ~r/^Farm.*$/,
         "Legacy Database": ~r/^LegacyDb.*$/,
