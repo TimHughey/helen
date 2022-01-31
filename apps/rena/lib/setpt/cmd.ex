@@ -24,13 +24,15 @@ defmodule Rena.SetPt.Cmd do
     alfred.execute({cmd_args, notify: true})
   end
 
+  @good [:ok, :busy]
   def log_execute_result(%{rc: rc, name: name}, action, opts) do
     tags = [equipment: name]
 
-    # always log that an action was performed (even if it failed)
-    Betty.runtime_metric(opts, tags, [{action, true}])
-
-    unless rc == :ok, do: Betty.app_error(opts, [{:cmd_fail, true} | tags])
+    if rc in @good do
+      Betty.runtime_metric(opts, tags, [{action, true}])
+    else
+      Betty.app_error(opts, [{:cmd_fail, true} | tags])
+    end
   end
 
   def put(what, key, acc), do: {:cont, Map.put(acc, key, what)}
