@@ -15,7 +15,9 @@ defmodule SallyDevAliasAlignTest do
       data = %{pins: Sally.CommandAid.make_pins(device, %{pins: [:from_status]})}
       dispatch = %{data: data, recv_at: Timex.now()}
 
-      assert :aligned == Sally.DevAlias.align_status(dev_alias, dispatch)
+      aligned = Sally.DevAlias.align_status(dev_alias, dispatch)
+
+      assert {:aligned, <<_::binary>>} = aligned
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 3, latest: :busy]]
@@ -30,7 +32,10 @@ defmodule SallyDevAliasAlignTest do
       pins = Sally.CommandAid.make_pins(device, %{pins: [:from_status]})
       dispatch = %{data: %{pins: pins}, recv_at: Timex.now()}
 
-      assert :busy == Sally.DevAlias.align_status(dev_alias, dispatch)
+      busy = Sally.DevAlias.align_status(dev_alias, dispatch)
+
+      assert {:busy, {:tracked, pid}} = busy
+      assert Process.alive?(pid)
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3]

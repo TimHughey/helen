@@ -16,7 +16,7 @@ defmodule SallyCommandTest do
       assert %Sally.DevAlias{id: dev_alias_id, name: name} = dev_alias
       assert %Sally.Command{acked: false, refid: refid} = cmd
 
-      {:error, {:already_started, _pid}} = Sally.Command.track(cmd, [])
+      assert {:tracked, _pid} = Sally.Command.track(cmd, [])
 
       tracked_info = Sally.Command.tracked_info(refid)
       assert %Sally.Command{} = tracked_info

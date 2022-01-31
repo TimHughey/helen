@@ -84,7 +84,24 @@ defmodule Sally.Command do
     add(dev_alias, Keyword.merge(opts, @add_unknown_cmd))
   end
 
-  def align_cmd(dev_alias, pin_cmd, align_at) do
+  @dont_notify [notify_when_released: false]
+  def align_cmd(%{pio: pio} = dev_alias, pin_data, align_at) do
+    pin_cmd = Sally.Command.pin_cmd(pio, pin_data)
+
+    latest_cmd = Sally.Command.latest(dev_alias, :id)
+
+    # NOTE: when a command is busy sent it to track. either the  ack from t
+    # he host hasn't arrived (already tracked) or something is truly wrong.
+    # by tracking it the timeout will eventually fire and tidy things up.
+    case latest_cmd do
+      # NOTE: busy commads _should_ aleady be tracked, otherwise it will timeout
+      %{acked: false, acked_at: nil} = cmd -> {:busy, track(cmd, @dont_notify)}
+      %{acked: true, cmd: ^pin_cmd, orphaned: false} -> {:aligned, pin_cmd}
+      _ -> align_cmd_force(dev_alias, pin_cmd, align_at)
+    end
+  end
+
+  def align_cmd_force(dev_alias, pin_cmd, align_at) do
     :ok = log_aligned_cmd(dev_alias, pin_cmd)
 
     add(dev_alias, cmd: pin_cmd, ref_dt: align_at, cmd_opts: @immediate)
@@ -153,14 +170,6 @@ defmodule Sally.Command do
     Enum.find(pin_data, @default_pin, &match?([^pio, _], &1))
     |> Enum.at(1)
   end
-
-  # @doc """
-  # Load the `Sally.DevAlias`, if needed
-  # """
-  # @doc since: "0.5.15"
-  # def load_dev_alias(cmd) when is_struct(cmd) or is_nil(cmd) do
-  #   cmd |> Repo.preload(:dev_alias)
-  # end
 
   def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
     import Ecto.Query, only: [from: 2]

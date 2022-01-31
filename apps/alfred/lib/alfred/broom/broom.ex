@@ -97,8 +97,11 @@ defmodule Alfred.Broom do
   end
 
   def track(%{refid: refid} = exec_result, module, opts) do
-    [tracked_info: exec_result, module: module, opts: opts_final(module, opts), caller_pid: self()]
+    opts = opts_final(module, opts)
+
+    [tracked_info: exec_result, module: module, opts: opts, caller_pid: self()]
     |> then(fn args -> GenServer.start_link(__MODULE__, args, name: server(refid)) end)
+    |> munge_start_link_rc()
   end
 
   @status [:complete]
@@ -317,6 +320,13 @@ defmodule Alfred.Broom do
     merged = Keyword.merge(more_cmd_opts, priority_cmd_opts)
 
     Keyword.put(acc, :cmd_opts, merged)
+  end
+
+  def munge_start_link_rc(rc) do
+    case rc do
+      {:ok, pid} when is_pid(pid) -> rc
+      {:error, {:already_started, pid}} when is_pid(pid) -> {:tracked, pid}
+    end
   end
 
   @doc false

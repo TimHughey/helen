@@ -41,19 +41,10 @@ defmodule Sally.DevAlias do
 
   @returned [returning: true]
 
-  def align_status(%Sally.DevAlias{pio: pio} = dev_alias, dispatch) do
+  def align_status(%Sally.DevAlias{} = dev_alias, dispatch) do
     %{data: %{pins: pin_data}, recv_at: align_at} = dispatch
-    pin_cmd = Sally.Command.pin_cmd(pio, pin_data)
 
-    # latest_cmd = Sally.Command.saved(dev_alias)
-
-    latest_cmd = Sally.Command.latest(dev_alias, :id)
-
-    case latest_cmd do
-      %{acked: false, acked_at: nil} -> :busy
-      %{acked: true, cmd: ^pin_cmd, orphaned: false} -> :aligned
-      _ -> Sally.Command.align_cmd(dev_alias, pin_cmd, align_at)
-    end
+    Sally.Command.align_cmd(dev_alias, pin_data, align_at)
   end
 
   def changeset(changes, %Schema{} = a, opts \\ []) do
@@ -122,58 +113,13 @@ defmodule Sally.DevAlias do
     {rc, new_cmd}
   end
 
-  # (1 of 2) find with proper opts
-  # def find(opts) when is_list(opts) and opts != [] do
-  #   case Repo.get_by(Schema, opts) do
-  #     %Schema{} = x -> load_device(x) |> load_cmd_last()
-  #     x when is_nil(x) -> nil
-  #   end
-  # end
-
-  # (2 of 2) validate param and build opts for find/2
-  # def find(id_or_schema) do
-  #   case id_or_schema do
-  #     x when is_binary(x) -> find(name: x)
-  #     x when is_integer(x) -> find(id: x)
-  #     x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
-  #   end
-  # end
-
   def find(id) when is_integer(id), do: Sally.Repo.get_by(__MODULE__, id: id)
   def find(<<_::binary>> = name), do: Sally.Repo.get_by(__MODULE__, name: name)
-
-  # def find_by_name(name) when is_binary(name), do: find(name: name)
-
-  # def get_by(<<_::binary>> = name), do: Sally.Repo.get_by(__MODULE__, name: name)
 
   @dont_replace [:id, :last_seen_at, :updated_at]
   @replace Enum.reject(@columns, fn x -> x in @dont_replace end)
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
   def insert_opts, do: @insert_opts
-
-  # def just_saw_db(%{} = multi_changes) do
-  #   %{device: %{id: device_id}, dispatch: %{sent_at: seen_at}} = multi_changes
-  #
-  #   Ecto.Query.from(dev_alias in Sally.DevAlias,
-  #     update: [set: [updated_at: ^seen_at]],
-  #     where: [device_id: ^device_id],
-  #     select: [:id, :name, :ttl_ms, :updated_at]
-  #   )
-  # end
-
-  # @doc """
-  #   Mark a single DevAlias (by id) as just seen
-  #
-  #   Looks up the DevAlias by id then reuses `just_saw/3`
-  # """
-  # @doc since: "0.5.10"
-  # @spec just_saw_id(Ecto.Repo.t(), multi_changes, id :: integer, DateTime.t()) :: db_result()
-  # def just_saw_id(repo, _changes, id, %DateTime{} = seen_at) when is_integer(id) do
-  #   case repo.get(Schema, id) do
-  #     %Schema{} = x -> just_saw(repo, %{aliases: [x]}, seen_at)
-  #     x when is_nil(x) -> just_saw(repo, %{aliases: []}, seen_at)
-  #   end
-  # end
 
   def load_aliases(%Sally.Device{id: device_id}) do
     Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])

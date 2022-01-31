@@ -49,6 +49,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %Alfred.Status{rc: :busy, detail: %{cmd: ^cmd}} = status
     end
 
+    @tag capture_log: true
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :orphan, echo: :instruct]]
     test "Alfred.status/2 for new mutable DevAlias (with orphaned cmd)", ctx do
       # NOTE: confirm the cmd was sent
