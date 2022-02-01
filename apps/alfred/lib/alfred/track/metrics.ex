@@ -1,4 +1,4 @@
-defmodule Alfred.Broom.Metrics do
+defmodule Alfred.Track.Metrics do
   @moduledoc false
 
   require Logger
@@ -12,8 +12,8 @@ defmodule Alfred.Broom.Metrics do
             timeout: 0,
             errors: 0
 
-  def count(%Alfred.Broom{} = broom) do
-    GenServer.cast(__MODULE__, {:count, broom})
+  def count(%Alfred.Track{} = track) do
+    GenServer.cast(__MODULE__, {:count, track})
   end
 
   @counts_default [:tracked, :released, :timeout, :errors]
@@ -52,8 +52,8 @@ defmodule Alfred.Broom.Metrics do
   end
 
   @impl true
-  def handle_cast({:count, broom}, state) do
-    case broom do
+  def handle_cast({:count, track}, state) do
+    case track do
       %{at: %{timeout: %DateTime{}}} -> update_count(:timeout, state)
       %{at: %{released: %DateTime{}}} -> update_count(:released, state)
       %{at: %{tracked: %DateTime{}}} -> update_count(:tracked, state)

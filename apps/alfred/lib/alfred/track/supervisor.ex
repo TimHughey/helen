@@ -1,4 +1,4 @@
-defmodule Alfred.Broom.Supervisor do
+defmodule Alfred.Track.Supervisor do
   use Supervisor
 
   def start_link(init_arg) do
@@ -8,12 +8,12 @@ defmodule Alfred.Broom.Supervisor do
   @impl true
   def init(_inir_args) do
     children = [
-      {Alfred.Broom.Metrics, []},
+      {Alfred.Track.Metrics, []},
       {Registry, [name: registry(), keys: :unique]}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  def registry, do: Alfred.Broom.Registry
+  def registry, do: Alfred.Track.Registry
 end

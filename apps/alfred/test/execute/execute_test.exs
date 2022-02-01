@@ -52,11 +52,11 @@ defmodule Alfred.ExecuteTest do
       assert %Alfred.Execute{detail: %{cmd: "on", __execute__: %{refid: refid}}, name: ^name, rc: :busy} =
                Alfred.Test.DevAlias.execute(execute_args, [])
 
-      assert Alfred.Broom.tracked?(refid)
+      assert Alfred.Track.tracked?(refid)
 
       assert :ok == Alfred.Test.Command.release(refid, [])
 
-      assert [errors: _, released: _, timeout: _, tracked: tracked] = Alfred.Broom.Metrics.counts()
+      assert [errors: _, released: _, timeout: _, tracked: tracked] = Alfred.Track.Metrics.counts()
       assert tracked > 0
     end
   end

@@ -60,18 +60,18 @@ defmodule Rena.SetPt.ServerTest do
     end
   end
 
-  describe "Rena.SetPt.Server.handle_info/2 processes Alfred.Broom" do
+  describe "Rena.SetPt.Server.handle_info/2 processes Alfred.Track" do
     @tag equipment_add: [], state_add: []
-    test "when Alfred.Broom acked and Last Exec refids match", %{state: state} do
+    test "when Alfred.Track acked and Last Exec refids match", %{state: state} do
       acked_at = DateTime.utc_now()
 
-      msg = {Alfred, %Alfred.Broom{rc: :ok, at: %{released: acked_at}}}
+      msg = {Alfred, %Alfred.Track{rc: :ok, at: %{released: acked_at}}}
       assert {:noreply, %Rena.SetPt.State{last_exec: ^acked_at}} = Server.handle_info(msg, state)
     end
 
     @tag equipment_add: [], state_add: []
-    test "when Alfred.Broom is not acked", %{state: state} do
-      msg = {Alfred, %Alfred.Broom{rc: :timeout}}
+    test "when Alfred.Track is not acked", %{state: state} do
+      msg = {Alfred, %Alfred.Track{rc: :timeout}}
       assert {:noreply, %Rena.SetPt.State{last_exec: :failed}} = Server.handle_info(msg, state)
     end
   end

@@ -4,7 +4,7 @@ defmodule Sally.Command do
   require Logger
   use Agent
   use Ecto.Schema
-  use Alfred.Broom, timeout_after: "PT3.3S"
+  use Alfred.Track, timeout_after: "PT3.3S"
 
   require Ecto.Query
 
@@ -109,7 +109,7 @@ defmodule Sally.Command do
 
   # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
   @impl true
-  def broom_timeout(%Alfred.Broom{tracked_info: %{id: id}}) do
+  def track_timeout(%Alfred.Track{tracked_info: %{id: id}}) do
     # NOTE: there could be a race condition, only retrieve unacked cmd
     Sally.Repo.get_by(__MODULE__, id: id)
     |> ack_orphan_now()

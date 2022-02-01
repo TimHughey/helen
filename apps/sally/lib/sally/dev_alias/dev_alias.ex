@@ -11,7 +11,7 @@ defmodule Sally.DevAlias do
 
   use Ecto.Schema
   use Alfred.Status
-  use Alfred.Execute, broom: Sally.Command
+  use Alfred.Execute, track: Sally.Command
   use Alfred.JustSaw
 
   alias __MODULE__, as: Schema

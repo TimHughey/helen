@@ -74,7 +74,7 @@ defmodule SallyDevAliasTest do
       assert packed_length < 45
 
       # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
-      refute Alfred.Broom.tracked?(refid)
+      refute Alfred.Track.tracked?(refid)
     end
 
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]

@@ -9,7 +9,7 @@ defmodule Alfred.Application do
   def start(_type, _args) do
     opts = [strategy: :one_for_one, name: __MODULE__, max_restarts: 10, max_seconds: 5]
 
-    [{Alfred.Name.Supervisor, []}, {Alfred.Notify.Supervisor, []}, {Alfred.Broom.Supervisor, []}]
+    [{Alfred.Name.Supervisor, []}, {Alfred.Notify.Supervisor, []}, {Alfred.Track.Supervisor, []}]
     |> Supervisor.start_link(opts)
   end
 end

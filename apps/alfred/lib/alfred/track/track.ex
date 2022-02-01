@@ -1,10 +1,10 @@
-defmodule Alfred.Broom do
+defmodule Alfred.Track do
   @moduledoc false
 
   require Logger
   use GenServer
 
-  @registry Alfred.Broom.Supervisor.registry()
+  @registry Alfred.Track.Supervisor.registry()
 
   @timeout_ms_default 3300
 
@@ -39,36 +39,36 @@ defmodule Alfred.Broom do
 
   @type status_opt() :: :complete
 
-  @callback broom_timeout(Alfred.Broom.t()) :: any()
+  @callback track_timeout(Alfred.Track.t()) :: any()
   @callback make_refid() :: String.t()
   @callback now() :: DateTime.t()
   @callback release(refid :: String.t(), opts :: list()) :: :ok
-  @callback track(schema :: map(), opts :: list()) :: Broom.t()
+  @callback track(schema :: map(), opts :: list()) :: Track.t()
   @callback track(status_opt(), schema :: map(), DateTime.t()) :: :ok
   @callback tracked_info(refid :: String.t()) :: any()
 
   # coveralls-ignore-start
   defmacro __using__(use_opts) do
     quote location: :keep, bind_quoted: [use_opts: use_opts] do
-      # NOTE: capture use opts for Alfred.Broom
-      Alfred.Broom.put_attribute(__MODULE__, use_opts)
-      @behaviour Alfred.Broom
+      # NOTE: capture use opts for Alfred.Track
+      Alfred.Track.put_attribute(__MODULE__, use_opts)
+      @behaviour Alfred.Track
 
-      def make_refid, do: Alfred.Broom.make_refid()
+      def make_refid, do: Alfred.Track.make_refid()
 
       @doc false
-      def now, do: Alfred.Broom.now()
+      def now, do: Alfred.Track.now()
 
-      def release(what, opts), do: Alfred.Broom.release(what, __MODULE__, opts)
+      def release(what, opts), do: Alfred.Track.release(what, __MODULE__, opts)
 
-      def track(exec_result, opts), do: Alfred.Broom.track(exec_result, __MODULE__, opts)
-      def track(status, refid, at), do: Alfred.Broom.track({status, refid}, __MODULE__, at)
+      def track(exec_result, opts), do: Alfred.Track.track(exec_result, __MODULE__, opts)
+      def track(status, refid, at), do: Alfred.Track.track({status, refid}, __MODULE__, at)
 
-      def tracked_info(refid), do: Alfred.Broom.tracked_info(refid, __MODULE__)
+      def tracked_info(refid), do: Alfred.Track.tracked_info(refid, __MODULE__)
     end
   end
 
-  @mod_attribute :alfred_broom_use_opts
+  @mod_attribute :alfred_track_use_opts
 
   @doc false
   def put_attribute(module, use_opts) do
@@ -142,7 +142,7 @@ defmodule Alfred.Broom do
     Process.link(caller_pid)
     state = make_state(caller_pid, opts_rest)
 
-    :ok = Alfred.Broom.Metrics.count(state)
+    :ok = Alfred.Track.Metrics.count(state)
     _ = Process.send_after(self(), :timeout, timeout_ms(state))
 
     {:ok, state}
@@ -179,7 +179,7 @@ defmodule Alfred.Broom do
     state = update_at(state, at_list) |> notify_if_requested(:ok)
 
     :ok = record_metrics(state)
-    :ok = Alfred.Broom.Metrics.count(state)
+    :ok = Alfred.Track.Metrics.count(state)
 
     # :normal exit won't restart the linked process
     {:stop, :normal, :ok, state}
@@ -209,13 +209,13 @@ defmodule Alfred.Broom do
     state = update_at(state, [:timeout, :released], now) |> notify_if_requested(:timeout)
 
     try do
-      _ignored = module.broom_timeout(state)
+      _ignored = module.track_timeout(state)
     catch
       _, _ -> :ok
     end
 
     :ok = record_metrics(state)
-    :ok = Alfred.Broom.Metrics.count(state)
+    :ok = Alfred.Track.Metrics.count(state)
     :ok = record_timeout(state)
 
     {:stop, :normal, state}

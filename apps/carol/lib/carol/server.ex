@@ -166,7 +166,7 @@ defmodule Carol.Server do
   end
 
   @impl true
-  def handle_info({Alfred, %Alfred.Broom{}}, %{exec_result: execute} = s) do
+  def handle_info({Alfred, %Alfred.Track{}}, %{exec_result: execute} = s) do
     State.save_cmd(execute, s)
     |> noreply(:timeout)
   end
@@ -205,8 +205,8 @@ defmodule Carol.Server do
   end
 
   # @indent 40
-  # def log_refid_mismatch({broom, execute}, state) do
-  #   %{refid: b_refid} = broom
+  # def log_refid_mismatch({track, execute}, state) do
+  #   %{refid: b_refid} = track
   #   %{detail: %{refid: e_refid}} = execute
   #   %{episodes: episodes} = state
   #   active_id = Carol.Episode.active_id(episodes)

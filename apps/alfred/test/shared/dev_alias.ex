@@ -2,7 +2,7 @@ defmodule Alfred.Test.DevAlias do
   @moduledoc false
 
   use Alfred.Status
-  use Alfred.Execute, broom: Alfred.Test.Command
+  use Alfred.Execute, track: Alfred.Test.Command
   use Alfred.JustSaw
 
   defstruct name: "",

@@ -65,7 +65,7 @@ defmodule Alfred.Execute do
       info: info,
       name: name,
       force: if(get_in(opts, [:cmd_opts, :force]) == true, do: true, else: false),
-      broom_module: broom_module(module)
+      track_module: track_module(module)
     }
 
     Enum.reduce_while(@checks, checks_map, fn
@@ -191,8 +191,8 @@ defmodule Alfred.Execute do
   @doc false
   def track(checks_map, opts) do
     case checks_map do
-      %{broom_module: :none = rc} -> rc
-      %{broom_module: module, execute_cmd: {:busy, cmd}} -> module.track(cmd, opts)
+      %{track_module: :none = rc} -> rc
+      %{track_module: module, execute_cmd: {:busy, cmd}} -> module.track(cmd, opts)
       _ -> :ok
     end
     |> continue()
@@ -235,22 +235,22 @@ defmodule Alfred.Execute do
   end
 
   @doc false
-  @broom_key [@mod_attribute, :broom]
-  def broom_module(module), do: module.__info__(:attributes) |> get_in(@broom_key)
+  @track_key [@mod_attribute, :track]
+  def track_module(module), do: module.__info__(:attributes) |> get_in(@track_key)
 
   @doc false
   def put_attribute(module, use_opts) do
     Module.register_attribute(module, @mod_attribute, persist: true)
     overrides = use_opts[:overrides] || []
 
-    # broom = use_opts[:broom]
+    # track = use_opts[:track]
     #
-    # unless Module.open?(broom) do
-    #   mod_funcs = broom.__info__(:functions)
+    # unless Module.open?(track) do
+    #   mod_funcs = track.__info__(:functions)
     # end
 
     [
-      broom: use_opts[:broom] || :none,
+      track: use_opts[:track] || :none,
       overrides: Enum.into(overrides, %{}, fn key -> {key, true} end)
     ]
     |> then(fn val -> Module.put_attribute(module, @mod_attribute, val) end)

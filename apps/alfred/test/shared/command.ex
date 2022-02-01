@@ -1,7 +1,7 @@
 defmodule Alfred.Test.Command do
   @moduledoc false
 
-  use Alfred.Broom, timeout_after: "PT3.3S", metrics_interval: "PT1M", cmd_opts: [notify_when_released: true]
+  use Alfred.Track, timeout_after: "PT3.3S", metrics_interval: "PT1M", cmd_opts: [notify_when_released: true]
 
   defstruct refid: nil,
             cmd: "off",
@@ -38,8 +38,8 @@ defmodule Alfred.Test.Command do
     end
   end
 
-  def broom_timeout(%Alfred.Broom{} = broom) do
-    Process.send(self(), {__MODULE__, :timeout, broom}, [])
+  def track_timeout(%Alfred.Track{} = track) do
+    Process.send(self(), {__MODULE__, :timeout, track}, [])
   end
 
   def new(%{cmd: cmd} = parts, at) when is_map(parts) do

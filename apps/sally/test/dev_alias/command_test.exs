@@ -7,7 +7,7 @@ defmodule SallyCommandTest do
 
   setup [:dev_alias_add]
 
-  describe "Sally.Command.broom_timeout/1" do
+  describe "Sally.Command.track_timeout/1" do
     @tag capture_log: true
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 2, latest: :busy]]
     test "acks a command as an orphan", ctx do
@@ -21,9 +21,9 @@ defmodule SallyCommandTest do
       tracked_info = Sally.Command.tracked_info(refid)
       assert %Sally.Command{} = tracked_info
 
-      broom = %Alfred.Broom{tracked_info: tracked_info}
+      track = %Alfred.Track{tracked_info: tracked_info}
 
-      assert %Sally.Command{cmd: acked_cmd} = cmd = Sally.Command.broom_timeout(broom)
+      assert %Sally.Command{cmd: acked_cmd} = cmd = Sally.Command.track_timeout(track)
 
       assert %{acked: true, orphaned: true} = cmd
       assert %{acked_at: %DateTime{}, rt_latency_us: rt_us} = cmd

@@ -199,7 +199,7 @@ defmodule CarolServerTest do
     end
   end
 
-  describe "Carol.Server.handle_info/2 handles Alfred.Broom" do
+  describe "Carol.Server.handle_info/2 handles Alfred.Track" do
     @tag skip: false
     @tag equipment_add: [cmd: "on", rc: :busy]
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
@@ -212,10 +212,10 @@ defmodule CarolServerTest do
       assert {:noreply, %Carol.State{} = new_state, _timeout} = noreply_tuple
 
       execute = new_state.exec_result
-      broom = %Alfred.Broom{tracked_info: %{cmd: execute.detail.cmd}, refid: execute.detail.refid}
+      track = %Alfred.Track{tracked_info: %{cmd: execute.detail.cmd}, refid: execute.detail.refid}
 
       assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
-               Carol.Server.handle_info({Alfred, broom}, new_state)
+               Carol.Server.handle_info({Alfred, track}, new_state)
 
       assert cmd_live =~ ~r/^BUSY\s\{on\}/
     end
@@ -232,10 +232,10 @@ defmodule CarolServerTest do
       assert {:noreply, %Carol.State{} = new_state, _timeout} = noreply_tuple
 
       execute = new_state.exec_result
-      broom = %Alfred.Broom{tracked_info: %{cmd: execute.detail.cmd}, refid: "1234"}
+      track = %Alfred.Track{tracked_info: %{cmd: execute.detail.cmd}, refid: "1234"}
 
       assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
-               Carol.Server.handle_info({Alfred, broom}, new_state)
+               Carol.Server.handle_info({Alfred, track}, new_state)
 
       assert cmd_live =~ ~r/^BUSY\s\{on\}/
     end
