@@ -67,7 +67,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
   end
 
   describe "Alfred.execute/2 integration with Sally.DevAlias" do
-    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
+    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 15]]
     test "does not issue a cmd/instruction to the remote host when same cmd", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 
@@ -87,7 +87,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %{acked: true, cmd: ^before_cmd, id: ^before_id} = detail
     end
 
-    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
+    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 15]]
     test "issues a cmd/instruction to the remote host when different cmd", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 
