@@ -76,19 +76,22 @@ defmodule Sally.Command do
 
   @immediate [ack: :immediate]
   @add_unknown_cmd [cmd: "unknown", cmd_opts: @immediate]
-  def add_unknown(<<_::binary>> = name, opts) do
-    Sally.Repo.get_by(Sally.DevAlias, name: name) |> add_unknown(opts)
-  end
+  def add_unknown(what, opts) do
+    case what do
+      <<_::binary>> = name ->
+        Sally.Repo.get_by!(Sally.DevAlias, name: name) |> add_unknown(opts)
 
-  def add_unknown(%Sally.DevAlias{} = dev_alias, opts) do
-    add(dev_alias, Keyword.merge(opts, @add_unknown_cmd))
+      %Sally.DevAlias{} = dev_alias ->
+        cmd = add(dev_alias, Keyword.merge(opts, @add_unknown_cmd))
+        struct(dev_alias, cmds: [cmd])
+    end
   end
 
   @dont_notify [notify_when_released: false]
   def align_cmd(%{pio: pio} = dev_alias, pin_data, align_at) do
     pin_cmd = Sally.Command.pin_cmd(pio, pin_data)
 
-    latest_cmd = Sally.Command.latest(dev_alias, :id)
+    latest_cmd = latest_cmd(dev_alias)
 
     # NOTE: when a command is busy sent it to track. either the  ack from t
     # he host hasn't arrived (already tracked) or something is truly wrong.
@@ -107,14 +110,6 @@ defmodule Sally.Command do
     add(dev_alias, cmd: pin_cmd, ref_dt: align_at, cmd_opts: @immediate)
   end
 
-  # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
-  @impl true
-  def track_timeout(%Alfred.Track{tracked_info: %{id: id}}) do
-    # NOTE: there could be a race condition, only retrieve unacked cmd
-    Sally.Repo.get_by(__MODULE__, id: id)
-    |> ack_orphan_now()
-  end
-
   def changeset(changes, %Schema{} = c) when is_map(changes) do
     alias Ecto.Changeset
 
@@ -128,29 +123,62 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
-  def check_latest(%Sally.DevAlias{} = dev_alias) do
-    saved_cmd = saved(dev_alias)
-    db_cmd = latest(dev_alias, :id)
-
-    unless saved_cmd == db_cmd do
-      ["saved[", to_binary(saved_cmd), "] db[", to_binary(db_cmd), "]"] |> Logger.info()
-    end
-  end
+  # def check_latest(%Sally.DevAlias{} = dev_alias) do
+  #   saved_cmd = saved(dev_alias)
+  #   db_cmd = latest(dev_alias, :id)
+  #
+  #   unless saved_cmd == db_cmd do
+  #     ["saved[", to_binary(saved_cmd), "] db[", to_binary(db_cmd), "]"] |> Logger.info()
+  #   end
+  # end
 
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
-  def latest(%Sally.DevAlias{} = dev_alias, :id) do
-    latest_query(dev_alias, :id) |> Sally.Repo.one()
+  def latest_cmd(%Sally.DevAlias{} = dev_alias) do
+    latest_cmd(dev_alias, :query) |> Sally.Repo.one()
   end
 
-  def latest_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
+  def latest_cmd(%Sally.DevAlias{id: dev_alias_id}, :query) do
     Ecto.Query.from(cmd in Schema,
       where: [dev_alias_id: ^dev_alias_id],
       order_by: [desc: :sent_at],
       limit: 1
     )
   end
+
+  # def latest(<<_::binary>> = name, :name) do
+  #   latest_query(name) |> Sally.Repo.one()
+  # end
+
+  # def latest_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
+  #   Ecto.Query.from(cmd in Schema,
+  #     where: [dev_alias_id: ^dev_alias_id],
+  #     order_by: [desc: :sent_at],
+  #     limit: 1
+  #   )
+  # end
+  #
+  # def latest_query(<<_::binary>> = name) do
+  #   import Ecto.Query, only: [from: 2]
+  #
+  #   from(da in Sally.DevAlias,
+  #     as: :dev_alias,
+  #     where: da.name == ^name,
+  #     join: c in assoc(da, :cmds),
+  #     inner_lateral_join:
+  #       latest in subquery(
+  #         from(Schema,
+  #           where: [dev_alias_id: parent_as(:dev_alias).id],
+  #           order_by: [desc: :sent_at],
+  #           limit: 1,
+  #           select: [:id]
+  #         )
+  #       ),
+  #     on: latest.id == c.id,
+  #     preload: [cmds: c]
+  #   )
+  # end
 
   def log_aligned_cmd(dev_alias, pin_cmd) do
     [~s("), dev_alias.name, ~s("), " [", pin_cmd, "]"]
@@ -198,30 +226,26 @@ defmodule Sally.Command do
     Map.put(changes, :rt_latency_us, Timex.diff(changes.acked_at, cmd.sent_at))
   end
 
+  # def status(%Sally.DevAlias{name: name}, opts) do
+  #   dev_alias = Sally.DevAlias.find(name)
+  #
+  #   case latest(dev_alias, :id) do
+  #     %Sally.Command{} = cmd -> cmd
+  #     nil -> add_unknown(name, opts)
+  #   end
+  #   |> status_log_unknown(name)
+  #   |> then(fn cmd -> struct(dev_alias, cmds: [cmd], status: cmd) end)
+  # end
+
   def status(<<_::binary>> = name, opts) do
-    Sally.Repo.get_by(Sally.DevAlias, name: name) |> status(opts)
-  end
-
-  def status(%Sally.DevAlias{name: name} = dev_alias, opts) do
-    case latest(dev_alias, :id) do
-      %Sally.Command{} = cmd -> cmd
-      nil -> add_unknown(name, opts)
-    end
-    |> status_log_unknown(name)
-    |> then(fn cmd -> struct(dev_alias, cmds: [cmd], status: cmd) end)
-  end
-
-  # def status_from_db(%{name: <<_::binary>> = name}, opts), do: status_from_db(name, opts)
-
-  def status_from_db(<<_::binary>> = name, opts) do
     query = status_query(name, opts)
 
     case Sally.Repo.one(query) do
       %Sally.DevAlias{} = dev_alias -> dev_alias
-      nil -> add_unknown(name, opts) |> then(fn _x -> status_from_db(name, opts) end)
+      nil -> add_unknown(name, opts) |> then(fn _x -> status(name, opts) end)
     end
     |> status_log_unknown(name)
-    |> then(fn %{cmds: [cmd]} = dev_alias -> struct(dev_alias, status: cmd) end)
+    |> then(fn %{cmds: [cmd]} = dev_alias -> struct(dev_alias, nature: :cmds, status: cmd) end)
   end
 
   @unknown %{cmd: "unknown", acked: true}
@@ -256,6 +280,14 @@ defmodule Sally.Command do
     )
   end
 
+  # def status_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
+  #   Ecto.Query.from(cmd in Schema,
+  #     where: [dev_alias_id: ^dev_alias_id],
+  #     order_by: [desc: :sent_at],
+  #     limit: 1
+  #   )
+  # end
+
   def summary(%Schema{} = x) do
     Map.take(x, [:cmd, :acked, :sent_at])
   end
@@ -263,6 +295,14 @@ defmodule Sally.Command do
   def summary([%Schema{} = x | _]), do: summary(x)
 
   def summary([]), do: %{}
+
+  # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
+  @impl true
+  def track_timeout(%Alfred.Track{tracked_info: %{id: id}}) do
+    # NOTE: there could be a race condition, only retrieve unacked cmd
+    Sally.Repo.get_by(__MODULE__, id: id)
+    |> ack_orphan_now()
+  end
 
   ##
   ## Agent

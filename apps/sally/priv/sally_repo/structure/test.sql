@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 14.1
+-- Dumped from database version 13.5
 -- Dumped by pg_dump version 14.1
 
 SET statement_timeout = 0;
@@ -322,6 +322,13 @@ CREATE INDEX datapoint_reading_at_index ON public.datapoint USING btree (reading
 
 
 --
+-- Name: dev_alias_device_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX dev_alias_device_id_index ON public.dev_alias USING btree (device_id);
+
+
+--
 -- Name: dev_alias_name_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -389,3 +396,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20210526202613);
 INSERT INTO public."schema_migrations" (version) VALUES (20211101114631);
 INSERT INTO public."schema_migrations" (version) VALUES (20211129190841);
 INSERT INTO public."schema_migrations" (version) VALUES (20220123142033);
+INSERT INTO public."schema_migrations" (version) VALUES (20220201145624);

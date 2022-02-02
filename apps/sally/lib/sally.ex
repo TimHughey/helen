@@ -225,6 +225,7 @@ defmodule Sally do
     end
   end
 
+  defdelegate explain(), to: Sally.DevAlias.Explain, as: :all
   defdelegate explain(name, category, what, opts \\ []), to: Sally.DevAlias.Explain, as: :query
 
   def host_devices(name) do

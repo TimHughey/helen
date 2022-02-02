@@ -31,8 +31,9 @@ defmodule Sally.Mutable.Dispatch do
   # @return [returning: true]
   @impl true
   def process(%{category: "cmdack", filter_extra: [refid | _]} = dispatch) do
-    cmd = Sally.Command.tracked_info(refid)
+    # TODO: track/3 should return tracked info
     :ok = Sally.Command.track(:complete, refid, dispatch.recv_at)
+    cmd = Sally.Command.tracked_info(refid)
 
     cmd = Sally.Command.ack_now(cmd)
     dev_alias = Sally.DevAlias.ttl_reset(cmd)

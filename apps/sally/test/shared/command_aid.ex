@@ -11,7 +11,7 @@ defmodule Sally.CommandAid do
 
   def cmd_from(what) do
     case what do
-      %Sally.DevAlias{} = dev_alias -> Sally.Command.latest(dev_alias, :id) |> cmd_from()
+      %Sally.DevAlias{} = dev_alias -> Sally.Command.latest_cmd(dev_alias) |> cmd_from()
       %Sally.Command{acked: false} -> random_cmd()
       %Sally.Command{acked: true, orphaned: true} -> random_cmd()
       %Sally.Command{acked: true, cmd: cmd} -> cmd

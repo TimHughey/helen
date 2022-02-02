@@ -24,17 +24,20 @@ defmodule Sally.DevAlias do
 
   @type list_or_schema() :: [Ecto.Schema.t(), ...] | Ecto.Schema.t()
 
+  @cmds foreign_key: :dev_alias_id, preload_order: [desc: :sent_at]
+  @daps foreign_key: :dev_alias_id, preload_order: [desc: :reading_at]
+
   schema "dev_alias" do
     field(:name, :string)
     field(:pio, :integer)
+    field(:nature, :any, virtual: true)
     field(:description, :string, default: "<none>")
     field(:ttl_ms, :integer, default: @ttl_default)
+    field(:status, :any, virtual: true)
 
     belongs_to(:device, Device)
-    has_many(:cmds, Command, foreign_key: :dev_alias_id, preload_order: [desc: :sent_at])
-    has_many(:datapoints, Datapoint, foreign_key: :dev_alias_id, preload_order: [desc: :reading_at])
-
-    field(:status, :map, virtual: true, default: %{})
+    has_many(:cmds, Command, @cmds)
+    has_many(:datapoints, Datapoint, @daps)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -121,9 +124,23 @@ defmodule Sally.DevAlias do
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
   def insert_opts, do: @insert_opts
 
-  def load_aliases(%Sally.Device{id: device_id}) do
-    Ecto.Query.from(a in Schema, where: [device_id: ^device_id], order_by: [asc: a.pio])
+  def load_aliases(%Sally.Device{} = device) do
+    load_aliases(device, :query)
     |> Sally.Repo.all()
+    |> Enum.map(&struct(&1, nature: String.to_atom(&1.nature)))
+  end
+
+  @fragment "case when ? then 'cmds' else 'datapoints' end"
+  def load_aliases(%Sally.Device{} = device, :query) do
+    Ecto.Query.from(dev_alias in Schema,
+      where: dev_alias.device_id == ^device.id,
+      order_by: [asc: dev_alias.pio],
+      # NOTE: join on device to get mutable
+      join: device in Sally.Device,
+      on: dev_alias.device_id == device.id,
+      # NOTE: select merge the nature
+      select_merge: %{nature: fragment(@fragment, device.mutable)}
+    )
   end
 
   def load_cmd_last(%Schema{} = x) do
@@ -184,7 +201,8 @@ defmodule Sally.DevAlias do
 
   def status_lookup(%{name: name, nature: nature}, opts) do
     case nature do
-      :cmds -> find(name) |> Sally.Command.status(opts)
+      # :cmds -> find(name) |> Sally.Command.status(opts)
+      :cmds -> Sally.Command.status(name, opts)
       :datapoints -> Sally.Datapoint.status(name, opts)
     end
     |> status_lookup_finalize()

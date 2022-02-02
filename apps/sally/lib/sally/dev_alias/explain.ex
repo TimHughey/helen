@@ -1,6 +1,19 @@
 defmodule Sally.DevAlias.Explain do
   @moduledoc false
 
+  @all [latest: :cmds, status: :cmds, status: :datapoints, dev_alias: :load_aliases]
+  def all do
+    Enum.each(@all, fn {category, type} ->
+      case {category, type} do
+        {_, :cmds} -> "womb heater power"
+        {_, :datapoints} -> "attic"
+        {:dev_alias, :load_aliases} -> "front chandelier pwm"
+      end
+      |> query(category, type, [])
+      |> IO.puts()
+    end)
+  end
+
   @default_opts [analyze: true, buffers: true, wal: true]
   def explain_opts(opts), do: Keyword.merge(opts, @default_opts)
 
@@ -9,35 +22,48 @@ defmodule Sally.DevAlias.Explain do
       iex> Sally.explain(name, what, opts)
 
      name:      name of a Sally.DevAlias
-     category:  :status | :cmdack (only for type: :cmds)
-     type:      :cmds or :datapoints
+     category:  :latest (for :cmds) | :status | :dev_alias
+     type:      :cmds | :datapoints | :load_aliases
      opts:      explain opts (default: [analyze: true, buffers: true])
     """
   end
 
-  def query(name, :cmdack, :cmds, opts) do
+  def query(name, :latest, :cmds, opts) do
     module = Sally.Command
+    dev_alias = Sally.Repo.get_by(Sally.DevAlias, name: name)
 
-    Sally.Repo.get_by(Sally.DevAlias, name: name)
-    |> module.latest_query(:id)
-    |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts(opts)) end)
-    |> then(fn output -> ["\n", inspect(module), ".latest_query/1", "\n", output] end)
-    |> IO.iodata_to_binary()
+    module.latest_cmd(dev_alias, :query)
+    |> explain(opts)
+    |> assemble_output(module, ".latest_cmd/2")
   end
 
   def query(name, :status, what, opts) do
     opts = explain_opts(opts)
     {explain_opts, query_opts} = Keyword.split(opts, Keyword.keys(@default_opts))
 
-    module =
-      case what do
-        :cmds -> Sally.Command
-        :datapoints -> Sally.Datapoint
-      end
+    module = if(what == :cmds, do: Sally.Command, else: Sally.Datapoint)
 
     module.status_query(name, query_opts)
-    |> then(fn query -> Sally.Repo.explain(:all, query, explain_opts) end)
-    |> then(fn output -> ["\n", inspect(module), ".status_query/2", "\n", output] end)
-    |> IO.iodata_to_binary()
+    |> explain(explain_opts)
+    |> assemble_output(module, ".status_query/2")
+  end
+
+  def query(<<_::binary>> = name, :dev_alias, :load_aliases, opts) do
+    module = Sally.DevAlias
+
+    example_dev_alias = Sally.Repo.get_by!(Sally.DevAlias, name: name)
+    device = Sally.Repo.get_by(Sally.Device, id: example_dev_alias.device_id)
+
+    module.load_aliases(device, :query)
+    |> explain(opts)
+    |> assemble_output(module, ".load_aliases/2")
+  end
+
+  defp explain(query, opts) do
+    Sally.Repo.explain(:all, query, explain_opts(opts))
+  end
+
+  defp assemble_output(raw, module, function) do
+    ["\n", inspect(module), function, "\n", raw] |> IO.iodata_to_binary()
   end
 end

@@ -73,7 +73,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
       dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
       assert %Sally.DevAlias{name: dev_alias_name} = dev_alias
-      assert cmd_status = Sally.Command.status(dev_alias, [])
+      assert cmd_status = Sally.Command.status(dev_alias_name, [])
       assert %Sally.DevAlias{cmds: [%Sally.Command{} = raw_cmd]} = cmd_status
       assert %{id: before_id} = raw_cmd
 

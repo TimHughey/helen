@@ -91,11 +91,6 @@ defmodule Alfred.Status do
   #
 
   @doc since: "0.3.0"
-  def status(%{name: name} = name_map, module, opts) when not is_map_key(name_map, :nature) do
-    Alfred.Name.fake_name_info(name_map, module, opts)
-    |> then(fn opts -> status(name, module, opts) end)
-  end
-
   @checks [:registered, :ttl_info, :lookup, :ttl_lookup, :busy, :orphan, :finalize]
   # (aaa of bbb) invoked via status/2 injected into using module
   def status(<<_::binary>> = name, module, opts) do
@@ -111,16 +106,6 @@ defmodule Alfred.Status do
       what, checks_map -> apply_check(what, checks_map, module, overrides_map, opts_all)
     end)
     |> new_from_checks_accumulator()
-
-    # Enum.reduce(@checks, {:ok, checks_map}, fn
-    #   # a check has failed or otherwise signals checking should stop
-    #   _what, {:halt, _checks_map} = acc -> acc
-    #   # detail created, no further checks necessary
-    #   _what, {_rc, %{detail: _}} = acc -> acc
-    #   # continue checks
-    #   what, {_rc, checks_map} -> apply_check(what, checks_map, module, overrides_map, opts_all)
-    # end)
-    # |> new_from_checks_tuple()
   end
 
   # (aaa of bbb) typically invoked from Alfred.status/2
@@ -221,24 +206,6 @@ defmodule Alfred.Status do
     end
   end
 
-  # @doc false
-  # def check(:detail, %{lookup: lookup}, _opts) do
-  #   case lookup do
-  #     %{datapoints: [%{} = detail]} -> {:ok, detail}
-  #     %{cmds: [cmd]} when is_struct(cmd) -> {:ok, Map.from_struct(cmd)}
-  #     %{cmds: [cmd]} -> {:ok, cmd}
-  #     _ -> :no_match
-  #   end
-  # end
-
-  # def check(:good, %{lookup: lookup}, _opts) do
-  #   case lookup do
-  #     %{cmds: [%{acked: true}]} -> :ok
-  #     %{datapoints: [%{}]} -> :ok
-  #     _ -> :no_match
-  #   end
-  # end
-
   # (aaa / bbb) orphan check
   def check(:orphan = what, checks_map, _opts) do
     %{lookup: %{cmds: cmds, updated_at: at}} = checks_map
@@ -258,10 +225,6 @@ defmodule Alfred.Status do
       _ -> put_what_rc_cont(:ok)
     end
   end
-
-  # def check(:busy, %{lookup: %{cmds: [%{acked: false} = cmd]}}, _opts) do
-  #   {:busy, %{detail: Map.take(cmd, [:cmd, :refid, :sent_at])}}
-  # end
 
   def check(:registered = what, checks_map, _opts) do
     case checks_map do

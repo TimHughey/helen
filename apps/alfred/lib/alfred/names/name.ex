@@ -27,15 +27,15 @@ defmodule Alfred.Name do
 
   def callbacks(name) when is_binary(name), do: call({:get, :callbacks}, name)
 
-  def fake_name_info(%{name: name, ttl_ms: ttl_ms, updated_at: seen_at}, module, opts) do
-    {nature, opts_rest} = Keyword.pop(opts, :nature)
-
-    callbacks = %{status: {module, 2}, execute: {module, 2}}
-
-    [name: name, nature: nature, seen_at: seen_at, ttl_ms: ttl_ms, callbacks: callbacks]
-    |> then(fn fields -> struct(__MODULE__, fields) end)
-    |> then(fn name_info -> Keyword.put(opts_rest, :__name_info__, name_info) end)
-  end
+  # def fake_name_info(%{name: name, ttl_ms: ttl_ms, updated_at: seen_at}, module, opts) do
+  #   {nature, opts_rest} = Keyword.pop(opts, :nature)
+  #
+  #   callbacks = %{status: {module, 2}, execute: {module, 2}}
+  #
+  #   [name: name, nature: nature, seen_at: seen_at, ttl_ms: ttl_ms, callbacks: callbacks]
+  #   |> then(fn fields -> struct(__MODULE__, fields) end)
+  #   |> then(fn name_info -> Keyword.put(opts_rest, :__name_info__, name_info) end)
+  # end
 
   def info(<<_::binary>> = name), do: call({:info}, name)
 

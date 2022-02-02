@@ -12,6 +12,17 @@ defmodule SallyDevAliasTest do
     end
   end
 
+  describe "Sally.DevAlias.load_aliases/1" do
+    @tag dev_alias_add: [auto: :pwm, count: 4, cmds: [history: 3]]
+    test "populates nature virtual field", ctx do
+      assert %{device: %Sally.Device{} = device} = ctx
+
+      aliases = Sally.DevAlias.load_aliases(device)
+
+      assert Enum.all?(aliases, &match?(%{nature: :cmds}, &1))
+    end
+  end
+
   describe "Sally.DevAlias.status_lookup/3" do
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50, minutes: -1]]
     test "handles a DevAlias with Commands", ctx do

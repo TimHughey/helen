@@ -65,24 +65,24 @@ defmodule SallyCommandTest do
     test "populates :cmds and :status", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 
-      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
+      %{name: name} = Sally.DevAliasAid.random_pick(dev_aliases)
 
-      status = Sally.Command.status(dev_alias, [])
+      status = Sally.Command.status(name, [])
 
       assert %Sally.DevAlias{cmds: [%Sally.Command{id: id}], status: %{id: id}} = status
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 100]]
-    test "agrees with Sally.Command.status_v0", ctx do
+    test "result is same using DevAlias join query or Command query", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 
       %{name: name} = dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
 
-      dev_alias1 = Sally.Command.status(dev_alias, [])
-      dev_alias0 = Sally.Command.status_from_db(name, [])
+      latest_cmd = Sally.Command.latest_cmd(dev_alias)
+      dev_alias = Sally.Command.status(name, [])
 
-      assert %Sally.DevAlias{cmds: [%Sally.Command{id: id}]} = dev_alias1
-      assert %Sally.DevAlias{cmds: [%Sally.Command{id: ^id}]} = dev_alias0
+      assert %Sally.Command{id: cmd_id} = latest_cmd
+      assert %Sally.DevAlias{cmds: [%Sally.Command{id: ^cmd_id}]} = dev_alias
     end
   end
 
