@@ -260,25 +260,46 @@ defmodule Sally.Command do
   end
 
   def status_query(<<_::binary>> = name, _opts) do
-    require Ecto.Query
+    import Ecto.Query, only: [from: 2]
 
-    Ecto.Query.from(dev_alias in Sally.DevAlias,
+    from(da in Sally.DevAlias,
       as: :dev_alias,
-      where: [name: ^name],
-      join: cmd in assoc(dev_alias, :cmds),
+      where: da.name == ^name,
+      join: c in assoc(da, :cmds),
       inner_lateral_join:
-        latest_cmd in subquery(
-          Ecto.Query.from(cmd in Schema,
-            distinct: [desc: cmd.sent_at],
+        latest in subquery(
+          from(Schema,
             where: [dev_alias_id: parent_as(:dev_alias).id],
             order_by: [desc: :sent_at],
+            limit: 1,
             select: [:id]
           )
         ),
-      on: latest_cmd.id == cmd.id,
-      preload: [cmds: cmd]
+      on: latest.id == c.id,
+      preload: [cmds: c]
     )
   end
+
+  # def status_query(<<_::binary>> = name, _opts) do
+  #   require Ecto.Query
+  #
+  #   Ecto.Query.from(dev_alias in Sally.DevAlias,
+  #     as: :dev_alias,
+  #     where: [name: ^name],
+  #     join: cmd in assoc(dev_alias, :cmds),
+  #     inner_lateral_join:
+  #       latest_cmd in subquery(
+  #         Ecto.Query.from(cmd in Schema,
+  #           distinct: [desc: cmd.sent_at],
+  #           where: [dev_alias_id: parent_as(:dev_alias).id],
+  #           order_by: [desc: :sent_at],
+  #           select: [:id]
+  #         )
+  #       ),
+  #     on: latest_cmd.id == cmd.id,
+  #     preload: [cmds: cmd]
+  #   )
+  # end
 
   # def status_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
   #   Ecto.Query.from(cmd in Schema,

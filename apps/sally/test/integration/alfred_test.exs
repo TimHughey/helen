@@ -86,5 +86,25 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %Alfred.Execute{rc: :ok, name: ^dev_alias_name, detail: detail} = execute
       assert %{acked: true, cmd: ^before_cmd, id: ^before_id} = detail
     end
+
+    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 1]]
+    test "issues a cmd/instruction to the remote host when different cmd", ctx do
+      assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
+
+      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
+      assert %Sally.DevAlias{name: dev_alias_name} = dev_alias
+
+      new_cmd = Sally.CommandAid.random_cmd()
+      cmd_opts = [name: dev_alias_name, cmd: new_cmd, echo: :instruct]
+      execute = Alfred.execute(cmd_opts, [])
+
+      assert %Alfred.Execute{rc: :busy, name: ^dev_alias_name, detail: detail} = execute
+      assert %{cmd: ^new_cmd} = detail
+
+      status = Alfred.status(dev_alias_name, [])
+      assert %Alfred.Status{rc: :busy, detail: %{cmd: ^new_cmd}} = status
+
+      assert_receive(%Sally.Host.Instruct{}, 100)
+    end
   end
 end
