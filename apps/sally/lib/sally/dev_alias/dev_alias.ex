@@ -231,6 +231,6 @@ defmodule Sally.DevAlias do
     cs = changeset(%{updated_at: ttl_at}, dev_alias, required: [:updated_at])
 
     Sally.Repo.update!(cs, @returned)
-    |> then(fn %{updated_at: seen_at} = dev_alias -> struct(dev_alias, seen_at: seen_at) end)
+    |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at) end)
   end
 end

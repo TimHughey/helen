@@ -245,7 +245,7 @@ defmodule Alfred.Name do
       Alfred.Name.put_attribute(__MODULE__, use_opts)
 
       @behaviour Alfred.Name
-      def register([_ | _] = items, opts) do
+      def register(items, opts) when is_list(items) do
         Enum.map(items, &register(&1, opts))
       end
 
