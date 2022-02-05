@@ -180,7 +180,7 @@ defmodule Sally.DevAliasAid do
     if count == 1, do: List.first(picked), else: picked
   end
 
-  def register({:ok, %Sally.DevAlias{device_id: device_id}} = dev_alias_rc, opts) do
+  def register(%Sally.DevAlias{device_id: device_id} = dev_alias_rc, opts) do
     case Sally.Device.find(device_id) do
       %{mutable: true} -> :cmds
       %{mutable: false} -> :datapoints
@@ -189,14 +189,14 @@ defmodule Sally.DevAliasAid do
     |> then(fn nature -> register(dev_alias_rc, nature, opts) end)
   end
 
-  def register({:ok, %Sally.DevAlias{} = dev_alias}, nature, opts) do
+  def register(%Sally.DevAlias{} = dev_alias, nature, opts) do
     register_opts = Keyword.get(opts, :register, [])
 
     if register_opts do
       allowed_opts = Alfred.Name.allowed_opts()
-      register_opts = Keyword.take(opts, allowed_opts) |> Keyword.put_new(:nature, nature)
+      register_opts = Keyword.take(opts, allowed_opts)
 
-      rc = Sally.DevAlias.just_saw(dev_alias, register_opts)
+      rc = Sally.DevAlias.register(dev_alias, register_opts)
 
       %{dev_alias: dev_alias, name_registration: %{rc: rc, name: dev_alias.name, nature: nature}}
     else
@@ -204,7 +204,7 @@ defmodule Sally.DevAliasAid do
     end
   end
 
-  def register(error, _nature, _opts), do: raise(inspect(error, pretty: true))
+  # def register(error, _nature, _opts), do: raise(inspect(error, pretty: true))
 
   def sleep(pass, ms), do: tap(pass, fn _ -> Process.sleep(ms) end)
 

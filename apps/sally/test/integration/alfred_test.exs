@@ -6,7 +6,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
   @moduletag sally: true, sally_alfred_integration: true
 
-  # NOTE: devalias_add/1 automatically registers the name via Sally.DevAlias.just_saw/2
+  # NOTE: devalias_add/1 automatically registers the name via Sally.DevAlias.register/2
   # ** if this behaviour is NOT desired include register: false in devalias_add opts
 
   defmacro assert_dev_alias do
@@ -51,7 +51,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
     @tag capture_log: true
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :orphan, echo: :instruct]]
-    test "Alfred.status/2 for new mutable DevAlias (with orphaned cmd)", ctx do
+    test "Alfred.status/2 for new mutable DevAlias (with cmd timeout", ctx do
       # NOTE: confirm the cmd was sent
       assert_receive(%Sally.Host.Instruct{}, 10)
       Process.sleep(10)
@@ -62,7 +62,9 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %{acked: true, orphaned: true, cmd: cmd} = Sally.Command.saved(dev_alias)
 
       status = Alfred.status(name, [])
-      assert %Alfred.Status{rc: :orphan, detail: %{cmd: ^cmd}} = status
+      assert %Alfred.Status{rc: rc, detail: %{cmd: ^cmd}} = status
+      assert {:timeout, ms} = rc
+      assert is_integer(ms) and ms > 1
     end
   end
 

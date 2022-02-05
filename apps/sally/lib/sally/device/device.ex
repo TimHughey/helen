@@ -47,11 +47,6 @@ defmodule Sally.Device do
   def columns(:cast), do: @columns
   def columns(:required), do: @required
 
-  # def columns(:required), do: columns_exclude([:inserted_at, :updated_at])
-  # def columns(:replace), do: columns_exclude([:last_seen_at, :updated_at])
-  #
-  # def columns_exclude(cols), do: Enum.reject(@columns_all, fn key -> key in cols end)
-
   def create(<<_::binary>> = ident, create_at, %{} = params) do
     %{
       ident: ident,
@@ -148,6 +143,8 @@ defmodule Sally.Device do
     end
     |> then(fn nature -> [{:nature, nature} | opts] end)
   end
+
+  def nature(%Sally.Device{mutable: mutable}), do: if(mutable, do: :cmds, else: :datapoints)
 
   def pio_check(schema, opts) when is_list(opts) do
     case schema do

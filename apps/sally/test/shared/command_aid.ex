@@ -75,7 +75,7 @@ defmodule Sally.CommandAid do
         {:busy, %{acked: false}} = rc when num == history -> rc
         error_rc -> raise("execute error: #{inspect(error_rc, pretty: true)}")
       end
-      |> track(cmd_args)
+      |> detuple()
       |> send_payload(cmd_args)
     end)
   end
@@ -133,22 +133,22 @@ defmodule Sally.CommandAid do
     cmd
   end
 
-  def track(exec_rc, cmd_args) do
-    case exec_rc do
-      {:busy, %Sally.Command{} = cmd} -> track_now(cmd, cmd_args)
-      {:ok, cmd} -> cmd
-    end
-  end
-
-  def track_now(%Sally.Command{} = cmd, args) do
-    rc = Sally.Command.track(cmd, args)
-
-    unless match?({:ok, pid} when is_pid(pid), rc) do
-      raise("track failed: #{inspect(rc)}")
-    end
-
-    cmd
-  end
+  # def track(exec_rc, cmd_args) do
+  #   case exec_rc do
+  #     {:busy, %Sally.Command{} = cmd} -> track_now(cmd, cmd_args)
+  #     {:ok, cmd} -> cmd
+  #   end
+  # end
+  #
+  # def track_now(%Sally.Command{} = cmd, args) do
+  #   rc = Sally.Command.track(cmd, args)
+  #
+  #   unless match?({:ok, pid} when is_pid(pid), rc) do
+  #     raise("track failed: #{inspect(rc)}")
+  #   end
+  #
+  #   cmd
+  # end
 
   def detuple({_, cmd}), do: cmd
   def detuple(cmd), do: cmd

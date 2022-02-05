@@ -3,15 +3,63 @@ defmodule Alfred do
   Master of known names
   """
 
+  # coveralls-ignore-start
+  defmacro __using__(use_opts) do
+    quote bind_quoted: [use_opts: use_opts] do
+      Alfred.register_attribute(__MODULE__)
+      @_alfred_features_ [:execute, :track]
+
+      use Alfred.Status
+
+      execute_opts = Keyword.get(use_opts, :execute)
+      if execute_opts, do: use(Alfred.Execute, execute_opts)
+
+      name_opts = Keyword.get(use_opts, :name, [])
+      use Alfred.Name, name_opts
+    end
+  end
+
+  @mod_attribute :alfred_use_opts
+  @doc false
+  def put_attribute(module, use_opts) do
+    Module.register_attribute(module, @mod_attribute, persist: true)
+
+    [
+      callback: Keyword.get(use_opts, :callback, :module),
+      execute: Keyword.get(use_opts, :execute, :not_supported),
+      status: Keyword.get(use_opts, :status, :not_supported),
+      track: Keyword.get(use_opts, :track, :opt_out)
+    ]
+
+    Module.put_attribute(module, @mod_attribute, use_opts)
+  end
+
+  def register_attribute(module) do
+    Module.register_attribute(module, @mod_attribute, persist: true)
+  end
+
+  # coveralls-ignore-stop
+
   ##
   ## Alfred.Execute
   ##
 
-  defdelegate execute(tuple), to: Alfred.Execute
-  defdelegate execute(args, opts), to: Alfred.Execute
-  defdelegate execute_off(name, opts \\ []), to: Alfred.Execute, as: :off
-  defdelegate execute_on(name, opts \\ []), to: Alfred.Execute, as: :on
-  defdelegate execute_toggle(name, opts \\ []), to: Alfred.Execute, as: :toggle
+  def execute({opts, overrides} = args_tuple) when is_list(opts) and is_list(overrides) do
+    args_tuple
+    |> Alfred.Execute.Args.auto()
+    |> Enum.into(%{})
+    |> Alfred.Name.apply(:execute)
+  end
+
+  def execute(opts) when is_list(opts), do: execute(opts, [])
+
+  def execute(opts, overrides), do: execute({opts, overrides})
+
+  # defdelegate execute(tuple), to: Alfred.Execute
+  # defdelegate execute(args, opts), to: Alfred.Execute
+  def execute_off(name, opts \\ []), do: execute([name: name, cmd: "off"], opts)
+  def execute_on(name, opts \\ []), do: execute([name: name, cmd: "on"], opts)
+  # defdelegate execute_toggle(name, opts \\ []), to: Alfred.Execute, as: :toggle
   defdelegate execute_to_binary(execute), to: Alfred.Execute, as: :to_binary
 
   ##
@@ -31,11 +79,16 @@ defmodule Alfred do
   ##
 
   defdelegate notify_register(opts), to: Alfred.Notify, as: :register
+  defdelegate notify_register(name, opts), to: Alfred.Notify, as: :register
   defdelegate notify_unregister(opts), to: Alfred.Notify, as: :unregister
 
   ##
   ## Alfred.Status delegation
   ##
 
-  defdelegate status(name, opts \\ []), to: Alfred.Status, as: :status
+  def status(<<_::binary>> = name, opts \\ []) do
+    args = Enum.into(opts, %{}) |> Map.put(:name, name)
+
+    Alfred.Name.apply(args, :status)
+  end
 end

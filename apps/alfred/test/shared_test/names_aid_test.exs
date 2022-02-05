@@ -1,12 +1,10 @@
 defmodule AlfredNamesAidTest do
   use ExUnit.Case, async: true
-  use Should
+  use Alfred.TestAid
 
   @moduletag alfred: true, alfred_names_aid: true
 
-  import Alfred.NamesAid, only: [name_add: 1, parts_add: 1, parts_add_auto: 1]
-
-  setup [:name_add, :parts_add_auto, :parts_add]
+  setup [:name_add, :parts_auto_add, :parts_add]
 
   defmacro assert_binaries(name, binaries) do
     quote bind_quoted: [name: name, binaries: binaries] do
@@ -29,11 +27,11 @@ defmodule AlfredNamesAidTest do
       assert %{name: ^name, rc: :busy, cmd: "on", type: :mut} = parts
     end
 
-    @tag name_add: [type: :mut, rc: :orphaned, cmd: "on"]
-    test "makes mutable name with rc orphaned and cmd on", %{name: name, parts: parts} do
-      assert_binaries(name, ["mutable", "orphaned", "on"])
+    @tag name_add: [type: :mut, rc: :timeout, cmd: "on"]
+    test "makes mutable name with rc timeout and cmd on", %{name: name, parts: parts} do
+      assert_binaries(name, ["mutable", "timeout", "on"])
 
-      assert %{name: ^name, rc: :orphaned, cmd: "on", type: :mut} = parts
+      assert %{name: ^name, rc: :timeout, cmd: "on", type: :mut} = parts
     end
 
     @tag name_add: [type: :mut, cmd: "on", expired_ms: 1000]

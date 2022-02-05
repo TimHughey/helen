@@ -1,5 +1,6 @@
 defmodule Rena.Sensor.SensorTest do
   use ExUnit.Case, async: true
+  use Alfred.TestAid
 
   @moduletag rena: true, rena_sensor_test: true
 
@@ -43,7 +44,7 @@ defmodule Rena.Sensor.SensorTest do
            [temp_f: 6.1],
            [temp_f: 0.5],
            [temp_f: 11.1],
-           [rc: :error, temp_f: 0]
+           [rc: :expired, temp_f: 0]
          ]
     test "creates accurate summary", %{range_add: range, sensors: sensors} do
       res = Rena.Sensor.range_compare(sensors, range, alfred: AlfredSim)
@@ -58,6 +59,4 @@ defmodule Rena.Sensor.SensorTest do
     mid_pt = (range.high - range.low) / 2 + range.low
     %{range_add: range, mid_pt: mid_pt}
   end
-
-  def sensors_add(ctx), do: Alfred.NamesAid.sensors_add(ctx)
 end

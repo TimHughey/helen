@@ -1,5 +1,6 @@
 defmodule CarolServerTest do
   use ExUnit.Case, async: true
+  use Alfred.TestAid
   use Should
 
   @moduletag carol: true, carol_server: true
@@ -19,8 +20,7 @@ defmodule CarolServerTest do
     quote location: :keep, bind_quoted: [ctx: ctx, cmd: cmd] do
       assert %{equipment: <<_::binary>>} = ctx
 
-      assert_receive {:echo, %Alfred.Status{}}, 100
-      assert_receive {:echo, %Alfred.Execute{detail: %{cmd: ^cmd}}}, 100
+      assert_receive {:echo, %Alfred.Execute{cmd: ^cmd}}, 100
     end
   end
 
@@ -240,10 +240,6 @@ defmodule CarolServerTest do
       assert cmd_live =~ ~r/^BUSY\s\{on\}/
     end
   end
-
-  defp equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
-
-  defp memo_add(ctx), do: Alfred.NotifyAid.memo_add(ctx)
 
   defp missing_opts_add(ctx) do
     Map.put_new(ctx, :server_name, __MODULE__)

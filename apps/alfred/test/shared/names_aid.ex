@@ -15,10 +15,6 @@ defmodule Alfred.NamesAid do
   ## ExUnit setup functions
   ##
 
-  defmacrop ref_dt do
-    quote do: Map.get(var!(ctx), :ref_dt, Timex.now("America/New_York"))
-  end
-
   @doc """
   Create a unique equipment name for merge into a test `Exunit` test context.
 
@@ -31,19 +27,25 @@ defmodule Alfred.NamesAid do
 
   """
   # NOTE: need ctx for ref_dt/0
-  def equipment_add(%{equipment_add: opts} = ctx) do
-    {register_opts, opts_rest} = Keyword.pop(opts, :register, [])
-    register_opts = Alfred.Name.register_opts(register_opts, seen_at: ref_dt())
+  def equipment_add(%{equipment_add: opts}) do
+    dev_alias = new_dev_alias(:equipment, opts)
 
-    name = binary_from_opts(:mut, opts_rest)
+    name = if(match?(%Alfred.DevAlias{}, dev_alias), do: dev_alias.name, else: "unknown")
 
-    dev_alias = Alfred.Test.DevAlias.new(name)
-    rc = Alfred.Test.DevAlias.register(dev_alias, register_opts)
-
-    %{equipment: name, registered_name: %{dev_alias: dev_alias, name: name, rc: rc}}
+    %{equipment: name, dev_alias: dev_alias}
   end
 
   def equipment_add(_), do: :ok
+
+  def new_dev_alias(type, opts) do
+    {parts_opts, opts_rest} = split_parts_opts(opts)
+
+    case type do
+      :equipment -> binary_from_opts(:mut, parts_opts)
+      :sensor -> binary_from_opts(:imm, parts_opts)
+    end
+    |> Alfred.DevAlias.new(opts_rest)
+  end
 
   @doc """
   Create a unique name of type for merge into `ExUnit` test context.
@@ -91,23 +93,20 @@ defmodule Alfred.NamesAid do
     end
   end
 
-  def parts_add_auto(ctx) do
+  def parts_auto_add(ctx) do
     case ctx do
       %{name: name} -> %{parts_add: name}
       _ -> :ok
     end
   end
 
-  def sensor_add(%{sensor_add: opts} = ctx) do
-    {register_opts, opts_rest} = Keyword.pop(opts, :register, [])
-    register_opts = Alfred.Name.register_opts(register_opts, seen_at: ref_dt())
+  @sensor_default [rc: :ok, temp_f: 81.1]
+  def sensor_add(%{sensor_add: opts}) do
+    opts = Keyword.merge(@sensor_default, opts)
 
-    name = binary_from_opts(:imm, opts_rest)
+    dev_alias = new_dev_alias(:sensor, opts)
 
-    dev_alias = Alfred.Test.DevAlias.new(name)
-    rc = Alfred.Test.DevAlias.register(name, register_opts)
-
-    %{sensor: name, registered_name: %{dev_alias: dev_alias, name: name, rc: rc}}
+    %{sensor: dev_alias.name, dev_alias: dev_alias}
   end
 
   def sensor_add(_), do: :ok
@@ -120,22 +119,10 @@ defmodule Alfred.NamesAid do
     |> sensors_add()
   end
 
-  def sensors_add(%{sensors_add: [_ | _] = many} = ctx) do
-    Enum.reduce(many, %{register: [seen_at: ref_dt()], sensors: []}, fn
-      [{:register = key, val}], acc ->
-        Map.put(acc, key, val)
+  def sensors_add(%{sensors_add: [_ | _] = many}) do
+    dev_aliases = Enum.map(many, &new_dev_alias(:sensor, &1))
 
-      [_ | _] = opts, %{register: register_opts, sensors: sensors} = acc ->
-        name = binary_from_opts(:imm, opts)
-
-        register_opts = Alfred.Name.register_opts(register_opts, seen_at: ref_dt())
-        Alfred.Test.DevAlias.register(name, register_opts)
-
-        Map.put(acc, :sensors, [name | sensors])
-
-      _, acc ->
-        acc
-    end)
+    %{sensors: Enum.map(dev_aliases, &Map.get(&1, :name)), dev_alias: dev_aliases}
   end
 
   def sensors_add(_ctx), do: :ok
@@ -143,6 +130,12 @@ defmodule Alfred.NamesAid do
   ##
   ## Binary conversions - from opts and to_parts
   ##
+
+  @parts_opts [:busy, :cmd, :expired_ms, :name, :rc, :relhum, :temp_f, :timeout, :ttl_ms, :type]
+  # @parts_opts [:busy, :cmd, :expired_ms, :name, :rc, :timeout, :ttl_ms, :type]
+  def parts_opts, do: @parts_opts
+
+  def split_parts_opts(opts), do: Keyword.split(opts, @parts_opts)
 
   def binary_from_opts(type, opts) when is_list(opts) do
     opts_map = Enum.into(opts, %{})
@@ -158,7 +151,7 @@ defmodule Alfred.NamesAid do
     case regex_common(name) do
       %{type: :mut, args: args} = x -> {regex_mutable(args), x}
       %{type: :imm, args: args} = x -> {regex_immutable(args), x}
-      %{type: :unk} = x -> {%{rc: :unkown}, x}
+      %{type: :unk} = x -> {%{rc: :unknown}, x}
     end
     |> merge_and_clean()
   end
@@ -166,13 +159,6 @@ defmodule Alfred.NamesAid do
   ##
   ## Misc
   ##
-
-  def possible_parts do
-    # NOTE: the order of part keys is significant for assembling an
-    # accurate view of a binary name.  e.g. expired_ms is used to
-    # create updated_at.
-    [:name, :expired_ms, :type, :rc, :ttl_ms, :cmd, :temp_f, :relhum]
-  end
 
   def unique(prefix, index \\ 4)
       when is_binary(prefix)
@@ -207,8 +193,9 @@ defmodule Alfred.NamesAid do
 
   defp add_cmd(opts_map) do
     case opts_map do
+      #  %{cmd: :random} -> random_cmd(12)
       %{cmd: cmd} -> cmd
-      _ -> "off"
+      _ -> random_cmd(12)
     end
   end
 
@@ -229,7 +216,7 @@ defmodule Alfred.NamesAid do
     case opts_map do
       %{expired_ms: _} -> "expired"
       %{busy: true} -> "busy"
-      %{orphaned: true} -> "orphaned"
+      %{timeout: true} -> "timeout"
       %{rc: rc} when is_atom(rc) -> Atom.to_string(rc)
       %{rc: rc} when is_binary(rc) -> rc
       _ -> "ok"
@@ -259,6 +246,8 @@ defmodule Alfred.NamesAid do
     end
   end
 
+  def random_cmd(length \\ 8), do: Enum.take_random(?a..?z, length) |> to_string()
+
   defp regex_common(name) when is_binary(name) do
     re = ~r/^
       ((?<type>imm|mut|unk)[a-z0-9_]+)\s
@@ -267,7 +256,7 @@ defmodule Alfred.NamesAid do
       $/x
 
     case Regex.named_captures(re, name) do
-      x when is_nil(x) -> %{name: name, parse_failed: :common}
+      x when is_nil(x) -> raise(~s(parse failed: "name"))
       x when is_map(x) -> make_matchable(x) |> Map.put(:name, name)
     end
   end
@@ -280,7 +269,7 @@ defmodule Alfred.NamesAid do
       $/x
 
     case Regex.named_captures(re, args) do
-      x when is_nil(x) -> %{parse_failed: :immutable}
+      x when is_nil(x) -> raise(~s(parse failed: "name"))
       x when is_map(x) -> make_matchable(x)
     end
   end
@@ -292,19 +281,17 @@ defmodule Alfred.NamesAid do
       $/x
 
     case Regex.named_captures(re, args) do
-      x when is_nil(x) -> %{parse_failed: :mutable}
+      x when is_nil(x) -> raise(~s(parse failed: "name"))
       x when is_map(x) -> make_matchable(x)
     end
   end
 
-  defp to_binary(x) do
-    x |> Enum.reject(fn x -> is_nil(x) end) |> Enum.join(" ")
-  end
+  defp to_binary(x), do: x |> Enum.reject(fn x -> is_nil(x) end) |> Enum.join(" ")
 
   defp to_float_safe(x) do
     case Float.parse(x) do
       {val, _} -> val
-      :error -> 0.0
+      :error -> raise("unable to convert #{inspect(x)} to float")
     end
   end
 end

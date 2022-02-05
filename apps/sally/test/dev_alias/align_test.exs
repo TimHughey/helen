@@ -34,7 +34,8 @@ defmodule SallyDevAliasAlignTest do
 
       busy = Sally.DevAlias.align_status(dev_alias, dispatch)
 
-      assert {:busy, {:tracked, pid}} = busy
+      assert {:busy, cmd} = busy
+      assert %Sally.Command{track: {:tracked, pid}} = cmd
       assert Process.alive?(pid)
     end
 

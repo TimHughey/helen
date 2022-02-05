@@ -9,8 +9,6 @@ defmodule Alfred.Ticket do
 
   @type t :: %__MODULE__{name: String.t(), ref: reference(), opts: ticket_opts()}
 
-  def new(base_info) when is_struct(base_info), do: Map.from_struct(base_info) |> new()
-
   @doc false
   def new(base_info) when is_map(base_info) do
     base_info

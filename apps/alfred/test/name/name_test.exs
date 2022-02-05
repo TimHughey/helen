@@ -1,42 +1,20 @@
 defmodule Alfred.NameTest do
   use ExUnit.Case, async: true
-  use Should
-
-  import Alfred.NamesAid, only: [equipment_add: 1]
+  use Alfred.TestAid
 
   @moduletag alfred: true, alfred_name: true
 
   setup [:equipment_add]
 
-  defmacro assert_registered_name(ctx, :ok) do
-    quote bind_quoted: [ctx: ctx] do
-      assert %{registered_name: %{name: <<_::binary>> = name, rc: :ok}} = ctx
+  defmacro assert_registered_name do
+    quote do
+      ctx = var!(ctx)
+
+      assert %{dev_alias: %Alfred.DevAlias{name: name, register: pid} = dev_alias} = ctx
+      assert is_pid(pid) and Process.alive?(pid)
       assert Alfred.name_registered?(name)
 
       name
-    end
-  end
-
-  # defmacro assert_registered_name(ctx, :ok) do
-  #   quote bind_quoted: [ctx: ctx] do
-  #     assert %{registered_name: %{name: <<_::binary>> = name, pid: :ok}} = ctx
-  #     refute Alfred.Name.missing?(name)
-  #
-  #     name
-  #   end
-  # end
-
-  describe "Alfred.Name.callback/2" do
-    test "handles an unregistered name" do
-      assert {:not_found, "foo"} = Alfred.Name.callback("foo", :status)
-    end
-
-    @tag equipment_add: []
-    test "handles a registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
-
-      assert {Alfred.Test.DevAlias, 2} = Alfred.Name.callback(name, :status)
-      assert {Alfred.Test.DevAlias, 2} = Alfred.Name.callback(name, :execute)
     end
   end
 
@@ -47,14 +25,16 @@ defmodule Alfred.NameTest do
 
     @tag equipment_add: []
     test "returns info for a registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
       assert %{
                name: ^name,
                callbacks: %{
-                 execute: {Alfred.Test.DevAlias, 2},
-                 status: {Alfred.Test.DevAlias, 2}
+                 execute_cmd: {Alfred.DevAlias, 2},
+                 status_lookup: {Alfred.DevAlias, 2}
                },
+               module: Alfred.DevAlias,
+               nature: :cmds,
                seen_at: %DateTime{},
                ttl_ms: 5_000
              } = Alfred.Name.info(name)
@@ -68,22 +48,22 @@ defmodule Alfred.NameTest do
 
     @tag equipment_add: []
     test "handles a registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
       refute Alfred.Name.missing?(name, [])
-      refute Alfred.Name.missing?(ctx.registered_name.dev_alias, [])
+      refute Alfred.Name.missing?(ctx.dev_alias, [])
     end
 
     @tag equipment_add: []
     test "honors opts ttl_ms", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
       assert Alfred.Name.missing?(name, ttl_ms: 0)
     end
 
     @tag equipment_add: [ttl_ms: 25, register: [ttl_ms: 100]]
     test "honors registered ttl_ms", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
       # NOTE: confirm the correct ttl_ms opt made it to Alfred.Name.register/2
       assert %{ttl_ms: 100} = Alfred.name_info(name)
@@ -99,21 +79,22 @@ defmodule Alfred.NameTest do
   describe "Alfred.Name.register/2" do
     @tag equipment_add: []
     test "handles unregistered name", ctx do
-      assert_registered_name(ctx, :ok)
+      assert_registered_name()
     end
 
     @tag equipment_add: []
     test "handles previously registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
+      _name = assert_registered_name()
 
-      assert :ok = Alfred.Name.register(name, [])
+      previously_registered = Alfred.DevAlias.register(ctx.dev_alias, [])
+      assert previously_registered == ctx.dev_alias
     end
   end
 
   describe "Alfred.Name.all_registered/0" do
     @tag equipment_add: []
     test "handles previously registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
       all = Alfred.name_all_registered()
 
@@ -128,10 +109,10 @@ defmodule Alfred.NameTest do
 
     @tag equipment_add: []
     test "handles a registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
       assert %DateTime{} = Alfred.Name.seen_at(name)
-      assert %DateTime{} = Alfred.Name.seen_at(ctx.registered_name.dev_alias)
+      assert %DateTime{} = Alfred.Name.seen_at(ctx.dev_alias)
     end
   end
 
@@ -142,23 +123,20 @@ defmodule Alfred.NameTest do
 
     @tag equipment_add: []
     test "handles a registered name", ctx do
-      name = assert_registered_name(ctx, :ok)
+      name = assert_registered_name()
 
-      assert :ok = Alfred.Name.unregister(name)
+      assert :ok = Alfred.DevAlias.unregister(%{name: name})
       refute Alfred.name_registered?(name)
 
       # NOTE: must do this reduction due to Registry delayed registration release
-      Enum.reduce(1..10, :check, fn
-        _, :check ->
+      Enum.reduce_while(1..10, nil, fn
+        _, _ ->
           if Registry.lookup(Alfred.Name.Registry, name) == [] do
-            :unregistered
+            {:halt, :unregistered}
           else
             Process.sleep(1)
-            :check
+            {:cont, nil}
           end
-
-        _, :unregistered = acc ->
-          acc
       end)
 
       assert [] = Registry.lookup(Alfred.Name.Registry, name)

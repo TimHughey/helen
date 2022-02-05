@@ -4,25 +4,16 @@ defmodule Alfred.Status do
 
   """
 
-  @rc_default {:unset, :default}
-
-  defstruct name: :none, detail: :none, rc: @rc_default, __raw__: nil
+  defstruct name: :none, detail: :none, rc: nil, __raw__: :none
 
   @type lookup_result() :: nil | {:ok, any()} | {:error, any()} | struct() | map()
-  @type nature() :: :cmds | :datapoints
-  @type status_mutable :: map()
-  @type status_immutable :: map()
-  @type status_detail :: status_mutable | status_immutable
-  @type status_rc :: :ok | {:not_found, String.t()} | :busy | :orphan | {:ttl_expired, pos_integer()}
+  @type status_rc :: :ok | {:not_found, String.t()} | :busy | :timeout | {:ttl_expired, pos_integer()}
 
-  @type t :: %__MODULE__{name: String.t(), detail: status_detail(), rc: status_rc()}
+  @type t :: %__MODULE__{name: String.t(), detail: map | struct, rc: status_rc(), __raw__: any}
 
-  @mod_attribute :alfred_status_overrides_map
-  @callback status(binary(), list()) :: %__MODULE__{}
-  @callback status_check(atom(), map() | struct(), list()) :: :ok | {atom(), any()}
-  @callback status_lookup(map(), list()) :: lookup_result()
+  @callback status_lookup(map(), map()) :: lookup_result()
 
-  @optional_callbacks [status_check: 3]
+  # coveralls-ignore-start
 
   @doc false
   defmacro __using__(use_opts) do
@@ -30,25 +21,18 @@ defmodule Alfred.Status do
       Alfred.Status.put_attribute(__MODULE__, use_opts)
 
       @behaviour Alfred.Status
-      def status(name, opts), do: Alfred.Status.status(name, __MODULE__, opts)
     end
   end
+
+  @mod_attribute :alfred_status_use_opts
 
   @doc false
   def put_attribute(module, use_opts) do
     Module.register_attribute(module, @mod_attribute, persist: true)
-    overrides = use_opts[:overrides] || []
-
-    [
-      overrides: Enum.into(overrides, %{}, fn key -> {key, true} end)
-    ]
-    |> then(fn val -> Module.put_attribute(module, @mod_attribute, val) end)
+    Module.put_attribute(module, @mod_attribute, use_opts)
   end
 
-  @doc false
-  def overrides_map(module) do
-    get_in(module.__info__(:attributes), [@mod_attribute, :overrides])
-  end
+  # coveralls-ignore-stop
 
   @doc since: "0.3.0"
   def get_cmd(%__MODULE__{} = status) do
@@ -58,227 +42,95 @@ defmodule Alfred.Status do
     end
   end
 
+  @doc false
+  @not_found [detail: :none, rc: :not_found]
+  def not_found(name), do: struct(__MODULE__, [{:name, name} | @not_found])
+
   @doc since: "0.3.0"
   def raw(%Alfred.Status{__raw__: raw}), do: raw
 
-  # Creating the Status of a Name
-  #
-  # A list of checks are reduced to create the status.  The result of each reduction determines if
-  # the checks should continue or stop (e.g. due to check failure).  The end result is a details
-  # map to use as the source data for the final Alfred.Status.
-  #
-  #  1. Get Alfred.Name info
-  #     a. confirm name is registered
-  #     b. confirm ttl isn't expired
-  #
-  #  2. Lookup the name via status_lookup/3 (requires name, nature and opts)
-  #     a. confirm the name exists (low probability fail if Alfred.Name exists and TTL isn't expired)
-  #     b. confirm the ttl isn't expired (similar fail probability)
-  #     c. nature == :cmds: check if the command is busy
-  #     d. nature == :cmds: check if the command is orphaned
-  #     e. confirm the status is good comprised of nature dependent checks
-  #     f. assemble the status detail
-  #
-  #  3. If all checks are successful, create Alfred.Status from detail map
-  #
-  # Handling of failed or intermediate checks
-  #
-  #  1. When a check fails Alfred.Status :name and :rc are populated
-  #  2. Intermediate status results (e.g. busy) __may__ populate detail
-  #  3. Successful status populate :rc, :name and :detail
-  #     a. :detail varies wthh the nature of the name (e.g. cmds vs. datapoints)
-  #     b. the caller is responsible for interpreting the detail
-  #
+  defmacrop continue(val, what \\ :auto) do
+    %{function: {func, _}} = __CALLER__
 
-  @doc since: "0.3.0"
-  @checks [:registered, :ttl_info, :lookup, :ttl_lookup, :busy, :orphan, :finalize]
-  # (aaa of bbb) invoked via status/2 injected into using module
-  def status(<<_::binary>> = name, module, opts) do
-    {info, opts_rest} = Keyword.pop(opts, :__name_info__, Alfred.Name.info(name))
+    quote bind_quoted: [val: val, func: func, what: what] do
+      what = if(what == :auto, do: func, else: what)
 
-    opts_all = Keyword.merge([ref_dt: Timex.now()], [{:name, name} | opts_rest])
-    overrides_map = overrides_map(module)
-
-    checks_map = %{info: info, name: name}
-
-    Enum.reduce_while(@checks, checks_map, fn
-      :lookup, checks_map -> execute_lookup(checks_map, opts_all)
-      what, checks_map -> apply_check(what, checks_map, module, overrides_map, opts_all)
-    end)
-    |> new_from_checks_accumulator()
-  end
-
-  # (aaa of bbb) typically invoked from Alfred.status/2
-  def status(<<_::binary>> = name, opts) do
-    info = Alfred.Name.info(name)
-    opts_all = [{:__name_info__, info} | opts]
-
-    case info do
-      %{name: name, callbacks: %{status: {module, _}}} -> module.status(name, opts_all)
-      %{callbacks: %{status: nil}} -> {:error, :status_not_supported}
-      {:not_found = rc, name} -> struct(__MODULE__, name: name, rc: rc, detail: :none)
-      rc -> rc
+      {:cont, Map.put(var!(chk_map), what, val)}
     end
   end
 
-  @doc false
-  def new_from_checks_accumulator({:cont, checks_map}) do
-    new_from_checks_accumulator(checks_map)
+  defmacrop halt(rc, detail) do
+    %{function: {what, _}} = __CALLER__
+
+    quote bind_quoted: [rc: rc, detail: detail, what: what] do
+      chk_map = var!(chk_map)
+      detail = if(detail == :none, do: :none, else: Map.get(chk_map, :detail, %{}) |> Map.merge(detail))
+
+      {:halt, Map.merge(chk_map, %{what => rc, rc: rc, detail: detail})}
+    end
   end
 
-  def new_from_checks_accumulator(checks_map) do
-    checks_map
-    |> Map.take([:detail, :name, :rc])
-    |> Map.put(:__raw__, Map.get(checks_map, :lookup, :none))
-    |> Map.put_new(:detail, :none)
+  @doc since: "0.3.0"
+  @checks [:lookup, :raw, :busy, :timeout, :finalize]
+  # (aaa of bbb) invoked via status/2 injected into using module
+  def status_now(%{name: name} = info, args) do
+    chk_map = %{info: info, name: name}
+
+    Enum.reduce_while(@checks, chk_map, fn
+      :lookup, chk_map -> lookup(chk_map, info, args)
+      :raw, %{lookup: raw} = chk_map -> continue(raw, :__raw__)
+      :busy, chk_map -> busy(chk_map, args)
+      :timeout, chk_map -> timeout(chk_map, args)
+      :finalize, chk_map -> finalize(chk_map, args)
+    end)
+    |> Map.take([:detail, :name, :__raw__, :rc])
     |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
-  # @doc false
-  # def apply_check(what, checks_map, module, overrides, opts) do
-  #   info = checks_map.info
-  #
-  #   case {what, overrides} do
-  #     {:lookup, _overrides} -> module.status_lookup(info, opts)
-  #     {what, %{^what => true}} -> module.check(what, checks_map, opts)
-  #     {what, _overrides} -> check(what, checks_map, opts)
-  #   end
-  #   |> checks_map_put(what, checks_map)
-  # end
-  #
-  # @doc false
-  # def new_from_checks_tuple({rc, checks_map}) do
-  #   checks_map
-  #   |> Map.take([:detail, :name, :rc])
-  #   |> Map.put(:__raw__, Map.get(checks_map, :lookup, :none))
-  #   |> Map.put_new(:detail, :none)
-  #   |> Map.put_new(:rc, rc)
-  #   |> then(fn fields -> struct(__MODULE__, fields) end)
-  # end
-
-  defmacrop put_detail_rc(rc, detail) do
-    quote bind_quoted: [rc: rc, detail: detail] do
-      checks_map = var!(checks_map)
-      what = var!(what)
-
-      detail = Map.get(checks_map, :detail, %{}) |> Map.merge(detail)
-
-      {:halt, Map.merge(checks_map, %{what => rc, :rc => rc, :detail => detail})}
-    end
-  end
-
-  defmacrop put_cmd_detail_rc(rc) do
-    quote bind_quoted: [rc: rc] do
-      checks_map = var!(checks_map)
-      what = var!(what)
-      cmd = var!(cmd)
-
-      cmd_map = if(is_struct(cmd), do: Map.from_struct(cmd), else: cmd)
-
-      {:halt, Map.merge(checks_map, %{what => rc, :rc => rc, :detail => cmd_map})}
-    end
-  end
-
-  defmacrop put_what_rc_cont(rc) do
-    quote bind_quoted: [rc: rc], do: {:cont, Map.put_new(var!(checks_map), var!(what), rc)}
-  end
-
-  defmacrop put_final_rc(rc) do
-    quote bind_quoted: [rc: rc], do: {:halt, Map.put_new(var!(checks_map), :rc, rc)}
-  end
-
   @doc false
-  def apply_check(what, checks_map, module, overrides, opts) do
-    case {what, overrides} do
-      {what, %{^what => true}} -> module.check(what, checks_map, opts)
-      {what, _overrides} -> check(what, checks_map, opts)
+  @busy_keys [:cmd, :refid, :sent_at]
+  def busy(chk_map, _opts) do
+    %{lookup: %{cmds: cmds}} = chk_map
+
+    case cmds do
+      [%{acked: false} = cmd] -> halt(:busy, Map.take(cmd, @busy_keys))
+      _ -> continue(:ok)
     end
   end
 
   @doc false
-  def check(:finalize = what, checks_map, _opts) do
-    %{lookup: lookup} = checks_map
+  def finalize(chk_map, _opts) do
+    %{lookup: lookup} = chk_map
 
     case lookup do
-      %{datapoints: [%{} = detail]} -> put_detail_rc(:ok, detail)
-      %{cmds: [%{acked: true} = cmd]} -> put_cmd_detail_rc(:ok)
-      _ -> put_detail_rc(:error, %{})
-    end
-  end
-
-  # (aaa / bbb) orphan check
-  def check(:orphan = what, checks_map, _opts) do
-    %{lookup: %{cmds: cmds, updated_at: at}} = checks_map
-
-    case cmds do
-      [%{orphaned: true} = cmd] -> orphan_rc(cmd, at, what, checks_map)
-      _ -> put_what_rc_cont(:ok)
-    end
-  end
-
-  @busy_keys [:cmd, :refid, :sent_at]
-  def check(:busy = what, checks_map, _opts) do
-    %{lookup: %{cmds: cmds}} = checks_map
-
-    case cmds do
-      [%{acked: false} = cmd] -> put_detail_rc(:busy, Map.take(cmd, @busy_keys))
-      _ -> put_what_rc_cont(:ok)
-    end
-  end
-
-  def check(:registered = what, checks_map, _opts) do
-    case checks_map do
-      # name is registered
-      %{info: %{name: _}} -> put_what_rc_cont({:ok})
-      %{info: {:not_found = rc, _name}} -> put_final_rc(rc)
-    end
-  end
-
-  @ttl_checks [:ttl_info, :ttl_lookup]
-  def check(what, checks_map, opts) when what in @ttl_checks do
-    # NOTE: this check is called twice, use what to drive which is checked
-    case {what, checks_map} do
-      # handle ttl check for info
-      {:ttl_info, %{info: %{ttl_ms: ttl_ms, seen_at: at}}} -> {at, ttl_ms}
-      {:ttl_lookup, %{lookup: %{ttl_ms: ttl_ms, updated_at: at}}} -> {at, ttl_ms}
-    end
-    |> ttl_check(what, checks_map, opts)
-  end
-
-  @doc false
-  def execute_lookup(checks_map, opts) do
-    what = :lookup
-    %{info: %{callbacks: %{status: {module, 2}}} = name_info} = checks_map
-
-    case module.status_lookup(name_info, opts) do
-      nil -> put_detail_rc(:no_data, %{})
-      %{} = result -> put_what_rc_cont(result)
+      %{datapoints: [%{} = detail]} -> halt(:ok, detail)
+      %{cmds: [%{acked: true} = cmd]} -> halt(:ok, cmd)
+      _ -> halt(:error, %{})
     end
   end
 
   @doc false
-  def orphan_rc(cmd_map, updated_at, what, checks_map) do
-    %{acked_at: acked_at} = cmd_map
+  def lookup(chk_map, info, args) do
+    opts = Enum.into(args, [])
 
-    if Timex.before?(updated_at, acked_at) do
-      put_detail_rc(:orphan, cmd_map)
-    else
-      put_what_rc_cont(:ok)
+    Alfred.Name.Callback.invoke(info, [info, opts], :status_lookup) |> continue()
+  end
+
+  @doc false
+  def timeout(%{lookup: %{cmds: [cmd], updated_at: at}} = chk_map, opts) do
+    ref_dt = opts[:ref_dt] || Timex.now()
+
+    acked_before? = Timex.before?(at, cmd.acked_at)
+
+    case {cmd, acked_before?} do
+      {%{acked: true, orphaned: true}, true} ->
+        {:timeout, Timex.diff(ref_dt, cmd.acked_at, :millisecond)} |> halt(cmd)
+
+      _ ->
+        continue(:ok)
     end
   end
 
   @doc false
-  def ttl_check({at, ttl_ms}, what, checks_map, opts) do
-    ref_dt = Keyword.get(opts, :ref_dt)
-    ttl_ms = Keyword.get(opts, :ttl_ms, ttl_ms)
-
-    ttl_start_at = Timex.shift(ref_dt, milliseconds: ttl_ms * -1)
-
-    # if either the device hasn't been seen or the DevAlias hasn't been updated then the ttl is expired
-    if Timex.before?(ttl_start_at, at) do
-      put_what_rc_cont(:ok)
-    else
-      put_final_rc({:ttl_expired, DateTime.diff(ref_dt, at, :millisecond)})
-    end
-  end
+  def timeout(chk_map, _opts), do: continue(:ok)
 end

@@ -39,13 +39,14 @@ defmodule Alfred.Track do
 
   @type status_opt() :: :complete
 
-  @callback track_timeout(Alfred.Track.t()) :: any()
   @callback make_refid() :: String.t()
   @callback now() :: DateTime.t()
   @callback release(refid :: String.t(), opts :: list()) :: :ok
-  @callback track(schema :: map(), opts :: list()) :: Track.t()
+  @callback track(map(), opts :: list()) :: Track.t()
   @callback track(status_opt(), schema :: map(), DateTime.t()) :: :ok
-  @callback tracked_info(refid :: String.t()) :: any()
+  @callback track_now?(what :: map() | struct(), opts :: list) :: boolean()
+  @callback track_timeout(Alfred.Track.t()) :: any()
+  @callback tracked_info(refid :: String.t() | pid) :: any()
 
   # coveralls-ignore-start
   defmacro __using__(use_opts) do
@@ -58,13 +59,15 @@ defmodule Alfred.Track do
 
       @doc false
       def now, do: Alfred.Track.now()
-
       def release(what, opts), do: Alfred.Track.release(what, __MODULE__, opts)
 
-      def track(exec_result, opts), do: Alfred.Track.track(exec_result, __MODULE__, opts)
+      # def track(exec_result, opts), do: Alfred.Track.track(exec_result, __MODULE__, opts)
+      def track(what, opts), do: Alfred.Track.track(what, __MODULE__, opts)
       def track(status, refid, at), do: Alfred.Track.track({status, refid}, __MODULE__, at)
+      def track_now?(_what, _opts), do: true
+      defoverridable track_now?: 2
 
-      def tracked_info(refid), do: Alfred.Track.tracked_info(refid, __MODULE__)
+      def tracked_info(what), do: Alfred.Track.tracked_info(what, __MODULE__)
     end
   end
 
@@ -96,12 +99,16 @@ defmodule Alfred.Track do
     {:release, refid, opts_final(module, opts)} |> call(refid)
   end
 
-  def track(%{refid: refid} = exec_result, module, opts) do
-    opts = opts_final(module, opts)
+  # def track(%{refid: refid} = exec_result, module, opts) do
+  #   opts = opts_final(module, opts)
+  #
+  #   [tracked_info: exec_result, module: module, opts: opts, caller_pid: self()]
+  #   |> then(fn args -> GenServer.start_link(__MODULE__, args, name: server(refid)) end)
+  #   |> munge_start_link_rc()
+  # end
 
-    [tracked_info: exec_result, module: module, opts: opts, caller_pid: self()]
-    |> then(fn args -> GenServer.start_link(__MODULE__, args, name: server(refid)) end)
-    |> munge_start_link_rc()
+  def track(%{refid: _, track: _} = item, module, opts) do
+    if module.track_now?(item, opts), do: track_now(item, module, opts), else: item
   end
 
   @status [:complete]
@@ -124,16 +131,17 @@ defmodule Alfred.Track do
     {:tracked_info, refid, opts_final(module, [])} |> call(refid)
   end
 
-  ## GenServer
+  def track_now(%{refid: refid, track: _} = item, module, opts) do
+    opts = opts_final(module, opts)
+    args = [tracked_info: item, module: module, opts: opts, caller_pid: self()]
+    server_opts = [name: server(refid)]
 
-  @doc false
-  def child_spec(args) do
-    {restart, args_rest} = Keyword.pop(args, :restart, :temporary)
-    caller_pid = Keyword.get(args, :caller_pid)
-    refid = Keyword.get(args, :tracked_info) |> Map.get(:refid)
+    rc = GenServer.start_link(__MODULE__, args, server_opts)
 
-    %{id: {refid, caller_pid}, start: {__MODULE__, :start_link, [args_rest]}, restart: restart}
+    Map.put(item, :track, munge_start_link_rc(rc))
   end
+
+  ## GenServer
 
   @impl true
   def init(opts) do
@@ -242,20 +250,20 @@ defmodule Alfred.Track do
   @doc false
   def server(refid), do: {:via, Registry, {@registry, refid}}
 
-  # @doc false
-  # def short_name({:via, Registry, {_, short_name}}), do: short_name
-
   @doc false
   def record_metrics(state) do
-    %{opts: opts, at: at} = state
+    %{opts: opts, tracked_info: info, at: at} = state
 
-    tags = [name: opts[:name], cmd: opts[:cmd]]
+    name = opts[:name]
+    cmd = if(is_struct(info), do: info.cmd, else: opts[:cmd])
+
+    tags = [mutable: name, name: name, cmd: cmd, release: true]
 
     fields = [
       track_us: safe_diff_dt(at.tracked, at.sent),
       roundtrip_us: safe_diff_dt(at.complete, at.sent),
       release_us: safe_diff_dt(at.released, at.complete),
-      timeout_us: safe_diff_dt(now(), at.sent)
+      timeout_us: safe_diff_dt(at.timeout, at.sent)
     ]
 
     # NOTE: Betty.runtime_metric/3 will extract module from state
@@ -266,11 +274,12 @@ defmodule Alfred.Track do
 
   @doc false
   def record_timeout(state) do
-    %{module: module, opts: opts, refid: refid} = state
+    %{module: module, opts: opts, tracked_info: info} = state
 
     name = opts[:name]
+    cmd = if(is_struct(info), do: info.cmd, else: info[:cmd])
 
-    [mutable: name, module: module, name: name, cmd: opts[:cmd], timeout: true, refid: refid]
+    [mutable: name, module: module, name: name, cmd: cmd, timeout: true]
     |> Betty.app_error_v2()
 
     :ok

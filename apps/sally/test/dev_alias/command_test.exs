@@ -16,7 +16,10 @@ defmodule SallyCommandTest do
       assert %Sally.DevAlias{id: dev_alias_id, name: name} = dev_alias
       assert %Sally.Command{acked: false, refid: refid} = cmd
 
-      assert {:tracked, _pid} = Sally.Command.track(cmd, [])
+      tracked_cmd = Sally.Command.track(cmd, [])
+      assert %Sally.Command{track: tracked} = tracked_cmd
+      assert {:tracked, pid} = tracked
+      assert is_pid(pid) and Process.alive?(pid)
 
       tracked_info = Sally.Command.tracked_info(refid)
       assert %Sally.Command{} = tracked_info
@@ -31,7 +34,9 @@ defmodule SallyCommandTest do
 
       assert is_integer(rt_us) and rt_us > 100
 
-      assert %{rc: :orphan, detail: %{cmd: ^acked_cmd}} = Alfred.status(name)
+      assert %{rc: rc, detail: %{cmd: ^acked_cmd}} = Alfred.status(name)
+      assert {:timeout, ms} = rc
+      assert ms > 1
     end
   end
 

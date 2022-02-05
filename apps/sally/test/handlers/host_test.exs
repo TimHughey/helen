@@ -33,7 +33,7 @@ defmodule Sally.HostDispatchTest do
           txn_info: %{},
           valid?: true
         },
-        100
+        500
       )
     end
 

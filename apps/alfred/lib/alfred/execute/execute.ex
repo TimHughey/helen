@@ -4,18 +4,15 @@ defmodule Alfred.Execute do
 
   """
 
-  @rc_default {:unset, :default}
-
-  defstruct name: :none, detail: :none, rc: @rc_default
+  defstruct name: :none, cmd: "unknown", detail: :none, rc: nil, __raw__: :none
 
   @callback execute_cmd(any(), opts :: list()) :: any()
-  @callback execute(args :: any(), opts :: list) :: any()
 
   defmacrop continue(val) do
     %{function: {what, _}} = __CALLER__
 
     quote bind_quoted: [val: val, what: what] do
-      {:cont, Map.put(var!(checks_map), what, val)}
+      {:cont, Map.put(var!(chk_map), what, val)}
     end
   end
 
@@ -23,75 +20,42 @@ defmodule Alfred.Execute do
     %{function: {what, _}} = __CALLER__
 
     quote bind_quoted: [rc: rc, detail: detail, what: what] do
-      checks_map = var!(checks_map)
-      detail = if(detail == :none, do: :none, else: Map.get(checks_map, :detail, %{}) |> Map.merge(detail))
+      chk_map = var!(chk_map)
+      detail = if(detail == :none, do: :none, else: Map.get(chk_map, :detail, %{}) |> Map.merge(detail))
 
-      {:halt, Map.merge(checks_map, %{what => rc, rc: rc, detail: detail})}
+      {:halt, Map.merge(chk_map, %{what => rc, rc: rc, detail: detail})}
     end
   end
-
-  # Executing a command for a Name
-  #
-  #
 
   @doc since: "0.3.0"
-
-  # (aaa of bbb) accept a tuple of args and overrides
-  def execute({[_ | _] = args, overrides}) when is_list(overrides) do
-    Alfred.Execute.Args.auto({args, overrides}) |> Enum.into(%{}) |> execute()
-  end
-
-  def execute(%{name: name} = args_map) do
-    info = Alfred.Name.info(name)
-    args_all = [{:__name_info__, info} | Enum.into(args_map, [])]
-
-    case info do
-      %{callbacks: %{execute: {mod, _}, status: {_, _}}} -> mod.execute(name, args_all)
-      %{callbacks: %{execute: nil}} -> struct(__MODULE__, name: name, rc: :not_supported)
-      {:not_found = rc, name} -> struct(__MODULE__, name: name, rc: rc)
-      rc -> rc
-    end
-  end
-
-  @checks [:registered, :ttl_info, :status, :verify, :compare, :execute_cmd, :track, :finalize]
-  def execute(args, module) when is_list(args) and is_atom(module) do
-    name = Keyword.get(args, :name)
-    {info, args_rest} = Keyword.pop(args, :__name_info__, Alfred.Name.info(name))
-    opts = Keyword.merge([ref_dt: Timex.now()], args_rest)
-
-    overrides = overrides_map(module)
-
-    checks_map = %{
+  @checks [:status, :verify, :compare, :execute_cmd, :finalize]
+  def execute_now(%{name: name} = info, args) do
+    chk_map = %{
       info: info,
       name: name,
-      force: if(get_in(opts, [:cmd_opts, :force]) == true, do: true, else: false),
-      track_module: track_module(module)
+      force: if(get_in(args, [:cmd_opts, :force]) == true, do: true, else: false)
     }
 
-    Enum.reduce_while(@checks, checks_map, fn
-      what, checks_map when is_map_key(overrides, what) -> module.check(what, checks_map, opts)
-      :registered, %{info: %{name: _}} -> continue(:ok)
-      :registered, %{info: {:not_found = rc, _name}} -> halt(rc, :none)
-      :ttl_info, checks_map -> ttl_info(checks_map, opts)
-      :status, checks_map -> status(checks_map, opts)
-      :verify, checks_map -> verify(checks_map)
-      :compare, checks_map -> compare(checks_map, opts)
-      :execute_cmd, checks_map -> execute_cmd(checks_map, opts)
-      :track, checks_map -> track(checks_map, opts)
-      :finalize, checks_map -> finalize(checks_map)
+    Enum.reduce_while(@checks, chk_map, fn
+      :status, chk_map -> status(chk_map, info, args)
+      :verify, chk_map -> verify(chk_map)
+      :compare, chk_map -> compare(chk_map, args)
+      :execute_cmd, chk_map -> execute_cmd(chk_map, info, args)
+      :finalize, chk_map -> finalize(chk_map)
     end)
     |> new_from_checks_accumulator()
   end
 
-  def execute([_ | _] = args, opts) when is_list(opts) do
-    Alfred.Execute.Args.auto({args, opts}) |> Enum.into(%{}) |> execute()
+  @doc false
+  def new_from_checks_accumulator(chk_map) do
+    cmd = if(match?(%{detail: %{cmd: _}}, chk_map), do: chk_map.detail.cmd, else: nil)
+
+    if(is_binary(cmd), do: put_in(chk_map, [:cmd], cmd), else: chk_map)
+    |> Map.take([:cmd, :detail, :name, :__raw__, :rc])
+    |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
-  @doc since: "0.3.0"
-  def off(name, opts), do: execute([name: name, cmd: "off"], opts)
-
-  @doc since: "0.3.0"
-  def on(name, opts), do: execute([name: name, cmd: "on"], opts)
+  def not_found(name), do: struct(__MODULE__, name: name, rc: :not_found)
 
   @doc since: "0.3.0"
   def toggle(_name, _opts) do
@@ -99,7 +63,7 @@ defmodule Alfred.Execute do
   end
 
   @doc """
-  Convert an `Alfred.Execute` to a sratus binary
+  Convert an `Alfred.Execute` to a status binary
 
   """
   @doc since: "0.3.0"
@@ -109,9 +73,8 @@ defmodule Alfred.Execute do
       %{rc: :busy, detail: %{cmd: cmd, refid: refid}} -> ["BUSY", "{#{cmd}}", "@#{refid}"]
       %{rc: :not_found} -> ["NOT_FOUND"]
       %{rc: {:ttl_expired, ms}} -> ["TTL_EXPIRED", "+#{ms}ms"]
-      %{rc: {:orphaned, ms}} -> ["ORPHANED", "+#{ms}ms"]
-      %{rc: :error} -> ["ERROR"]
-      _ -> ["UNMATCHED"]
+      %{rc: {:timeout, ms}} -> ["TIMEOUT", "+#{ms}ms"]
+      _ -> ["ERROR"]
     end
     |> then(fn detail -> detail ++ ["[#{name}]"] end)
     |> Enum.join(" ")
@@ -122,144 +85,67 @@ defmodule Alfred.Execute do
   ##
 
   @doc false
-  def compare(%{status: status, force: force} = checks_map, opts) do
+  def compare(%{status: status, force: force} = chk_map, opts) do
     want_cmd = opts[:cmd]
 
     case status do
       _status when force -> continue(:force)
-      %{detail: %{rc: rc} = detail} when rc in [:busy, :error] -> halt(rc, detail)
       %{detail: %{cmd: ^want_cmd} = detail} -> halt(:ok, detail)
       _ -> continue(:not_equal)
     end
   end
 
   @doc false
-  def execute_cmd(checks_map, opts) do
-    %{status: status, info: %{callbacks: %{execute: {module, 2}}}} = checks_map
+  def execute_cmd(%{status: status} = chk_map, info, args) do
+    raw = Alfred.Status.raw(status)
+    opts = Enum.into(args, [])
 
-    case module.execute_cmd(status, opts) do
+    execute = Alfred.Name.Callback.invoke(info, [raw, opts], :execute_cmd)
+
+    case execute do
       {rc, result} when rc in [:ok, :busy] -> continue({rc, result})
       {rc, result} -> halt(rc, result)
     end
   end
 
   @doc false
-  def status(%{info: info} = checks_map, opts) do
-    %{callbacks: %{status: {module, 2}}} = info
+  def finalize(%{execute_cmd: {rc, detail}} = chk_map), do: halt(rc, detail)
 
-    module.status(info.name, opts) |> continue()
+  @doc false
+  def status(chk_map, info, args) do
+    status = Alfred.Name.Callback.invoke(info, [info, args], :status)
+
+    merge = %{__raw__: Map.get(status, :__raw__), status: status}
+
+    {:cont, Map.merge(chk_map, merge)}
   end
 
   @doc false
-  def finalize(checks_map) do
-    %{execute_cmd: {rc, exec_result}, track: track_result} = checks_map
-
-    detail = %{cmd: exec_result.cmd, __execute__: exec_result, __track__: track_result}
-
-    halt(rc, detail)
-  end
-
-  @doc false
-  def new_from_checks_accumulator({:cont, checks_map}) do
-    new_from_checks_accumulator(checks_map)
-  end
-
-  def new_from_checks_accumulator(checks_map) do
-    checks_map
-    |> Map.take([:detail, :name, :rc])
-    |> Map.put_new(:detail, :none)
-    |> then(fn fields -> struct(__MODULE__, fields) end)
-  end
-
-  @doc false
-  def ttl_info(%{info: info} = checks_map, opts) do
-    %{ttl_ms: ttl_ms, seen_at: at} = info
-
-    ref_dt = Keyword.get(opts, :ref_dt)
-    ttl_ms = Keyword.get(opts, :ttl_ms, ttl_ms)
-
-    ttl_start_at = Timex.shift(ref_dt, milliseconds: ttl_ms * -1)
-
-    # if either the device hasn't been seen or the DevAlias hasn't been updated then the ttl is expired
-    if Timex.before?(ttl_start_at, at) do
-      continue(:ok)
-    else
-      halt({:ttl_expired, DateTime.diff(ref_dt, at, :millisecond)}, :none)
-    end
-  end
-
-  @doc false
-  def track(checks_map, opts) do
-    case checks_map do
-      %{track_module: :none = rc} -> rc
-      %{track_module: module, execute_cmd: {:busy, cmd}} -> module.track(cmd, opts)
-      _ -> :ok
-    end
-    |> continue()
-  end
-
-  @doc false
-  def verify(%{status: status} = checks_map) do
+  def verify(%{status: status} = chk_map) do
     case status do
       %Alfred.Status{rc: :ok} -> continue(:ok)
       %Alfred.Status{rc: rc, detail: detail} -> halt(rc, detail)
     end
   end
 
-  ##
-  ## __using__ and helpers
-  ##
-
   @mod_attribute :alfred_execute_use_opts
 
   # coveralls-ignore-start
+
   @doc false
   defmacro __using__(use_opts) do
     quote bind_quoted: [use_opts: use_opts] do
       Alfred.Execute.put_attribute(__MODULE__, use_opts)
 
       @behaviour Alfred.Execute
-      def execute({[_ | _] = _args, opts} = tuple) when is_list(opts) do
-        tuple |> Alfred.Execute.Args.auto() |> Alfred.Execute.execute(__MODULE__)
-      end
-
-      def execute(<<_::binary>> = name, opts) do
-        Keyword.put(opts, :name, name)
-        |> Alfred.Execute.execute(__MODULE__)
-      end
-
-      def execute(args, opts) when is_list(opts) do
-        Alfred.Execute.Args.auto({args, opts}) |> Alfred.Execute.execute(__MODULE__)
-      end
     end
   end
 
   @doc false
-  @track_key [@mod_attribute, :track]
-  def track_module(module), do: module.__info__(:attributes) |> get_in(@track_key)
-
-  @doc false
   def put_attribute(module, use_opts) do
     Module.register_attribute(module, @mod_attribute, persist: true)
-    overrides = use_opts[:overrides] || []
-
-    # track = use_opts[:track]
-    #
-    # unless Module.open?(track) do
-    #   mod_funcs = track.__info__(:functions)
-    # end
-
-    [
-      track: use_opts[:track] || :none,
-      overrides: Enum.into(overrides, %{}, fn key -> {key, true} end)
-    ]
-    |> then(fn val -> Module.put_attribute(module, @mod_attribute, val) end)
+    Module.put_attribute(module, @mod_attribute, use_opts)
   end
 
   # coveralls-ignore-stop
-
-  @doc false
-  def overrides_map(module) do
-    get_in(module.__info__(:attributes), [@mod_attribute, :overrides])
-  end
 end

@@ -1,4 +1,4 @@
-defmodule Alfred.Test.Datapoint do
+defmodule Alfred.Datapoint do
   @moduledoc false
 
   defstruct temp_c: nil, temp_f: nil, reading_at: nil
@@ -10,7 +10,6 @@ defmodule Alfred.Test.Datapoint do
   end
 
   def new(fields, %DateTime{} = at) do
-    [{:reading_at, at} | fields]
-    |> then(fn fields -> struct(__MODULE__, fields) end)
+    struct(__MODULE__, [reading_at: at] ++ fields)
   end
 end

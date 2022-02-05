@@ -1,136 +1,156 @@
-defmodule Alfred.Test.DevAlias do
+defmodule Alfred.DevAlias do
   @moduledoc false
 
-  use Alfred.Status
-  use Alfred.Execute, track: Alfred.Test.Command
-  use Alfred.JustSaw
+  use Alfred, name: [backend: :module], execute: []
 
   defstruct name: "",
             pio: 0,
             description: "<none>",
             ttl_ms: 15_000,
-            device: [],
+            nature: nil,
             cmds: nil,
             datapoints: nil,
+            status: nil,
+            register: nil,
+            seen_at: nil,
+            parts: nil,
             inserted_at: nil,
             updated_at: nil
 
+  @type t :: %__MODULE__{
+          name: String.t(),
+          pio: pos_integer(),
+          description: String.t(),
+          ttl_ms: pos_integer(),
+          nature: :cmds | :datapoints,
+          cmds: list | [],
+          datapoints: list | [],
+          status: Alfred.Status.t() | nil,
+          register: pid | nil,
+          seen_at: DateTime.t(),
+          parts: map | nil,
+          inserted_at: DateTime.t(),
+          updated_at: DateTime.t()
+        }
+
   @tz "America/New_York"
 
-  def add_callbacks(opts) do
-    callbacks = %{execute: {__MODULE__, 2}, status: {__MODULE__, 2}}
+  # Callbacks
 
-    Keyword.put_new(opts, :callbacks, callbacks)
+  @impl true
+  def execute_cmd(%Alfred.DevAlias{} = dev_alias, opts) do
+    new_cmd = Alfred.Command.execute(dev_alias, opts)
+
+    rc = if(new_cmd.acked, do: :ok, else: :busy)
+
+    {rc, new_cmd}
   end
 
   @impl true
-  def execute_cmd(%Alfred.Status{} = status, opts) do
-    Process.send(self(), {:echo, status}, [])
+  def status_lookup(%{name: name, nature: :datapoints}, _invoke_args) do
+    dev_alias = Alfred.NamesAid.binary_to_parts(name) |> new(register: false)
 
-    Alfred.Status.raw(status) |> Alfred.Test.Command.add(opts)
+    %{datapoints: [dap]} = dev_alias
+
+    refined_dap = Map.drop(dap, [:__meta__, :__struct__])
+
+    struct(dev_alias, datapoints: [refined_dap])
   end
 
-  # (1 of 4) handle unkonwn names
-  def new(%{type: :unk}), do: new(nil)
-  def new(%{rc: :error}), do: new(nil)
+  @impl true
+  def status_lookup(%{name: name, nature: :cmds}, _invoke_args) do
+    Alfred.NamesAid.binary_to_parts(name) |> new(register: false)
+  end
 
   # (2 of 4) construct a new DevAlias from a parts map
-  def new(parts) when is_map(parts) do
-    populate_order = [:name, :timestamps, :cmds, :datapoints]
+  @steps [:nature, :description, :ttl, :tstamps, :cmds, :daps, :struct, :register]
+  def new(%{name: name} = parts, opts) when is_list(opts) do
+    base_fields = [name: name, parts: parts, pio: 0]
 
-    Enum.reduce(populate_order, [pio: 0], fn
-      :name, fields -> [{:name, Map.get(parts, :name)} | fields]
-      :timestamps, fields -> timestamps_and_ttl(parts, fields)
-      :cmds, fields -> cmds(parts, fields)
-      :datapoints, fields -> datapoints(parts, fields)
+    Enum.reduce(@steps, base_fields, fn
+      :nature, fields -> nature(parts, fields)
+      :description, fields -> description(parts, fields)
+      :ttl, fields -> ttl(parts, fields)
+      :tstamps, fields -> timestamps(fields)
+      :cmds, fields -> cmds(parts, fields, opts)
+      :daps, fields -> datapoints(parts, fields)
+      :struct, fields -> struct(__MODULE__, fields)
+      :register, dev_alias -> register(dev_alias, opts)
     end)
-    |> new()
   end
 
-  # (3 of 4) construct a DevAlias struct from a list of fields
-  def new(fields) when is_list(fields), do: struct(__MODULE__, fields)
+  def new(<<_::binary>> = name, opts) do
+    Alfred.NamesAid.binary_to_parts(name) |> new(opts)
+  end
 
-  def new(<<_::binary>> = name), do: Alfred.NamesAid.binary_to_parts(name) |> new()
+  def ttl_reset(%Alfred.DevAlias{} = dev_alias) do
+    struct(dev_alias, updated_at: now(), seen_at: now())
+  end
 
-  # (3 of 4) catch all
-  def new(_), do: nil
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
 
-  def register(_what, false), do: nil
+  def cmds(parts, fields, opts) do
+    case parts do
+      %{type: :mut} ->
+        at = fields[:updated_at]
+        cmd = Alfred.Command.new(parts, at, opts)
+        [cmds: [cmd], status: cmd]
 
-  # name registration helper
-  def register(what, opts) do
-    case {what, opts} do
-      {_what, false} -> nil
-      {<<_::binary>> = name, _register_opts} -> new(name)
-      {%__MODULE__{} = dev_alias, _register_opts} -> dev_alias
-      {_what, _register_opts} -> nil
+      _ ->
+        []
     end
-    |> just_saw(opts)
+    |> then(fn cmd_fields -> cmd_fields ++ fields end)
   end
 
-  @impl true
-  def status_lookup(%{name: name, nature: :datapoints}, opts) when is_list(opts) do
-    %{datapoints: [datapoint]} = dev_alias = Alfred.NamesAid.binary_to_parts(name) |> new()
+  def datapoints(parts, fields) do
+    case parts do
+      %{type: :imm} ->
+        dap = Alfred.Datapoint.new(parts, fields[:updated_at])
+        [datapoints: [dap], status: dap]
 
-    datapoint
-    |> Map.from_struct()
-    |> Enum.reject(fn {_key, val} -> is_nil(val) end)
-    |> Enum.into(%{})
-    |> then(fn datapoint -> struct(dev_alias, datapoints: [datapoint]) end)
+      _ ->
+        []
+    end
+    |> then(fn dap_fields -> dap_fields ++ fields end)
   end
 
-  def status_lookup(%{name: name, nature: :cmds}, opts) when is_list(opts) do
-    Alfred.NamesAid.binary_to_parts(name) |> new()
+  def description(parts, fields) do
+    case parts do
+      %{type: :imm} -> "sensor"
+      %{type: :mut} -> "equipment"
+    end
+    |> then(fn description -> [description: description] ++ fields end)
   end
 
-  ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
-
-  defp cmds(%{type: :mut} = parts, fields) do
-    at = fields[:updated_at]
-    cmd = Alfred.Test.Command.new(parts, at)
-
-    [{:cmds, List.wrap(cmd)} | fields]
-    |> description("equipment")
+  def nature(parts, fields) do
+    case parts do
+      %{type: :mut} -> :cmds
+      %{type: :imm} -> :datapoints
+    end
+    |> then(fn nature -> [nature: nature] ++ fields end)
   end
 
-  defp cmds(_parts, fields), do: fields
+  def now, do: Timex.now(@tz)
 
-  defp datapoints(%{type: :imm} = parts, fields) when is_map(parts) and is_list(fields) do
-    at = fields[:updated_at]
-    datapoint = Alfred.Test.Datapoint.new(parts, at)
+  def timestamps(fields) do
+    # NOTE: __shift_ms__ is a positive value
+    update = Timex.shift(now(), milliseconds: fields[:__shift_ms__])
+    insert = Timex.shift(update, microseconds: -102)
 
-    [{:datapoints, List.wrap(datapoint)} | fields]
-    |> description("sensor")
+    [inserted_at: insert, seen_at: update, updated_at: update] ++ fields
   end
 
-  defp datapoints(_parts, fields), do: fields
-
-  defp description(fields, description), do: [{:description, description} | fields]
-
-  defp now, do: Timex.now(@tz)
-
-  defp timestamps_and_ttl(parts, fields) do
+  def ttl(parts, fields) do
     case parts do
       %{rc: :ok} -> {5_000, 0}
       %{rc: :expired, expired_ms: ms} -> {ms, (ms + 100) * -1}
+      %{rc: :expired} -> {10, -110}
       %{rc: :busy} -> {5_000, -100}
-      %{rc: :orphaned} -> {5_000, -1000}
+      %{rc: :timeout} -> {5_001, -1000}
+      _ -> {13, 0}
     end
-    |> then(fn {ttl_ms, ms} -> [{:ttl_ms, ttl_ms} | timestamps(fields, ms)] end)
-  end
-
-  defp timestamps(fields, ms) do
-    # pop the existing keys; the new values will be put back
-    {updated_at, fields_rest} = Keyword.pop(fields, :updated_at, now())
-    {_inserted_at, fields_rest} = Keyword.pop(fields_rest, :inserted_at)
-
-    # NOTE: ms is a positive value
-    updated_at = Timex.shift(updated_at, milliseconds: ms)
-    inserted_at = Timex.shift(updated_at, microseconds: -102)
-
-    # put the revised keys into fields
-    [{:updated_at, updated_at} | [{:inserted_at, inserted_at} | fields_rest]]
+    |> then(fn {ttl, shift_ms} -> [ttl_ms: ttl, __shift_ms__: shift_ms] ++ fields end)
   end
 end

@@ -1,8 +1,6 @@
 defmodule Alfred.ExecuteTest do
   use ExUnit.Case, async: true
-  use Should
-
-  import Alfred.NamesAid, only: [equipment_add: 1, name_add: 1, sensor_add: 1]
+  use Alfred.TestAid
 
   @moduletag alfred: true, alfred_execute: true
 
@@ -17,31 +15,26 @@ defmodule Alfred.ExecuteTest do
     end
   end
 
-  describe "Alfred.Execute.execute/2" do
+  describe "Alfred.execute/2" do
     @tag name_add: [type: :unk]
     test "handles unknown name", ctx do
       name = get_name_from_ctx()
 
-      assert %Alfred.Execute{name: ^name, rc: :not_found, detail: :none} =
-               Alfred.Execute.execute([name: name, cmd: "on"], [])
-    end
-  end
+      execute = Alfred.execute([name: name, cmd: "on"], [])
 
-  describe "Alfred.Test.DevAlias.execute/2" do
-    @tag name_add: [type: :unk]
-    test "handles unknown name", ctx do
-      name = get_name_from_ctx()
+      assert %Alfred.Execute{name: ^name, rc: :not_found, detail: :none} = execute
 
-      assert %Alfred.Execute{name: ^name, rc: :not_found, detail: :none} =
-               Alfred.Test.DevAlias.execute([name: name, cmd: "on"], [])
+      assert Alfred.execute_to_binary(execute) =~ "NOT_FOUND"
     end
 
     @tag equipment_add: [cmd: "off"]
     test "handles cmd equal to status", ctx do
       name = get_name_from_ctx()
 
-      assert %Alfred.Execute{rc: :ok, detail: %{cmd: "off"}, name: ^name} =
-               Alfred.Test.DevAlias.execute([name: name, cmd: "off"], [])
+      execute = Alfred.execute(name: name, cmd: "off")
+      assert %Alfred.Execute{rc: :ok, cmd: cmd, detail: %{cmd: cmd}, name: ^name} = execute
+
+      assert Alfred.execute_to_binary(execute) =~ "OK {off} [mutable"
     end
 
     @tag equipment_add: [cmd: "off"]
@@ -49,15 +42,84 @@ defmodule Alfred.ExecuteTest do
       name = get_name_from_ctx()
       execute_args = [name: name, cmd: "on"]
 
-      assert %Alfred.Execute{detail: %{cmd: "on", __execute__: %{refid: refid}}, name: ^name, rc: :busy} =
-               Alfred.Test.DevAlias.execute(execute_args, [])
+      execute = Alfred.execute(execute_args, [])
+
+      assert %Alfred.Execute{cmd: "on" = cmd, rc: :busy} = execute
+      assert %Alfred.Execute{__raw__: %Alfred.DevAlias{}} = execute
+      assert %Alfred.Execute{detail: detail, name: ^name} = execute
+      assert %{cmd: ^cmd, refid: refid} = detail
+
+      assert Alfred.execute_to_binary(execute) =~ "BUSY {on} @"
 
       assert Alfred.Track.tracked?(refid)
 
-      assert :ok == Alfred.Test.Command.release(refid, [])
+      assert :ok == Alfred.Command.release(refid, [])
 
       assert [errors: _, released: _, timeout: _, tracked: tracked] = Alfred.Track.Metrics.counts()
       assert tracked > 0
+    end
+
+    @tag equipment_add: [cmd: "off", busy: true]
+    test "handles busy status", ctx do
+      name = get_name_from_ctx()
+
+      execute_args = [name: name, cmd: "on"]
+
+      execute = Alfred.execute(execute_args, [])
+      assert %Alfred.Execute{rc: :busy, cmd: "off", detail: detail, name: ^name} = execute
+
+      assert %{cmd: "off", refid: <<_::binary>>, sent_at: %DateTime{}} = detail
+
+      assert Alfred.execute_to_binary(execute) =~ "BUSY {off} @"
+    end
+
+    @tag equipment_add: [cmd: "off", timeout: true]
+    test "handles timeout status", ctx do
+      name = get_name_from_ctx()
+
+      execute_args = [name: name, cmd: "on"]
+
+      execute = Alfred.execute(execute_args, [])
+      assert %Alfred.Execute{rc: rc, cmd: "off", detail: detail, name: ^name} = execute
+
+      assert {:timeout, ms} = rc
+      assert ms > 10
+      assert %{cmd: "off", refid: <<_::binary>>, sent_at: %DateTime{}} = detail
+
+      assert Alfred.execute_to_binary(execute) =~ ~r/TIMEOUT \+\d+ms \[\w+/
+    end
+
+    @tag equipment_add: [cmd: "off", expired_ms: 10]
+    test "handles ttl_expired status", ctx do
+      name = get_name_from_ctx()
+
+      execute_args = [name: name, cmd: "on"]
+
+      execute = Alfred.execute(execute_args)
+      assert %Alfred.Execute{rc: rc, cmd: "unknown", detail: detail, name: ^name} = execute
+
+      assert {:ttl_expired, ms} = rc
+      assert ms > 10
+      assert :none = detail
+
+      assert Alfred.execute_to_binary(execute) =~ ~r/TTL_EXPIRED \+\d+ms \[\w+/
+    end
+
+    @tag equipment_add: [cmd: "off"]
+    test "honors force: true ", ctx do
+      name = get_name_from_ctx()
+
+      cmd = "off"
+      execute_args = [name: name, cmd: cmd]
+
+      execute = Alfred.execute(execute_args, force: true)
+      assert %Alfred.Execute{rc: :busy, cmd: ^cmd, detail: detail, name: ^name} = execute
+
+      assert %{cmd: ^cmd, acked: false, refid: <<_::binary>>} = detail
+      assert %{sent_at: %DateTime{}, track: {:ok, pid}} = detail
+      assert is_pid(pid) and Process.alive?(pid)
+
+      assert Alfred.execute_to_binary(execute) =~ "BUSY {off} @"
     end
   end
 end

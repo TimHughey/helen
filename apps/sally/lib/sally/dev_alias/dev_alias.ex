@@ -10,9 +10,7 @@ defmodule Sally.DevAlias do
   require Ecto.Query
 
   use Ecto.Schema
-  use Alfred.Status
-  use Alfred.Execute, track: Sally.Command
-  use Alfred.JustSaw
+  use Alfred, name: [backend: :module], execute: []
 
   alias __MODULE__, as: Schema
   alias Ecto.Changeset
@@ -33,7 +31,9 @@ defmodule Sally.DevAlias do
     field(:nature, :any, virtual: true)
     field(:description, :string, default: "<none>")
     field(:ttl_ms, :integer, default: @ttl_default)
+    field(:register, :any, virtual: true)
     field(:status, :any, virtual: true)
+    field(:seen_at, :utc_datetime_usec, virtual: true)
 
     belongs_to(:device, Device)
     has_many(:cmds, Command, @cmds)
@@ -70,6 +70,7 @@ defmodule Sally.DevAlias do
 
   def create(%Sally.Device{} = device, opts) do
     dev_alias = Ecto.build_assoc(device, :aliases)
+    nature = Sally.Device.nature(device)
 
     %{
       name: opts[:name],
@@ -78,7 +79,8 @@ defmodule Sally.DevAlias do
       ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
     }
     |> changeset(dev_alias)
-    |> Repo.insert(insert_opts())
+    |> Repo.insert!(insert_opts())
+    |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at, nature: nature) end)
   end
 
   def delete(name_or_id) do
@@ -103,6 +105,7 @@ defmodule Sally.DevAlias do
   end
 
   @doc false
+  @impl true
   def execute_cmd(%Alfred.Status{} = status, opts), do: Alfred.Status.raw(status) |> execute_cmd(opts)
 
   def execute_cmd(%Sally.DevAlias{} = dev_alias, opts) do
@@ -139,7 +142,7 @@ defmodule Sally.DevAlias do
       join: device in Sally.Device,
       on: dev_alias.device_id == device.id,
       # NOTE: select merge the nature
-      select_merge: %{nature: fragment(@fragment, device.mutable)}
+      select_merge: %{nature: fragment(@fragment, device.mutable), seen_at: dev_alias.updated_at}
     )
   end
 
@@ -199,6 +202,7 @@ defmodule Sally.DevAlias do
     end
   end
 
+  @impl true
   def status_lookup(%{name: name, nature: nature}, opts) do
     case nature do
       # :cmds -> find(name) |> Sally.Command.status(opts)
@@ -213,8 +217,8 @@ defmodule Sally.DevAlias do
     case dev_alias do
       %{cmds: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, cmds: [])
       %{datapoints: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, datapoints: [])
-      other -> other
     end
+    |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at) end)
   end
 
   def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
@@ -227,5 +231,6 @@ defmodule Sally.DevAlias do
     cs = changeset(%{updated_at: ttl_at}, dev_alias, required: [:updated_at])
 
     Sally.Repo.update!(cs, @returned)
+    |> then(fn %{updated_at: seen_at} = dev_alias -> struct(dev_alias, seen_at: seen_at) end)
   end
 end

@@ -168,10 +168,7 @@ defmodule Sally do
          {:pio_opt, pio} when is_integer(pio) <- {:pio_opt, Device.pio_check(device, opts)} do
       final_opts = [name: name, pio: pio] ++ Keyword.take(opts, [:description, :ttl_ms])
 
-      case DevAlias.create(device, final_opts) do
-        {:ok, %DevAlias{} = x} -> x
-        {:error, %Ecto.Changeset{errors: errors}} -> {:error, errors}
-      end
+      DevAlias.create(device, final_opts)
     else
       {:device_opt, :latest} -> Keyword.replace(opts, :device, device_latest()) |> device_add_alias()
       {:device_opt, nil} -> {:error, ":device missing or non-binary"}

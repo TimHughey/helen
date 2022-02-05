@@ -1,6 +1,7 @@
 defmodule Alfred.NotifyTest do
   use ExUnit.Case, async: true
-  use Should
+  use Alfred.TestAid
+  # use Should
 
   import ExUnit.CaptureIO
   import ExUnit.CaptureLog
@@ -11,12 +12,14 @@ defmodule Alfred.NotifyTest do
     {:ok, %{equipment_add: []}}
   end
 
-  setup [:opts_add, :equipment_add, :notifier_add]
+  #  setup [:opts_add, :equipment_add, :notifier_add]
+  setup [:equipment_add, :notifier_add]
 
-  defmacro assert_registered_name(ctx) do
-    quote bind_quoted: [ctx: ctx] do
-      assert %{registered_name: registered_name} = ctx
-      assert {:ok, %Alfred.Ticket{name: name, ref: ref, notifier_pid: pid}} = registered_name
+  defmacro assert_ticket do
+    quote do
+      ctx = var!(ctx)
+      assert %{ticket_rc: ticket_rc} = ctx
+      assert {:ok, %Alfred.Ticket{name: name, ref: ref, notifier_pid: pid}} = ticket_rc
       assert Process.alive?(pid)
 
       {name, pid, ref}
@@ -26,7 +29,7 @@ defmodule Alfred.NotifyTest do
   describe "Alfred.Notify.find_registration/1" do
     @tag notifier_add: []
     test "returns registration for the reference", ctx do
-      {name, notifier_pid, ref} = assert_registered_name(ctx)
+      {name, notifier_pid, ref} = assert_ticket()
       caller_pid = self()
 
       assert {^name, ^notifier_pid, {^caller_pid, ^ref}} = Alfred.Notify.find_registration(ref)
@@ -34,7 +37,7 @@ defmodule Alfred.NotifyTest do
   end
 
   describe "Alfred.Notify.register/2" do
-    @tag equipment_add: []
+    # @tag equipment_add: []
     test "starts Notify for name, properly links and shuts down", %{equipment: name} do
       test_pid = self()
 
@@ -45,7 +48,7 @@ defmodule Alfred.NotifyTest do
       # the process is killed to validate proper shutdown of the notifier process.
 
       spawn(fn ->
-        Alfred.Notify.register(name, [])
+        Alfred.notify_register(name, [])
         |> then(fn rc -> Process.send(test_pid, {self(), rc}, []) end)
         |> tap(fn _ -> Process.sleep(10_000) end)
       end)
@@ -82,16 +85,16 @@ defmodule Alfred.NotifyTest do
 
     @tag notifier_add: []
     test "handles previously registered name (does not start a duplicate notifier)", ctx do
-      {name, _pid, ref} = assert_registered_name(ctx)
+      {name, _pid, ref} = assert_ticket()
 
-      assert {:ok, %Alfred.Ticket{name: ^name, ref: ^ref, opts: %{}}} = Alfred.Notify.register(name, [])
+      assert {:ok, %Alfred.Ticket{name: ^name, ref: ^ref, opts: %{}}} = Alfred.notify_register(name, [])
     end
   end
 
   describe "Alfred.Notify.unregister/1" do
     @tag notifier_add: []
     test "stops notifier", ctx do
-      {_name, notifier_pid, ref} = reg_tuple = assert_registered_name(ctx)
+      {_name, notifier_pid, ref} = reg_tuple = assert_ticket()
 
       assert :ok = Alfred.Notify.unregister(ref)
       refute Process.alive?(notifier_pid)
@@ -109,7 +112,7 @@ defmodule Alfred.NotifyTest do
   describe "Alfred.Notify honors missing ms" do
     @tag notifier_add: [missing_ms: 0, send_missing_msg: true]
     test "when ms == 100", ctx do
-      {name, _pid, ref} = assert_registered_name(ctx)
+      {name, _pid, ref} = assert_ticket()
 
       pid = self()
 
@@ -123,7 +126,7 @@ defmodule Alfred.NotifyTest do
   describe "Alfred.Notify error handling:" do
     @tag notifier_add: []
     test "all bad msgs", ctx do
-      {_name, pid, _ref} = assert_registered_name(ctx)
+      {_name, pid, _ref} = assert_ticket()
 
       assert capture_log(fn -> assert :error = Alfred.Notify.call(@bad_msg, pid) end) =~ ~r/bad_msg/
       assert :ok = GenServer.cast(pid, @bad_msg)
@@ -142,17 +145,8 @@ defmodule Alfred.NotifyTest do
 
     @tag notifier_add: []
     test "handle_call({:get, key}, from, state)", ctx do
-      {_name, pid, _ref} = assert_registered_name(ctx)
+      {_name, pid, _ref} = assert_ticket()
       assert {:bad_path, :unknown} = GenServer.call(pid, {:get, :unknown})
-    end
-  end
-
-  def opts_add(ctx) do
-    opts_default = [interval_ms: :all]
-
-    case ctx do
-      %{opts_add: opts} -> %{opts: Keyword.merge(opts_default, opts)}
-      _ -> %{opts: opts_default}
     end
   end
 
@@ -168,10 +162,8 @@ defmodule Alfred.NotifyTest do
     end)
   end
 
-  def equipment_add(ctx), do: Alfred.NamesAid.equipment_add(ctx)
-
   def notifier_add(%{notifier_add: opts, equipment: name}) do
-    %{registered_name: Alfred.Notify.register(name, opts)}
+    %{ticket_rc: Alfred.notify_register(name, opts)}
   end
 
   def notifier_add(_ctx), do: :ok

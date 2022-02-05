@@ -84,8 +84,7 @@ defmodule SallyDevAliasTest do
 
       assert packed_length < 45
 
-      # NOTE: direct call to Sally.DevAlias.execute_cmd/2 should not track the command
-      refute Alfred.Track.tracked?(refid)
+      assert Alfred.Track.tracked?(refid)
     end
 
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
@@ -131,7 +130,10 @@ defmodule SallyDevAliasTest do
     @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
     test "handles changeset errors", %{device: device} do
       opts = [device: device.ident, name: Sally.DevAliasAid.unique(:dev_alias), pio: -1]
-      assert {:error, [{:pio, _}]} = Sally.device_add_alias(opts)
+
+      assert_raise(Ecto.InvalidChangesetError, fn ->
+        Sally.device_add_alias(opts)
+      end)
     end
 
     @tag dev_alias_add: [auto: :pwm]

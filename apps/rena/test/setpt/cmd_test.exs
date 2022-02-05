@@ -56,7 +56,7 @@ defmodule Rena.SetPt.CmdTest do
       assert %{action: :no_change} = make_result
     end
 
-    @tag equipment_add: [rc: :error, cmd: "unknown"]
+    @tag equipment_add: [rc: :timeout, cmd: "unknown"]
     @tag result_opts: [lt_low: 3]
     test "equipment error tuple with Alfred.Status not good", ctx do
       assert {:equipment_error, %Alfred.Status{}} =

@@ -47,7 +47,7 @@ defmodule Sally.Mutable.Dispatch do
     %{aliases: aliases, device: device} = dispatch.txn_info
 
     register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.recv_at)
-    :ok = Sally.DevAlias.just_saw(aliases, register_opts)
+    _ = Sally.DevAlias.register(aliases, register_opts)
   end
 
   @impl true
@@ -58,6 +58,6 @@ defmodule Sally.Mutable.Dispatch do
     %{aliases: aliases, device: device} = dispatch.txn_info
 
     register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.recv_at)
-    :ok = Sally.DevAlias.just_saw(aliases, register_opts)
+    _ = Sally.DevAlias.register(aliases, register_opts)
   end
 end

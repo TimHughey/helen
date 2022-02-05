@@ -1,46 +1,44 @@
 defmodule Alfred.NofiConsumer do
   @moduledoc false
 
-  defstruct name: nil, caller_pid: nil, name_pid: nil, ticket: nil
+  defstruct dev_alias: nil, caller_pid: nil, ticket: nil
 
   use GenServer
 
   def info(pid), do: GenServer.call(pid, {:info})
-  def trigger(pid), do: GenServer.call(pid, {:just_saw})
+  def trigger(pid), do: GenServer.call(pid, {:trigger})
 
-  @name_opts Alfred.Name.allowed_opts()
   @notify_opts Alfred.Notify.allowed_opts()
   @impl true
   def init(init_args) do
-    {name_opts, args_rest} = Keyword.split(init_args, @name_opts)
-    {notify_opts, fields} = Keyword.split(args_rest, @notify_opts)
+    dev_alias = Keyword.get(init_args, :dev_alias)
+    {notify_opts, fields} = Keyword.split(init_args, @notify_opts)
 
-    name = fields[:name]
+    _dev_alias = Alfred.DevAlias.register(dev_alias, [])
+    {:ok, ticket} = Alfred.Notify.register(dev_alias.name, notify_opts)
 
-    {:ok, name_pid} = Alfred.Name.register(name, name_opts)
-    {:ok, ticket} = Alfred.Notify.register(name, notify_opts)
-
-    {:ok, struct(%__MODULE__{}, [name_pid: name_pid, ticket: ticket] ++ fields)}
+    {:ok, struct(%__MODULE__{}, [ticket: ticket] ++ fields)}
   end
 
   def start_link(args) do
-    name_opts = Enum.into(args, []) |> Keyword.put_new(:type, :mut)
+    name_opts = Enum.into(args, [])
 
-    %{name: name} = Alfred.NamesAid.name_add(%{name_add: name_opts})
+    dev_alias = Alfred.NamesAid.new_dev_alias(:equipment, type: :mut)
 
-    init_args = [name: name, caller_pid: self()] ++ name_opts
+    init_args = [dev_alias: dev_alias, caller_pid: self()] ++ name_opts
 
     GenServer.start_link(__MODULE__, init_args)
   end
 
   @impl true
-  def handle_call({:info}, _from, state), do: make_info_map(state) |> reply(state)
+  def handle_call({:info}, _from, state), do: {:reply, make_info_map(state), state}
 
   @impl true
-  def handle_call({:just_saw}, _from, %{name: name} = state) do
-    :ok = Alfred.Name.register(name, [])
+  def handle_call({:trigger}, _from, %{dev_alias: dev_alias} = state) do
+    dev_alias = Alfred.DevAlias.ttl_reset(dev_alias)
+    _dev_alias = Alfred.DevAlias.register(dev_alias, [])
 
-    reply(:ok, state)
+    {:reply, :ok, struct(state, dev_alias: dev_alias)}
   end
 
   @impl true
@@ -49,19 +47,16 @@ defmodule Alfred.NofiConsumer do
 
     :ok = Process.send(state.caller_pid, msg, [])
 
-    noreply(state)
+    {:noreply, state}
   end
 
   ## PRIVATE
   ## PRIVATE
   ## PRIVATE
 
-  def make_info_map(%{ticket: %{ref: ref}} = state) do
-    extras = %{server_pid: self(), seen_at: Alfred.Notify.seen_at(ref)}
+  def make_info_map(%{dev_alias: dev_alias, ticket: %{ref: ref}} = state) do
+    extras = %{name: dev_alias.name, server_pid: self(), seen_at: Alfred.Notify.seen_at(ref)}
 
     Map.from_struct(state) |> Map.merge(extras)
   end
-
-  def noreply(state), do: {:noreply, state}
-  def reply(result, %__MODULE__{} = state), do: {:reply, result, state}
 end

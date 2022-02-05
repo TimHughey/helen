@@ -216,6 +216,10 @@ defmodule Sally.Dispatch do
     [halt_reason: reason] |> update(dispatch)
   end
 
+  def halt_reason([<<_::binary>> | _] = parts, %{valid?: _} = dispatch) do
+    [halt_reason: Enum.join(parts, " ")] > update(dispatch)
+  end
+
   def handoff(%Sally.Dispatch{} = dispatch), do: route_now(dispatch)
 
   def invalid(%Sally.Dispatch{} = dispatch, <<_::binary>> = reason) do
@@ -273,17 +277,24 @@ defmodule Sally.Dispatch do
     end
   end
 
-  def process(%Sally.Dispatch{filter_extra: [_ident, "error"]} = dispatch) do
-    halt_reason("host reported status error", dispatch)
+  def process(%{valid?: true} = dispatch) do
+    case {dispatch.subsystem, dispatch.filter_extra} do
+      {"host", _} -> dispatch
+      {"mut", [_refid]} -> dispatch
+      {sub, [_ident, "ok"]} when sub in ["mut", "immut"] -> dispatch
+      {sub, [ident, status]} -> [sub, ident, status] |> halt_reason(dispatch)
+    end
+    |> process_via_module()
   end
 
-  def process(%Sally.Dispatch{callback_mod: callback_mod} = dispatch) do
+  def process_via_module(%{valid?: true} = dispatch) do
     # NOTE: support process/1 returning either a database result tuple _OR_ a map
     # when we get a map merge it into the existing txn_info
 
-    callback_mod.process(dispatch)
-    |> save_txn_info(dispatch)
+    dispatch.callback_mod.process(dispatch) |> save_txn_info(dispatch)
   end
+
+  def process_via_module(%{valid?: false} = dispatch), do: dispatch
 
   def post_process(%{callback_mod: callback_mod, post_process?: true} = dispatch) do
     callback_mod.post_process(dispatch)

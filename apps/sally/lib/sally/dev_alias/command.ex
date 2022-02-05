@@ -14,6 +14,7 @@ defmodule Sally.Command do
   schema "command" do
     field(:refid, :string)
     field(:cmd, :string, default: "unknown")
+    field(:track, :any, virtual: true)
     field(:acked, :boolean, default: false)
     field(:orphaned, :boolean, default: false)
     field(:rt_latency_us, :integer, default: 0)
@@ -71,6 +72,7 @@ defmodule Sally.Command do
     |> Map.merge(fields_map)
     |> changeset(new_cmd)
     |> Repo.insert!(returning: true)
+    |> track(cmd_opts)
     |> save()
   end
 
@@ -123,15 +125,6 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
-  # def check_latest(%Sally.DevAlias{} = dev_alias) do
-  #   saved_cmd = saved(dev_alias)
-  #   db_cmd = latest(dev_alias, :id)
-  #
-  #   unless saved_cmd == db_cmd do
-  #     ["saved[", to_binary(saved_cmd), "] db[", to_binary(db_cmd), "]"] |> Logger.info()
-  #   end
-  # end
-
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
@@ -146,39 +139,6 @@ defmodule Sally.Command do
       limit: 1
     )
   end
-
-  # def latest(<<_::binary>> = name, :name) do
-  #   latest_query(name) |> Sally.Repo.one()
-  # end
-
-  # def latest_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
-  #   Ecto.Query.from(cmd in Schema,
-  #     where: [dev_alias_id: ^dev_alias_id],
-  #     order_by: [desc: :sent_at],
-  #     limit: 1
-  #   )
-  # end
-  #
-  # def latest_query(<<_::binary>> = name) do
-  #   import Ecto.Query, only: [from: 2]
-  #
-  #   from(da in Sally.DevAlias,
-  #     as: :dev_alias,
-  #     where: da.name == ^name,
-  #     join: c in assoc(da, :cmds),
-  #     inner_lateral_join:
-  #       latest in subquery(
-  #         from(Schema,
-  #           where: [dev_alias_id: parent_as(:dev_alias).id],
-  #           order_by: [desc: :sent_at],
-  #           limit: 1,
-  #           select: [:id]
-  #         )
-  #       ),
-  #     on: latest.id == c.id,
-  #     preload: [cmds: c]
-  #   )
-  # end
 
   def log_aligned_cmd(dev_alias, pin_cmd) do
     [~s("), dev_alias.name, ~s("), " [", pin_cmd, "]"]
@@ -225,17 +185,6 @@ defmodule Sally.Command do
   def rt_latency_put(changes, cmd) do
     Map.put(changes, :rt_latency_us, Timex.diff(changes.acked_at, cmd.sent_at))
   end
-
-  # def status(%Sally.DevAlias{name: name}, opts) do
-  #   dev_alias = Sally.DevAlias.find(name)
-  #
-  #   case latest(dev_alias, :id) do
-  #     %Sally.Command{} = cmd -> cmd
-  #     nil -> add_unknown(name, opts)
-  #   end
-  #   |> status_log_unknown(name)
-  #   |> then(fn cmd -> struct(dev_alias, cmds: [cmd], status: cmd) end)
-  # end
 
   def status(<<_::binary>> = name, opts) do
     query = status_query(name, opts)
@@ -316,6 +265,13 @@ defmodule Sally.Command do
   def summary([%Schema{} = x | _]), do: summary(x)
 
   def summary([]), do: %{}
+
+  @impl true
+  def track_now?(%Sally.Command{} = cmd, opts) do
+    track? = Keyword.get(opts, :track, true)
+
+    track? and match?(%{acked: false}, cmd)
+  end
 
   # NOTE: returns => {:ok, schema} __OR__ {:ok, already_acked}
   @impl true

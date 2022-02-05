@@ -1,12 +1,12 @@
 defmodule Alfred.NofiConsumerTest do
   use ExUnit.Case, async: true
-  use Should
 
   @moduletag alfred: true, alfred_nofi_consumer: true
 
   describe "Alfred.NofiConsumer" do
     test "starts, provides info and can trigger a notify" do
-      assert {:ok, server_pid} = Alfred.NofiConsumer.start_link(interval_ms: :all)
+      args = [interval_ms: :all]
+      assert {:ok, server_pid} = Alfred.NofiConsumer.start_link(args)
 
       info = Alfred.NofiConsumer.info(server_pid)
 
@@ -14,9 +14,9 @@ defmodule Alfred.NofiConsumerTest do
 
       assert %{
                name: <<_::binary>> = name,
+               dev_alias: %{register: name_pid},
                caller_pid: ^test_pid,
                server_pid: ^server_pid,
-               name_pid: name_pid,
                ticket: %Alfred.Ticket{} = ticket,
                seen_at: :never
              } = info
