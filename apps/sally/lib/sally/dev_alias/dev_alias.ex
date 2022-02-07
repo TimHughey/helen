@@ -127,16 +127,16 @@ defmodule Sally.DevAlias do
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
   def insert_opts, do: @insert_opts
 
-  def load_aliases(%Sally.Device{} = device) do
-    load_aliases(device, :query)
+  def load_aliases(%Sally.Device{id: id}) do
+    load_alias_query(:device_id, id)
     |> Sally.Repo.all()
-    |> Enum.map(&struct(&1, nature: String.to_atom(&1.nature)))
+    |> nature_to_atom()
   end
 
   @fragment "case when ? then 'cmds' else 'datapoints' end"
-  def load_aliases(%Sally.Device{} = device, :query) do
+  def load_alias_query(field, val) when is_atom(field) do
     Ecto.Query.from(dev_alias in Schema,
-      where: dev_alias.device_id == ^device.id,
+      where: field(dev_alias, ^field) == ^val,
       order_by: [asc: dev_alias.pio],
       # NOTE: join on device to get mutable
       join: device in Sally.Device,
@@ -144,11 +144,6 @@ defmodule Sally.DevAlias do
       # NOTE: select merge the nature
       select_merge: %{nature: fragment(@fragment, device.mutable), seen_at: dev_alias.updated_at}
     )
-  end
-
-  def load_cmd_last(%Schema{} = x) do
-    cmd_query = Command.query_preload_latest_cmd()
-    Repo.preload(x, cmds: cmd_query)
   end
 
   def load_command_ids(schema_or_nil) do
@@ -159,18 +154,6 @@ defmodule Sally.DevAlias do
   def load_datapoint_ids(schema_or_nil) do
     q = Ecto.Query.from(dp in Datapoint, select: [:id])
     Repo.preload(schema_or_nil, [datapoints: q], force: true)
-  end
-
-  def load_device(schema_or_tuple) do
-    case schema_or_tuple do
-      {:ok, %Schema{} = a} -> {:ok, Repo.preload(a, [:device])}
-      %Schema{} = a -> Repo.preload(a, [:device])
-      x -> x
-    end
-  end
-
-  def load_info(%Schema{} = schema) do
-    schema |> Repo.preload(device: [:host]) |> load_cmd_last()
   end
 
   def names do
@@ -184,8 +167,13 @@ defmodule Sally.DevAlias do
     |> Repo.all()
   end
 
-  def preload_query do
-    Ecto.Query.from(a in Schema, order_by: [asc: a.pio])
+  # NOTE: accepts a list, single dev alias or nil
+  def nature_to_atom(dev_alias) do
+    case dev_alias do
+      %{nature: <<_::binary>> = x} -> struct(dev_alias, nature: String.to_atom(x))
+      many when is_list(many) -> Enum.map(many, &nature_to_atom(&1))
+      _ -> dev_alias
+    end
   end
 
   def rename(opts) when is_list(opts) do
@@ -209,28 +197,27 @@ defmodule Sally.DevAlias do
       :cmds -> Sally.Command.status(name, opts)
       :datapoints -> Sally.Datapoint.status(name, opts)
     end
-    |> status_lookup_finalize()
+    |> status_finalize()
   end
 
-  @doc false
-  def status_lookup_finalize(dev_alias) do
+  # NOTE: nature is set by the status queries
+  def status_finalize(dev_alias) do
     case dev_alias do
-      %{cmds: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, cmds: [])
-      %{datapoints: %Ecto.Association.NotLoaded{}} -> struct(dev_alias, datapoints: [])
+      # NOTE: populate nature from the original reuqest map
+      %{status: %{}, nature: nature} when is_atom(nature) -> dev_alias
+      _ -> {:error, :no_data}
     end
-    |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at) end)
   end
 
   def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
 
   def ttl_reset(%Sally.Command{dev_alias_id: id, acked_at: ttl_at}) do
-    Sally.Repo.load(Schema, id: id) |> ttl_reset(ttl_at)
+    load_alias_query(:id, id) |> Sally.Repo.one() |> nature_to_atom() |> ttl_reset(ttl_at)
   end
 
-  def ttl_reset(%Sally.DevAlias{} = dev_alias, ttl_at) do
-    cs = changeset(%{updated_at: ttl_at}, dev_alias, required: [:updated_at])
-
-    Sally.Repo.update!(cs, @returned)
-    |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at) end)
+  def ttl_reset(%Sally.DevAlias{nature: nature} = dev_alias, ttl_at) do
+    changeset(%{updated_at: ttl_at}, dev_alias, required: [:updated_at])
+    |> Sally.Repo.update!(@returned)
+    |> struct(nature: nature, seen_at: dev_alias.updated_at)
   end
 end

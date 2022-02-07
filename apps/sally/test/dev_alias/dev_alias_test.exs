@@ -27,16 +27,12 @@ defmodule SallyDevAliasTest do
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50, minutes: -1]]
     test "handles a DevAlias with Commands", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+      assert %{cmd_latest: %Sally.Command{id: cmd_id, cmd: cmd}} = ctx
 
-      name_map = %{name: name, nature: :cmds}
-      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
-      assert_execution_us(elapsed, 15_000)
+      dev_alias = Sally.DevAlias.status_lookup(%{name: name, nature: :cmds}, [])
 
-      assert %Sally.DevAlias{} = dev_alias
-      assert Ecto.assoc_loaded?(dev_alias.cmds)
-      assert Ecto.assoc_loaded?(dev_alias.datapoints)
-
-      assert [%Sally.Command{}] = dev_alias.cmds
+      assert %Sally.DevAlias{status: status} = dev_alias
+      assert %{id: ^cmd_id, cmd: ^cmd} = status
     end
 
     @tag dev_alias_add: [auto: :ds, daps: [history: 50, seconds: -7]]
@@ -44,15 +40,10 @@ defmodule SallyDevAliasTest do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
       assert %{name_registration: %{name: ^name}} = ctx
 
-      name_map = %{name: name, nature: :datapoints}
-      {elapsed, dev_alias} = Timex.Duration.measure(Sally.DevAlias, :status_lookup, [name_map, []])
-      assert_execution_us(elapsed, 15_000)
+      dev_alias = Sally.DevAlias.status_lookup(%{name: name, nature: :datapoints}, [])
 
-      assert %Sally.DevAlias{} = dev_alias
-      assert Ecto.assoc_loaded?(dev_alias.cmds)
-      assert Ecto.assoc_loaded?(dev_alias.datapoints)
-
-      assert [%{temp_f: temp_f, temp_c: temp_c, relhum: relhum}] = dev_alias.datapoints
+      assert %Sally.DevAlias{status: status} = dev_alias
+      assert %{relhum: relhum, temp_c: temp_c, temp_f: temp_f} = status
       assert is_float(temp_f)
       assert is_float(temp_c)
       assert is_float(relhum)
@@ -64,7 +55,7 @@ defmodule SallyDevAliasTest do
     test "creates new busy command from Sally.DevAlias", ctx do
       assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
 
-      cmd = "on"
+      cmd = random_cmd()
 
       # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
       # for validation
@@ -91,13 +82,11 @@ defmodule SallyDevAliasTest do
     test "creates new acked command from Sally.DevAlias", ctx do
       assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
 
-      cmd = "on"
+      cmd = random_cmd()
       opts = [cmd: cmd, cmd_opts: [ack: :immediate]]
 
-      {elapsed, {:ok, %Sally.Command{cmd: ^cmd}}} =
-        Timex.Duration.measure(Sally.DevAlias, :execute_cmd, [dev_alias, opts])
-
-      assert_execution_us(elapsed, 25_000)
+      execute_cmd = Sally.DevAlias.execute_cmd(dev_alias, opts)
+      assert {:ok, %Sally.Command{cmd: ^cmd}} = execute_cmd
     end
   end
 
@@ -166,6 +155,7 @@ defmodule SallyDevAliasTest do
   end
 
   @tag dev_alias_add: [auto: :ds]
+  @tag skip: true
   test "Sally.devalias_info/2 returns summarized and raw results", ctx do
     assert %{device: device, host: host} = ctx
 

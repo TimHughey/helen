@@ -1,12 +1,15 @@
 defmodule Alfred.NofiConsumerTest do
   use ExUnit.Case, async: true
+  use Alfred.TestAid
 
   @moduletag alfred: true, alfred_nofi_consumer: true
 
+  setup [:nofi_add]
+
   describe "Alfred.NofiConsumer" do
-    test "starts, provides info and can trigger a notify" do
-      args = [interval_ms: :all]
-      assert {:ok, server_pid} = Alfred.NofiConsumer.start_link(args)
+    @tag nofi_add: [interval_ms: :all]
+    test "starts, provides info and can trigger a notify", ctx do
+      assert %{nofi_server: {:ok, server_pid}} = ctx
 
       info = Alfred.NofiConsumer.info(server_pid)
 

@@ -4,7 +4,7 @@ defmodule Alfred.Status do
 
   """
 
-  defstruct name: :none, detail: :none, rc: nil, __raw__: :none
+  defstruct name: :none, detail: :none, rc: :not_found, __raw__: :none
 
   @type lookup_result() :: nil | {:ok, any()} | {:error, any()} | struct() | map()
   @type status_rc :: :ok | {:not_found, String.t()} | :busy | :timeout | {:ttl_expired, pos_integer()}
@@ -43,8 +43,7 @@ defmodule Alfred.Status do
   end
 
   @doc false
-  @not_found [detail: :none, rc: :not_found]
-  def not_found(name), do: struct(__MODULE__, [{:name, name} | @not_found])
+  def not_found(name), do: struct(__MODULE__, name: name)
 
   @doc since: "0.3.0"
   def raw(%Alfred.Status{__raw__: raw}), do: raw
@@ -64,15 +63,14 @@ defmodule Alfred.Status do
 
     quote bind_quoted: [rc: rc, detail: detail, what: what] do
       chk_map = var!(chk_map)
-      detail = if(detail == :none, do: :none, else: Map.get(chk_map, :detail, %{}) |> Map.merge(detail))
+      merge = %{what => rc, detail: merge_detail(chk_map, detail), rc: rc}
 
-      {:halt, Map.merge(chk_map, %{what => rc, rc: rc, detail: detail})}
+      {:halt, Map.merge(chk_map, merge)}
     end
   end
 
   @doc since: "0.3.0"
   @checks [:lookup, :raw, :busy, :timeout, :finalize]
-  # (aaa of bbb) invoked via status/2 injected into using module
   def status_now(%{name: name} = info, args) do
     chk_map = %{info: info, name: name}
 
@@ -88,49 +86,52 @@ defmodule Alfred.Status do
   end
 
   @doc false
-  @busy_keys [:cmd, :refid, :sent_at]
   def busy(chk_map, _opts) do
-    %{lookup: %{cmds: cmds}} = chk_map
-
-    case cmds do
-      [%{acked: false} = cmd] -> halt(:busy, Map.take(cmd, @busy_keys))
+    case chk_map.lookup.status do
+      %{acked: false} = status -> halt(:busy, status)
       _ -> continue(:ok)
     end
   end
 
   @doc false
-  def finalize(chk_map, _opts) do
-    %{lookup: lookup} = chk_map
+  @detail_drop [:__meta__, :__struct__]
+  def merge_detail(_chk_mao, :none), do: :none
 
-    case lookup do
-      %{datapoints: [%{} = detail]} -> halt(:ok, detail)
-      %{cmds: [%{acked: true} = cmd]} -> halt(:ok, cmd)
-      _ -> halt(:error, %{})
-    end
+  def merge_detail(chk_map, merge_this) do
+    existing = Map.get(chk_map, :detail, %{})
+    clean = Map.drop(merge_this, @detail_drop)
+
+    Map.merge(existing, clean)
   end
+
+  @doc false
+  def finalize(chk_map, _opts), do: halt(:ok, chk_map.lookup.status)
 
   @doc false
   def lookup(chk_map, info, args) do
     opts = Enum.into(args, [])
 
-    Alfred.Name.Callback.invoke(info, [info, opts], :status_lookup) |> continue()
-  end
+    lookup = Alfred.Name.Callback.invoke(info, [info, opts], :status_lookup)
 
-  @doc false
-  def timeout(%{lookup: %{cmds: [cmd], updated_at: at}} = chk_map, opts) do
-    ref_dt = opts[:ref_dt] || Timex.now()
-
-    acked_before? = Timex.before?(at, cmd.acked_at)
-
-    case {cmd, acked_before?} do
-      {%{acked: true, orphaned: true}, true} ->
-        {:timeout, Timex.diff(ref_dt, cmd.acked_at, :millisecond)} |> halt(cmd)
-
-      _ ->
-        continue(:ok)
+    case lookup do
+      %{} -> continue(lookup)
+      {:error, :no_data = rc} -> halt(rc, %{})
     end
   end
 
   @doc false
-  def timeout(chk_map, _opts), do: continue(:ok)
+  @timeout %{acked: true, orphaned: true}
+  @unit :millisecond
+  def timeout(%{lookup: %{status: status, seen_at: seen_at}} = chk_map, opts) do
+    cond do
+      match?(@timeout, status) and Timex.before?(seen_at, status.acked_at) ->
+        ref_dt = opts[:ref_dt] || Timex.now()
+        rc = {:timeout, Timex.diff(ref_dt, status.acked_at, @unit)}
+
+        halt(rc, status)
+
+      true ->
+        continue(:ok)
+    end
+  end
 end

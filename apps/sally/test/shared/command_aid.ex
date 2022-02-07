@@ -11,10 +11,10 @@ defmodule Sally.CommandAid do
 
   def cmd_from(what) do
     case what do
-      %Sally.DevAlias{} = dev_alias -> Sally.Command.latest_cmd(dev_alias) |> cmd_from()
-      %Sally.Command{acked: false} -> random_cmd()
-      %Sally.Command{acked: true, orphaned: true} -> random_cmd()
-      %Sally.Command{acked: true, cmd: cmd} -> cmd
+      %{name: _} -> Sally.Command.latest_cmd(what) |> cmd_from()
+      %{acked: false} -> random_cmd()
+      %{acked: true, orphaned: true} -> random_cmd()
+      %{acked: true, cmd: cmd} -> cmd
       :none -> "off"
       _ -> "UNKNOWN"
     end
@@ -124,7 +124,15 @@ defmodule Sally.CommandAid do
     Enum.map(0..(count - 1), fn pin -> [pin, cmd_from_opts(pin, pin_opts)] end)
   end
 
-  def random_cmd, do: Enum.take_random(?a..?z, 8) |> to_string()
+  def random_cmd do
+    Enum.map(1..8, fn
+      1 -> Enum.take_random(?a..?z, 1)
+      _ -> Enum.take_random(?0..?z, 1)
+    end)
+    |> to_string()
+  end
+
+  # def random_cmd, do: Enum.take_random(?a..?z, 8) |> to_string()
 
   def send_payload(cmd, opts) do
     preloads = [dev_alias: [device: [:host]]]

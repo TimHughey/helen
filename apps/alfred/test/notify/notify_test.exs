@@ -1,7 +1,6 @@
 defmodule Alfred.NotifyTest do
   use ExUnit.Case, async: true
   use Alfred.TestAid
-  # use Should
 
   import ExUnit.CaptureIO
   import ExUnit.CaptureLog
@@ -12,8 +11,7 @@ defmodule Alfred.NotifyTest do
     {:ok, %{equipment_add: []}}
   end
 
-  #  setup [:opts_add, :equipment_add, :notifier_add]
-  setup [:equipment_add, :notifier_add]
+  setup [:equipment_add, :notifier_add, :nofi_add]
 
   defmacro assert_ticket do
     quote do
@@ -42,48 +40,37 @@ defmodule Alfred.NotifyTest do
       test_pid = self()
 
       # NOTE: we spawn a new process to be the notification requester allowing validation
-      # of the correct linakges. the spawned process sends the test process a message
-      # containing the its pid and the results of Alfred.Notify.register/2.
+      # of the correct linkages. the spawned process sends the test process a message
+      # containing its pid and the results of Alfred.Notify.register/2.
       # The notification requestor then sleeps while validations are completed. Finally,
       # the process is killed to validate proper shutdown of the notifier process.
 
       spawn(fn ->
-        Alfred.notify_register(name, [])
-        |> then(fn rc -> Process.send(test_pid, {self(), rc}, []) end)
-        |> tap(fn _ -> Process.sleep(10_000) end)
+        rc = Alfred.notify_register(name, [])
+
+        Process.send(test_pid, {self(), rc}, [])
+        Process.sleep(10_000)
       end)
 
-      receive do
-        {link_pid, {:ok, %Alfred.Ticket{notifier_pid: notifier_pid}}} ->
-          # validate the notifier pid is properly supervised
-          assert Enum.any?(Supervisor.which_children(Alfred.Notify.DynamicSupervisor), fn
-                   {:undefined, ^notifier_pid, :worker, [Alfred.Notify]} -> true
-                   _ -> false
-                 end)
+      assert_receive({link_pid, {:ok, ticket}}, 150)
+      assert %Alfred.Ticket{notifier_pid: notifier_pid} = ticket
 
-          # validate the notify process is linked to it's requestor
-          assert [links: [^notifier_pid]] = Keyword.take(Process.info(link_pid), [:links])
+      # validate the notify process is linked to it's requestor
+      assert [links: [^notifier_pid]] = Keyword.take(Process.info(link_pid), [:links])
 
-          # kill the notifier requestor, validate the notifier terminates and the
-          # registry removes the registration
-          assert Process.exit(link_pid, :stop)
+      # kill the notifier requestor, validate the notifier terminates and the
+      # registry removes the registration
+      assert Process.exit(link_pid, :stop)
 
-          # allow time for spawned pid and linked notifier to terminate
-          Process.sleep(10)
+      # allow time for spawned pid and linked notifier to terminate
+      Process.sleep(10)
 
-          refute Process.alive?(link_pid)
-          refute Process.alive?(notifier_pid)
-          assert [] = Registry.lookup(Alfred.Notify.Registry, link_pid)
-
-        any ->
-          refute any, "wrong message received: #{inspect(any, pretty: true)}"
-      after
-        # allow a timeout since it appears compile time may impact the test
-        150 -> refute true, "timeout"
-      end
+      refute Process.alive?(link_pid)
+      refute Process.alive?(notifier_pid)
+      assert [] = Registry.lookup(Alfred.Notify.Registry, link_pid)
     end
 
-    @tag notifier_add: []
+    @tag notifier_add: [interval_ms: 1000, missing_ms: 1000]
     test "handles previously registered name (does not start a duplicate notifier)", ctx do
       {name, _pid, ref} = assert_ticket()
 
@@ -122,13 +109,30 @@ defmodule Alfred.NotifyTest do
     end
   end
 
+  describe "Alfred.Notify honors interval_ms" do
+    @tag nofi_add: [interval_ms: 1]
+    test "when interval_ms==1", ctx do
+      assert %{nofi_server: {:ok, pid}} = ctx
+      assert is_pid(pid) and Process.alive?(pid)
+
+      assert %{dev_alias: %{name: name}} = Alfred.NofiConsumer.info(pid)
+
+      assert :ok = Alfred.NofiConsumer.trigger(pid)
+
+      assert_receive({memo, _}, 100)
+
+      assert %Alfred.Memo{name: ^name} = memo
+    end
+  end
+
   @bad_msg {:bad_msg}
   describe "Alfred.Notify error handling:" do
     @tag notifier_add: []
     test "all bad msgs", ctx do
       {_name, pid, _ref} = assert_ticket()
 
-      assert capture_log(fn -> assert :error = Alfred.Notify.call(@bad_msg, pid) end) =~ ~r/bad_msg/
+      log = capture_log(fn -> assert :error = Alfred.Notify.call(@bad_msg, pid) end)
+      assert log =~ ~r/bad_msg/
       assert :ok = GenServer.cast(pid, @bad_msg)
       assert :ok = Process.send(pid, @bad_msg, [])
 

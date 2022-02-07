@@ -315,6 +315,20 @@ CREATE INDEX command_sent_at_index ON public.command USING btree (sent_at);
 
 
 --
+-- Name: datapoint_dev_alias_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX datapoint_dev_alias_id_index ON public.datapoint USING btree (dev_alias_id);
+
+
+--
+-- Name: datapoint_dev_alias_id_reading_at_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX datapoint_dev_alias_id_reading_at_index ON public.datapoint USING btree (dev_alias_id, reading_at);
+
+
+--
 -- Name: datapoint_reading_at_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -397,3 +411,5 @@ INSERT INTO public."schema_migrations" (version) VALUES (20211101114631);
 INSERT INTO public."schema_migrations" (version) VALUES (20211129190841);
 INSERT INTO public."schema_migrations" (version) VALUES (20220123142033);
 INSERT INTO public."schema_migrations" (version) VALUES (20220201145624);
+INSERT INTO public."schema_migrations" (version) VALUES (20220206160941);
+INSERT INTO public."schema_migrations" (version) VALUES (20220206170830);

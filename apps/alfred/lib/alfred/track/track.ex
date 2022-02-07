@@ -99,14 +99,6 @@ defmodule Alfred.Track do
     {:release, refid, opts_final(module, opts)} |> call(refid)
   end
 
-  # def track(%{refid: refid} = exec_result, module, opts) do
-  #   opts = opts_final(module, opts)
-  #
-  #   [tracked_info: exec_result, module: module, opts: opts, caller_pid: self()]
-  #   |> then(fn args -> GenServer.start_link(__MODULE__, args, name: server(refid)) end)
-  #   |> munge_start_link_rc()
-  # end
-
   def track(%{refid: _, track: _} = item, module, opts) do
     if module.track_now?(item, opts), do: track_now(item, module, opts), else: item
   end

@@ -1,15 +1,12 @@
 defmodule Sally.Command do
   @moduledoc false
 
-  require Logger
   use Agent
   use Ecto.Schema
   use Alfred.Track, timeout_after: "PT3.3S"
 
-  require Ecto.Query
-
-  alias __MODULE__, as: Schema
-  alias Sally.{DevAlias, Repo}
+  require Logger
+  import Ecto.Query, only: [from: 2, join: 4, preload: 3]
 
   schema "command" do
     field(:refid, :string)
@@ -21,7 +18,7 @@ defmodule Sally.Command do
     field(:sent_at, :utc_datetime_usec)
     field(:acked_at, :utc_datetime_usec)
 
-    belongs_to(:dev_alias, DevAlias)
+    belongs_to(:dev_alias, Sally.DevAlias)
   end
 
   @returned [returning: true]
@@ -44,13 +41,13 @@ defmodule Sally.Command do
 
   def ack_orphan_now(nil), do: {:ok, :already_acked}
 
-  def ack_orphan_now(%Schema{} = cmd) do
+  def ack_orphan_now(%__MODULE__{} = cmd) do
     :ok = log_orphan_cmd(cmd)
 
     ack_now_cs(cmd, :orphan, now()) |> Sally.Repo.update!(@returned) |> save()
   end
 
-  def add(%DevAlias{} = da, opts) do
+  def add(%Sally.DevAlias{} = da, opts) do
     {cmd, opts_rest} = Keyword.pop(opts, :cmd)
     {cmd_opts, opts_rest} = Keyword.pop(opts_rest, :cmd_opts, [])
     {ref_dt, field_list} = Keyword.pop(opts_rest, :ref_dt, now())
@@ -71,7 +68,7 @@ defmodule Sally.Command do
     }
     |> Map.merge(fields_map)
     |> changeset(new_cmd)
-    |> Repo.insert!(returning: true)
+    |> Sally.Repo.insert!(returning: true)
     |> track(cmd_opts)
     |> save()
   end
@@ -112,7 +109,7 @@ defmodule Sally.Command do
     add(dev_alias, cmd: pin_cmd, ref_dt: align_at, cmd_opts: @immediate)
   end
 
-  def changeset(changes, %Schema{} = c) when is_map(changes) do
+  def changeset(changes, %__MODULE__{} = c) when is_map(changes) do
     alias Ecto.Changeset
 
     c
@@ -129,11 +126,11 @@ defmodule Sally.Command do
   def columns(:cast), do: @cast_cols
 
   def latest_cmd(%Sally.DevAlias{} = dev_alias) do
-    latest_cmd(dev_alias, :query) |> Sally.Repo.one()
+    latest_cmd_query(dev_alias) |> Sally.Repo.one()
   end
 
-  def latest_cmd(%Sally.DevAlias{id: dev_alias_id}, :query) do
-    Ecto.Query.from(cmd in Schema,
+  def latest_cmd_query(%Sally.DevAlias{id: dev_alias_id}) do
+    Ecto.Query.from(cmd in __MODULE__,
       where: [dev_alias_id: ^dev_alias_id],
       order_by: [desc: :sent_at],
       limit: 1
@@ -159,17 +156,17 @@ defmodule Sally.Command do
     |> Enum.at(1)
   end
 
-  def purge(%DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
+  def purge(%Sally.DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
     import Ecto.Query, only: [from: 2]
 
-    all_ids = Enum.map(cmds, fn %Schema{id: id} -> id end)
+    all_ids = Enum.map(cmds, fn %__MODULE__{id: id} -> id end)
     batches = Enum.chunk_every(all_ids, batch_size)
 
     for batch <- batches, reduce: {:ok, 0} do
       {:ok, acc} ->
-        q = from(c in Schema, where: c.id in ^batch)
+        q = from(c in __MODULE__, where: c.id in ^batch)
 
-        {deleted, _} = Repo.delete_all(q)
+        {deleted, _} = Sally.Repo.delete_all(q)
 
         {:ok, acc + deleted}
     end
@@ -178,7 +175,7 @@ defmodule Sally.Command do
   def query_preload_latest_cmd do
     import Ecto.Query, only: [from: 2]
 
-    from(c in Schema, distinct: c.dev_alias_id, order_by: [desc: c.sent_at])
+    from(c in __MODULE__, distinct: c.dev_alias_id, order_by: [desc: c.sent_at])
   end
 
   @doc false
@@ -193,81 +190,58 @@ defmodule Sally.Command do
       %Sally.DevAlias{} = dev_alias -> dev_alias
       nil -> add_unknown(name, opts) |> then(fn _x -> status(name, opts) end)
     end
-    |> status_log_unknown(name)
-    |> then(fn %{cmds: [cmd]} = dev_alias -> struct(dev_alias, nature: :cmds, status: cmd) end)
+    |> tap(fn dev_alias -> status_log_unknown(dev_alias, name) end)
   end
 
   @unknown %{cmd: "unknown", acked: true}
-  def status_log_unknown(what, name) do
-    case what do
-      @unknown -> Logger.warn(~s("#{name}"))
-      %{cmds: [@unknown]} -> Logger.warn(~s("#{name}"))
-      _ -> :ok
-    end
+  def status_log_unknown(%{status: @unknown}, name), do: Logger.warn(~s("#{name}"))
+  def status_log_unknown(_what, _name), do: :ok
 
-    what
-  end
+  def status_base_query(val) do
+    cmd_fields = __schema__(:fields)
 
-  def status_query(<<_::binary>> = name, _opts) do
-    import Ecto.Query, only: [from: 2]
+    field = if(is_binary(val), do: :name, else: :id)
 
-    from(da in Sally.DevAlias,
+    from(dev_alias in Sally.DevAlias,
       as: :dev_alias,
-      where: da.name == ^name,
-      join: c in assoc(da, :cmds),
+      where: field(dev_alias, ^field) == ^val,
       inner_lateral_join:
         latest in subquery(
-          from(Schema,
+          from(Sally.Command,
             where: [dev_alias_id: parent_as(:dev_alias).id],
             order_by: [desc: :sent_at],
-            limit: 1,
-            select: [:id]
+            limit: 1
           )
         ),
-      on: latest.id == c.id,
-      preload: [cmds: c]
+      select_merge: %{nature: :cmds, seen_at: dev_alias.updated_at, status: map(latest, ^cmd_fields)}
     )
   end
 
-  # def status_query(<<_::binary>> = name, _opts) do
-  #   require Ecto.Query
-  #
-  #   Ecto.Query.from(dev_alias in Sally.DevAlias,
-  #     as: :dev_alias,
-  #     where: [name: ^name],
-  #     join: cmd in assoc(dev_alias, :cmds),
-  #     inner_lateral_join:
-  #       latest_cmd in subquery(
-  #         Ecto.Query.from(cmd in Schema,
-  #           distinct: [desc: cmd.sent_at],
-  #           where: [dev_alias_id: parent_as(:dev_alias).id],
-  #           order_by: [desc: :sent_at],
-  #           select: [:id]
-  #         )
-  #       ),
-  #     on: latest_cmd.id == cmd.id,
-  #     preload: [cmds: cmd]
-  #   )
-  # end
+  def status_query(<<_::binary>> = name, opts) do
+    query = status_base_query(name)
 
-  # def status_query(%Sally.DevAlias{id: dev_alias_id}, :id) do
-  #   Ecto.Query.from(cmd in Schema,
-  #     where: [dev_alias_id: ^dev_alias_id],
-  #     order_by: [desc: :sent_at],
-  #     limit: 1
-  #   )
-  # end
+    Enum.reduce(opts, query, fn
+      {:preload, :device_and_host}, query ->
+        query
+        |> join(:inner, [dev_alias], device in assoc(dev_alias, :device))
+        |> join(:inner, [_, _, device], host in assoc(device, :host))
+        |> preload([_, _, device, host], device: {device, host: host})
 
-  def summary(%Schema{} = x) do
+      _, query ->
+        query
+    end)
+  end
+
+  def summary(%__MODULE__{} = x) do
     Map.take(x, [:cmd, :acked, :sent_at])
   end
 
-  def summary([%Schema{} = x | _]), do: summary(x)
+  def summary([%__MODULE__{} = x | _]), do: summary(x)
 
   def summary([]), do: %{}
 
   @impl true
-  def track_now?(%Sally.Command{} = cmd, opts) do
+  def track_now?(%__MODULE__{} = cmd, opts) do
     track? = Keyword.get(opts, :track, true)
 
     track? and match?(%{acked: false}, cmd)

@@ -32,7 +32,7 @@ defmodule Sally.DevAlias.Explain do
     module = Sally.Command
     dev_alias = Sally.Repo.get_by(Sally.DevAlias, name: name)
 
-    module.latest_cmd(dev_alias, :query)
+    module.latest_cmd_query(dev_alias)
     |> explain(opts)
     |> assemble_output(module, ".latest_cmd/2")
   end
@@ -45,16 +45,15 @@ defmodule Sally.DevAlias.Explain do
 
     module.status_query(name, query_opts)
     |> explain(explain_opts)
-    |> assemble_output(module, ".status_query/2")
+    |> assemble_output(module, ".status_query/2 (#{inspect(opts)})")
   end
 
   def query(<<_::binary>> = name, :dev_alias, :load_aliases, opts) do
     module = Sally.DevAlias
 
-    example_dev_alias = Sally.Repo.get_by!(Sally.DevAlias, name: name)
-    device = Sally.Repo.get_by(Sally.Device, id: example_dev_alias.device_id)
+    dev_alias = Sally.Repo.get_by!(Sally.DevAlias, name: name)
 
-    module.load_aliases(device, :query)
+    module.load_alias_query(:device_id, dev_alias.device_id)
     |> explain(opts)
     |> assemble_output(module, ".load_aliases/2")
   end

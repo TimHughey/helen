@@ -16,7 +16,7 @@ defmodule Alfred.Notify do
   def dispatch(%{name: name_binary} = name, opts) when is_list(opts) do
     Registry.dispatch(@registry, name_binary, fn entries ->
       for {notifier_pid, {_caller_pid, _ref}} <- entries do
-        GenServer.cast(notifier_pid, {:just_saw, name, opts})
+        GenServer.cast(notifier_pid, {:notify, name, opts})
       end
     end)
   end
@@ -100,15 +100,6 @@ defmodule Alfred.Notify do
   # GENSERVER
   # GENSERVER
 
-  @doc false
-  def child_spec(args) do
-    {restart, args_rest} = Keyword.pop(args, :restart, :temporary)
-    link_pid = Keyword.get(args, :link_pid)
-    name = Keyword.get(args, :name)
-
-    %{id: {name, link_pid}, start: {__MODULE__, :start_link, [args_rest]}, restart: restart}
-  end
-
   @impl true
   def init(args) do
     caller_pid = Keyword.get(args, :link_pid)
@@ -121,14 +112,7 @@ defmodule Alfred.Notify do
 
     {:ok, _owner_pid} = Registry.register(@registry, reg_key, reg_val)
 
-    {:ok, state, timeout_ms(state)}
-  end
-
-  @doc false
-  def start_link(args) when is_list(args) do
-    # NOTE: Notify processes do not have a name.  rather, all calls are performed by
-    # looking up it's pid or Registry.dispatch/4
-    GenServer.start_link(__MODULE__, args)
+    {:ok, state, timeout_ms(state, :only_ms)}
   end
 
   @impl true
@@ -164,7 +148,7 @@ defmodule Alfred.Notify do
   end
 
   @impl true
-  def handle_cast({:just_saw, %{name: x, seen_at: seen_at}, _opts}, %{name: x} = state) do
+  def handle_cast({:notify, %{name: x, seen_at: seen_at}, _opts}, %{name: x} = state) do
     state
     |> update_at(:seen, seen_at)
     |> notify()
@@ -181,6 +165,9 @@ defmodule Alfred.Notify do
 
     noreply(state)
   end
+
+  @impl true
+  def handle_continue(:missing, state), do: handle_info(:timeout, state)
 
   @impl true
   def handle_info(:timeout, state) do
@@ -225,9 +212,6 @@ defmodule Alfred.Notify do
   end
 
   @doc false
-  def interval_ms(%{opts: %{ms: %{interval: x}}}), do: x
-
-  @doc false
   def log_missing(_state), do: :ok
 
   defmacro put_ms(key, val) do
@@ -247,7 +231,7 @@ defmodule Alfred.Notify do
     state = struct(__MODULE__, fields) |> update_at(:missing, now())
 
     Enum.reduce(opts_rest, state.opts, fn
-      {:interval_ms, :all}, acc -> put_ms(:interval, 0)
+      {:interval_ms, :all = val}, acc -> put_ms(:interval, val)
       {:interval_ms, x}, acc when is_integer(x) -> put_ms(:interval, x)
       {:missing_ms, x}, acc when x < 100 -> put_ms(:missing, 100)
       {:missing_ms, x}, acc when is_integer(x) -> put_ms(:missing, x)
@@ -296,16 +280,24 @@ defmodule Alfred.Notify do
   def start_notifier(name, opts) do
     args = Keyword.merge(opts, name: name, link_pid: self(), restart: :temporary)
 
-    {:ok, notifier_pid} = Alfred.Notify.DynamicSupervisor.start_child(__MODULE__, args)
+    {:ok, notifier_pid} = GenServer.start_link(__MODULE__, args)
 
     call({:get, :ticket}, notifier_pid)
   end
 
   @doc false
-  def timeout_ms(%{at: %{missing: at}, opts: %{ms: %{missing: missing_ms}}}) do
-    elapsed_ms = Timex.diff(now(), at, :milliseconds)
+  @timeout_types [:only_ms, :ensure_timeout]
+  def timeout_ms(state, type) when type in @timeout_types do
+    last_missing_at = state.at.missing
+    missing_ms = state.opts.ms.missing
 
-    if elapsed_ms > missing_ms, do: 0, else: missing_ms - elapsed_ms
+    elapsed_ms = Timex.diff(now(), last_missing_at, :milliseconds)
+
+    cond do
+      elapsed_ms > missing_ms and type == :ensure_timeout -> {:continue, :missing}
+      elapsed_ms > missing_ms -> 0
+      true -> missing_ms - elapsed_ms
+    end
   end
 
   @doc false
@@ -314,11 +306,15 @@ defmodule Alfred.Notify do
   end
 
   @doc false
-  def noreply(state), do: {:noreply, state, timeout_ms(state)}
+  def noreply(state), do: {:noreply, state, timeout_ms(state, :ensure_timeout)}
 
   @doc false
-  def reply(rc, %__MODULE__{} = state), do: {:reply, rc, state, timeout_ms(state)}
+  def reply(rc, %__MODULE__{} = state) do
+    {:reply, rc, state, timeout_ms(state, :ensure_timeout)}
+  end
 
   @doc false
-  def reply(%__MODULE__{} = state, rc), do: {:reply, rc, state, timeout_ms(state)}
+  def reply(%__MODULE__{} = state, rc) do
+    {:reply, rc, state, timeout_ms(state, :ensure_timeout)}
+  end
 end

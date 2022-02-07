@@ -5,6 +5,13 @@ defmodule Alfred.NofiConsumer do
 
   use GenServer
 
+  def nofi_add(ctx) do
+    case ctx do
+      %{nofi_add: opts} -> %{nofi_server: start_link(opts)}
+      _ -> :ok
+    end
+  end
+
   def info(pid), do: GenServer.call(pid, {:info})
   def trigger(pid), do: GenServer.call(pid, {:trigger})
 

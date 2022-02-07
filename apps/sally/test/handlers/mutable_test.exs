@@ -27,20 +27,15 @@ defmodule Sally.MutableDispatchTest do
 
       assert_receive(%Sally.Dispatch{} = dispatch, 500)
 
-      assert %{invalid_reason: :none, subsystem: "mut", valid?: true} = dispatch
+      assert %{halt_reason: :none, subsystem: "mut", valid?: true} = dispatch
       assert %{filter_extra: [^refid]} = dispatch
       assert %{txn_info: %{aliases: %Sally.DevAlias{name: ^name}}} = dispatch
 
       status = Alfred.status(name, [])
+      assert %Alfred.Status{rc: :ok, name: ^name} = status
 
-      assert %Alfred.Status{
-               rc: :ok,
-               name: ^name,
-               __raw__: %Sally.DevAlias{
-                 name: ^name,
-                 cmds: [%Sally.Command{id: ^cmd_id, cmd: ^cmd, refid: ^refid}]
-               }
-             } = status
+      raw = Alfred.Status.raw(status)
+      assert %{name: ^name, status: %{id: ^cmd_id, cmd: ^cmd, refid: ^refid}} = raw
     end
 
     @tag capture_log: true
@@ -55,7 +50,7 @@ defmodule Sally.MutableDispatchTest do
 
       assert_receive(%Sally.Dispatch{} = dispatch, 150)
 
-      assert %{invalid_reason: :none, subsystem: "mut", valid?: true} = dispatch
+      assert %{halt_reason: :none, subsystem: "mut", valid?: true} = dispatch
       assert %{filter_extra: [_device_ident, "ok"]} = dispatch
       assert %{txn_info: %{} = txn_info} = dispatch
 

@@ -3,6 +3,22 @@ defmodule Sally.DatapointAid do
   Supporting functionality for creating Sally.Datapoint for testing
   """
 
+  def avg_daps(%{dap_history: daps} = _ctx, count), do: avg_daps(daps, count)
+
+  def avg_daps([_ | _] = daps, count) do
+    daps
+    |> Enum.reverse()
+    |> Enum.take(count)
+    |> Enum.reduce(%{temp_c: 0, temp_f: 0, relhum: 0}, fn dap, acc ->
+      Enum.reduce(dap, acc, fn {key, val}, acc ->
+        sum = Map.get(acc, key)
+
+        Map.put(acc, key, sum + val)
+      end)
+    end)
+    |> Enum.into(%{}, fn {key, sum} -> {key, sum / count} end)
+  end
+
   def dispatch(%{category: category}, opts_map) do
     unless is_map_key(opts_map, :device), do: raise(":device is missing")
 

@@ -29,7 +29,6 @@ defmodule Sally.Dispatch do
             txn_info: :none,
             final_at: nil,
             valid?: false,
-            invalid_reason: "not processed",
             opts: []
 
   @type env() :: String.t()
@@ -58,7 +57,6 @@ defmodule Sally.Dispatch do
           txn_info: :none | {:ok, map()} | {:error, map()},
           final_at: DateTime.t() | nil,
           valid?: boolean(),
-          invalid_reason: String.t(),
           opts: [] | [{:echo, boolean()}]
         }
 
@@ -185,22 +183,22 @@ defmodule Sally.Dispatch do
   def accept({[env, ident, subsystem, category, extras], payload}) do
     [
       env: env,
-      subsystem: subsystem,
       category: category,
-      ident: ident,
       filter_extra: extras,
-      payload: payload
+      ident: ident,
+      payload: payload,
+      recv_at: Timex.now(),
+      subsystem: subsystem
     ]
     |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
   def check_txn(%Sally.Dispatch{} = dispatch) do
     case dispatch do
-      # NOTE: filter out invalid Dispatch to avoid matching on valid? below
+      # NOTE: ensure only valid Dispatch match subsequent case statements
       %{valid?: false} -> dispatch
       %{txn_info: {:ok, %{host: host}}} -> valid([host: host, txn_info: :host], dispatch)
       %{txn_info: {:ok, txn_info}} -> valid([txn_info: txn_info], dispatch)
-      %{txn_info: {:error, _multi_key, txn_error, _detail}} -> invalid(dispatch, txn_error)
       %{txn_info: :none} -> dispatch
     end
     |> update(dispatch)
@@ -209,47 +207,28 @@ defmodule Sally.Dispatch do
   def finalize(dispatch) do
     [final_at: DateTime.utc_now()]
     |> update(dispatch)
-    |> tap(fn dispatch -> log_if_invalid(dispatch) end)
+    |> tap(fn dispatch -> log_halt(dispatch) end)
   end
 
-  def halt_reason(<<_::binary>> = reason, %Sally.Dispatch{} = dispatch) do
-    [halt_reason: reason] |> update(dispatch)
+  def halt(<<_::binary>> = reason, %{valid?: _} = dispatch) do
+    [halt_reason: reason, valid?: false] |> update(dispatch)
   end
 
-  def halt_reason([<<_::binary>> | _] = parts, %{valid?: _} = dispatch) do
-    [halt_reason: Enum.join(parts, " ")] > update(dispatch)
+  def halt([<<_::binary>> | _] = parts, %{valid?: _} = dispatch) do
+    Enum.join(parts, " ") |> halt(dispatch)
   end
 
-  def handoff(%Sally.Dispatch{} = dispatch), do: route_now(dispatch)
+  def handoff(%{valid?: _} = dispatch), do: route_now(dispatch)
 
-  def invalid(%Sally.Dispatch{} = dispatch, <<_::binary>> = reason) do
-    invalid(dispatch, reason, [])
-  end
-
-  def invalid(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
-    Keyword.put(fields, :valid?, false) |> update(dispatch)
-  end
-
-  def invalid(%Sally.Dispatch{} = dispatch, reason, fields) when is_list(fields) do
-    fields = Keyword.put(fields, :invalid_reason, invalid_reason(reason))
-
-    invalid(dispatch, fields)
-  end
-
-  def invalid_reason(reason) do
-    case reason do
-      <<_::binary>> -> [invalid_reason: reason]
-      _ -> [invalid_reason: inspect(reason, pretty: true)]
-    end
-  end
-
-  @not_authorized "host not authorized"
+  @no_auth "host not authorized"
   @unknown_host "unknown host"
-  def load_host(%Sally.Dispatch{valid?: true, ident: host_ident} = dispatch) do
-    case Sally.Host.find_by_ident(host_ident) do
-      %Sally.Host{authorized: true} = host -> [host: host] |> valid(dispatch)
-      %Sally.Host{authorized: false} = host -> invalid(dispatch, @not_authorized, host: host)
-      nil -> invalid(dispatch, @unknown_host)
+  def load_host(%{ident: host_ident} = dispatch) do
+    host = Sally.Host.find_by_ident(host_ident)
+
+    case host do
+      %{authorized: true} -> [host: host] |> valid(dispatch)
+      %{authorized: false} -> [@no_auth, host_ident] |> halt(dispatch)
+      nil -> [@unknown_host, host_ident] |> halt(dispatch)
     end
   end
 
@@ -258,7 +237,7 @@ defmodule Sally.Dispatch do
   def new(fields), do: struct(Sally.Dispatch, fields)
 
   @data_prune [:mtime, :log, :echo]
-  def preprocess(%Sally.Dispatch{log: log, opts: opts} = dispatch) do
+  def preprocess(%{log: log, opts: opts} = dispatch) do
     with %{valid?: true} = dispatch <- check_metadata(dispatch),
          %{valid?: true, data: data} = dispatch <- unpack(dispatch),
          %{valid?: true} = dispatch <- check_sent_time(dispatch) do
@@ -282,7 +261,7 @@ defmodule Sally.Dispatch do
       {"host", _} -> dispatch
       {"mut", [_refid]} -> dispatch
       {sub, [_ident, "ok"]} when sub in ["mut", "immut"] -> dispatch
-      {sub, [ident, status]} -> [sub, ident, status] |> halt_reason(dispatch)
+      {sub, [ident, status]} -> [sub, ident, status] |> halt(dispatch)
     end
     |> process_via_module()
   end
@@ -307,7 +286,6 @@ defmodule Sally.Dispatch do
   def reduce(%Sally.Dispatch{} = dispatch, callback_mod) do
     Enum.reduce_while(@order, dispatch, fn
       _function, %{valid?: false} = dispatch -> {:halt, Sally.Dispatch.finalize(dispatch)}
-      _function, %{halt_reason: <<_::binary>>} -> {:halt, Sally.Dispatch.finalize(dispatch)}
       :finished, dispatch -> {:halt, dispatch}
       :routed, dispatch -> {:cont, Sally.Dispatch.routed(dispatch, callback_mod)}
       function, dispatch -> {:cont, apply(Sally.Dispatch, function, [dispatch])}
@@ -332,15 +310,16 @@ defmodule Sally.Dispatch do
     [txn_info: txn_info] |> update(dispatch)
   end
 
+  @payload_error "payload is not a bitstring"
   def unpack(%{payload: payload} = dispatch) do
     valid(dispatch, data: Msgpax.unpack!(payload) |> atomize_keys(), payload: :unpacked)
   catch
-    _, _ -> invalid(dispatch, "payload is not a bitstring")
+    _, _ -> halt(@payload_error, dispatch)
   end
 
-  def update(%Sally.Dispatch{} = dispatch), do: dispatch
+  def update(%{valid?: _} = dispatch), do: dispatch
 
-  def update(fields, %Sally.Dispatch{} = dispatch) when is_list(fields) do
+  def update(fields, %{valid?: _} = dispatch) when is_list(fields) do
     struct(dispatch, fields)
   end
 
@@ -351,7 +330,7 @@ defmodule Sally.Dispatch do
   end
 
   def valid(%Sally.Dispatch{} = dispatch) do
-    [valid?: true, invalid_reason: :none] |> update(dispatch)
+    [valid?: true] |> update(dispatch)
   end
 
   def valid(fields, %Sally.Dispatch{} = dispatch) when is_list(fields) do
@@ -359,11 +338,10 @@ defmodule Sally.Dispatch do
   end
 
   def valid(%Sally.Dispatch{} = dispatch, fields) when is_list(fields) do
-    Keyword.merge(fields, valid?: true, invalid_reason: :none)
-    |> update(dispatch)
+    put_in(fields, [:valid?], true) |> update(dispatch)
   end
 
-  def valid(val, key, %Sally.Dispatch{txn_info: txn_info} = dispatch) when is_atom(key) do
+  def valid(val, key, %{txn_info: txn_info} = dispatch) when is_atom(key) do
     txn_info = if(is_map(txn_info), do: txn_info, else: %{})
     [txn_info: Map.put(txn_info, key, val)] |> valid(dispatch)
   end
@@ -377,38 +355,42 @@ defmodule Sally.Dispatch do
 
   @host_categories ["startup", "boot", "run", "ota", "log"]
   @subsystems ["immut", "mut"]
-  defp check_metadata(%{} = m) do
-    case {m.subsystem, m.category} do
-      {"host", cat} when cat in @host_categories -> valid(m)
-      {subsystem, _cat} when subsystem in @subsystems -> valid(m) |> load_host()
-      x -> invalid(m, "unknown subsystem/category: #{inspect(x)}")
+  @host_cat_err "unknown host category"
+  @sub_cat_err "unknown subsystem/category"
+  defp check_metadata(%{category: cat, subsystem: sub} = dispatch) do
+    case {sub, cat} do
+      {"host", cat} when cat in @host_categories -> valid(dispatch)
+      {sub, _cat} when sub in @subsystems -> valid(dispatch) |> load_host()
+      {"host", cat} -> [@host_cat_err, cat] |> halt(dispatch)
+      {sub, cat} -> [@sub_cat_err, sub, cat] |> halt(dispatch)
     end
   end
 
+  @mtime_err "mtime is missing"
+  @future_err "data is from the future"
+  @stale_err "data is stale"
   @variance_opt [Sally.Dispatch.Handler, :mtime_variance_ms]
   @variance_ms Application.compile_env(:sally, @variance_opt, 10_000)
-  defp check_sent_time(%{data: data} = m) do
-    recv_at = m.recv_at || DateTime.utc_now()
-    sent_at = DateTime.from_unix!(data[:mtime] || 0, :millisecond)
-
-    m = update(m, recv_at: recv_at, sent_at: sent_at)
-    ms_diff = DateTime.diff(recv_at, sent_at, :millisecond)
+  @unit_ms :millisecond
+  defp check_sent_time(%{data: data, recv_at: recv_at} = dispatch) do
+    mtime = data[:mtime]
+    sent_at = if(mtime, do: DateTime.from_unix!(mtime, @unit_ms), else: nil)
+    ms_diff = if(sent_at, do: DateTime.diff(recv_at, sent_at, @unit_ms), else: nil)
 
     cond do
-      DateTime.compare(sent_at, DateTime.from_unix!(0)) == :eq -> invalid(m, "mtime is missing")
-      ms_diff < @variance_ms * -1 -> invalid(m, "data is from the future #{ms_diff * -1}ms")
-      ms_diff < 0 -> m
-      ms_diff >= @variance_ms -> invalid(m, "data is #{ms_diff}ms old")
-      true -> m
+      is_nil(sent_at) -> halt(@mtime_err, dispatch)
+      ms_diff < @variance_ms * -1 -> halt([@future_err, "#{ms_diff * -1}ms"], dispatch)
+      ms_diff >= @variance_ms -> halt([@stale_err, "#{ms_diff}ms"], dispatch)
+      true -> [sent_at: sent_at] |> valid(dispatch)
     end
   end
 
-  defp log_if_invalid(%{valid?: true} = dispatch), do: dispatch
+  defp log_halt(%{valid?: true} = dispatch), do: dispatch
 
-  defp log_if_invalid(%{valid?: false, invalid_reason: invalid_reason}) do
-    case invalid_reason do
-      <<_::binary>> -> [invalid_reason]
-      _ -> ["\n", inspect(invalid_reason, pretty: true)]
+  defp log_halt(%{valid?: false, halt_reason: halt_reason}) do
+    case halt_reason do
+      <<_::binary>> -> [halt_reason]
+      _ -> ["\n", inspect(halt_reason, pretty: true)]
     end
     |> tap(fn log -> Logger.warn(log) end)
   end

@@ -45,7 +45,6 @@ defmodule Alfred.ExecuteTest do
       execute = Alfred.execute(execute_args, [])
 
       assert %Alfred.Execute{cmd: "on" = cmd, rc: :busy} = execute
-      assert %Alfred.Execute{__raw__: %Alfred.DevAlias{}} = execute
       assert %Alfred.Execute{detail: detail, name: ^name} = execute
       assert %{cmd: ^cmd, refid: refid} = detail
 

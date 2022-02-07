@@ -4,7 +4,7 @@ defmodule Alfred.Notify.Supervisor do
 
   @impl true
   def init(_init_arg) do
-    [{Alfred.Notify.DynamicSupervisor, []}, {Registry, [name: registry(), keys: :duplicate]}]
+    [{Registry, [name: registry(), keys: :duplicate]}]
     |> Supervisor.init(strategy: :one_for_one)
   end
 

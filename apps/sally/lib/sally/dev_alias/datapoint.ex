@@ -3,28 +3,23 @@ defmodule Sally.Datapoint do
   Database schema definition and functions for Datapoints associated to `Sally.DevAlias`
   """
 
-  require Logger
-
   use Ecto.Schema
-  require Ecto.Query
-  alias Ecto.Query
-
-  alias __MODULE__, as: Schema
-  alias Sally.{DevAlias, Repo}
+  require Logger
+  import Ecto.Query, only: [from: 2]
 
   schema "datapoint" do
     field(:temp_c, :float)
     field(:relhum, :float)
     field(:reading_at, :utc_datetime_usec)
 
-    belongs_to(:dev_alias, DevAlias)
+    belongs_to(:dev_alias, Sally.DevAlias)
   end
 
   @returned [returning: true]
 
   def add([_ | _] = aliases, raw_data, at), do: Enum.map(aliases, &add(&1, raw_data, at))
 
-  def add(%DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
+  def add(%Sally.DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
     raw_data
     |> Map.take([:temp_c, :relhum])
     |> Map.put(:reading_at, at)
@@ -32,13 +27,13 @@ defmodule Sally.Datapoint do
     |> Sally.Repo.insert!(@returned)
   end
 
-  def changeset(changes, %Schema{} = dp) when is_map(changes), do: changeset(dp, changes)
+  def changeset(changes, %__MODULE__{} = dp) when is_map(changes), do: changeset(dp, changes)
 
   @cast_columns [:temp_c, :relhum, :reading_at]
   @required_columns [:temp_c, :reading_at, :dev_alias_id]
   @validate_temp_c [greater_than: -30.0, less_than: 80.0]
   @validate_relhum [greater_than: 0.0, less_than_or_equal_to: 100.0]
-  def changeset(%Schema{} = dp, changes) when is_map(changes) do
+  def changeset(%__MODULE__{} = dp, changes) when is_map(changes) do
     dp
     |> Ecto.Changeset.cast(changes, @cast_columns)
     |> Ecto.Changeset.validate_required(@required_columns)
@@ -46,114 +41,71 @@ defmodule Sally.Datapoint do
     |> Ecto.Changeset.validate_number(:relhum, @validate_relhum)
   end
 
-  @since_ms_default 1000 * 60 * 5
-  def preload_avg(nil, _opts), do: nil
-
-  def preload_avg(dev_alias_or_nil, opts) when is_list(opts) do
-    since_ms = Keyword.get(opts, :since_ms, @since_ms_default)
-
-    preload_avg(dev_alias_or_nil, since_ms)
-  end
-
-  def preload_avg(dev_alias_or_nil, since_ms) when is_integer(since_ms) do
-    import Ecto.Query, only: [from: 2, subquery: 1]
-
-    # select the datapoints within the requested range
-    inner_query =
-      from(dp in Schema,
-        where: dp.reading_at >= ago(^since_ms, "millisecond"),
-        order_by: [desc: :reading_at]
-      )
-
-    # preload the averge of the datapoints selected by inner_query for this DevAlias
-    Repo.preload(dev_alias_or_nil,
-      datapoints:
-        from(dp in subquery(inner_query),
-          order_by: [:dev_alias_id],
-          group_by: [:dev_alias_id, :reading_at],
-          select: %{temp_c: avg(dp.temp_c), temp_f: avg(dp.temp_c * 1.8 + 32), relhum: avg(dp.relhum)},
-          limit: 1
-        )
-    )
-  end
-
-  def purge(%DevAlias{datapoints: datapoints}, :all, batch_size \\ 10) do
-    all_ids = Enum.map(datapoints, fn %Schema{id: id} -> id end)
+  def purge(%Sally.DevAlias{datapoints: datapoints}, :all, batch_size \\ 10) do
+    all_ids = Enum.map(datapoints, fn %{id: id} -> id end)
     batches = Enum.chunk_every(all_ids, batch_size)
 
     for batch <- batches, reduce: {:ok, 0} do
       {:ok, acc} ->
-        q = Query.from(dp in Schema, where: dp.id in ^batch)
+        q = from(dp in __MODULE__, where: dp.id in ^batch)
 
-        {deleted, _} = Repo.delete_all(q)
+        {deleted, _} = Sally.Repo.delete_all(q)
 
         {:ok, acc + deleted}
     end
   end
 
-  def reduce_to_avgs(%DevAlias{datapoints: [%{} | _] = daps} = dev_alias) do
-    struct(dev_alias, datapoints: [reduce_to_avgs(daps)])
-  end
-
-  def reduce_to_avgs(datapoints) when is_list(datapoints) do
-    Enum.reduce(datapoints, {0, %{}}, fn %{} = datapoint, {count, sums} ->
-      Enum.reduce(Map.take(datapoint, [:temp_c, :relhum]), %{}, fn
-        {k, v}, a -> if(v, do: Map.put(a, k, Map.get(sums, k, 0) + v), else: a)
-      end)
-      |> then(fn sum_map -> {count + 1, sum_map} end)
-    end)
-    |> reduce_sums_to_avgs()
-  end
-
-  def reduce_sums_to_avgs({count, sums}) do
-    avgs = Enum.into(sums, %{}, fn {k, v} -> {k, Float.round(v / count, 2)} end)
-
-    Map.put(avgs, :temp_f, Float.round(Map.get(avgs, :temp_c) * 1.8 + 32, 2))
-  end
-
   def status(name, opts) do
-    status_query(name, opts)
-    |> Sally.Repo.one()
-    |> reduce_to_avgs()
+    status_query(name, opts) |> Sally.Repo.one()
   end
 
+  @since_ms_default 1000 * 60 * 5
+  @temp_f ~s|((avg(?) * 1.8) + 32.0)|
   def status_query(<<_::binary>> = name, opts) when is_list(opts) do
-    require Ecto.Query
-
     since_ms = Keyword.get(opts, :since_ms, @since_ms_default)
 
-    Ecto.Query.from(dev_alias in Sally.DevAlias,
+    from(dev_alias in Sally.DevAlias,
       as: :dev_alias,
       where: [name: ^name],
-      join: datapoints in assoc(dev_alias, :datapoints),
       inner_lateral_join:
-        latest_datapoints in subquery(
-          Ecto.Query.from(datapoint in Sally.Datapoint,
+        latest in subquery(
+          from(d in Sally.Datapoint,
             where: [dev_alias_id: parent_as(:dev_alias).id],
-            where: datapoint.reading_at >= ago(^since_ms, "millisecond"),
-            order_by: [desc: :reading_at],
-            group_by: [:id, :dev_alias_id, :reading_at]
-            # select: [:id]
+            where: d.reading_at >= ago(^since_ms, "millisecond")
           )
         ),
-      on: latest_datapoints.id == datapoints.id,
-      preload: [datapoints: datapoints]
+      group_by: [:id],
+      select_merge: %{
+        nature: :datapoints,
+        seen_at: dev_alias.updated_at,
+        status: %{
+          points: count(latest.id),
+          relhum: avg(latest.relhum),
+          temp_c: avg(latest.temp_c),
+          temp_f: fragment(@temp_f, latest.temp_c),
+          first_at: min(latest.reading_at)
+        }
+      }
     )
   end
 
+  def temp_f(%{temp_c: tc}), do: tc * 1.8 + 32.0
+  def temp_f(_), do: nil
+
   # NOTE: assume the caller (Sally.Immutable.Dispatch has verified the map)
-  @measurement "immutables"
   def write(%{aliases: []}), do: []
 
-  def write_metrics(%{} = map) do
+  @measurement "immutables"
+  @fields_want [:temp_c, :relhum]
+  def write_metrics(%{aliases: aliases, datapoints: datapoints} = map) do
     family = map.device.family
     read_us = map.data.metrics["read"]
 
-    zipped = Enum.zip(map.aliases, map.datapoints)
+    Enum.map(datapoints, fn dap ->
+      %{name: name} = Enum.find(aliases, fn dev_alias -> dev_alias.id == dap.dev_alias_id end)
 
-    Enum.into(zipped, [], fn {%{name: name}, dap} ->
-      tags = [name: name, family: family]
-      fields = reduce_to_avgs([dap]) |> Map.put(:read_us, read_us) |> Enum.into([])
+      tags = [nqme: name, family: family]
+      fields = Map.take(dap, @fields_want) |> Map.merge(%{temp_f: temp_f(dap), read_us: read_us})
 
       Betty.metric(@measurement, fields, tags)
 

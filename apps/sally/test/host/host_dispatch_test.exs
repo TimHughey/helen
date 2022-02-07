@@ -23,8 +23,8 @@
 #   @tag mtime: -100_000
 #   @tag payload: %{}
 #   test "can Sally.Dispatch.accept/1 handle an old message", ctx do
-#     assert %Sally.Dispatch{valid?: false, invalid_reason: invalid_reason} = ctx.dispatch
-#     assert invalid_reason =~ ~r/old/
+#     assert %Sally.Dispatch{valid?: false, halt_reason: halt_reason} = ctx.dispatch
+#     assert halt_reason =~ ~r/old/
 #   end
 #
 #   @tag category: "ota"
@@ -33,8 +33,8 @@
 #   @tag mtime: :none
 #   @tag payload: %{}
 #   test "can Sally.Dispatch.accept/1 handle a message missing the mtime key", ctx do
-#     assert %Sally.Dispatch{valid?: false, invalid_reason: invalid_reason} = ctx.dispatch
-#     assert invalid_reason =~ ~r/mtime is missing/
+#     assert %Sally.Dispatch{valid?: false, halt_reason: halt_reason} = ctx.dispatch
+#     assert halt_reason =~ ~r/mtime is missing/
 #   end
 #
 #   @tag category: "bad"
@@ -43,8 +43,8 @@
 #   @tag mtime: :now
 #   @tag payload: %{}
 #   test "can Sally.Dispatch.accept/1 handle a message with invalid category", ctx do
-#     assert %Sally.Dispatch{valid?: false, invalid_reason: invalid_reason} = ctx.dispatch
-#     assert invalid_reason =~ ~r/unknown subsystem/
+#     assert %Sally.Dispatch{valid?: false, halt_reason: halt_reason} = ctx.dispatch
+#     assert halt_reason =~ ~r/unknown subsystem/
 #   end
 #
 #   defp make_mtime(ctx) do

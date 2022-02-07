@@ -68,13 +68,16 @@ defmodule SallyCommandTest do
   describe "Sally.Command.status/2" do
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 2]]
     test "populates :cmds and :status", ctx do
-      assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
+      assert %{dev_alias: dev_aliases, cmd_latest: cmds} = ctx
 
-      %{name: name} = Sally.DevAliasAid.random_pick(dev_aliases)
+      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
+      assert %{name: name} = dev_alias
+
+      %{id: cmd_id} = find_latest_cmd(cmds, dev_alias)
 
       status = Sally.Command.status(name, [])
 
-      assert %Sally.DevAlias{cmds: [%Sally.Command{id: id}], status: %{id: id}} = status
+      assert %Sally.DevAlias{name: ^name, status: %{id: ^cmd_id}} = status
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 100]]
@@ -87,45 +90,18 @@ defmodule SallyCommandTest do
       dev_alias = Sally.Command.status(name, [])
 
       assert %Sally.Command{id: cmd_id} = latest_cmd
-      assert %Sally.DevAlias{cmds: [%Sally.Command{id: ^cmd_id}]} = dev_alias
+      assert %Sally.DevAlias{status: %{id: ^cmd_id}} = dev_alias
     end
-  end
 
-  describe "Sally.Command elapsed" do
-    @tag skip: true
-    @tag output: false
-    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 100]]
-    test "status/2 vs. status_from_db2", ctx do
-      assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 3]]
+    test "preloads device and host", ctx do
+      assert %{dev_alias: %{name: name}} = ctx
 
-      dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
+      query = Sally.Command.status_query(name, preload: :device_and_host)
 
-      opts = [dev_alias.name, []]
-      {fastest, da1} = Duration.measure(Sally.Command, :status, opts)
-      {slowest, da2} = Duration.measure(Sally.Command, :status_from_db, opts)
+      dev_alias = Sally.Repo.one(query)
 
-      fastest_ms = Duration.to_milliseconds(fastest) |> Float.round(2)
-      slowest_ms = Duration.to_milliseconds(slowest) |> Float.round(2)
-
-      assert fastest_ms < slowest_ms
-
-      assert %Sally.DevAlias{cmds: [%{cmd: match_cmd}]} = da1
-      assert %Sally.DevAlias{cmds: [%{cmd: ^match_cmd}]} = da2
-
-      if ctx.output do
-        fastest = to_string(fastest_ms) |> String.pad_leading(6)
-        slowest = to_string(slowest_ms) |> String.pad_leading(6)
-
-        header = [ctx.describe, " [line: ", to_string(ctx.line), "]"]
-
-        [status: fastest, status_from_db: slowest]
-        |> Enum.map(fn {func, ms} ->
-          func = to_string(func) |> String.pad_leading(14, " ")
-          ["\n", func, ": ", ms, " ms"]
-        end)
-        |> then(fn lines -> ["\n", header, lines, "\n"] end)
-        |> IO.puts()
-      end
+      assert %{device: %Sally.Device{host: %Sally.Host{}}} = dev_alias
     end
   end
 end

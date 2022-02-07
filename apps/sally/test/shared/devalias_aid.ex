@@ -113,6 +113,10 @@ defmodule Sally.DevAliasAid do
 
   def find_busy(_dev_aliases), do: raise("not a list of Sally.DevAlias")
 
+  def find_latest_cmd(cmds, %{id: id}) do
+    Enum.find(cmds, &match?(%{dev_alias_id: ^id}, &1))
+  end
+
   def latest_cmd(ctrl_map) do
     Map.get(ctrl_map, :cmd_history, []) |> Enum.reverse() |> List.first(:none)
   end

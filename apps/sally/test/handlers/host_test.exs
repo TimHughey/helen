@@ -25,7 +25,7 @@ defmodule Sally.HostDispatchTest do
           # NOTE: duplicate variable names in a pattern match must be equal
           host: %Sally.Host{ident: host_ident},
           ident: host_ident,
-          invalid_reason: :none,
+          halt_reason: :none,
           payload: :unpacked,
           recv_at: %DateTime{},
           routed: :ok,
@@ -53,7 +53,7 @@ defmodule Sally.HostDispatchTest do
           # NOTE: duplicate variable names in a pattern match must be equal
           host: %Sally.Host{ident: host_ident},
           ident: host_ident,
-          invalid_reason: :none,
+          halt_reason: :none,
           payload: :unpacked,
           recv_at: %DateTime{},
           routed: :ok,
@@ -79,7 +79,7 @@ defmodule Sally.HostDispatchTest do
           final_at: %DateTime{},
           host: %Sally.Host{ident: host_ident},
           ident: host_ident,
-          invalid_reason: :none,
+          halt_reason: :none,
           payload: :unpacked,
           recv_at: %DateTime{},
           routed: :ok,

@@ -61,8 +61,10 @@ defmodule Sally do
   """
   @doc since: "0.5.9"
   def devalias_info(name, opts \\ [:summary]) when is_binary(name) do
-    with %DevAlias{} = dev_alias <- Repo.get_by(DevAlias, name: name),
-         dev_alias <- DevAlias.load_info(dev_alias) do
+    with %Ecto.Query{} = query <- Sally.DevAlias.load_alias_query(:name, name),
+         %Sally.DevAlias{} = dev_alias <- Sally.Repo.one(query) do
+      dev_alias = Sally.DevAlias.status_lookup(dev_alias, [])
+
       cond do
         [:summary] == opts ->
           assoc = %{

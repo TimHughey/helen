@@ -20,9 +20,9 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
   setup [:dev_alias_add]
 
-  describe "Alfred.status/2 integration with Sally.DevAlias" do
+  describe "Sally.DevAlias integration with Alfred.status" do
     @tag dev_alias_add: [auto: :mcp23008]
-    test "Alfred.status/2 for new mutable DevAlias (no cmds) rc: :ok", ctx do
+    test "mutable (no cmds) rc: :ok", ctx do
       {_dev_alias, name} = assert_dev_alias()
 
       # NOTE: cmd == "unknown" because this DevAlias did not have commands
@@ -36,7 +36,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
     end
 
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :busy, echo: :instruct]]
-    test "Alfred.status/2 for new mutable DevAlias (with one cmd) :busy", ctx do
+    test "mutable (with one cmd) :busy", ctx do
       # NOTE: confirm the cmd was sent
       assert_receive(%Sally.Host.Instruct{}, 10)
 
@@ -51,7 +51,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
     @tag capture_log: true
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 1, latest: :orphan, echo: :instruct]]
-    test "Alfred.status/2 for new mutable DevAlias (with cmd timeout", ctx do
+    test "mutable (with cmd timeout", ctx do
       # NOTE: confirm the cmd was sent
       assert_receive(%Sally.Host.Instruct{}, 10)
       Process.sleep(10)
@@ -62,22 +62,42 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %{acked: true, orphaned: true, cmd: cmd} = Sally.Command.saved(dev_alias)
 
       status = Alfred.status(name, [])
+
       assert %Alfred.Status{rc: rc, detail: %{cmd: ^cmd}} = status
       assert {:timeout, ms} = rc
       assert is_integer(ms) and ms > 1
+    end
+
+    @tag dev_alias_add: [auto: :ds, daps: [history: 90, seconds: -1]]
+    test "immutable (with history)", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+
+      assert %{rc: :ok, detail: detail} = Alfred.status(name, since_ms: 60_000)
+      assert %{points: points} = detail
+
+      history_avg = Sally.DatapointAid.avg_daps(ctx, points)
+
+      Enum.each(history_avg, fn {k, v} -> assert_in_delta(v, Map.get(detail, k), 0.01) end)
+    end
+
+    @tag dev_alias_add: [auto: :ds]
+    test "immutable (without history)", ctx do
+      assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
+
+      assert %{rc: :no_data, detail: %{}} = Alfred.status(name, since_ms: 60_000)
     end
   end
 
   describe "Alfred.execute/2 integration with Sally.DevAlias" do
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 15]]
     test "does not issue a cmd/instruction to the remote host when same cmd", ctx do
-      assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
+      assert %{dev_alias: [_ | _] = dev_aliases} = ctx
 
       dev_alias = Sally.DevAliasAid.random_pick(dev_aliases)
       assert %Sally.DevAlias{name: dev_alias_name} = dev_alias
       assert cmd_status = Sally.Command.status(dev_alias_name, [])
-      assert %Sally.DevAlias{cmds: [%Sally.Command{} = raw_cmd]} = cmd_status
-      assert %{id: before_id} = raw_cmd
+      assert %Sally.DevAlias{status: status} = cmd_status
+      assert %{id: before_id} = status
 
       assert %Alfred.Status{rc: :ok, detail: detail} = Alfred.status(dev_alias_name, [])
       assert %{cmd: before_cmd, id: ^before_id} = detail

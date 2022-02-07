@@ -4,6 +4,7 @@ defmodule Alfred do
   """
 
   # coveralls-ignore-start
+
   defmacro __using__(use_opts) do
     quote bind_quoted: [use_opts: use_opts] do
       Alfred.register_attribute(__MODULE__)
@@ -52,14 +53,9 @@ defmodule Alfred do
   end
 
   def execute(opts) when is_list(opts), do: execute(opts, [])
-
   def execute(opts, overrides), do: execute({opts, overrides})
-
-  # defdelegate execute(tuple), to: Alfred.Execute
-  # defdelegate execute(args, opts), to: Alfred.Execute
   def execute_off(name, opts \\ []), do: execute([name: name, cmd: "off"], opts)
   def execute_on(name, opts \\ []), do: execute([name: name, cmd: "on"], opts)
-  # defdelegate execute_toggle(name, opts \\ []), to: Alfred.Execute, as: :toggle
   defdelegate execute_to_binary(execute), to: Alfred.Execute, as: :to_binary
 
   ##

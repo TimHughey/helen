@@ -27,7 +27,7 @@ defmodule Sally.ImmutableDispatchTest do
 
       assert_receive(%Sally.Dispatch{} = dispatch, 500)
 
-      assert %{invalid_reason: :none, subsystem: "immut", valid?: true} = dispatch
+      assert %{halt_reason: :none, subsystem: "immut", valid?: true} = dispatch
       assert %{filter_extra: [^device_ident, "ok"]} = dispatch
       assert %{txn_info: %{} = txn_info} = dispatch
 

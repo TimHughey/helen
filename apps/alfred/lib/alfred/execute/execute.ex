@@ -4,7 +4,7 @@ defmodule Alfred.Execute do
 
   """
 
-  defstruct name: :none, cmd: "unknown", detail: :none, rc: nil, __raw__: :none
+  defstruct name: :none, cmd: "unknown", detail: :none, rc: nil
 
   @callback execute_cmd(any(), opts :: list()) :: any()
 
@@ -51,7 +51,6 @@ defmodule Alfred.Execute do
     cmd = if(match?(%{detail: %{cmd: _}}, chk_map), do: chk_map.detail.cmd, else: nil)
 
     if(is_binary(cmd), do: put_in(chk_map, [:cmd], cmd), else: chk_map)
-    |> Map.take([:cmd, :detail, :name, :__raw__, :rc])
     |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
@@ -113,11 +112,7 @@ defmodule Alfred.Execute do
 
   @doc false
   def status(chk_map, info, args) do
-    status = Alfred.Name.Callback.invoke(info, [info, args], :status)
-
-    merge = %{__raw__: Map.get(status, :__raw__), status: status}
-
-    {:cont, Map.merge(chk_map, merge)}
+    Alfred.Name.Callback.invoke(info, [info, args], :status) |> continue()
   end
 
   @doc false

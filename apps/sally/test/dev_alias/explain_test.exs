@@ -13,6 +13,7 @@ defmodule SallyDevAliasExplainTest do
 
       explain_output = Sally.explain(name, :status, :cmds, [])
 
+      assert explain_output =~ ~r/command_dev_alias_id_index/
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Sort Method/
     end
@@ -23,9 +24,24 @@ defmodule SallyDevAliasExplainTest do
 
       explain_output = Sally.explain(name, :status, :datapoints, [])
 
-      assert explain_output =~ ~r/Join Filter/
+      assert explain_output =~ ~r/datapoint_dev_alias_id_reading_at_index/
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Sort Method/
+    end
+
+    @tag dev_alias_add: [auto: :mcp23008, count: 1, cmds: [history: 100]]
+    test "Sally.Command.status_query/2 (with device and host)", ctx do
+      assert %{dev_alias: %{name: name}} = ctx
+
+      explain_output = Sally.explain(name, :status, :cmds, preload: :device_and_host)
+
+      assert explain_output =~ ~r/command_dev_alias_id_index/
+      assert explain_output =~ ~r/device_pkey/
+      assert explain_output =~ ~r/host_pkey/
+
+      assert explain_output =~ ~r/Sort Method/
+      assert explain_output =~ ~r/Index Scan/
+      assert explain_output =~ ~r/Index Cond/
     end
 
     @tag dev_alias_add: [auto: :mcp23008, count: 3, cmds: [history: 100]]
