@@ -127,6 +127,12 @@ defmodule Sally.DevAlias do
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
   def insert_opts, do: @insert_opts
 
+  def load_alias(<<_::binary>> = name) do
+    load_alias_query(:name, name)
+    |> Sally.Repo.one()
+    |> nature_to_atom()
+  end
+
   def load_aliases(%Sally.Device{id: id}) do
     load_alias_query(:device_id, id)
     |> Sally.Repo.all()
@@ -193,7 +199,6 @@ defmodule Sally.DevAlias do
   @impl true
   def status_lookup(%{name: name, nature: nature}, opts) do
     case nature do
-      # :cmds -> find(name) |> Sally.Command.status(opts)
       :cmds -> Sally.Command.status(name, opts)
       :datapoints -> Sally.Datapoint.status(name, opts)
     end

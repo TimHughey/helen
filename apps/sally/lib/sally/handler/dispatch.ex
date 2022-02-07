@@ -256,11 +256,12 @@ defmodule Sally.Dispatch do
     end
   end
 
+  @subsystems ["immut", "mut"]
   def process(%{valid?: true} = dispatch) do
     case {dispatch.subsystem, dispatch.filter_extra} do
       {"host", _} -> dispatch
       {"mut", [_refid]} -> dispatch
-      {sub, [_ident, "ok"]} when sub in ["mut", "immut"] -> dispatch
+      {sub, [_ident, "ok"]} when sub in @subsystems -> dispatch
       {sub, [ident, status]} -> [sub, ident, status] |> halt(dispatch)
     end
     |> process_via_module()
@@ -354,7 +355,6 @@ defmodule Sally.Dispatch do
   end
 
   @host_categories ["startup", "boot", "run", "ota", "log"]
-  @subsystems ["immut", "mut"]
   @host_cat_err "unknown host category"
   @sub_cat_err "unknown subsystem/category"
   defp check_metadata(%{category: cat, subsystem: sub} = dispatch) do

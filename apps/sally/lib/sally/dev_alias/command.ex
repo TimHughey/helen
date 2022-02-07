@@ -172,12 +172,6 @@ defmodule Sally.Command do
     end
   end
 
-  def query_preload_latest_cmd do
-    import Ecto.Query, only: [from: 2]
-
-    from(c in __MODULE__, distinct: c.dev_alias_id, order_by: [desc: c.sent_at])
-  end
-
   @doc false
   def rt_latency_put(changes, cmd) do
     Map.put(changes, :rt_latency_us, Timex.diff(changes.acked_at, cmd.sent_at))
@@ -197,7 +191,7 @@ defmodule Sally.Command do
   def status_log_unknown(%{status: @unknown}, name), do: Logger.warn(~s("#{name}"))
   def status_log_unknown(_what, _name), do: :ok
 
-  def status_base_query(val) do
+  def status_base_query(val, _opts) do
     cmd_fields = __schema__(:fields)
 
     field = if(is_binary(val), do: :name, else: :id)
@@ -218,7 +212,7 @@ defmodule Sally.Command do
   end
 
   def status_query(<<_::binary>> = name, opts) do
-    query = status_base_query(name)
+    query = status_base_query(name, opts)
 
     Enum.reduce(opts, query, fn
       {:preload, :device_and_host}, query ->

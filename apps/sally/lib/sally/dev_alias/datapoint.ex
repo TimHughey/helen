@@ -5,7 +5,7 @@ defmodule Sally.Datapoint do
 
   use Ecto.Schema
   require Logger
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query, only: [from: 2, join: 4, preload: 3]
 
   schema "datapoint" do
     field(:temp_c, :float)
@@ -61,12 +61,13 @@ defmodule Sally.Datapoint do
 
   @since_ms_default 1000 * 60 * 5
   @temp_f ~s|((avg(?) * 1.8) + 32.0)|
-  def status_query(<<_::binary>> = name, opts) when is_list(opts) do
+  def status_base_query(val, opts) when is_list(opts) do
     since_ms = Keyword.get(opts, :since_ms, @since_ms_default)
+    field = if(is_binary(val), do: :name, else: :id)
 
     from(dev_alias in Sally.DevAlias,
       as: :dev_alias,
-      where: [name: ^name],
+      where: field(dev_alias, ^field) == ^val,
       inner_lateral_join:
         latest in subquery(
           from(d in Sally.Datapoint,
@@ -89,6 +90,21 @@ defmodule Sally.Datapoint do
     )
   end
 
+  def status_query(<<_::binary>> = name, opts) when is_list(opts) do
+    query = status_base_query(name, opts)
+
+    Enum.reduce(opts, query, fn
+      {:preload, :device_and_host}, query ->
+        query
+        |> join(:inner, [dev_alias], device in assoc(dev_alias, :device))
+        |> join(:inner, [_, _, device], host in assoc(device, :host))
+        |> preload([_, _, device, host], device: {device, host: host})
+
+      _, query ->
+        query
+    end)
+  end
+
   def temp_f(%{temp_c: tc}), do: tc * 1.8 + 32.0
   def temp_f(_), do: nil
 
@@ -104,7 +120,7 @@ defmodule Sally.Datapoint do
     Enum.map(datapoints, fn dap ->
       %{name: name} = Enum.find(aliases, fn dev_alias -> dev_alias.id == dap.dev_alias_id end)
 
-      tags = [nqme: name, family: family]
+      tags = [name: name, family: family]
       fields = Map.take(dap, @fields_want) |> Map.merge(%{temp_f: temp_f(dap), read_us: read_us})
 
       Betty.metric(@measurement, fields, tags)
