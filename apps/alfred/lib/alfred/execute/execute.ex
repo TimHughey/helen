@@ -112,7 +112,10 @@ defmodule Alfred.Execute do
 
   @doc false
   def status(chk_map, info, args) do
-    Alfred.Name.Callback.invoke(info, [info, args], :status) |> continue()
+    # NOTE: request raw populated by status_lookup/2
+    args = put_in(args, [:raw], true)
+
+    Alfred.Name.Callback.invoke(info, args, :status) |> continue()
   end
 
   @doc false

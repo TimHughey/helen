@@ -81,7 +81,7 @@ defmodule Alfred.Status do
       :timeout, chk_map -> timeout(chk_map, args)
       :finalize, chk_map -> finalize(chk_map, args)
     end)
-    |> Map.take([:detail, :name, :__raw__, :rc])
+    |> take_fields(args)
     |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
@@ -117,6 +117,15 @@ defmodule Alfred.Status do
       %{} -> continue(lookup)
       {:error, :no_data = rc} -> halt(rc, %{})
     end
+  end
+
+  @essential_fields [:detail, :name, :rc]
+  def take_fields(chk_map, opts) do
+    # NOTE: only populate :__raw__ if requested
+    extra_fields = if get_in(opts, [:raw]) == true, do: [:__raw__], else: []
+    take_fields = @essential_fields ++ extra_fields
+
+    Map.take(chk_map, take_fields)
   end
 
   @doc false

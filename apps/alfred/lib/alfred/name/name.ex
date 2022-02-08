@@ -195,10 +195,13 @@ defmodule Alfred.Name do
   end
 
   @impl true
-  def handle_call({:update, %{seen_at: at} = item, opts}, _from, state) do
+  def handle_call({:update, %{} = item, opts}, _from, state) do
     :ok = Alfred.Notify.dispatch(state, opts)
 
-    struct(state, seen_at: at)
+    # NOTE: accept seen_at AND ttl_ms as updates
+    # NOTE: the registered name can never change it's nature, callbacks or name
+    Map.take(item, [:seen_at, :ttl_ms])
+    |> then(fn fields -> struct(state, fields) end)
     |> reply(item)
   end
 
