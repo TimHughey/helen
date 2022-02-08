@@ -248,16 +248,19 @@ defmodule Alfred.Name do
       Alfred.Name.put_attribute(__MODULE__, use_opts)
 
       @behaviour Alfred.Name
-      def register(items, opts) when is_list(items) do
-        Enum.map(items, &register(&1, opts))
-      end
-
-      def register(item, opts) do
-        Alfred.Name.register(item, __MODULE__, opts)
+      def register(item, opts \\ []) do
+        case item do
+          [%{name: _} | _] = items -> Enum.map(items, &register(&1, opts))
+          %{name: _} -> Alfred.Name.register(item, __MODULE__, opts)
+        end
       end
 
       def unregister(%{name: _} = item) do
-        Alfred.Name.unregister(item.name)
+        case item do
+          [%{name: _} | _] = items -> Enum.map(items, &unregister(&1))
+          %{name: name} -> Alfred.Name.unregister(name)
+          <<_::binary>> = name -> Alfred.Name.unregister(name)
+        end
       end
     end
   end
