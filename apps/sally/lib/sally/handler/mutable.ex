@@ -36,7 +36,7 @@ defmodule Sally.Mutable.Dispatch do
     cmd = Sally.Command.tracked_info(refid)
 
     cmd = Sally.Command.ack_now(cmd)
-    dev_alias = Sally.DevAlias.ttl_reset(cmd)
+    dev_alias = Sally.DevAlias.ttl_reset(cmd.dev_alias_id, cmd.acked_at)
     device = Sally.Device.ttl_reset(dev_alias)
 
     {:ok, %{command: cmd, aliases: dev_alias, device: device}}
@@ -44,10 +44,7 @@ defmodule Sally.Mutable.Dispatch do
 
   @impl true
   def post_process(%{category: "status", filter_extra: [_ident, "ok"]} = dispatch) do
-    %{aliases: aliases, device: device} = dispatch.txn_info
-
-    register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.recv_at)
-    _ = Sally.DevAlias.register(aliases, register_opts)
+    _ = Sally.DevAlias.register(dispatch.txn_info.aliases)
   end
 
   @impl true
@@ -55,9 +52,6 @@ defmodule Sally.Mutable.Dispatch do
     %{filter_extra: [refid | _]} = dispatch
     :ok = Sally.Command.release(refid, [])
 
-    %{aliases: aliases, device: device} = dispatch.txn_info
-
-    register_opts = Sally.Device.name_registration_opts(device, seen_at: dispatch.recv_at)
-    _ = Sally.DevAlias.register(aliases, register_opts)
+    _ = Sally.DevAlias.register(dispatch.txn_info.aliases)
   end
 end

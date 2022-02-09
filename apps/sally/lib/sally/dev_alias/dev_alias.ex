@@ -6,25 +6,19 @@ defmodule Sally.DevAlias do
   All actions (e.g. reading current value, changing state_ on a physical `Sally.Device`
   require a `Sally.DevAlias`
   """
-  require Logger
-  require Ecto.Query
 
   use Ecto.Schema
   use Alfred, name: [backend: :module], execute: []
 
-  alias __MODULE__, as: Schema
-  alias Ecto.Changeset
-  alias Sally.{Command, Datapoint, Device, Repo}
-
-  @pio_min 0
-  @ttl_default 15_000
-  @ttl_min 50
+  require Logger
+  import Ecto.Query, only: [from: 2]
 
   @type list_or_schema() :: [Ecto.Schema.t(), ...] | Ecto.Schema.t()
 
   @cmds foreign_key: :dev_alias_id, preload_order: [desc: :sent_at]
   @daps foreign_key: :dev_alias_id, preload_order: [desc: :reading_at]
 
+  @ttl_default 60_000
   schema "dev_alias" do
     field(:name, :string)
     field(:pio, :integer)
@@ -35,9 +29,9 @@ defmodule Sally.DevAlias do
     field(:status, :any, virtual: true)
     field(:seen_at, :utc_datetime_usec, virtual: true)
 
-    belongs_to(:device, Device)
-    has_many(:cmds, Command, @cmds)
-    has_many(:datapoints, Datapoint, @daps)
+    belongs_to(:device, Sally.Device)
+    has_many(:cmds, Sally.Command, @cmds)
+    has_many(:datapoints, Sally.Datapoint, @daps)
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -50,16 +44,31 @@ defmodule Sally.DevAlias do
     Sally.Command.align_cmd(dev_alias, pin_data, align_at)
   end
 
-  def changeset(changes, %Schema{} = a, opts \\ []) do
+  @name_regex ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i
+  @pio_validate [greater_than_or_equal_to: 0]
+  @ttl_ms_min 50
+  @ttl_validate [greater_than_or_equal_to: @ttl_ms_min]
+  def changeset(changes, %__MODULE__{} = a, required \\ []) do
+    required = changeset_required(required, changes)
+
     a
-    |> Changeset.cast(changes, columns(:cast))
-    |> Changeset.validate_required(opts[:required] || columns(:required))
-    |> Changeset.validate_format(:name, ~r/^[a-z~][\w .:-]+[[:alnum:]]$/i)
-    |> Changeset.validate_length(:name, max: 128)
-    |> Changeset.validate_number(:pio, greater_than_or_equal_to: @pio_min)
-    |> Changeset.validate_length(:description, max: 128)
-    |> Changeset.validate_number(:ttl_ms, greater_than_or_equal_to: @ttl_min)
-    |> Changeset.unique_constraint(:name, [:name])
+    |> Ecto.Changeset.cast(changes, columns(:cast))
+    |> Ecto.Changeset.validate_required(required)
+    |> Ecto.Changeset.validate_format(:name, @name_regex)
+    |> Ecto.Changeset.validate_length(:name, max: 128)
+    |> Ecto.Changeset.validate_number(:pio, @pio_validate)
+    |> Ecto.Changeset.validate_length(:description, max: 128)
+    |> Ecto.Changeset.validate_number(:ttl_ms, @ttl_validate)
+    |> Ecto.Changeset.unique_constraint(:name, [:name])
+  end
+
+  def changeset_required(what, changes) do
+    case what do
+      :changes -> Map.keys(changes)
+      x when is_atom(x) -> [x]
+      x when is_list(x) -> x
+      _ -> raise("bad args: #{inspect(what)}")
+    end
   end
 
   @columns [:id, :name, :pio, :description, :ttl_ms, :device_id, :inserted_at, :updated_at]
@@ -79,34 +88,29 @@ defmodule Sally.DevAlias do
       ttl_ms: opts[:ttl_ms] || dev_alias.ttl_ms
     }
     |> changeset(dev_alias)
-    |> Repo.insert!(insert_opts())
+    |> Sally.Repo.insert!(insert_opts())
     |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at, nature: nature) end)
   end
 
-  def delete(name_or_id) do
-    with %Schema{} = a <- find(name_or_id) |> load_command_ids() |> load_datapoint_ids(),
-         {:ok, cmd_count} <- Command.purge(a, :all),
-         {:ok, dp_count} <- Datapoint.purge(a, :all),
-         {:ok, %Schema{name: n}} <- Repo.delete(a) do
-      res = [name: n, commands: cmd_count, datapoints: dp_count] |> Enum.reject(fn x -> x == 0 end)
+  def delete(what) do
+    dev_alias = load_alias(what)
 
-      {:ok, res}
-    else
-      nil -> {:unknown, name_or_id}
-      error -> error
-    end
-  end
+    unless match?(%{id: _}, dev_alias), do: raise("not found: #{inspect(what)}")
 
-  def exists?(name_or_id) do
-    case find(name_or_id) do
-      %Schema{} -> true
-      _anything -> false
-    end
+    {nature, module} = nature_module(dev_alias)
+
+    nature_ids = nature_ids_query(dev_alias) |> Sally.Repo.all()
+    purged = module.purge(nature_ids, [])
+    unregister = unregister(dev_alias)
+
+    {:ok, %{:name => dev_alias.name, nature => purged, :unregister => unregister}}
   end
 
   @doc false
   @impl true
-  def execute_cmd(%Alfred.Status{} = status, opts), do: Alfred.Status.raw(status) |> execute_cmd(opts)
+  def execute_cmd(%Alfred.Status{} = status, opts) do
+    Alfred.Status.raw(status) |> execute_cmd(opts)
+  end
 
   def execute_cmd(%Sally.DevAlias{} = dev_alias, opts) do
     new_cmd = Sally.Command.add(dev_alias, opts)
@@ -127,72 +131,92 @@ defmodule Sally.DevAlias do
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:name]] ++ @returned
   def insert_opts, do: @insert_opts
 
-  def load_alias(<<_::binary>> = name) do
-    load_alias_query(:name, name)
+  def load_alias(what) do
+    load_alias_query(what)
     |> Sally.Repo.one()
     |> nature_to_atom()
   end
 
-  def load_aliases(%Sally.Device{id: id}) do
-    load_alias_query(:device_id, id)
+  def load_aliases(what) do
+    load_alias_query(what)
     |> Sally.Repo.all()
     |> nature_to_atom()
   end
 
-  @fragment "case when ? then 'cmds' else 'datapoints' end"
   def load_alias_query(field, val) when is_atom(field) do
-    Ecto.Query.from(dev_alias in Schema,
+    load_alias_query({field, val})
+  end
+
+  @nature_sql "case when ? then 'cmds' else 'datapoints' end"
+  def load_alias_query(what) do
+    {field, val} = what_field(what)
+
+    from(dev_alias in __MODULE__,
       where: field(dev_alias, ^field) == ^val,
       order_by: [asc: dev_alias.pio],
       # NOTE: join on device to get mutable
       join: device in Sally.Device,
-      on: dev_alias.device_id == device.id,
+      on: device.id == dev_alias.device_id,
       # NOTE: select merge the nature
-      select_merge: %{nature: fragment(@fragment, device.mutable), seen_at: dev_alias.updated_at}
+      select_merge: %{nature: fragment(@nature_sql, device.mutable), seen_at: dev_alias.updated_at}
     )
   end
 
-  def load_command_ids(schema_or_nil) do
-    q = Ecto.Query.from(c in Command, select: [:id])
-    Repo.preload(schema_or_nil, [cmds: q], force: true)
-  end
-
-  def load_datapoint_ids(schema_or_nil) do
-    q = Ecto.Query.from(dp in Datapoint, select: [:id])
-    Repo.preload(schema_or_nil, [datapoints: q], force: true)
-  end
-
   def names do
-    Ecto.Query.from(x in Schema, select: x.name, order_by: x.name) |> Repo.all()
+    from(x in __MODULE__, select: x.name, order_by: x.name) |> Sally.Repo.all()
   end
 
   def names_begin_with(pattern) when is_binary(pattern) do
     like_string = "#{pattern}%"
 
-    Ecto.Query.from(x in Schema, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
-    |> Repo.all()
+    from(x in __MODULE__, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
+    |> Sally.Repo.all()
+  end
+
+  def nature_ids_query(what, opts \\ []) when is_list(opts) do
+    dev_alias = load_alias(what)
+
+    unless match?(%{id: _}, dev_alias), do: raise("not found: #{inspect(what)}")
+
+    case dev_alias do
+      %{id: id, nature: :cmds} -> Sally.Command.ids_query([dev_alias_id: id] ++ opts)
+      %{id: id, nature: :datapoints} -> Sally.Datapoint.ids_query([dev_alias_id: id] ++ opts)
+    end
   end
 
   # NOTE: accepts a list, single dev alias or nil
+  @natures [:cmds, :datapoints]
   def nature_to_atom(dev_alias) do
     case dev_alias do
       %{nature: <<_::binary>> = x} -> struct(dev_alias, nature: String.to_atom(x))
+      %{nature: x} when x in @natures -> dev_alias
       many when is_list(many) -> Enum.map(many, &nature_to_atom(&1))
-      _ -> dev_alias
+      nil -> nil
+      x -> raise("unable to determine nature: #{inspect(x)}")
     end
+  end
+
+  def nature_module(%{nature: nature}) do
+    unless nature in @natures, do: raise("unknown nature: #{inspect(nature)}")
+
+    case nature do
+      :cmds -> Sally.Command
+      :datapoints -> Sally.Datapoint
+    end
+    |> then(fn module -> {nature, module} end)
   end
 
   def rename(opts) when is_list(opts) do
     with {:opts, from} when is_binary(from) <- {:opts, opts[:from]},
          {:opts, to} when is_binary(to) <- {:opts, opts[:to]},
-         {:found, %Schema{} = x} <- {:found, find(from)},
+         {:found, %{id: _} = x} <- {:found, find(from)},
          cs <- changeset(%{name: to}, x, [:name]),
-         {:ok, %Schema{} = updated_schema} <- Repo.update(cs, returning: true) do
-      updated_schema
+         {:ok, %{id: _} = updated} <- Sally.Repo.update(cs, returning: true) do
+      updated
     else
       {:opts, _} -> {:bad_args, opts}
       {:found, nil} -> {:not_found, opts[:from]}
-      {:error, %Changeset{} = cs} -> {:name_taken, cs.changes.name}
+      {:error, %Ecto.Changeset{} = cs} -> {:name_taken, cs.changes.name}
     end
   end
 
@@ -214,15 +238,44 @@ defmodule Sally.DevAlias do
     end
   end
 
-  def summary(%Schema{} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
+  def summary(%{id: _} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
 
-  def ttl_reset(%Sally.Command{dev_alias_id: id, acked_at: ttl_at}) do
-    load_alias_query(:id, id) |> Sally.Repo.one() |> nature_to_atom() |> ttl_reset(ttl_at)
+  def ttl_adjust(what, ttl_ms) do
+    changes = %{ttl_ms: ttl_ms}
+    dev_alias = load_alias(what)
+
+    # NOTE: update!/2 will raise so matching on result is safe
+    # NOTE: reload DevAlias to ensure nature and seen_at are populated
+    changeset(changes, dev_alias, :ttl_ms)
+    |> Sally.Repo.update!([])
+    |> load_alias()
   end
 
-  def ttl_reset(%Sally.DevAlias{nature: nature} = dev_alias, ttl_at) do
-    changeset(%{updated_at: ttl_at}, dev_alias, required: [:updated_at])
-    |> Sally.Repo.update!(@returned)
-    |> struct(nature: nature, seen_at: dev_alias.updated_at)
+  def ttl_reset(%{nature: nature} = dev_alias, ttl_at) when nature in @natures do
+    unless match?(%DateTime{}, ttl_at), do: raise("ttl_at not a DateTime")
+
+    changes = %{updated_at: ttl_at}
+
+    # NOTE: Sally.Repo.update!/2 returns virtual fields unchanged
+    dev_alias = changeset(changes, dev_alias, :changes) |> Sally.Repo.update!(@returned)
+
+    struct(dev_alias, seen_at: dev_alias.updated_at)
+  end
+
+  # NOTE: generic ttl_reset (e.g. cmd_ack)
+  def ttl_reset(what, ttl_at) do
+    load_alias(what) |> ttl_reset(ttl_at)
+  end
+
+  def what_field(what) do
+    case what do
+      %__MODULE__{id: id} -> {:id, id}
+      %Sally.Device{id: device_id} -> {:device_id, device_id}
+      %{dev_alias_id: id} -> {:id, id}
+      [{field, _val} = tuple] when is_atom(field) -> tuple
+      <<_::binary>> -> {:name, what}
+      x when is_integer(x) -> {:id, what}
+      _ -> raise("bad args: #{inspect(what)}")
+    end
   end
 end

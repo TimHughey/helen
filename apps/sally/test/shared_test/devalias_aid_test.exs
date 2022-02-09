@@ -44,10 +44,10 @@ defmodule Sally.DevAliasAidTest do
 
       assert Enum.all?(cmd_latest, fn execute -> match?(%{acked: false}, execute) end)
 
-      assert %Sally.DevAlias{cmds: cmds} = Sally.DevAlias.load_command_ids(dev_alias)
+      query = Sally.DevAlias.nature_ids_query(dev_alias)
+      assert ids = Sally.Repo.all(query)
 
-      # NOTE: only busy (aka busy) commands are returned 
-      assert length(cmds) == 1
+      assert length(ids) == 5
 
       assert %Sally.DevAlias{} = Sally.DevAliasAid.find_busy(dev_aliases)
     end
@@ -62,8 +62,9 @@ defmodule Sally.DevAliasAidTest do
 
       assert length(dap_history) == 5
 
-      assert %Sally.DevAlias{datapoints: dps} = Sally.DevAlias.load_datapoint_ids(dev_alias)
-      assert length(dps) == 5
+      query = Sally.DevAlias.nature_ids_query(dev_alias)
+      assert ids = Sally.Repo.all(query)
+      assert length(ids) == 5
     end
 
     @tag host_add: [], device_add: []

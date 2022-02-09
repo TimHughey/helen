@@ -20,8 +20,6 @@ defmodule Sally.DeviceAid do
     Sally.Device.create(ident, create_at, params)
   end
 
-  def aliases(%Sally.Device{} = device), do: Sally.Device.load_aliases(device)
-
   def next_pio(%Sally.Device{pios: pios} = device) do
     pios = 0..(pios - 1)
     next = Enum.find(pios, :none, fn pio -> not Sally.Device.pio_aliased?(device, pio) end)
@@ -35,7 +33,9 @@ defmodule Sally.DeviceAid do
       <<"i2c"::binary, _::binary>> -> 0..7
       <<"pwm"::binary, _::binary>> -> 0..3
     end
-    |> Enum.map(fn n -> {n, "z"} end)
+    # NOTE: this simulates the pin data from the remote host, nil is ignored
+    # by Sally.Device.create/3
+    |> Enum.map(fn n -> {n, nil} end)
   end
 
   def subsystem(ident) do
@@ -54,9 +54,9 @@ defmodule Sally.DeviceAid do
     x = Ecto.UUID.generate() |> String.split("-") |> Enum.at(4)
 
     case type do
-      :ds -> "ds.#{x}"
+      :ds -> "ds." <> x
       :mcp23008 -> "i2c.#{x}.mcp23008.20"
-      :pwm -> "pwm.#{x}"
+      :pwm -> "pwm." <> x
     end
   end
 end

@@ -6,7 +6,7 @@ description = "lightdesk only"
 version = 1
 
 [host]
-report_ms = 7_000
+report_ms = 11_000
 
 [ota]
 base_url = "https://www.wisslanding.com/sally/firmware"

@@ -6,7 +6,7 @@ defmodule Sally.Command do
   use Alfred.Track, timeout_after: "PT3.3S"
 
   require Logger
-  import Ecto.Query, only: [from: 2, join: 4, preload: 3]
+  import Ecto.Query, only: [from: 2, join: 4, preload: 3, where: 3]
 
   schema "command" do
     field(:refid, :string)
@@ -125,6 +125,23 @@ defmodule Sally.Command do
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
+  @shift_units [:months, :days, :hours, :minutes, :seconds, :milliseconds]
+  def ids_query(opts) do
+    query = from(cmd in __MODULE__, order_by: :id, select: cmd.id)
+
+    Enum.reduce(opts, query, fn
+      {:dev_alias_id, id}, query ->
+        where(query, [cmd], cmd.dev_alias_id == ^id)
+
+      {unit, _val} = shift_tuple, query when unit in @shift_units ->
+        before = Timex.now() |> Timex.shift([shift_tuple])
+        where(query, [cmd], cmd.sent_at <= ^before)
+
+      kv, _query ->
+        raise("unknown opt: #{inspect(kv)}")
+    end)
+  end
+
   def latest_cmd(%Sally.DevAlias{} = dev_alias) do
     latest_cmd_query(dev_alias) |> Sally.Repo.one()
   end
@@ -138,14 +155,14 @@ defmodule Sally.Command do
   end
 
   def log_aligned_cmd(dev_alias, pin_cmd) do
-    [~s("), dev_alias.name, ~s("), " [", pin_cmd, "]"]
+    ["[", dev_alias.name, "] ", "{", pin_cmd, "}"]
     |> Logger.info()
   end
 
   def log_orphan_cmd(%{id: _} = cmd) do
     cmd = Sally.Repo.preload(cmd, [:dev_alias])
 
-    [~s("), cmd.dev_alias.name, ~s("), " [", cmd.cmd, "]"]
+    ["[", cmd.dev_alias.name, "] ", "{", cmd.cmd, "}"]
     |> Logger.info()
   end
 
@@ -156,21 +173,33 @@ defmodule Sally.Command do
     |> Enum.at(1)
   end
 
-  def purge(%Sally.DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
-    import Ecto.Query, only: [from: 2]
+  def purge([id | _] = ids, opts) when is_integer(id) do
+    batch_size = opts[:batch_size] || 10
 
-    all_ids = Enum.map(cmds, fn %__MODULE__{id: id} -> id end)
-    batches = Enum.chunk_every(all_ids, batch_size)
+    batches = Enum.chunk_every(ids, batch_size)
 
-    for batch <- batches, reduce: {:ok, 0} do
-      {:ok, acc} ->
-        q = from(c in __MODULE__, where: c.id in ^batch)
+    Enum.reduce(batches, 0, fn batch, total ->
+      {purged, _} = from(x in __MODULE__, where: x.id in ^batch) |> Sally.Repo.delete_all()
 
-        {deleted, _} = Sally.Repo.delete_all(q)
-
-        {:ok, acc + deleted}
-    end
+      purged + total
+    end)
   end
+
+  # def purge(%Sally.DevAlias{cmds: cmds}, :all, batch_size \\ 10) do
+  #   import Ecto.Query, only: [from: 2]
+  #
+  #   all_ids = Enum.map(cmds, fn %__MODULE__{id: id} -> id end)
+  #   batches = Enum.chunk_every(all_ids, batch_size)
+  #
+  #   for batch <- batches, reduce: {:ok, 0} do
+  #     {:ok, acc} ->
+  #       q = from(c in __MODULE__, where: c.id in ^batch)
+  #
+  #       {deleted, _} = Sally.Repo.delete_all(q)
+  #
+  #       {:ok, acc + deleted}
+  #   end
+  # end
 
   @doc false
   def rt_latency_put(changes, cmd) do
@@ -226,11 +255,11 @@ defmodule Sally.Command do
     end)
   end
 
-  def summary(%__MODULE__{} = x) do
+  def summary(%{cmd: _, acked: _, sent_at: _} = x) do
     Map.take(x, [:cmd, :acked, :sent_at])
   end
 
-  def summary([%__MODULE__{} = x | _]), do: summary(x)
+  def summary([%{cmd: _} = x | _]), do: summary(x)
 
   def summary([]), do: %{}
 

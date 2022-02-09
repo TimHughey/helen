@@ -5,7 +5,7 @@ defmodule Sally.Datapoint do
 
   use Ecto.Schema
   require Logger
-  import Ecto.Query, only: [from: 2, join: 4, preload: 3]
+  import Ecto.Query, only: [from: 2, join: 4, preload: 3, where: 3]
 
   schema "datapoint" do
     field(:temp_c, :float)
@@ -20,6 +20,8 @@ defmodule Sally.Datapoint do
   def add([_ | _] = aliases, raw_data, at), do: Enum.map(aliases, &add(&1, raw_data, at))
 
   def add(%Sally.DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
+    log_add(a, raw_data)
+
     raw_data
     |> Map.take([:temp_c, :relhum])
     |> Map.put(:reading_at, at)
@@ -41,19 +43,58 @@ defmodule Sally.Datapoint do
     |> Ecto.Changeset.validate_number(:relhum, @validate_relhum)
   end
 
-  def purge(%Sally.DevAlias{datapoints: datapoints}, :all, batch_size \\ 10) do
-    all_ids = Enum.map(datapoints, fn %{id: id} -> id end)
-    batches = Enum.chunk_every(all_ids, batch_size)
+  @shift_units [:months, :days, :hours, :minutes, :seconds, :milliseconds]
+  def ids_query(opts) do
+    query = from(dap in __MODULE__, order_by: :id, select: dap.id)
 
-    for batch <- batches, reduce: {:ok, 0} do
-      {:ok, acc} ->
-        q = from(dp in __MODULE__, where: dp.id in ^batch)
+    Enum.reduce(opts, query, fn
+      {:dev_alias_id, id}, query ->
+        where(query, [dap], dap.dev_alias_id == ^id)
 
-        {deleted, _} = Sally.Repo.delete_all(q)
+      {unit, _val} = shift_tuple, query when unit in @shift_units ->
+        before = Timex.now() |> Timex.shift([shift_tuple])
+        where(query, [dap], dap.reading_at <= ^before)
 
-        {:ok, acc + deleted}
+      kv, _query ->
+        raise("unknown opt: #{inspect(kv)}")
+    end)
+  end
+
+  @log_these ["attic south exterior", "exterior se"]
+  def log_add(%{name: name}, %{temp_c: temp_c}) do
+    if name in @log_these do
+      temp_c = if is_float(temp_c), do: Float.round(temp_c, 2), else: temp_c
+
+      ["[", name, "] ", "{", Float.to_string(temp_c), "}"]
+      |> Logger.info()
     end
   end
+
+  def purge([id | _] = ids, opts) when is_integer(id) do
+    batch_size = opts[:batch_size] || 10
+
+    batches = Enum.chunk_every(ids, batch_size)
+
+    Enum.reduce(batches, 0, fn batch, total ->
+      {purged, _} = from(x in __MODULE__, where: x.id in ^batch) |> Sally.Repo.delete_all()
+
+      purged + total
+    end)
+  end
+
+  # def purge(%Sally.DevAlias{datapoints: datapoints}, :all, batch_size \\ 10) do
+  #   all_ids = Enum.map(datapoints, fn %{id: id} -> id end)
+  #   batches = Enum.chunk_every(all_ids, batch_size)
+  #
+  #   for batch <- batches, reduce: {:ok, 0} do
+  #     {:ok, acc} ->
+  #       q = from(dp in __MODULE__, where: dp.id in ^batch)
+  #
+  #       {deleted, _} = Sally.Repo.delete_all(q)
+  #
+  #       {:ok, acc + deleted}
+  #   end
+  # end
 
   def status(name, opts) do
     status_query(name, opts) |> Sally.Repo.one()

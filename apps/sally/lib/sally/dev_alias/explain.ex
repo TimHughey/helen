@@ -52,8 +52,9 @@ defmodule Sally.DevAlias.Explain do
     module = Sally.DevAlias
 
     dev_alias = Sally.Repo.get_by!(Sally.DevAlias, name: name)
+    device = Sally.Repo.get_by!(Sally.Device, id: dev_alias.device_id)
 
-    module.load_alias_query(:device_id, dev_alias.device_id)
+    module.load_alias_query(device)
     |> explain(opts)
     |> assemble_output(module, ".load_aliases/2")
   end

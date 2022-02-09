@@ -59,7 +59,7 @@ defmodule Sally.CommandAid do
   end
 
   def historical(%Sally.DevAlias{} = dev_alias, opts_map) do
-    history = get_in(opts_map, [:cmds, :history]) || 1
+    history = get_in(opts_map, [:_cmds_, :history]) || 1
 
     Enum.map(1..history, fn num ->
       Process.sleep(10)
@@ -113,7 +113,7 @@ defmodule Sally.CommandAid do
   def make_pins(%Sally.Device{pios: pios} = device, opts_map) do
     pin_opts = Map.get(opts_map, :pins, [:random])
 
-    %{aliases: aliases} = Sally.Device.load_aliases(device)
+    %{aliases: aliases} = Sally.Device.preload(device)
 
     Enum.map(0..(pios - 1), fn pin_num ->
       Enum.find(aliases, :none, &match?(%{pio: ^pin_num}, &1)) |> make_pin(pin_num, pin_opts)

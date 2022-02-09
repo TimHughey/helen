@@ -16,7 +16,7 @@ defmodule Sally.DevAliasAid do
   end
 
   @add_order [:prereqs, :count, :cmds, :daps]
-  @return_keys [:host, :device, :dev_alias, :name_registration, :cmd_latest, :dap_history]
+  @return_keys [:host, :device, :dev_alias, :name_reg, :cmd_latest, :dap_history]
   def add(%{dev_alias_add: opts} = ctx) when is_list(opts) do
     {ctrl_map, opts} = normalize_opts(opts, :as_map)
 
@@ -56,7 +56,8 @@ defmodule Sally.DevAliasAid do
 
   @add_daps_order [:dap_history]
   def add_daps(ctrl_map, opts) do
-    opts_map = Enum.into(opts, %{})
+    dap_map = (get_in(ctrl_map, [:daps]) || []) |> Enum.into(%{})
+    opts_map = Enum.into(opts, %{}) |> Map.put(:_daps_, dap_map)
 
     Enum.reduce(@add_daps_order, ctrl_map, fn
       # NOTE: must use acc for collect/1 macro
@@ -173,7 +174,7 @@ defmodule Sally.DevAliasAid do
 
   def prereqs(_, _), do: raise(":device and/or :host not found in ctx")
 
-  @provides [:host, :device, :dev_alias, :cmd_latest, :name_registration]
+  @provides [:host, :device, :dev_alias, :cmd_latest, :name_reg]
   def provided_opts(ctx), do: Map.take(ctx, @provides) |> Enum.into([])
 
   def random_cmd, do: Ecto.UUID.generate() |> String.split("-") |> Enum.at(1)
@@ -202,9 +203,9 @@ defmodule Sally.DevAliasAid do
 
       rc = Sally.DevAlias.register(dev_alias, register_opts)
 
-      %{dev_alias: dev_alias, name_registration: %{rc: rc, name: dev_alias.name, nature: nature}}
+      %{dev_alias: dev_alias, name_reg: %{rc: rc, name: dev_alias.name, nature: nature}}
     else
-      %{dev_alias: dev_alias, name_registration: :none}
+      %{dev_alias: dev_alias, name_reg: :none}
     end
   end
 

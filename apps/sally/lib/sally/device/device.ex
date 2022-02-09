@@ -6,6 +6,8 @@ defmodule Sally.Device do
   require Logger
   use Ecto.Schema
 
+  import Ecto.Query, only: [from: 2, where: 3]
+
   alias Ecto.Changeset
 
   alias __MODULE__, as: Schema
@@ -50,7 +52,7 @@ defmodule Sally.Device do
   def create(<<_::binary>> = ident, create_at, %{} = params) do
     %{
       ident: ident,
-      family: determine_family(ident),
+      family: family(ident),
       mutable: params.subsystem == "mut",
       pios: pios_from_pin_data(params.data),
       last_seen_at: create_at
@@ -59,34 +61,34 @@ defmodule Sally.Device do
     |> Sally.Repo.insert!(insert_opts())
   end
 
-  # (1 of 2) find with proper opts
-  def find(opts) when is_list(opts) and opts != [] do
-    case Repo.get_by(Schema, opts) do
-      %Schema{} = x -> preload(x)
-      x when is_nil(x) -> nil
+  @families [:ds, :i2c, :pwm]
+  def family(what) do
+    case what do
+      %{ident: ident} -> family(ident)
+      x when x in @families -> Atom.to_string(what)
+      <<"ds"::utf8, _rest::binary>> -> "ds"
+      <<"pwm"::utf8, _rest::binary>> -> "pwm"
+      <<"i2c"::utf8, _rest::binary>> -> "i2c"
+      _ -> raise("family unsupported: #{inspect(what)}")
     end
   end
 
-  # # (2 of 2) validate param and build opts for find/2
-  def find(id_or_ident) do
-    case id_or_ident do
-      x when is_binary(x) -> find(ident: x)
-      x when is_integer(x) -> find(id: x)
-      x -> {:bad_args, "must be binary or integer: #{inspect(x)}"}
+  def find(what) do
+    {field, val} = what_field(what)
+
+    query = from(device in __MODULE__, where: field(device, ^field) == ^val, order_by: device.ident)
+
+    case field do
+      :family ->
+        pattern = val <> "%"
+        where(query, [device], ilike(device.ident, ^pattern)) |> Sally.Repo.all()
+
+      :mutable ->
+        Sally.Repo.all(query)
+
+      _ ->
+        Sally.Repo.one(query) |> preload()
     end
-  end
-
-  def idents_begin_with(pattern) when is_binary(pattern) do
-    import Ecto.Query, only: [from: 2]
-
-    like_string = "#{pattern}%"
-
-    from(x in Schema,
-      where: like(x.ident, ^like_string),
-      order_by: x.ident,
-      select: x.ident
-    )
-    |> Repo.all()
   end
 
   @dont_replace [:id, :last_seen_at, :updated_at]
@@ -94,26 +96,39 @@ defmodule Sally.Device do
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:ident]] ++ @returned
   def insert_opts, do: @insert_opts
 
-  def latest(opts) do
-    import Ecto.Query, only: [from: 2]
+  @shift_opts [:months, :days, :hours, :minutes, :seconds, :milliseconds]
+  @latest_steps [:query, :load, :locate, :finalize]
+  # NOTE: this can be a very expensive function!!
+  def latest(opts \\ []) do
+    schema? = Keyword.get(opts, :schema, false)
 
-    age = opts[:age] || [hours: -1]
-    schema = if opts[:schema] == true, do: true, else: false
-    before = Timex.now() |> Timex.shift(age)
-
-    from(x in Schema,
-      where: x.inserted_at >= ^before,
-      order_by: [desc: x.inserted_at],
-      limit: 1
-    )
-    |> Repo.one()
-    |> then(fn result ->
-      case result do
-        %Schema{} = x when schema == true -> x
-        %Schema{ident: ident} -> ident
-        _ -> :none
-      end
+    Enum.reduce(@latest_steps, nil, fn
+      :query, _ -> latest_query(opts)
+      :load, query -> Sally.Repo.all(query)
+      :locate, devices -> latest_locate(devices)
+      # a device without aliases was found, this is the one we want
+      :finalize, %{id: _} = latest -> if(schema?, do: latest, else: latest.ident)
+      # bad luck, no device without aliases found
+      :finalize, _none -> nil
     end)
+  end
+
+  def latest_locate(devices) do
+    # NOTE: reduce the devices until one is found without aliases
+    Enum.reduce_while(devices, :none, fn device, _acc ->
+      device = preload(device)
+
+      if match?(%{aliases: []}, device), do: {:halt, device}, else: {:cont, :has_aliases}
+    end)
+  end
+
+  def latest_query(opts) do
+    shifts = Keyword.take(opts, @shift_opts)
+    unless shifts != [], do: raise("must provide at least one shift option")
+
+    after_at = Timex.now() |> Timex.shift(shifts)
+
+    from(device in __MODULE__, where: device.inserted_at >= ^after_at, order_by: device.inserted_at)
   end
 
   def load_aliases(%Schema{} = device), do: Repo.preload(device, [:aliases])
@@ -136,14 +151,6 @@ defmodule Sally.Device do
     end
   end
 
-  def name_registration_opts(%Schema{} = device, opts) do
-    case device do
-      %{mutable: true} -> :cmds
-      %{mutable: false} -> :datapoints
-    end
-    |> then(fn nature -> [{:nature, nature} | opts] end)
-  end
-
   def nature(%Sally.Device{mutable: mutable}), do: if(mutable, do: :cmds, else: :datapoints)
 
   def pio_check(schema, opts) when is_list(opts) do
@@ -154,12 +161,12 @@ defmodule Sally.Device do
     end
   end
 
-  def pio_aliased?(%Schema{pios: pios} = device, pio) when pio < pios do
-    device = load_aliases(device)
+  def pio_aliased?(%__MODULE__{pios: pios} = device, pio) do
+    unless is_integer(pio), do: raise("pio must be an integer")
+    unless pio - 1 < pios, do: raise("pio exceeds device pios (#{pios})")
 
-    dev_alias = Enum.find(device.aliases, &match?(%{pio: ^pio}, &1))
-
-    match?(%Sally.DevAlias{}, dev_alias)
+    Sally.DevAlias.load_aliases(device)
+    |> Enum.any?(&match?(%{pio: ^pio}, &1))
   end
 
   def pios(%Schema{pios: pios}), do: pios
@@ -171,7 +178,12 @@ defmodule Sally.Device do
     end
   end
 
-  def preload(%Schema{} = x), do: Repo.preload(x, [:aliases])
+  def preload(what) do
+    case what do
+      %{id: _} -> Sally.Repo.preload(what, aliases: Sally.DevAlias.load_alias_query(what))
+      nil -> nil
+    end
+  end
 
   def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
 
@@ -181,12 +193,15 @@ defmodule Sally.Device do
     |> Sally.Repo.update!(@returned)
   end
 
-  defp determine_family(ident) do
-    case ident do
-      <<"ds"::utf8, _rest::binary>> -> "ds"
-      <<"pwm"::utf8, _rest::binary>> -> "pwm"
-      <<"i2c"::utf8, _rest::binary>> -> "i2c"
-      _ -> "unsupported"
+  def what_field(what) do
+    case what do
+      %__MODULE__{id: id} -> {:id, id}
+      %Sally.DevAlias{device_id: device_id} -> {:id, device_id}
+      [{:family, x}] -> {:family, family(x)}
+      [{field, _val} = tuple] when is_atom(field) -> tuple
+      <<_::binary>> -> {:ident, what}
+      x when is_integer(x) -> {:id, what}
+      _ -> raise("bad args: #{inspect(what)}")
     end
   end
 end

@@ -7,7 +7,7 @@ defmodule SallyDevAliasExplainTest do
   setup [:dev_alias_add]
 
   describe "Sally EXPLAIN" do
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 100]]
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50]]
     test "Sally.Command.status_query/1", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
@@ -18,7 +18,7 @@ defmodule SallyDevAliasExplainTest do
       assert explain_output =~ ~r/Sort Method/
     end
 
-    @tag dev_alias_add: [auto: :ds, daps: [history: 100]]
+    @tag dev_alias_add: [auto: :ds, daps: [history: 50]]
     test "Sally.Datapoint.status_query/2", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
@@ -29,7 +29,7 @@ defmodule SallyDevAliasExplainTest do
       assert explain_output =~ ~r/Sort Method/
     end
 
-    @tag dev_alias_add: [auto: :mcp23008, count: 1, cmds: [history: 100]]
+    @tag dev_alias_add: [auto: :mcp23008, count: 1, cmds: [history: 50]]
     test "Sally.Command.status_query/2 (with device and host)", ctx do
       assert %{dev_alias: %{name: name}} = ctx
 
@@ -44,7 +44,7 @@ defmodule SallyDevAliasExplainTest do
       assert explain_output =~ ~r/Index Cond/
     end
 
-    @tag dev_alias_add: [auto: :mcp23008, count: 3, cmds: [history: 100]]
+    @tag dev_alias_add: [auto: :mcp23008, count: 3, cmds: [history: 20]]
     test "Sally.Command.latest_cmd/2", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 

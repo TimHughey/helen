@@ -4,7 +4,7 @@ defmodule Sally.Synchronous.DeviceTest do
 
   @moduletag sally: true, sally_synchronous_device: true
 
-  setup [:dev_alias_add]
+  setup [:host_add, :device_add, :dev_alias_add]
 
   describe "Sally.device_move_aliases/1" do
     @tag dev_alias_add: [auto: :mcp23008, count: 8]
@@ -39,9 +39,10 @@ defmodule Sally.Synchronous.DeviceTest do
       add_ctx = %{host: host, device_add: [auto: :mcp23008]}
       assert %{device: %Sally.Device{}} = Sally.DeviceAid.add(add_ctx)
 
-      move_opts = [from: src_ident, to: :latest]
+      move_opts = [from: src_ident, to: :latest, milliseconds: -20]
+      moved = Sally.device_move_aliases(move_opts)
 
-      assert {:ok, %Sally.Device{ident: moved_ident} = moved_device} = Sally.device_move_aliases(move_opts)
+      assert {:ok, %Sally.Device{ident: moved_ident} = moved_device} = moved
 
       # verify the two devices were indeed different
       assert src_ident != moved_ident
@@ -53,6 +54,23 @@ defmodule Sally.Synchronous.DeviceTest do
         end
 
       assert Enum.all?(all_equal, fn x -> x end)
+    end
+  end
+
+  describe "Sally.Device.latest/1" do
+    @tag host_add: [], device_add: [auto: :pwm]
+    test "finds a recently created device", ctx do
+      assert %{device: %{id: device_id}} = ctx
+
+      latest = Sally.Device.latest(milliseconds: -20, schema: true)
+
+      assert %{id: ^device_id} = latest
+    end
+
+    test "returns nil when no latest device" do
+      latest = Sally.Device.latest(milliseconds: -5)
+
+      refute latest
     end
   end
 end

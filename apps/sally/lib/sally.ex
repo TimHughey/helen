@@ -30,18 +30,7 @@ defmodule Sally do
   > If the name is registered with `Alfred` it is deleted.
 
   """
-  @type devalias_delete_result() :: [String.t(), ...] | {:error, term()} | {:not_found, String.t()}
-  @type name_or_id() :: String.t() | pos_integer()
-  @spec devalias_delete(name_or_id()) :: devalias_delete_result()
-  def devalias_delete(name_or_id) do
-    case DevAlias.delete(name_or_id) do
-      {:ok, results} ->
-        {:ok, results ++ [alfred: Alfred.name_unregister(results[:name])]}
-
-      error ->
-        error
-    end
-  end
+  def devalias_delete(name_or_id), do: Sally.DevAlias.delete(name_or_id)
 
   @doc """
   Show info of a DevAlias
@@ -60,17 +49,17 @@ defmodule Sally do
 
   """
   @doc since: "0.5.9"
+  @info_preload [preload: :device_and_host]
   def devalias_info(name, opts \\ [:summary]) when is_binary(name) do
-    with %Ecto.Query{} = query <- Sally.DevAlias.load_alias_query(:name, name),
-         %Sally.DevAlias{} = dev_alias <- Sally.Repo.one(query) do
-      dev_alias = Sally.DevAlias.status_lookup(dev_alias, [])
+    with %{nature: _} = dev_alias <- Sally.DevAlias.load_alias(name) do
+      dev_alias = Sally.DevAlias.status_lookup(dev_alias, @info_preload)
 
       cond do
         [:summary] == opts ->
           assoc = %{
             device: Device.summary(dev_alias.device),
             host: Host.summary(dev_alias.device.host),
-            cmd: Command.summary(dev_alias.cmds)
+            cmd: Command.summary(dev_alias.status)
           }
 
           DevAlias.summary(dev_alias) |> Map.merge(assoc)
@@ -172,7 +161,7 @@ defmodule Sally do
 
       DevAlias.create(device, final_opts)
     else
-      {:device_opt, :latest} -> Keyword.replace(opts, :device, device_latest()) |> device_add_alias()
+      {:device_opt, :latest} -> Keyword.replace(opts, :device, device_latest(opts)) |> device_add_alias()
       {:device_opt, nil} -> {:error, ":device missing or non-binary"}
       {:device, nil} -> {:not_found, opts[:device]}
       {:name_opt, nil} -> {:error, ":name missing or non-binary"}
@@ -196,7 +185,11 @@ defmodule Sally do
   2. `schema: boolean()` device identifier to move aliases from
   """
   @doc since: "0.5.9"
-  def device_latest(opts \\ [schema: false, age: [hours: -1]]), do: Device.latest(opts)
+  def device_latest(opts \\ [schema: false, hours: -1]) do
+    opts = put_in(opts, [:schema], false)
+
+    Sally.Device.latest(opts)
+  end
 
   @doc """
   Move device aliases from one device to another
@@ -213,15 +206,16 @@ defmodule Sally do
 
   """
   @doc since: "0.5.7"
+
   def device_move_aliases(opts) when is_list(opts) do
-    with {:from, from_ident} when is_binary(from_ident) <- {:from, opts[:from]},
-         {:to, to_ident} when is_binary(to_ident) <- {:to, opts[:to]} do
-      Device.move_aliases(from_ident, to_ident)
-    else
-      {:from, nil} -> {:error, ":from missing or non-binary"}
-      {:to, nil} -> {:error, ":to missing or non-binary"}
-      {:to, :latest} -> Keyword.replace(opts, :to, device_latest()) |> device_move_aliases()
-    end
+    from = opts[:from]
+    unless from, do: raise("from device missing")
+
+    to = opts[:to] || device_latest(opts)
+    to = if is_nil(to) or to == :latest, do: device_latest(opts), else: to
+    unless to, do: raise("to device missing (no latest)")
+
+    Sally.Device.move_aliases(from, to)
   end
 
   defdelegate explain(), to: Sally.DevAlias.Explain, as: :all

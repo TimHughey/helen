@@ -6,9 +6,118 @@ defmodule SallyDevAliasTest do
 
   setup [:host_add, :device_add, :dev_alias_add]
 
-  defmacro assert_execution_us(elapsed, expected_us) do
-    quote bind_quoted: [elapsed: elapsed, expected_us: expected_us] do
-      #  assert Timex.Duration.to_microseconds(elapsed) < expected_us, format_elapsed_ms(elapsed)
+  describe "Sally.DevAlias" do
+    # NOTE: ensure at least one name exists
+    @tag dev_alias_add: [auto: :ds]
+    test "names/0 retrurns list of names", ctx do
+      %{dev_alias: %{name: name}} = ctx
+
+      names = Sally.DevAlias.names()
+
+      assert Enum.any?(names, &match?(^name, &1))
+    end
+
+    # NOTE: ensure at least one name exists
+    @tag dev_alias_add: [auto: :ds]
+    test "names_begin_with/1", ctx do
+      %{dev_alias: %{name: name}} = ctx
+
+      assert <<prefix::binary-size(2), _rest::binary>> = name
+
+      names = Sally.DevAlias.names_begin_with(prefix)
+
+      assert Enum.any?(names, &match?(^name, &1))
+      assert Enum.count(names) > 1
+    end
+  end
+
+  describe "Sally.DevAlias.delete/2" do
+    @tag dev_alias_add: [auto: :ds, daps: [history: 30]]
+    test "deletes an immutable by name (including datapoints)", ctx do
+      assert %{dev_alias: %{name: name}} = ctx
+
+      delete = Sally.DevAlias.delete(name)
+
+      assert {:ok, %{name: ^name, datapoints: count}} = delete
+
+      assert count == 30
+    end
+
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 30]]
+    test "deletes a mutable by name (including cmds)", ctx do
+      assert %{dev_alias: %{name: name}} = ctx
+
+      delete = Sally.DevAlias.delete(name)
+
+      assert {:ok, %{name: ^name, cmds: count}} = delete
+
+      assert count == 30
+    end
+  end
+
+  describe "Sally.DevAlias.execute_cmd/2" do
+    @tag dev_alias_add: [auto: :mcp23008, count: 8, cmds: [history: 3]]
+    test "creates new busy command from Sally.DevAlias", ctx do
+      assert %{device: %Sally.Device{ident: device_ident}} = ctx
+      assert %{dev_alias: [%{nature: :cmds} | _] = dev_aliases} = ctx
+
+      dev_alias = random_pick(dev_aliases)
+
+      # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
+      # for validation
+      cmd = random_cmd()
+      opts = [cmd: cmd, cmd_opts: [echo: :instruct]]
+      execute = Sally.DevAlias.execute_cmd(dev_alias, opts)
+
+      assert {:busy, %{cmd: ^cmd, refid: refid}} = execute
+
+      assert %{pio: pio} = dev_alias
+
+      # NOTE: confirm the Instruct sent
+      assert_receive(instruct, 100)
+
+      assert %{client_id: "sally_test"} = instruct
+      assert %{data: %{ack: true, cmd: ^cmd, pio: ^pio}} = instruct
+      assert %{filters: [^device_ident, ^refid]} = instruct
+      assert %{ident: <<"host"::binary, _::binary>>} = instruct
+      assert %{name: <<"hostname"::binary, _::binary>>} = instruct
+      assert %{packed_length: packed_length, subsystem: "i2c"} = instruct
+      assert packed_length < 45
+
+      assert Alfred.Track.tracked?(refid)
+    end
+
+    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
+    test "creates new acked command from Sally.DevAlias", ctx do
+      assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
+
+      cmd = random_cmd()
+      opts = [cmd: cmd, cmd_opts: [ack: :immediate]]
+
+      execute_cmd = Sally.DevAlias.execute_cmd(dev_alias, opts)
+      assert {:ok, %{cmd: ^cmd}} = execute_cmd
+    end
+  end
+
+  describe "Sally.DevAlias.load_alias/1" do
+    @tag dev_alias_add: [auto: :ds, daps: [history: 3]]
+    test "accepts a name", ctx do
+      %{dev_alias: %{id: id, name: name, nature: nature}} = ctx
+
+      dev_alias = Sally.DevAlias.load_alias(name)
+
+      assert %{id: ^id, name: ^name, seen_at: %DateTime{}} = dev_alias
+      assert %{nature: ^nature} = dev_alias
+    end
+
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 3]]
+    test "accepts an id", ctx do
+      %{dev_alias: %{id: id, name: name, nature: nature}} = ctx
+
+      dev_alias = Sally.DevAlias.load_alias(name)
+
+      assert %{id: ^id, name: ^name, seen_at: %DateTime{}} = dev_alias
+      assert %{nature: ^nature} = dev_alias
     end
   end
 
@@ -20,6 +129,32 @@ defmodule SallyDevAliasTest do
       aliases = Sally.DevAlias.load_aliases(device)
 
       assert Enum.all?(aliases, &match?(%{nature: :cmds}, &1))
+    end
+  end
+
+  describe "Sally.DevAlias.nature_ids/2" do
+    @tag dev_alias_add: [auto: :ds, daps: [history: 10, seconds: -2]]
+    test "returns ids for :nature == :datapoints", ctx do
+      %{dev_alias: %{name: name}} = ctx
+
+      query = Sally.DevAlias.nature_ids_query(name, seconds: -1)
+
+      ids = Sally.Repo.all(query)
+
+      assert Enum.count(ids) == 9
+      Enum.each(ids, fn id -> assert is_integer(id) end)
+    end
+
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 20]]
+    test "returns ids for :nature == :cmds", ctx do
+      %{dev_alias: %{name: name}} = ctx
+
+      query = Sally.DevAlias.nature_ids_query(name, milliseconds: -1)
+
+      ids = Sally.Repo.all(query)
+
+      assert Enum.count(ids) > 15
+      Enum.each(ids, fn id -> assert is_integer(id) end)
     end
   end
 
@@ -38,7 +173,7 @@ defmodule SallyDevAliasTest do
     @tag dev_alias_add: [auto: :ds, daps: [history: 50, seconds: -7]]
     test "handles DevAlias with Datapoints", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
-      assert %{name_registration: %{name: ^name}} = ctx
+      assert %{name_reg: %{name: ^name}} = ctx
 
       dev_alias = Sally.DevAlias.status_lookup(%{name: name, nature: :datapoints}, [])
 
@@ -50,179 +185,53 @@ defmodule SallyDevAliasTest do
     end
   end
 
-  describe "Sally.DevAlias.execute_cmd/2" do
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
-    test "creates new busy command from Sally.DevAlias", ctx do
-      assert %{device: %Sally.Device{ident: device_ident}, dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
+  describe "Sally.DevAlias.ttl_adjust/2" do
+    @tag dev_alias_add: [auto: :ds]
+    test "changes ttl of an immutable via name", ctx do
+      assert %{dev_alias: %{name: name, nature: nature}} = ctx
 
-      cmd = random_cmd()
+      ttl_ms = 60_000
+      dev_alias = Sally.DevAlias.ttl_adjust(name, ttl_ms)
 
-      # NOTE: include the echo: true option to receive the final Sally.Host.Instruct
-      # for validation
-      assert {:busy, %Sally.Command{cmd: ^cmd, refid: refid}} =
-               Sally.DevAlias.execute_cmd(dev_alias, cmd: cmd, cmd_opts: [echo: :instruct])
-
-      assert_receive %Sally.Host.Instruct{
-                       client_id: "sally_test",
-                       data: %{ack: true, cmd: ^cmd, pio: 0},
-                       filters: [^device_ident, ^refid],
-                       ident: <<"host"::binary, _::binary>>,
-                       name: <<"hostname"::binary, _::binary>>,
-                       packed_length: packed_length,
-                       subsystem: "i2c"
-                     },
-                     100
-
-      assert packed_length < 45
-
-      assert Alfred.Track.tracked?(refid)
-    end
-
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 3, minutes: -1]]
-    test "creates new acked command from Sally.DevAlias", ctx do
-      assert %{dev_alias: %Sally.DevAlias{} = dev_alias} = ctx
-
-      cmd = random_cmd()
-      opts = [cmd: cmd, cmd_opts: [ack: :immediate]]
-
-      execute_cmd = Sally.DevAlias.execute_cmd(dev_alias, opts)
-      assert {:ok, %Sally.Command{cmd: ^cmd}} = execute_cmd
-    end
-  end
-
-  ##
-  ## Tests via Sally top-level API
-  ##
-
-  describe "Sally.device_add_alias/1" do
-    @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
-    test "detects missing options", %{device: device} do
-      assert {:error, text} = Sally.device_add_alias(name: Sally.DevAliasAid.unique(:devalias))
-      assert text =~ ~r/:device missing/
-
-      assert {:error, text} = Sally.device_add_alias(device: device.ident)
-      assert text =~ ~r/name/
-
-      assert {:error, text} =
-               Sally.device_add_alias(device: device.ident, name: Sally.DevAliasAid.unique(:devalias))
-
-      assert text =~ ~r/pio/
-    end
-
-    test "detects missing device" do
-      assert {:not_found, text} =
-               Sally.device_add_alias(device: "ds.missing", name: Sally.DevAliasAid.unique(:devalias))
-
-      assert text =~ ~r/ds.missing/
-    end
-
-    @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
-    test "handles changeset errors", %{device: device} do
-      opts = [device: device.ident, name: Sally.DevAliasAid.unique(:dev_alias), pio: -1]
-
-      assert_raise(Ecto.InvalidChangesetError, fn ->
-        Sally.device_add_alias(opts)
-      end)
+      assert %{name: ^name, nature: ^nature, ttl_ms: ^ttl_ms} = dev_alias
+      assert %{seen_at: %DateTime{}} = dev_alias
     end
 
     @tag dev_alias_add: [auto: :pwm]
-    test "detects duplicate name", %{device: device, dev_alias: dev_alias} do
-      taken_name = dev_alias.name
+    test "changes ttl of a mutable via id", ctx do
+      assert %{dev_alias: %{id: id, nature: nature}} = ctx
 
-      opts = [device: device.ident, name: dev_alias.name]
-      assert {:name_taken, ^taken_name} = Sally.device_add_alias(opts)
+      ttl_ms = 60_000
+      dev_alias = Sally.DevAlias.ttl_adjust(id, ttl_ms)
+
+      assert %{id: ^id, nature: ^nature, ttl_ms: ^ttl_ms} = dev_alias
+      assert %{seen_at: %DateTime{}} = dev_alias
     end
   end
 
-  describe "Sally.devalias_delete/1" do
-    @tag skip: false
-    @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 100, minutes: -11]]
-    test "deletes a mutable DevAlias name", ctx do
-      assert %Sally.DevAlias{name: to_delete_name} = ctx.dev_alias
+  describe "Sally.DevAlias.reset/2" do
+    @tag dev_alias_add: [auto: :ds]
+    test "sets updated_at using a nature schema", ctx do
+      assert %{dev_alias: %{id: id, nature: nature}} = ctx
 
-      assert {:ok, [{:name, ^to_delete_name}, {:commands, _}, {:datapoints, _}, {:alfred, _}]} =
-               Sally.devalias_delete(to_delete_name)
+      fake_nature_schema = %{dev_alias_id: id}
+      now = Timex.now()
+
+      dev_alias = Sally.DevAlias.ttl_reset(fake_nature_schema, now)
+
+      assert %{id: ^id, nature: ^nature} = dev_alias
+      assert %{seen_at: ^now, updated_at: ^now} = dev_alias
     end
 
-    @tag skip: false
-    @tag dev_alias_add: [auto: :ds, daps: [history: 100, minutes: -11]]
-    test "deletes an immutable DevAlias name", ctx do
-      assert %Sally.DevAlias{name: to_delete_name} = ctx.dev_alias
+    @tag dev_alias_add: [auto: :pwm]
+    test "sets updated_at using a DevAlias", ctx do
+      assert %{dev_alias: %{id: id, nature: nature} = dev_alias} = ctx
 
-      assert {:ok, [{:name, ^to_delete_name}, {:commands, _}, {:datapoints, _}, {:alfred, _}]} =
-               Sally.devalias_delete(to_delete_name)
-    end
-  end
+      now = Timex.now()
+      dev_alias = Sally.DevAlias.ttl_reset(dev_alias, now)
 
-  @tag dev_alias_add: [auto: :ds]
-  @tag skip: true
-  test "Sally.devalias_info/2 returns summarized and raw results", ctx do
-    assert %{device: device, host: host} = ctx
-
-    assert %Sally.Host{
-             name: host_name,
-             ident: host_ident,
-             profile: host_profile,
-             last_seen_at: host_last_seen_at
-           } = host
-
-    assert %Sally.Device{ident: dev_ident, last_seen_at: dev_last_seen_at} = device
-
-    name = Sally.DevAliasAid.unique(:dev_alias)
-
-    assert %Sally.DevAlias{name: ^name, pio: dev_alias_pio, ttl_ms: dev_alias_ttl_ms} =
-             Sally.device_add_alias(device: device.ident, name: name)
-
-    assert %{
-             cmd: %{},
-             description: "<none>",
-             name: ^name,
-             pio: ^dev_alias_pio,
-             ttl_ms: ^dev_alias_ttl_ms,
-             host: %{
-               name: ^host_name,
-               ident: ^host_ident,
-               profile: ^host_profile,
-               last_seen_at: ^host_last_seen_at
-             },
-             device: %{ident: ^dev_ident, last_seen_at: ^dev_last_seen_at}
-           } = Sally.devalias_info(name)
-  end
-
-  describe "Sally.devalias_rename/1 handles" do
-    @tag dev_alias_add: [auto: :mcp23008, count: 2]
-    test "when the to name is taken", %{dev_alias: dev_aliases} do
-      assert [%Sally.DevAlias{name: from}, %Sally.DevAlias{name: to}] = dev_aliases
-
-      assert {:name_taken, ^to} = Sally.devalias_rename(from: from, to: to)
-    end
-
-    @tag device_add: [auto: :ds], devalias_add: []
-    test "when the new name is available", %{dev_alias: dev_alias} do
-      # first, test Host performs the rename
-      new_name = Sally.DevAliasAid.unique(:dev_alias)
-
-      assert %Sally.DevAlias{name: ^new_name} = Sally.DevAlias.rename(from: dev_alias.name, to: new_name)
-
-      # second, test Sally.dev_alias_rename recognizes success
-      assert :ok = Sally.devalias_rename(from: new_name, to: Sally.DevAliasAid.unique(:dev_alias))
-    end
-
-    test "when requested dev_alias name is unavailable" do
-      unavailable = Sally.DevAliasAid.unique(:dev_alias)
-
-      assert {:not_found, ^unavailable} =
-               Sally.devalias_rename(from: unavailable, to: Sally.DevAliasAid.unique(:dev_alias))
-    end
-
-    test "when opts are invalid" do
-      assert {:bad_args, _} = Sally.devalias_rename([])
+      assert %{id: ^id, nature: ^nature} = dev_alias
+      assert %{seen_at: ^now, updated_at: ^now} = dev_alias
     end
   end
-
-  def sort_dev_aliases(dev_aliases) do
-    Enum.sort(dev_aliases, fn %{id: lhs}, %{id: rhs} -> lhs <= rhs end)
-  end
-
-  def format_elapsed_ms(ms), do: Timex.format_duration(ms, :humanized)
 end

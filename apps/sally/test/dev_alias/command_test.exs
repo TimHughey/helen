@@ -36,7 +36,7 @@ defmodule SallyCommandTest do
 
       assert %{rc: rc, detail: %{cmd: ^acked_cmd}} = Alfred.status(name)
       assert {:timeout, ms} = rc
-      assert ms > 1
+      assert ms >= 1
     end
   end
 
@@ -80,7 +80,7 @@ defmodule SallyCommandTest do
       assert %Sally.DevAlias{name: ^name, status: %{id: ^cmd_id}} = status
     end
 
-    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 100]]
+    @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 20]]
     test "result is same using DevAlias join query or Command query", ctx do
       assert %{dev_alias: [%Sally.DevAlias{} | _] = dev_aliases} = ctx
 

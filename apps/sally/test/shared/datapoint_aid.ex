@@ -7,7 +7,7 @@ defmodule Sally.DatapointAid do
 
   def avg_daps([_ | _] = daps, count) do
     daps
-    |> Enum.reverse()
+    #  |> Enum.reverse()
     |> Enum.take(count)
     |> Enum.reduce(%{temp_c: 0, temp_f: 0, relhum: 0}, fn dap, acc ->
       Enum.reduce(dap, acc, fn {key, val}, acc ->
@@ -30,26 +30,30 @@ defmodule Sally.DatapointAid do
     [filter_extra: [device_ident, status], data: data]
   end
 
-  def historical(%Sally.DevAlias{name: name} = dev_alias, opts_map) do
-    %{history: count} = opts_map
-    daps = Enum.map(1..count, fn _ -> random_dap() end)
-    ref_dt = Timex.now()
+  @shifts [:hours, :minutes, :seconds, :milliseconds]
+  @shift_default [minutes: -1]
+  def historical(%Sally.DevAlias{} = dev_alias, opts_map) do
+    history = get_in(opts_map, [:_daps_, :history]) || 0
 
-    String.to_atom(name) |> Process.put(ref_dt)
+    shift_opts = Map.take(opts_map, @shifts) |> Enum.into([])
+    shift_opts = if(shift_opts == [], do: @shift_default, else: shift_opts)
 
-    (count - 1)..0
-    |> Enum.zip_with(daps, fn num, dap -> {shift(name, num, opts_map), dap} end)
-    |> Enum.each(fn {reading_at, data} -> Sally.Datapoint.add(dev_alias, data, reading_at) end)
+    # NOTE: get ref_dt ONCE because datapoint reading at must shift from a fixed point
+    ref_dt = get_in(opts_map, [:ref_dt]) || Timex.now()
 
-    #   Ecto.Multi.new()
-    #   |> Ecto.Multi.put(:aliases, [dev_alias])
-    #   |> Ecto.Multi.run(:datapoint, Sally.DevAlias, :add_datapoint, [data, reading_at])
-    #   |> Sally.Repo.transaction()
-    #   |> detuple_txn_result()
-    # end)
+    # NOTE: create the daps in reverse order
+    Enum.reduce((history - 1)..0, [], fn
+      num, daps_acc ->
+        # NOTE: create the shifts for _THIS_ datapoint based on num and fixed ref_dt
+        shifts = Enum.map(shift_opts, fn {key, val} -> {key, num * val} end)
+        reading_at = Timex.shift(ref_dt, shifts)
+        dap = random_dap()
 
-    # NOTE: return the created datapoints
-    daps
+        _ = Sally.Datapoint.add(dev_alias, dap, reading_at)
+
+        # NOTE: accumulate the random daps
+        [dap | daps_acc]
+    end)
   end
 
   def random_dap do
@@ -78,23 +82,5 @@ defmodule Sally.DatapointAid do
     decimal = if(decimal == 0, do: decimal, else: decimal / 100)
 
     whole + decimal
-  end
-
-  @shifts [:hours, :minutes, :seconds, :milliseconds]
-  @shift_default [minutes: -1]
-  def shift(name, num, opts_map) do
-    name_atom = String.to_atom(name)
-    ref_dt = Process.get(name_atom)
-    shift_opts = shift_opts(num, opts_map)
-
-    Timex.shift(ref_dt, shift_opts)
-  end
-
-  def shift_opts(num, opts_map) do
-    case Map.take(opts_map, @shifts) do
-      x when is_map(x) and map_size(x) == 0 -> @shift_default
-      shifts -> shifts |> Enum.into([])
-    end
-    |> Enum.map(fn {key, val} -> {key, num * val} end)
   end
 end
