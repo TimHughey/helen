@@ -252,6 +252,7 @@ defmodule Alfred.Name do
         case item do
           [%{name: _} | _] = items -> Enum.map(items, &register(&1, opts))
           %{name: _} -> Alfred.Name.register(item, __MODULE__, opts)
+          _ -> []
         end
       end
 
