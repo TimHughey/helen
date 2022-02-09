@@ -8,6 +8,19 @@ defmodule Sally.DeviceAid do
     %{device: add(opts, host)}
   end
 
+  # NOTE: used by Sally.DispatchAid
+  @host_defaults [:create, :setup]
+  def add(opts) when is_list(opts) do
+    {host_opts, device_opts} = Keyword.pop(opts, :host, [])
+
+    host_opts = Keyword.merge(@host_defaults, host_opts)
+
+    host = Sally.HostAid.add(host_opts)
+    device = add(device_opts, host)
+
+    %{host: host, device: device}
+  end
+
   def add(_), do: :ok
 
   def add(opts, %Sally.Host{} = host) when is_list(opts) do

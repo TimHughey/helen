@@ -9,6 +9,7 @@ defmodule Sally.Host.Restart do
     end
   end
 
+  @doc false
   def now(%Host{} = host, opts) when is_list(opts) do
     instruct = opts[:instruct] || Instruct
 

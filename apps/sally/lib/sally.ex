@@ -75,6 +75,16 @@ defmodule Sally do
     end
   end
 
+  @device_types [:imm, :mut]
+  def devalias_names(type) when type in @device_types do
+    mutable = type == :mut
+
+    devices = Sally.Device.find(mutable: mutable) |> Enum.map(&Sally.Device.preload(&1))
+
+    dev_aliases = Enum.reduce(devices, [], fn %{aliases: aliases}, acc -> aliases ++ acc end)
+    Enum.map(dev_aliases, fn %{name: name} -> name end) |> Enum.sort()
+  end
+
   @doc """
   Renames an existing DevAlias
 
@@ -151,23 +161,28 @@ defmodule Sally do
   > underlying device.
   """
   @doc since: "0.5.7"
-  def device_add_alias(opts) when is_list(opts) do
-    with {:device_opt, device} when is_binary(device) <- {:device_opt, opts[:device]},
-         {:device, %Device{} = device} <- {:device, Device.find(ident: device)},
-         {:name_opt, name} when is_binary(name) <- {:name_opt, opts[:name]},
-         {:available, true} <- {:available, Alfred.name_available?(name)},
-         {:pio_opt, pio} when is_integer(pio) <- {:pio_opt, Device.pio_check(device, opts)} do
-      final_opts = [name: name, pio: pio] ++ Keyword.take(opts, [:description, :ttl_ms])
+  def device_add_alias(<<_::binary>> = ident, opts) when is_list(opts) do
+    device = Sally.Device.find(ident)
+    unless match?(%{}, device), do: raise("not found: #{ident}")
 
-      DevAlias.create(device, final_opts)
-    else
-      {:device_opt, :latest} -> Keyword.replace(opts, :device, device_latest(opts)) |> device_add_alias()
-      {:device_opt, nil} -> {:error, ":device missing or non-binary"}
-      {:device, nil} -> {:not_found, opts[:device]}
-      {:name_opt, nil} -> {:error, ":name missing or non-binary"}
-      {:available, false} -> {:name_taken, opts[:name]}
-      {:pio_opt, _} -> {:error, ":pio missing (and is required) or non-integer"}
-    end
+    name = get_in(opts, [:name])
+    unless match?(<<_::binary>>, name), do: raise("required option :name is missing")
+
+    unless Alfred.name_available?(name), do: raise("requested name is taken")
+
+    pio = Sally.Device.pio_check(device, opts)
+
+    final_opts = [pio: pio] ++ Keyword.take(opts, [:name, :description, :ttl_ms])
+
+    Sally.DevAlias.create(device, final_opts)
+  end
+
+  def device_add_alias(:latest, opts) do
+    ident = device_latest(opts)
+
+    unless match?(<<_::binary>>, ident), do: raise("unable to locate a recent device")
+
+    device_add_alias(ident, opts)
   end
 
   @doc """
@@ -358,5 +373,9 @@ defmodule Sally do
       %Host{} = host -> Host.setup(host, opts)
       _ -> {:not_found, ident}
     end
+  end
+
+  def ttl_adjust([<<_::binary>> | _] = names, ttl_ms) when is_integer(ttl_ms) do
+    Enum.map(names, &Sally.DevAlias.ttl_adjust(&1, ttl_ms))
   end
 end

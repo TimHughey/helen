@@ -134,7 +134,6 @@ CREATE TABLE public.device (
     family character varying(24) NOT NULL,
     mutable boolean NOT NULL,
     pios integer NOT NULL,
-    last_seen_at timestamp without time zone,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -413,3 +412,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20220123142033);
 INSERT INTO public."schema_migrations" (version) VALUES (20220201145624);
 INSERT INTO public."schema_migrations" (version) VALUES (20220206160941);
 INSERT INTO public."schema_migrations" (version) VALUES (20220206170830);
+INSERT INTO public."schema_migrations" (version) VALUES (20220209192638);

@@ -14,10 +14,10 @@ defmodule Sally.Synchronous.DevAliasTest do
   describe "Sally.device_add_alias/1" do
     @tag device_add: [auto: :ds]
     test "creates alias to latest device discovered", ctx do
-      assert %{device: %Sally.Device{id: want_dev_id}} = ctx
+      assert %{device: %{id: want_dev_id, inserted_at: _inserted_at}} = ctx
 
-      opts = [device: :latest, milliseconds: -20, name: Sally.DevAliasAid.unique(:dev_alias)]
-      assert %{device_id: ^want_dev_id} = Sally.device_add_alias(opts)
+      opts = [milliseconds: -30, name: Sally.DevAliasAid.unique(:dev_alias)]
+      assert %{device_id: ^want_dev_id} = Sally.device_add_alias(:latest, opts)
     end
   end
 end

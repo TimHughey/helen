@@ -44,5 +44,24 @@ defmodule Sally.ImmutableDispatchTest do
       # NOTE: ensure the status detail has changed
       refute before_detail == after_detail
     end
+
+    @tag dispatch_add: [subsystem: "immut", category: "celsius", device: [auto: :ds]]
+    test "handles status message for device without aliases", ctx do
+      assert %{dispatch: dispatch, dispatch_filter: filter} = ctx
+      assert %{payload: payload, filter_extra: filter_extra} = dispatch
+
+      assert [device_ident, "ok"] = filter_extra
+      device = Sally.Device.find(device_ident)
+      assert %Sally.Device{ident: ^device_ident} = device
+
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
+
+      assert_receive(%Sally.Dispatch{} = dispatch, 500)
+      assert %{halt_reason: :none, valid?: true} = dispatch
+      assert %{txn_info: %{} = txn_info} = dispatch
+
+      # confirm no aliases were processed
+      assert %{_post_process_: [], aliases: []} = txn_info
+    end
   end
 end

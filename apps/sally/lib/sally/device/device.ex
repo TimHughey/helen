@@ -18,7 +18,7 @@ defmodule Sally.Device do
     field(:family, :string)
     field(:mutable, :boolean)
     field(:pios, :integer)
-    field(:last_seen_at, :utc_datetime_usec)
+    field(:seen_at, :utc_datetime_usec, virtual: true)
 
     belongs_to(:host, Host)
     has_many(:aliases, DevAlias, foreign_key: :device_id, preload_order: [asc: :pio])
@@ -42,20 +42,19 @@ defmodule Sally.Device do
     |> Changeset.validate_number(:pios, greater_than_or_equal_to: 1)
   end
 
-  @columns [:id, :ident, :family, :mutable, :pios, :last_seen_at, :updated_at, :inserted_at]
+  @columns [:id, :ident, :family, :mutable, :pios, :updated_at, :inserted_at]
   @not_required [:id, :inserted_at, :updated_at]
   @required Enum.reject(@columns, fn x -> x in @not_required end)
 
   def columns(:cast), do: @columns
   def columns(:required), do: @required
 
-  def create(<<_::binary>> = ident, create_at, %{} = params) do
+  def create(<<_::binary>> = ident, _create_at, %{} = params) do
     %{
       ident: ident,
       family: family(ident),
       mutable: params.subsystem == "mut",
-      pios: pios_from_pin_data(params.data),
-      last_seen_at: create_at
+      pios: pios_from_pin_data(params.data)
     }
     |> changeset(params.host)
     |> Sally.Repo.insert!(insert_opts())
@@ -91,7 +90,9 @@ defmodule Sally.Device do
     end
   end
 
-  @dont_replace [:id, :last_seen_at, :updated_at]
+  def immutable?(%{mutable: mutable}), do: not mutable
+
+  @dont_replace [:id, :updated_at]
   @replace Enum.reject(@columns, fn x -> x in @dont_replace end)
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:ident]] ++ @returned
   def insert_opts, do: @insert_opts
@@ -109,7 +110,7 @@ defmodule Sally.Device do
       # a device without aliases was found, this is the one we want
       :finalize, %{id: _} = latest -> if(schema?, do: latest, else: latest.ident)
       # bad luck, no device without aliases found
-      :finalize, _none -> nil
+      :finalize, _none -> raise("unable to discover a latest device")
     end)
   end
 
@@ -128,14 +129,18 @@ defmodule Sally.Device do
 
     after_at = Timex.now() |> Timex.shift(shifts)
 
-    from(device in __MODULE__, where: device.inserted_at >= ^after_at, order_by: device.inserted_at)
+    from(device in __MODULE__,
+      where: device.inserted_at >= ^after_at,
+      order_by: device.inserted_at,
+      select_merge: %{seen_at: device.updated_at}
+    )
   end
 
   def load_aliases(%Schema{} = device), do: Repo.preload(device, [:aliases])
 
-  def load_host(device) do
-    Repo.preload(device, [:host])
-  end
+  # def load_host(device) do
+  #   Repo.preload(device, [:host])
+  # end
 
   def move_aliases(src_ident, dest_ident) do
     with {:src, %Schema{} = src_dev} <- {:src, find(src_ident)},
@@ -154,10 +159,12 @@ defmodule Sally.Device do
   def nature(%Sally.Device{mutable: mutable}), do: if(mutable, do: :cmds, else: :datapoints)
 
   def pio_check(schema, opts) when is_list(opts) do
+    pio = opts[:pio]
+
     case schema do
-      %Schema{mutable: true} -> opts[:pio]
-      %Schema{mutable: false} -> 0
-      _ -> nil
+      %{mutable: true} when is_integer(pio) -> pio
+      %{mutable: false} -> 0
+      _ -> raise(":pio option required for mutable device aliases")
     end
   end
 
@@ -185,11 +192,11 @@ defmodule Sally.Device do
     end
   end
 
-  def summary(%Schema{} = x), do: Map.take(x, [:ident, :last_seen_at])
+  def summary(%Schema{} = x), do: Map.take(x, [:ident, :seen_at])
 
   def ttl_reset(%Sally.DevAlias{device_id: id, updated_at: ttl_at}) do
     Sally.Repo.load(Schema, id: id)
-    |> Ecto.Changeset.cast(%{last_seen_at: ttl_at}, [:last_seen_at])
+    |> Ecto.Changeset.cast(%{updated_at: ttl_at}, [:updated_at])
     |> Sally.Repo.update!(@returned)
   end
 

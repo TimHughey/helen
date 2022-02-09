@@ -68,9 +68,7 @@ defmodule Sally.Synchronous.DeviceTest do
     end
 
     test "returns nil when no latest device" do
-      latest = Sally.Device.latest(milliseconds: -5)
-
-      refute latest
+      assert_raise RuntimeError, ~r/latest/, fn -> Sally.Device.latest(milliseconds: -5) end
     end
   end
 end

@@ -48,14 +48,17 @@ defmodule Sally.DispatchAid do
 
   def add(_), do: :ok
 
+  @create_opts [:host, :dev_alias_opts, :device]
   def assemble_opts_map(opts) when is_list(opts) do
-    {create_opts, opts_rest} = Keyword.split(opts, [:host, :dev_alias_opts])
+    {create_opts, opts_rest} = Keyword.split(opts, @create_opts)
 
     case create_opts do
       [{:host, host_opts}] -> %{host: Sally.HostAid.add(host_opts)}
       [{:dev_alias_opts, dev_alias_opts}] -> Sally.DevAliasAid.add(dev_alias_opts)
+      [{:device, device_opts}] -> Sally.DeviceAid.add(device_opts)
       x -> raise_opts_map("ambiguous opts", x)
     end
+    # NOTE: all functions in the above case statement return a map
     |> Map.merge(Enum.into(opts_rest, %{}))
     |> Map.put(:opts, opts_rest)
   end
