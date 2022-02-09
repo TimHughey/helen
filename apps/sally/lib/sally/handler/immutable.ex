@@ -33,9 +33,7 @@ defmodule Sally.Immutable.Dispatch do
   @want_keys [:aliases, :datapoints, :device]
   # NOTE: the dispatch is guaranteed to be valid
   def post_process(%{} = dispatch) do
-    %{aliases: aliases} = dispatch.txn_info
-
-    _ = Sally.DevAlias.register(aliases, [])
+    _ = Sally.DevAlias.register(dispatch.txn_info.aliases)
 
     Map.take(dispatch.txn_info, @want_keys)
     |> Map.put(:data, dispatch.data)

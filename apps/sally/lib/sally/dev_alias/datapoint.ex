@@ -20,8 +20,6 @@ defmodule Sally.Datapoint do
   def add([_ | _] = aliases, raw_data, at), do: Enum.map(aliases, &add(&1, raw_data, at))
 
   def add(%Sally.DevAlias{} = a, raw_data, %DateTime{} = at) when is_map(raw_data) do
-    log_add(a, raw_data)
-
     raw_data
     |> Map.take([:temp_c, :relhum])
     |> Map.put(:reading_at, at)
@@ -58,16 +56,6 @@ defmodule Sally.Datapoint do
       kv, _query ->
         raise("unknown opt: #{inspect(kv)}")
     end)
-  end
-
-  @log_these ["attic south exterior", "exterior se"]
-  def log_add(%{name: name}, %{temp_c: temp_c}) do
-    if name in @log_these do
-      temp_c = if is_float(temp_c), do: Float.round(temp_c, 2), else: temp_c
-
-      ["[", name, "] ", "{", Float.to_string(temp_c), "}"]
-      |> Logger.info()
-    end
   end
 
   def purge([id | _] = ids, opts) when is_integer(id) do
