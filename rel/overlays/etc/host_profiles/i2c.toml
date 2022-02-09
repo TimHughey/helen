@@ -6,7 +6,7 @@ description = "i2c"
 version = 1
 
 [host]
-report_ms = 11_000
+report_ms = 17_000
 
 [ota]
 base_url = "https://www.wisslanding.com/sally/firmware"
@@ -16,5 +16,5 @@ valid_ms = 59_000
 # the engine is started only when the configuration is present
 
 [i2c]
-report = {stack = 4096, pri = 5, send_ms = 11_000, loops_per_discover = 10 }
+report = {stack = 4096, pri = 5, send_ms = 13_000, loops_per_discover = 10 }
 command = {stack = 4096, pri = 14}

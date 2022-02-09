@@ -11,7 +11,7 @@ description = "simple, no engines"
 version = 1
 
 [host]
-report_ms = 11_000
+report_ms = 30_000
 
 [ota]
 base_url = "https://www.wisslanding.com/sally/firmware"
