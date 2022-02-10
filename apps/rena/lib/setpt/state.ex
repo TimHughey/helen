@@ -12,8 +12,8 @@ defmodule Rena.SetPt.State do
             cmds: %{},
             transition_min_ms: 60_000,
             last_exec: :none,
-            last_notify_at: :none,
-            last_transition: DateTime.from_unix!(0),
+            notified_at: :none,
+            transition_at: DateTime.from_unix!(0),
             timezone: "America/New_York"
 
   @type cmds :: [{:active, list()}, {:inactive, list()}]
@@ -29,12 +29,12 @@ defmodule Rena.SetPt.State do
           cmds: cmds(),
           transition_min_ms: pos_integer(),
           last_exec: last_exec(),
-          last_notify_at: nil | DateTime.t(),
-          last_transition: DateTime.t(),
+          notified_at: nil | DateTime.t(),
+          transition_at: DateTime.t(),
           timezone: Calendar.time_zone()
         }
 
-  def allow_transition?(%State{last_transition: last, transition_min_ms: ms}, opts \\ []) do
+  def allow_transition?(%State{transition_at: last, transition_min_ms: ms}, opts \\ []) do
     now = opts[:now] || DateTime.utc_now()
 
     if DateTime.diff(now, last, :millisecond) > ms, do: true, else: false
@@ -63,7 +63,7 @@ defmodule Rena.SetPt.State do
     [{:name, s.equipment} | @notify_opts] |> alfred.notify_register() |> save_ticket(s)
   end
 
-  def transition(%State{} = s), do: %State{s | last_transition: DateTime.utc_now()}
+  def transition(%State{} = s), do: %State{s | transition_at: DateTime.utc_now()}
 
   # (1 of 2) handle pipelining
   def update_last_exec(what, %State{} = s), do: update_last_exec(s, what)
@@ -78,7 +78,7 @@ defmodule Rena.SetPt.State do
     end
   end
 
-  def update_last_notify_at(%State{} = s), do: %State{s | last_notify_at: DateTime.utc_now()}
+  def update_notified_at(%State{} = s), do: %State{s | notified_at: DateTime.utc_now()}
 
   ##
   ## Private

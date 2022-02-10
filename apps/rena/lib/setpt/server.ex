@@ -72,7 +72,7 @@ defmodule Rena.SetPt.Server do
       |> Rena.SetPt.State.update_last_exec(s)
       |> noreply()
     else
-      Rena.SetPt.State.update_last_notify_at(s) |> noreply()
+      Rena.SetPt.State.update_notified_at(s) |> noreply()
     end
   end
 
