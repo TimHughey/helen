@@ -27,7 +27,7 @@ defmodule Sally.MutableDispatchTest do
 
       assert_receive(%Sally.Dispatch{} = dispatch, 500)
 
-      assert %{halt_reason: :none, subsystem: "mut", valid?: true} = dispatch
+      assert %{subsystem: "mut", halt_reason: :none} = dispatch
       assert %{filter_extra: [^refid]} = dispatch
       assert %{txn_info: %{aliases: %Sally.DevAlias{name: ^name}}} = dispatch
 
@@ -49,7 +49,7 @@ defmodule Sally.MutableDispatchTest do
 
       assert_receive(%Sally.Dispatch{} = dispatch, 150)
 
-      assert %{halt_reason: :none, subsystem: "mut", valid?: true} = dispatch
+      assert %{subsystem: "mut", halt_reason: :none} = dispatch
       assert %{filter_extra: [_device_ident, "ok"]} = dispatch
       assert %{txn_info: %{} = txn_info} = dispatch
 

@@ -30,7 +30,7 @@ defmodule Sally.Mqtt.Handler do
   def connection(:down, s), do: reply_ok(s)
   def connection(:terminated, s), do: reply_ok(s)
 
-  # NOTE: match 'odd' messages (e.g. payload is not a bitstring) first
+  # NOTE: match and quietly ignore non-bitstring messages
   def handle_message(_topic, payload, s) when not is_bitstring(payload) do
     # TODO: log payload error
 
@@ -38,11 +38,10 @@ defmodule Sally.Mqtt.Handler do
   end
 
   # NOTE: filter levels: [@filter_env, "r2", _host, _subsys, _cat | _extra]
-  # NOTE: duplicato variables in a pattern match must be equal
-  def handle_message([@env, "r2" | _rest] = filter, payload, s) do
-    process_dispatch(filter, payload)
-    |> then(fn last_dispatch -> Map.put(s, :last, last_dispatch) end)
-    |> reply_ok()
+  def handle_message([@env, "r2" | filter_rest], payload, s) do
+    _ = Sally.Dispatch.accept(filter_rest, payload)
+
+    {:ok, s}
   end
 
   def handle_message(topic_filters, payload, s) do
@@ -57,13 +56,6 @@ defmodule Sally.Mqtt.Handler do
     |> Logger.info()
 
     reply_ok(s)
-  end
-
-  def process_dispatch([env, "r2", host_ident, subsystem, category | extra], payload) do
-    {[env, host_ident, subsystem, category, extra], payload}
-    |> Sally.Dispatch.accept()
-    |> Sally.Dispatch.preprocess()
-    |> Sally.Dispatch.handoff()
   end
 
   def subscription(:up, topic_filter, s) do

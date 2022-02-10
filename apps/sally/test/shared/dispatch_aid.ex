@@ -7,7 +7,7 @@ defmodule Sally.DispatchAid do
 
   defmacro assert_processed(dispatch) do
     quote bind_quoted: [dispatch: dispatch] do
-      assert %Sally.Dispatch{valid?: true, halt_reason: :none, results: %{} = results} = dispatch
+      assert %Sally.Dispatch{halt_reason: :none, results: %{} = results} = dispatch
       assert %{device: %Sally.Device{}, aliases: aliases} = results
 
       nature = if(dispatch.subsystem == "mut", do: :cmds, else: :datapoints)

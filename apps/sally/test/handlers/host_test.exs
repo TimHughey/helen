@@ -30,8 +30,7 @@ defmodule Sally.HostDispatchTest do
           recv_at: %DateTime{},
           routed: :ok,
           sent_at: %DateTime{},
-          txn_info: %{},
-          valid?: true
+          txn_info: %{}
         },
         500
       )
@@ -58,8 +57,7 @@ defmodule Sally.HostDispatchTest do
           recv_at: %DateTime{},
           routed: :ok,
           sent_at: %DateTime{},
-          txn_info: %{},
-          valid?: true
+          txn_info: %{}
         },
         500
       )
@@ -84,8 +82,7 @@ defmodule Sally.HostDispatchTest do
           recv_at: %DateTime{},
           routed: :ok,
           sent_at: %DateTime{},
-          txn_info: %{},
-          valid?: true
+          txn_info: %{}
         },
         500
       )

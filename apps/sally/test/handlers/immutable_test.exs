@@ -27,7 +27,7 @@ defmodule Sally.ImmutableDispatchTest do
 
       assert_receive(%Sally.Dispatch{} = dispatch, 500)
 
-      assert %{halt_reason: :none, subsystem: "immut", valid?: true} = dispatch
+      assert %{subsystem: "immut", halt_reason: :none} = dispatch
       assert %{filter_extra: [^device_ident, "ok"]} = dispatch
       assert %{txn_info: %{} = txn_info} = dispatch
 
@@ -57,7 +57,7 @@ defmodule Sally.ImmutableDispatchTest do
       assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
 
       assert_receive(%Sally.Dispatch{} = dispatch, 500)
-      assert %{halt_reason: :none, valid?: true} = dispatch
+      assert %{halt_reason: :none} = dispatch
       assert %{txn_info: %{} = txn_info} = dispatch
 
       # confirm no aliases were processed

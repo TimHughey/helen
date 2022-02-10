@@ -6,7 +6,8 @@
 #
 #   @moduletag sally: true, sally_dispatch: true
 #
-#   describe "Sally.Dispatch.accept/1" do
+#   describe "Sally.Dispatch.dispatch/1" do
 #     @tag dispatch_aid: [subsystem: "host", category: "boot"]
-#     test "handles a boot message", ctx
-# 
+#     test "contains list of available dispatchers", ctx do
+#       Sally.Dispatch.dis
+#
