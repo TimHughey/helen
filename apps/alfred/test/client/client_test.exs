@@ -27,8 +27,8 @@ defmodule Alfred.UseTest do
       assert ^name = Alfred.Test.Client.name(pid)
 
       status = Alfred.status(name)
-      assert %Alfred.Status{name: ^name, detail: detail, rc: :ok} = status
-      assert %{hello: :doctor} = detail
+      assert %Alfred.Status{name: ^name, story: story, rc: :ok} = status
+      assert %{hello: :doctor} = story
     end
 
     @tag name_add: [prefix: "server"]
@@ -42,8 +42,8 @@ defmodule Alfred.UseTest do
 
       cmd = "state"
       execute = Alfred.execute(name: name, cmd: cmd)
-      assert %Alfred.Execute{name: ^name, cmd: ^cmd, detail: detail, rc: :ok} = execute
-      assert %{name: <<_::binary>>, cmd: ^cmd, nature: :server} = detail
+      assert %Alfred.Execute{name: ^name, cmd: ^cmd, story: story, rc: :ok} = execute
+      assert %{name: <<_::binary>>, cmd: ^cmd, nature: :server} = story
     end
   end
 end

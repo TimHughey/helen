@@ -4,7 +4,7 @@ defmodule Alfred.Execute do
 
   """
 
-  defstruct name: :none, cmd: "unknown", detail: :none, rc: nil
+  defstruct name: :none, cmd: "unknown", story: :none, rc: nil
 
   @callback execute_cmd(any(), opts :: list()) :: any()
 
@@ -16,14 +16,14 @@ defmodule Alfred.Execute do
     end
   end
 
-  defmacrop halt(rc, detail) do
+  defmacrop halt(rc, story) do
     %{function: {what, _}} = __CALLER__
 
-    quote bind_quoted: [rc: rc, detail: detail, what: what] do
+    quote bind_quoted: [rc: rc, story: story, what: what] do
       chk_map = var!(chk_map)
-      detail = if(detail == :none, do: :none, else: Map.get(chk_map, :detail, %{}) |> Map.merge(detail))
+      story = if(story == :none, do: :none, else: Map.get(chk_map, :story, %{}) |> Map.merge(story))
 
-      {:halt, Map.merge(chk_map, %{what => rc, rc: rc, detail: detail})}
+      {:halt, Map.merge(chk_map, %{what => rc, rc: rc, story: story})}
     end
   end
 
@@ -48,7 +48,7 @@ defmodule Alfred.Execute do
 
   @doc false
   def new_from_checks_accumulator(chk_map) do
-    cmd = if(match?(%{detail: %{cmd: _}}, chk_map), do: chk_map.detail.cmd, else: nil)
+    cmd = if(match?(%{story: %{cmd: _}}, chk_map), do: chk_map.story.cmd, else: nil)
 
     if(is_binary(cmd), do: put_in(chk_map, [:cmd], cmd), else: chk_map)
     |> then(fn fields -> struct(__MODULE__, fields) end)
@@ -68,14 +68,14 @@ defmodule Alfred.Execute do
   @doc since: "0.3.0"
   def to_binary(%{name: name} = execute, _opts \\ []) do
     case execute do
-      %{rc: :ok, detail: %{cmd: cmd}} -> ["OK", "{#{cmd}}"]
-      %{rc: :busy, detail: %{cmd: cmd, refid: refid}} -> ["BUSY", "{#{cmd}}", "@#{refid}"]
+      %{rc: :ok, story: %{cmd: cmd}} -> ["OK", "{#{cmd}}"]
+      %{rc: :busy, story: %{cmd: cmd, refid: refid}} -> ["BUSY", "{#{cmd}}", "@#{refid}"]
       %{rc: :not_found} -> ["NOT_FOUND"]
       %{rc: {:ttl_expired, ms}} -> ["TTL_EXPIRED", "+#{ms}ms"]
       %{rc: {:timeout, ms}} -> ["TIMEOUT", "+#{ms}ms"]
       _ -> ["ERROR"]
     end
-    |> then(fn detail -> detail ++ ["[#{name}]"] end)
+    |> then(fn story -> story ++ ["[#{name}]"] end)
     |> Enum.join(" ")
   end
 
@@ -89,7 +89,7 @@ defmodule Alfred.Execute do
 
     case status do
       _status when force -> continue(:force)
-      %{detail: %{cmd: ^want_cmd} = detail} -> halt(:ok, detail)
+      %{story: %{cmd: ^want_cmd} = story} -> halt(:ok, story)
       _ -> continue(:not_equal)
     end
   end
@@ -108,7 +108,7 @@ defmodule Alfred.Execute do
   end
 
   @doc false
-  def finalize(%{execute_cmd: {rc, detail}} = chk_map), do: halt(rc, detail)
+  def finalize(%{execute_cmd: {rc, story}} = chk_map), do: halt(rc, story)
 
   @doc false
   def status(chk_map, info, args) do
@@ -122,7 +122,7 @@ defmodule Alfred.Execute do
   def verify(%{status: status} = chk_map) do
     case status do
       %Alfred.Status{rc: :ok} -> continue(:ok)
-      %Alfred.Status{rc: rc, detail: detail} -> halt(rc, detail)
+      %Alfred.Status{rc: rc, story: story} -> halt(rc, story)
     end
   end
 

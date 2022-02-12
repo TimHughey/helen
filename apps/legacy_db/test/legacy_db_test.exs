@@ -72,15 +72,15 @@ defmodule LegacyDbTest do
     assert [<<_::binary>> | _] = LegacyDb.all_pwm_names()
   end
 
-  test "pwm lookup alias details" do
+  test "pwm lookup alias story" do
     assert %{name: _} = LegacyDb.pwm_alias("front leds porch")
   end
 
-  test "sensor lookup alias details" do
+  test "sensor lookup alias story" do
     assert %{name: _} = LegacyDb.sensor_alias("display_tank")
   end
 
-  test "switch lookup alias details" do
+  test "switch lookup alias story" do
     assert %{name: _} = LegacyDb.switch_alias("display tank heater")
   end
 

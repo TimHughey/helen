@@ -34,7 +34,7 @@ defmodule SallyCommandTest do
 
       assert is_integer(rt_us) and rt_us > 100
 
-      assert %{rc: rc, detail: %{cmd: ^acked_cmd}} = Alfred.status(name)
+      assert %{rc: rc, story: %{cmd: ^acked_cmd}} = Alfred.status(name)
       assert {:timeout, ms} = rc
       assert ms >= 1
     end

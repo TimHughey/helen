@@ -105,7 +105,7 @@ defmodule Rena.SetPt.CmdTest do
       cmd_args = %{equipment: ctx.equipment, next_cmd: "on"}
 
       execute = Rena.SetPt.Cmd.execute(cmd_args, ctx.opts)
-      assert %Alfred.Execute{rc: :ok, detail: %{cmd: "on"}} = execute
+      assert %Alfred.Execute{rc: :ok, story: %{cmd: "on"}} = execute
     end
 
     @tag equipment_add: [busy: true, cmd: "on"]

@@ -64,7 +64,7 @@ defmodule AlfredTest do
       assert %Alfred.Status{
                name: <<_name::binary>>,
                rc: :ok,
-               detail: %{temp_f: _}
+               story: %{temp_f: _}
              } = status
     end
   end
@@ -74,14 +74,14 @@ defmodule AlfredTest do
       assert %Alfred.Status{
                name: <<_::binary>>,
                rc: :ok,
-               detail: %{cmd: <<_::binary>>}
+               story: %{cmd: <<_::binary>>}
              } = status
     end
   end
 
   describe "Alfred.status/2" do
     @tag sensor_add: [rc: :ok, temp_f: 81.1, relhum: 65.1]
-    test "returns a well formed Alfred.Status with datapoint detail", ctx do
+    test "returns a well formed Alfred.Status with datapoint story", ctx do
       name = get_name_from_ctx()
       status = Alfred.status(name, [])
 
@@ -89,7 +89,7 @@ defmodule AlfredTest do
     end
 
     @tag equipment_add: []
-    test "returns a well formed Alfred.Status with cmd detail", ctx do
+    test "returns a well formed Alfred.Status with cmd story", ctx do
       name = get_name_from_ctx()
       status = Alfred.status(name, [])
 

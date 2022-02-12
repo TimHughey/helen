@@ -30,7 +30,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       # when the DevAlias does not have any commands
 
       {status, log} = with_log(fn -> Alfred.status(name, []) end)
-      assert %Alfred.Status{rc: :ok, detail: %{cmd: "unknown"}} = status
+      assert %Alfred.Status{rc: :ok, story: %{cmd: "unknown"}} = status
 
       assert log =~ ~r(mfa=Sally.Command.status_log_unknown/2)
     end
@@ -46,7 +46,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %{cmd_latest: %{acked: false, acked_at: nil, cmd: cmd}} = ctx
 
       status = Alfred.status(name, [])
-      assert %Alfred.Status{rc: :busy, detail: %{cmd: ^cmd}} = status
+      assert %Alfred.Status{rc: :busy, story: %{cmd: ^cmd}} = status
     end
 
     @tag capture_log: true
@@ -63,7 +63,7 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
 
       status = Alfred.status(name, [])
 
-      assert %Alfred.Status{rc: rc, detail: %{cmd: ^cmd}} = status
+      assert %Alfred.Status{rc: rc, story: %{cmd: ^cmd}} = status
       assert {:timeout, ms} = rc
       assert is_integer(ms) and ms > 1
     end
@@ -72,19 +72,19 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
     test "immutable (with history)", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-      assert %{rc: :ok, detail: detail} = Alfred.status(name, since_ms: 60_000)
-      assert %{points: points} = detail
+      assert %{rc: :ok, story: story} = Alfred.status(name, since_ms: 60_000)
+      assert %{points: points} = story
 
       history_avg = Sally.DatapointAid.avg_daps(ctx, points)
 
-      Enum.each(history_avg, fn {k, v} -> assert_in_delta(v, Map.get(detail, k), 0.01) end)
+      Enum.each(history_avg, fn {k, v} -> assert_in_delta(v, Map.get(story, k), 0.01) end)
     end
 
     @tag dev_alias_add: [auto: :ds]
     test "immutable (without history)", ctx do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
-      assert %{rc: :no_data, detail: %{}} = Alfred.status(name, since_ms: 60_000)
+      assert %{rc: :no_data, story: %{}} = Alfred.status(name, since_ms: 60_000)
     end
   end
 
@@ -99,14 +99,14 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       assert %Sally.DevAlias{status: status} = cmd_status
       assert %{id: before_id} = status
 
-      assert %Alfred.Status{rc: :ok, detail: detail} = Alfred.status(dev_alias_name, [])
-      assert %{cmd: before_cmd, id: ^before_id} = detail
+      assert %Alfred.Status{rc: :ok, story: story} = Alfred.status(dev_alias_name, [])
+      assert %{cmd: before_cmd, id: ^before_id} = story
 
       cmd_opts = [name: dev_alias_name, cmd: before_cmd, echo: :instruct]
       execute = Alfred.execute(cmd_opts, [])
 
-      assert %Alfred.Execute{rc: :ok, name: ^dev_alias_name, detail: detail} = execute
-      assert %{acked: true, cmd: ^before_cmd, id: ^before_id} = detail
+      assert %Alfred.Execute{rc: :ok, name: ^dev_alias_name, story: story} = execute
+      assert %{acked: true, cmd: ^before_cmd, id: ^before_id} = story
     end
 
     @tag dev_alias_add: [auto: :pwm, count: 3, cmds: [history: 15]]
@@ -120,11 +120,11 @@ defmodule Sally.DevAliasAlfredIntegrationTest do
       cmd_opts = [name: dev_alias_name, cmd: new_cmd, echo: :instruct]
       execute = Alfred.execute(cmd_opts, [])
 
-      assert %Alfred.Execute{rc: :busy, name: ^dev_alias_name, detail: detail} = execute
-      assert %{cmd: ^new_cmd} = detail
+      assert %Alfred.Execute{rc: :busy, name: ^dev_alias_name, story: story} = execute
+      assert %{cmd: ^new_cmd} = story
 
       status = Alfred.status(dev_alias_name, [])
-      assert %Alfred.Status{rc: :busy, detail: %{cmd: ^new_cmd}} = status
+      assert %Alfred.Status{rc: :busy, story: %{cmd: ^new_cmd}} = status
 
       assert_receive(%Sally.Host.Instruct{}, 100)
     end

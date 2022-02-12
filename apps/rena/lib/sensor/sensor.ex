@@ -14,7 +14,7 @@ defmodule Rena.Sensor do
       status = alfred.status(name, opts)
 
       case status do
-        %{rc: :ok, detail: dpts} ->
+        %{rc: :ok, story: dpts} ->
           Rena.Sensor.Range.compare(dpts, range) |> Rena.Sensor.Result.tally_datapoint(acc)
 
         _error ->

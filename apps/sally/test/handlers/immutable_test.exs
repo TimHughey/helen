@@ -16,7 +16,7 @@ defmodule Sally.ImmutableDispatchTest do
       assert %{dap_history: [_ | _]} = create_info
 
       status_before = Alfred.status(name, [])
-      assert %Alfred.Status{detail: before_detail, rc: :ok} = status_before
+      assert %Alfred.Status{story: before_story, rc: :ok} = status_before
 
       assert %{payload: payload, filter_extra: filter_extra} = dispatch
       assert [device_ident, "ok"] = filter_extra
@@ -39,10 +39,10 @@ defmodule Sally.ImmutableDispatchTest do
       assert [{<<_::binary>> = _dev_alias_name, :ok}] = post_process
 
       status_after = Alfred.status(name, [])
-      assert %Alfred.Status{detail: after_detail, rc: :ok} = status_after
+      assert %Alfred.Status{story: after_story, rc: :ok} = status_after
 
-      # NOTE: ensure the status detail has changed
-      refute before_detail == after_detail
+      # NOTE: ensure the status story has changed
+      refute before_story == after_story
     end
 
     @tag dispatch_add: [subsystem: "immut", category: "celsius", device: [auto: :ds]]

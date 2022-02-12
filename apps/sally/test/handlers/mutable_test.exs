@@ -32,9 +32,9 @@ defmodule Sally.MutableDispatchTest do
       assert %{txn_info: %{aliases: %Sally.DevAlias{name: ^name}}} = dispatch
 
       status = Alfred.status(name, [])
-      assert %Alfred.Status{rc: :ok, name: ^name, detail: detail} = status
+      assert %Alfred.Status{rc: :ok, name: ^name, story: story} = status
 
-      assert %{id: ^cmd_id, cmd: ^cmd, refid: ^refid} = detail
+      assert %{id: ^cmd_id, cmd: ^cmd, refid: ^refid} = story
     end
 
     @tag capture_log: true

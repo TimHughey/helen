@@ -22,7 +22,7 @@ defmodule Alfred.ExecuteTest do
 
       execute = Alfred.execute([name: name, cmd: "on"], [])
 
-      assert %Alfred.Execute{name: ^name, rc: :not_found, detail: :none} = execute
+      assert %Alfred.Execute{name: ^name, rc: :not_found, story: :none} = execute
 
       assert Alfred.execute_to_binary(execute) =~ "NOT_FOUND"
     end
@@ -32,7 +32,7 @@ defmodule Alfred.ExecuteTest do
       name = get_name_from_ctx()
 
       execute = Alfred.execute(name: name, cmd: "off")
-      assert %Alfred.Execute{rc: :ok, cmd: cmd, detail: %{cmd: cmd}, name: ^name} = execute
+      assert %Alfred.Execute{rc: :ok, cmd: cmd, story: %{cmd: cmd}, name: ^name} = execute
 
       assert Alfred.execute_to_binary(execute) =~ "OK {off} [mutable"
     end
@@ -45,8 +45,8 @@ defmodule Alfred.ExecuteTest do
       execute = Alfred.execute(execute_args, [])
 
       assert %Alfred.Execute{cmd: "on" = cmd, rc: :busy} = execute
-      assert %Alfred.Execute{detail: detail, name: ^name} = execute
-      assert %{cmd: ^cmd, refid: refid} = detail
+      assert %Alfred.Execute{story: story, name: ^name} = execute
+      assert %{cmd: ^cmd, refid: refid} = story
 
       assert Alfred.execute_to_binary(execute) =~ "BUSY {on} @"
 
@@ -65,9 +65,9 @@ defmodule Alfred.ExecuteTest do
       execute_args = [name: name, cmd: "on"]
 
       execute = Alfred.execute(execute_args, [])
-      assert %Alfred.Execute{rc: :busy, cmd: "off", detail: detail, name: ^name} = execute
+      assert %Alfred.Execute{rc: :busy, cmd: "off", story: story, name: ^name} = execute
 
-      assert %{cmd: "off", refid: <<_::binary>>, sent_at: %DateTime{}} = detail
+      assert %{cmd: "off", refid: <<_::binary>>, sent_at: %DateTime{}} = story
 
       assert Alfred.execute_to_binary(execute) =~ "BUSY {off} @"
     end
@@ -79,11 +79,11 @@ defmodule Alfred.ExecuteTest do
       execute_args = [name: name, cmd: "on"]
 
       execute = Alfred.execute(execute_args, [])
-      assert %Alfred.Execute{rc: rc, cmd: "off", detail: detail, name: ^name} = execute
+      assert %Alfred.Execute{rc: rc, cmd: "off", story: story, name: ^name} = execute
 
       assert {:timeout, ms} = rc
       assert ms > 10
-      assert %{cmd: "off", refid: <<_::binary>>, sent_at: %DateTime{}} = detail
+      assert %{cmd: "off", refid: <<_::binary>>, sent_at: %DateTime{}} = story
 
       assert Alfred.execute_to_binary(execute) =~ ~r/TIMEOUT \+\d+ms \[\w+/
     end
@@ -95,11 +95,11 @@ defmodule Alfred.ExecuteTest do
       execute_args = [name: name, cmd: "on"]
 
       execute = Alfred.execute(execute_args)
-      assert %Alfred.Execute{rc: rc, cmd: "unknown", detail: detail, name: ^name} = execute
+      assert %Alfred.Execute{rc: rc, cmd: "unknown", story: story, name: ^name} = execute
 
       assert {:ttl_expired, ms} = rc
       assert ms > 10
-      assert :none = detail
+      assert :none = story
 
       assert Alfred.execute_to_binary(execute) =~ ~r/TTL_EXPIRED \+\d+ms \[\w+/
     end
@@ -112,10 +112,10 @@ defmodule Alfred.ExecuteTest do
       execute_args = [name: name, cmd: cmd]
 
       execute = Alfred.execute(execute_args, force: true)
-      assert %Alfred.Execute{rc: :busy, cmd: ^cmd, detail: detail, name: ^name} = execute
+      assert %Alfred.Execute{rc: :busy, cmd: ^cmd, story: story, name: ^name} = execute
 
-      assert %{cmd: ^cmd, acked: false, refid: <<_::binary>>} = detail
-      assert %{sent_at: %DateTime{}, track: {:ok, pid}} = detail
+      assert %{cmd: ^cmd, acked: false, refid: <<_::binary>>} = story
+      assert %{sent_at: %DateTime{}, track: {:ok, pid}} = story
       assert is_pid(pid) and Process.alive?(pid)
 
       assert Alfred.execute_to_binary(execute) =~ "BUSY {off} @"

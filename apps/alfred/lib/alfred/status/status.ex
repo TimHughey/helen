@@ -4,12 +4,12 @@ defmodule Alfred.Status do
 
   """
 
-  defstruct name: :none, detail: :none, rc: :not_found, __raw__: :none
+  defstruct name: :none, story: :none, rc: :not_found, __raw__: :none
 
   @type lookup_result() :: nil | {:ok, any()} | {:error, any()} | struct() | map()
   @type status_rc :: :ok | {:not_found, String.t()} | :busy | :timeout | {:ttl_expired, pos_integer()}
 
-  @type t :: %__MODULE__{name: String.t(), detail: map | struct, rc: status_rc(), __raw__: any}
+  @type t :: %__MODULE__{name: String.t(), story: map | struct, rc: status_rc(), __raw__: any}
 
   @callback status_lookup(map(), map()) :: lookup_result()
 
@@ -37,7 +37,7 @@ defmodule Alfred.Status do
   @doc since: "0.3.0"
   def get_cmd(%__MODULE__{} = status) do
     case status do
-      %{detail: %{cmd: cmd}} -> cmd
+      %{story: %{cmd: cmd}} -> cmd
       _ -> "UNKNOWN"
     end
   end
@@ -58,12 +58,12 @@ defmodule Alfred.Status do
     end
   end
 
-  defmacrop halt(rc, detail) do
+  defmacrop halt(rc, story) do
     %{function: {what, _}} = __CALLER__
 
-    quote bind_quoted: [rc: rc, detail: detail, what: what] do
+    quote bind_quoted: [rc: rc, story: story, what: what] do
       chk_map = var!(chk_map)
-      merge = %{what => rc, detail: merge_detail(chk_map, detail), rc: rc}
+      merge = %{what => rc, story: merge_story(chk_map, story), rc: rc}
 
       {:halt, Map.merge(chk_map, merge)}
     end
@@ -94,12 +94,12 @@ defmodule Alfred.Status do
   end
 
   @doc false
-  @detail_drop [:__meta__, :__struct__]
-  def merge_detail(_chk_mao, :none), do: :none
+  @story_drop [:__meta__, :__struct__]
+  def merge_story(_chk_mao, :none), do: :none
 
-  def merge_detail(chk_map, merge_this) do
-    existing = Map.get(chk_map, :detail, %{})
-    clean = Map.drop(merge_this, @detail_drop)
+  def merge_story(chk_map, merge_this) do
+    existing = Map.get(chk_map, :story, %{})
+    clean = Map.drop(merge_this, @story_drop)
 
     Map.merge(existing, clean)
   end
@@ -117,12 +117,12 @@ defmodule Alfred.Status do
     case lookup do
       %{} -> continue(lookup)
       {:error, :no_data = rc} -> halt(rc, %{})
-      {rc, %{} = detail} when rc in @allowed_rc -> halt(rc, detail)
+      {rc, %{} = story} when rc in @allowed_rc -> halt(rc, story)
       _ -> halt(:errpr, %{})
     end
   end
 
-  @essential_fields [:detail, :name, :rc]
+  @essential_fields [:story, :name, :rc]
   def take_fields(chk_map, opts) do
     # NOTE: only populate :__raw__ if requested
     extra_fields = if get_in(opts, [:raw]) == true, do: [:__raw__], else: []

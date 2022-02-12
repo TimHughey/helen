@@ -58,7 +58,7 @@ defmodule LegacyDb do
     query = Query.from(x in Schema, where: x.name == ^name)
 
     case Repo.one(query) |> Repo.preload(:device) do
-      %Schema{} = x -> make_alias_details(x)
+      %Schema{} = x -> make_alias_story(x)
       failure -> failure
     end
   end
@@ -69,7 +69,7 @@ defmodule LegacyDb do
     query = Query.from(x in Schema, where: x.name == ^name)
 
     case Repo.one(query) |> Repo.preload(:device) do
-      %Schema{} = x -> make_alias_details(x)
+      %Schema{} = x -> make_alias_story(x)
       failure -> failure
     end
   end
@@ -80,7 +80,7 @@ defmodule LegacyDb do
     query = Query.from(x in Schema, where: x.name == ^name)
 
     case Repo.one(query) |> Repo.preload(:device) do
-      %Schema{} = x -> make_alias_details(x)
+      %Schema{} = x -> make_alias_story(x)
       failure -> failure
     end
   end
@@ -89,16 +89,16 @@ defmodule LegacyDb do
     Query.from(x in schema, select: x.name) |> Repo.all()
   end
 
-  defp make_alias_details(alias_schema) do
-    alias_details = Map.take(alias_schema, [:description, :pio, :ttl_ms, :name])
-    dev_details = Map.take(alias_schema.device, [:device, :host, :last_seen_at, :last_cmd_at])
+  defp make_alias_story(alias_schema) do
+    alias_story = Map.take(alias_schema, [:description, :pio, :ttl_ms, :name])
+    dev_story = Map.take(alias_schema.device, [:device, :host, :last_seen_at, :last_cmd_at])
 
-    for {key, val} <- dev_details do
+    for {key, val} <- dev_story do
       case key do
         k when k in [:last_seen_at, :last_cmd_at] -> {k, Timex.to_datetime(val, "America/New_York")}
         k -> {k, val}
       end
     end
-    |> Enum.into(alias_details)
+    |> Enum.into(alias_story)
   end
 end

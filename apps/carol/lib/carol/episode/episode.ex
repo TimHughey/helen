@@ -251,7 +251,7 @@ defmodule Carol.Episode do
       x when x < 1000 -> ["in less than a second"]
       _ -> ["in", humanize_ms(ms)]
     end
-    |> then(fn details -> base ++ details end)
+    |> then(fn story -> base ++ story end)
     |> Enum.join(" ")
   end
 
@@ -263,7 +263,7 @@ defmodule Carol.Episode do
       x when x < 1000 -> ["started less than a second ago"]
       _ -> ["started", humanize_ms(ms), "ago"]
     end
-    |> then(fn details -> base ++ details end)
+    |> then(fn story -> base ++ story end)
     |> Enum.join(" ")
   end
 

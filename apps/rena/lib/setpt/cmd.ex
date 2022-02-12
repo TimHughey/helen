@@ -40,7 +40,7 @@ defmodule Rena.SetPt.Cmd do
 
   def put_status(status, acc) do
     case status do
-      %{rc: rc, detail: %{cmd: cmd}} -> %{rc: rc, cmd: cmd}
+      %{rc: rc, story: %{cmd: cmd}} -> %{rc: rc, cmd: cmd}
       %{rc: rc} -> %{rc: rc}
     end
     |> Map.put(:status, status)
