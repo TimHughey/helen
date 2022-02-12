@@ -49,7 +49,7 @@ defmodule Alfred do
     args_tuple
     |> Alfred.Execute.Args.auto()
     |> Enum.into(%{})
-    |> Alfred.Name.apply(:execute)
+    |> Alfred.Name.invoke(:execute)
   end
 
   def execute(opts) when is_list(opts), do: execute(opts, [])
@@ -85,6 +85,6 @@ defmodule Alfred do
   def status(<<_::binary>> = name, opts \\ []) do
     args = Enum.into(opts, %{}) |> Map.put(:name, name)
 
-    Alfred.Name.apply(args, :status)
+    Alfred.Name.invoke(args, :status)
   end
 end

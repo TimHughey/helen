@@ -196,7 +196,7 @@ defmodule Alfred.Notify do
   @doc false
   defmacro format_exception(kind, reason) do
     quote do
-      ["\n", Exception.format(unquote(kind), unquote(reason), __STACKTRACE__)] |> IO.puts()
+      ["\n", Exception.format(unquote(kind), unquote(reason), __STACKTRACE__)] |> Logger.warn()
 
       {:failed, {unquote(kind), unquote(reason)}}
     end

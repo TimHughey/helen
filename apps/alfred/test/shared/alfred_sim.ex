@@ -7,7 +7,7 @@ defmodule AlfredSim do
     args_tuple
     |> Alfred.Execute.Args.auto()
     |> Enum.into(%{})
-    |> Alfred.Name.apply(:execute)
+    |> Alfred.Name.invoke(:execute)
     |> tap(fn execute -> Process.send(self(), {:echo, execute}, []) end)
   end
 
@@ -44,6 +44,6 @@ defmodule AlfredSim do
   def status(<<_::binary>> = name, opts \\ []) do
     args = Enum.into(opts, %{}) |> Map.put(:name, name)
 
-    Alfred.Name.apply(args, :status)
+    Alfred.Name.invoke(args, :status)
   end
 end

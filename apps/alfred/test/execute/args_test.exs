@@ -9,27 +9,20 @@ defmodule Alfred.ExecuteArgsTest do
 
   describe "Alfred.Execute.Args.auto/2" do
     test "creates args from :id, :equipment, :params, :opts (no defaults)" do
-      assert [
-               cmd: "Overnight",
-               cmd_opts: [ack: :immediate],
-               cmd_params: [max: 256, min: 0, type: "random"],
-               name: "equip name",
-               pub_opts: []
-             ] =
-               Alfred.Execute.Args.auto(
-                 [
-                   id: "Overnight",
-                   params: [type: "random", min: 0, max: 256],
-                   equipment: "equip name",
-                   opts: [ack: :immediate]
-                 ],
-                 []
-               )
+      want_params = [type: "random", min: 0, max: 256]
+      want_opts = [ack: :immediate]
+      base = [id: "Overnight", params: want_params, equipment: "equip name", opts: want_opts]
+      args = Alfred.Execute.Args.auto(base, [])
+
+      assert [cmd: "Overnight", cmd_opts: got_opts, cmd_params: got_params, name: "equip name"] = args
+
+      assert Enum.sort(want_params) == Enum.sort(got_params)
+      assert Enum.sort(want_opts) == Enum.sort(got_opts)
     end
 
     test "creates args from cmd: :off, :name (no defaults)" do
-      assert [cmd: "off", cmd_opts: [], cmd_params: [], name: "some name", pub_opts: []] =
-               Alfred.Execute.Args.auto([cmd: "off", name: "some name"], [])
+      args = Alfred.Execute.Args.auto([cmd: "off", name: "some name"], [])
+      assert [cmd: "off", cmd_opts: [], cmd_params: [], name: "some name"] = args
     end
 
     test "honors defaults" do
@@ -37,8 +30,7 @@ defmodule Alfred.ExecuteArgsTest do
                cmd: "special",
                cmd_opts: [ack: :immediate],
                cmd_params: [max: 256, min: 0, type: "random"],
-               name: "some name",
-               pub_opts: []
+               name: "some name"
              ] =
                Alfred.Execute.Args.auto(
                  [
@@ -56,8 +48,7 @@ defmodule Alfred.ExecuteArgsTest do
                cmd: "special",
                cmd_opts: [ack: :immediate],
                cmd_params: [max: 256, min: 0, type: "random"],
-               name: "some name",
-               pub_opts: []
+               name: "some name"
              ] =
                Alfred.Execute.Args.auto(
                  [],
@@ -73,8 +64,7 @@ defmodule Alfred.ExecuteArgsTest do
                cmd: "25% of max",
                cmd_opts: [],
                cmd_params: [percent: 25, type: "fixed"],
-               name: "some name",
-               pub_opts: []
+               name: "some name"
              ] =
                Alfred.Execute.Args.auto(
                  [id: "ignore this", name: "some name", params: [percent: 25, type: "fixed"]],
@@ -87,8 +77,7 @@ defmodule Alfred.ExecuteArgsTest do
                cmd: "on",
                cmd_opts: [ack: :immediate, notify_when_released: true],
                cmd_params: [],
-               name: "some name",
-               pub_opts: []
+               name: "some name"
              ] =
                Alfred.Execute.Args.auto([cmd: :on], name: "some name", notify: true, opts: [ack: :immediate])
     end
@@ -98,8 +87,7 @@ defmodule Alfred.ExecuteArgsTest do
                cmd: "special",
                cmd_opts: [ack: :immediate],
                cmd_params: [type: "random"],
-               name: "some name",
-               pub_opts: []
+               name: "some name"
              ] =
                Alfred.Execute.Args.auto([cmd: "special", name: "some name", params: [type: "random"]],
                  cmd: :on,

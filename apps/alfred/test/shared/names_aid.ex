@@ -76,7 +76,7 @@ defmodule Alfred.NamesAid do
   def name_add(ctx) do
     case ctx do
       %{name_add: opts} ->
-        {type, opts_rest} = Keyword.pop(opts, :type)
+        {type, opts_rest} = Keyword.pop(opts, :type, :name)
         {key, opts_rest} = Keyword.pop(opts_rest, :key, :name)
 
         %{key => binary_from_opts(type, opts_rest)}
@@ -141,6 +141,7 @@ defmodule Alfred.NamesAid do
     opts_map = Enum.into(opts, %{})
 
     case type do
+      :name when is_map_key(opts_map, :prefix) -> unique(opts_map.prefix)
       x when x in [:imm, :immutable] -> immutable(opts_map)
       x when x in [:mut, :mutable] -> mutable(opts_map)
       x when x in [:unk, :unknown] -> unknown(opts_map)

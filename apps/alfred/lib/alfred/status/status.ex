@@ -108,6 +108,7 @@ defmodule Alfred.Status do
   def finalize(chk_map, _opts), do: halt(:ok, chk_map.lookup.status)
 
   @doc false
+  @allowed_rc [:busy, :error, :ok, :timeout]
   def lookup(chk_map, info, args) do
     opts = Enum.into(args, [])
 
@@ -116,6 +117,8 @@ defmodule Alfred.Status do
     case lookup do
       %{} -> continue(lookup)
       {:error, :no_data = rc} -> halt(rc, %{})
+      {rc, %{} = detail} when rc in @allowed_rc -> halt(rc, detail)
+      _ -> halt(:errpr, %{})
     end
   end
 

@@ -3,7 +3,7 @@ defmodule Alfred.Execute.Args do
 
   def auto({args, defaults}), do: auto(args, defaults)
 
-  @auto_merge [:cmd_opts, :cmd_params, :pub_opts]
+  @auto_merge [:cmd_opts, :cmd_params]
   @select_first [:name, :cmd]
   @cmd_opts_short [:ack, :echo, :force, :notify]
   def auto(args, defaults) when is_list(args) and is_list(defaults) do
@@ -21,13 +21,13 @@ defmodule Alfred.Execute.Args do
 
     # we collect args into a map for efficient pattern matching and determining when an
     # argument is already populated (see select_first/3)
-    base = %{cmd_opts: [], cmd_params: [], pub_opts: []}
+    base = %{cmd_opts: [], cmd_params: []}
 
     # make a single list of specified args first and defaults second
     # so the reduction finds specific args first
 
     Enum.reduce(final_args, base, fn
-      # always merge :cmd_opts, :cmd_params and :pub_opts
+      # always merge :cmd_opts and :cmd_params
       {key, value}, acc when key in @auto_merge -> merge_and_put(acc, key, value)
       # use the first :cmd and :name found
       {key, value}, acc when key in @select_first -> select_first(acc, key, value)

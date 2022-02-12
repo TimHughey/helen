@@ -30,12 +30,16 @@ defmodule Alfred.Name do
   @doc since: "0.3.0"
   def allowed_opts, do: Map.from_struct(__MODULE__) |> Map.keys()
 
-  @apply_pre_checks [:found?, :ttl_check, :invoke, :finalize]
-  def apply(%{name: name} = args, action) do
+  def available?(name), do: not registered?(name)
+
+  def info(<<_::binary>> = name), do: call({:info}, name)
+
+  @invoke_pre_checks [:found?, :ttl_check, :invoke, :finalize]
+  def invoke(%{name: name} = args, action) do
     name_info = info(name)
     args = update_in(args, [:ref_dt], &Kernel.if(&1, do: &1, else: Timex.now()))
 
-    Enum.reduce_while(@apply_pre_checks, name_info, fn
+    Enum.reduce_while(@invoke_pre_checks, name_info, fn
       :found?, {:not_found, name} -> not_found(name, action)
       :found?, info -> {:cont, info}
       :ttl_check, info -> ttl_check(info, args, action)
@@ -43,10 +47,6 @@ defmodule Alfred.Name do
       :finalize, result -> {:halt, result}
     end)
   end
-
-  def available?(name), do: not registered?(name)
-
-  def info(<<_::binary>> = name), do: call({:info}, name)
 
   def missing?(any, opts) when is_list(opts) do
     case any do

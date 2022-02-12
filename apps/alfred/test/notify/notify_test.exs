@@ -2,7 +2,6 @@ defmodule Alfred.NotifyTest do
   use ExUnit.Case, async: true
   use Alfred.TestAid
 
-  import ExUnit.CaptureIO
   import ExUnit.CaptureLog
 
   @moduletag alfred: true, alfred_notify: true
@@ -144,7 +143,7 @@ defmodule Alfred.NotifyTest do
       pid = spawn(fn -> nil end)
 
       assert {:no_server, _pid} = Alfred.Notify.call(@bad_msg, pid)
-      assert capture_io(fn -> Alfred.Notify.call(@bad_msg, self()) end) =~ ~r/call itself/
+      assert capture_log(fn -> Alfred.Notify.call(@bad_msg, self()) end) =~ ~r/call itself/
     end
 
     @tag notifier_add: []
