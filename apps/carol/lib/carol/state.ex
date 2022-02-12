@@ -4,21 +4,26 @@ defmodule Carol.State do
   require Logger
 
   defstruct server_name: :none,
+            # NOTE: name registered with Alfred
+            name: :none,
             equipment: :none,
             episodes: [],
-            cmd_live: :none,
+            register: nil,
+            seen_at: :none,
+            status: %{},
             ticket: :none,
-            exec_result: :none,
-            notify_at: :none
+            ttl_ms: 60_000
 
   @type t :: %State{
           server_name: :none | module(),
+          name: String.t(),
           equipment: String.t(),
           episodes: [] | [Carol.Episode.t(), ...],
-          cmd_live: :none | String.t(),
+          register: nil | {:ok, pid},
+          seen_at: DateTime.t(),
+          status: map,
           ticket: Alfred.Ticket.t(),
-          exec_result: Alfred.Execute.t(),
-          notify_at: DateTime.t()
+          ttl_ms: pos_integer()
         }
 
   def alfred, do: Process.get(:opts) |> Keyword.get(:alfred, Alfred)
@@ -26,37 +31,27 @@ defmodule Carol.State do
   def new(args) do
     {opts, rest} = pop_and_put_opts(args)
     {equipment, rest} = pop_equipment(rest)
+    {name, rest} = pop_name(rest)
     {defaults, rest} = Keyword.pop(rest, :defaults, [])
     {episodes, rest} = Keyword.pop(rest, :episodes, [])
-    {wrap?, rest} = Keyword.pop(rest, :wrap_ok, false)
 
     log_unknown_args(rest)
 
     # NOTE: defaults are only applicable to episodes
     episodes = Carol.Episode.new_from_episode_list(episodes, defaults)
 
-    [equipment: equipment, episodes: episodes, server_name: opts[:server_name]]
-    |> then(fn fields -> struct(State, fields) end)
-    |> wrap_ok_if_requested(wrap?)
+    fields = [equipment: equipment, episodes: episodes, server_name: opts[:server_name], name: name]
+
+    struct(__MODULE__, fields)
   end
+
+  def now, do: sched_opts() |> get_in([:ref_dt])
+
+  def opts, do: Process.get(:opts)
 
   def refresh_episodes(%State{} = s) do
     [episodes: Carol.Episode.analyze_episodes(s.episodes, sched_opts())]
     |> update(s)
-  end
-
-  def save_cmd(cmd, %State{} = state) do
-    case cmd do
-      %Alfred.Execute{} = execute -> [cmd_live: Alfred.execute_to_binary(execute)]
-      anything -> [cmd_live: anything]
-    end
-    |> update(state)
-  end
-
-  def save_exec_result(%Alfred.Execute{} = execute, %State{} = s) do
-    state = update([exec_result: execute], s)
-
-    save_cmd(execute, state)
   end
 
   def save_ticket(ticket_rc, %State{} = s) do
@@ -74,6 +69,8 @@ defmodule Carol.State do
 
     [List.to_tuple([:ref_dt, Timex.now(tz)]) | opts] |> Enum.sort()
   end
+
+  def seen_at(s), do: update(s, seen_at: now())
 
   def start_notifies(%State{ticket: ticket} = state) do
     case ticket do
@@ -101,21 +98,9 @@ defmodule Carol.State do
 
   def timeout(%State{} = s), do: Carol.Episode.ms_until_next_episode(s.episodes, sched_opts())
 
-  def update_notify_at(s) do
-    tz = Keyword.get(sched_opts(), :timezone)
-
-    struct(s, notify_at: Timex.now(tz))
-  end
-
   ## PRIVATE
   ## PRIVATE
   ## PRIVATE
-
-  def atom_to_equipment(instance) do
-    base = to_string(instance) |> String.replace("_", " ")
-
-    [base, "pwm"] |> Enum.join(" ")
-  end
 
   defp log_unknown_args([]), do: []
 
@@ -142,18 +127,24 @@ defmodule Carol.State do
 
   defp pop_equipment(args) do
     {equipment, rest} = Keyword.pop(args, :equipment)
-    {instance, rest} = Keyword.pop(rest, :instance)
 
     case equipment do
       x when is_binary(x) -> equipment
-      x when is_atom(x) -> atom_to_equipment(instance)
+      x when is_atom(x) -> to_string(x) |> String.replace("_", " ")
     end
     |> then(fn equipment -> {equipment, rest} end)
   end
 
-  defp update(fields, %State{} = s) when is_list(fields) or is_map(fields), do: struct(s, fields)
+  defp pop_name(args) do
+    {instance, rest} = Keyword.pop(args, :instance)
 
-  defp wrap_ok_if_requested(%State{} = state, wrap?) do
-    (wrap? && {:ok, state}) || state
+    case instance do
+      x when is_atom(x) -> to_string(instance) |> String.replace("_", " ")
+      <<_::binary>> -> instance
+    end
+    |> then(fn name -> {name, rest} end)
   end
+
+  defp update(fields, %__MODULE__{} = s), do: struct(s, fields)
+  defp update(%__MODULE__{} = s, fields), do: struct(s, fields)
 end

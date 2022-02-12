@@ -7,14 +7,14 @@ defmodule UseCarol.Beta do
 end
 
 defmodule CarolTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
 
   @moduletag carol: true, carol_use: true
 
   setup [:opts_add, :start_args_add, :start_supervised_add]
 
   describe "UseCarol.Alpha" do
-    # @tag skip: true
+    @tag skip: false
     test "config/0 returns list" do
       assert [instances: [_ | _], opts: [alfred: AlfredSim], otp_app: :carol] = UseCarol.Alpha.config()
     end
@@ -28,9 +28,11 @@ defmodule CarolTest do
 
       assert {:ok, _pid} = start_supervised(child_spec)
 
-      for {mod, _pid, :worker, _mods} <- Supervisor.which_children(UseCarol.Alpha) do
-        assert [{:cmd_live, :none} | _] = Carol.state(mod, :all)
-      end
+      children = Supervisor.which_children(UseCarol.Alpha)
+
+      Enum.all?(children, fn {mod, _pid, :worker, _mods} ->
+        assert [_ | _] = Carol.state(mod, :all)
+      end)
     end
   end
 

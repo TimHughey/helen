@@ -4,7 +4,7 @@ defmodule Carol.MixProject do
   def project do
     [
       app: :carol,
-      version: "0.4.1",
+      version: "0.4.2",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -29,11 +29,7 @@ defmodule Carol.MixProject do
   end
 
   # Run "mix help compile.app" to learn about applications.
-  def application do
-    [
-      extra_applications: [:logger]
-    ]
-  end
+  def application, do: [extra_applications: [:logger]]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do

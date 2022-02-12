@@ -1,6 +1,7 @@
 defmodule CarolServerTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
   use Alfred.TestAid
+  use Carol.TestAid
   use Should
 
   @moduletag carol: true, carol_server: true
@@ -8,6 +9,7 @@ defmodule CarolServerTest do
   setup [:equipment_add, :opts_add, :episodes_add, :state_add]
   setup [:memo_add, :start_args_add, :start_supervised_add]
   setup [:missing_opts_add]
+  setup [:init_add]
 
   defmacro msg(lhs, text, rhs) do
     quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
@@ -29,42 +31,45 @@ defmodule CarolServerTest do
     test "with empty config", %{child_spec: child_spec, server_name: server_name} do
       assert {:ok, pid} = start_supervised(child_spec)
 
-      assert %Carol.State{episodes: [], equipment: "first instance pwm", server_name: ^server_name} =
-               :sys.get_state(pid)
+      assert state = :sys.get_state(pid)
+      assert %Carol.State{} = state
+      assert %{episodes: [], equipment: equipment, server_name: ^server_name} = state
+      assert equipment =~ ~r/first/
     end
 
     @tag start_args_add: {:app, :carol, CarolTest, :front_chandelier}
     test "with epsiodes", %{child_spec: child_spec, server_name: server_name} do
       assert {:ok, pid} = start_supervised(child_spec)
+      state = :sys.get_state(pid)
 
-      assert %Carol.State{
-               cmd_live: :none,
-               exec_result: :none,
-               notify_at: :none,
-               server_name: ^server_name,
-               episodes: [%Carol.Episode{}, %Carol.Episode{}, %Carol.Episode{}],
-               ticket: %Alfred.Ticket{}
-             } = :sys.get_state(pid)
+      assert %Carol.State{server_name: ^server_name, ticket: %Alfred.Ticket{}} = state
+      assert %{seen_at: :none} = state
+      assert %{episodes: episodes} = state
+
+      assert Enum.count(episodes) == 3
+      assert Enum.all?(episodes, &match?(%Carol.Episode{}, &1))
     end
 
     @tag start_args_add: {:app, :carol, CarolWithEpisodes, :first_instance}
     test "with episodes (alt)", %{child_spec: child_spec, server_name: server_name} do
       assert {:ok, pid} = start_supervised(child_spec)
+      state = :sys.get_state(pid)
 
-      assert %Carol.State{
-               cmd_live: :none,
-               exec_result: :none,
-               notify_at: :none,
-               server_name: ^server_name,
-               episodes: [%Carol.Episode{}, %Carol.Episode{}, %Carol.Episode{}],
-               ticket: %Alfred.Ticket{}
-             } = :sys.get_state(pid)
+      assert %Carol.State{server_name: ^server_name, ticket: %Alfred.Ticket{}} = state
+      assert %{seen_at: :none} = state
+      assert %{episodes: episodes} = state
 
-      assert [cmd_live: :none, exec_result: :none, notify_at: :none, server_name: ^server_name] =
-               Carol.state(server_name, [:cmd_live, :exec_result, :notify_at, :server_name])
+      assert Enum.count(episodes) == 3
+      assert Enum.all?(episodes, &match?(%Carol.Episode{}, &1))
+
+      want_keys = [:seen_at, :server_name]
+      assert [seen_at: :none, server_name: ^server_name] = Carol.state(server_name, want_keys)
 
       assert [_ | _] = Carol.state(server_name, [])
-      assert [%Carol.Episode{}, %Carol.Episode{}, %Carol.Episode{}] = Carol.state(server_name, :episodes)
+      assert [_ | _] = episodes = Carol.state(server_name, :episodes)
+
+      assert Enum.all?(episodes, &match?(%Carol.Episode{}, &1))
+      assert Enum.count(episodes) == 3
       assert %{name: _, ref: _, opts: _} = Carol.state(server_name, :ticket)
     end
   end
@@ -76,7 +81,7 @@ defmodule CarolServerTest do
     @tag start_supervised_add: []
     test "live plus multiple short episodes", %{server_name: server_name} do
       # ensure the server starts with Now 1
-      assert "Now 1" = Carol.active_episode(server_name)
+      assert Carol.active_episode(server_name) =~ ~s(Now 1)
 
       # get the list of episode ids and count of episodes so we can remove activated
       # episodes from the total episode id list
@@ -107,6 +112,37 @@ defmodule CarolServerTest do
         end
 
       assert Enum.count(remaining_ids) < episode_count
+    end
+
+    # TODO: MOVE THIS TEST TO THE APPROPRIATE DESCRIPTION
+
+    @tag init_add: [episodes: {:short, [future: 12, now: 1, past: 1]}]
+    test "starts unsupervised with init args", ctx do
+      assert %{init_args: init_args, dev_alias: dev_alias} = ctx
+      assert %{name: <<_::binary>>} = dev_alias
+
+      server = get_in(init_args, [:instance])
+      assert <<_::binary>> = server
+
+      assert {:ok, pid} = GenServer.start_link(Carol.Server, init_args, [])
+      assert is_pid(pid) and Process.alive?(pid)
+
+      # NOTE: call register/1 on the equipment to trigger a notify
+      Alfred.DevAlias.register(dev_alias)
+      assert_receive(%Carol.State{}, 200)
+
+      # TODO: enhance assertions to check for pause and resumt
+      e1 = Alfred.execute(name: server, cmd: "pause")
+      assert %Alfred.Execute{rc: :ok} = e1
+
+      s1 = Alfred.status(server)
+      assert %Alfred.Status{rc: :ok} = s1
+
+      e2 = Alfred.execute(name: server, cmd: "resume")
+      assert %Alfred.Execute{rc: :ok} = e2
+
+      s2 = Alfred.status(server)
+      assert %Alfred.Status{rc: :ok} = s2
     end
   end
 
@@ -149,7 +185,7 @@ defmodule CarolServerTest do
     @tag state_add: [bootstrap: true, raw: true]
     test "handles successful start notifies", ctx do
       # NOTE: when raw: true start_add returns the actual reply from handle_continue/2
-      assert {:noreply, %Carol.State{} = new_state, {:continue, :bootstrap}} = ctx.state
+      assert {:noreply, %Carol.State{} = new_state, _timeout} = ctx.state
 
       # second call, vslidates ticket is %Ticket{}
       assert {:noreply, %Carol.State{ticket: %Alfred.Ticket{}}, timeout} =
@@ -158,25 +194,28 @@ defmodule CarolServerTest do
       assert is_integer(timeout)
     end
 
-    @tag equipment_add: []
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: []
-    test "retries failed start notifies", ctx do
-      # simulate start notifies failure
-      new_state = Carol.State.save_ticket({:no_server, Module}, ctx.state)
-
-      assert {:noreply, %Carol.State{}, {:continue, :bootstrap}} =
-               Carol.Server.handle_continue(:bootstrap, new_state)
-    end
+    #   @tag equipment_add: []
+    #   @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
+    #   @tag state_add: []
+    #   test "retries failed start notifies", ctx do
+    #     # simulate start notifies failure
+    #     new_state = Carol.State.save_ticket({:no_server, Module}, ctx.state)
+    #
+    #     assert {:noreply, %Carol.State{}, {:continue, :bootstrap}} =
+    #              Carol.Server.handle_continue(:bootstrap, new_state)
+    #   end
   end
 
   describe "Carol.Server.handle_continue/2 :tick" do
     @tag equipment_add: []
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [bootstrap: true]
+    @tag state_add: [tick: true]
     test "executes a cmd when a program is live", ctx do
-      assert {:noreply, %Carol.State{exec_result: %Alfred.Execute{detail: %{cmd: "on"}}}, _timeout} =
-               Carol.Server.handle_continue(:tick, ctx.state)
+      # NOTE: handle_continue(:tick, state) performed by Alfred.StateAid
+      assert %{state: state} = ctx
+      assert %Carol.State{register: register} = state
+      assert pid = register
+      assert is_pid(pid)
 
       assert_cmd_echoed(ctx, "on")
     end
@@ -185,69 +224,16 @@ defmodule CarolServerTest do
   describe "Carol.Server.handle_info/2 handles Alfred" do
     @tag equipment_add: []
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [bootstrap: true], memo_add: [missing?: true]
-    test "missing Memo", ctx do
-      assert {:noreply, %Carol.State{}, _} = Carol.Server.handle_info({Alfred, ctx.memo}, ctx.state)
-    end
-
-    @tag equipment_add: []
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag state_add: [bootstrap: true], memo_add: []
     test "nominal Memo", ctx do
-      assert {:noreply, %Carol.State{}, {:continue, :tick}} =
-               Carol.Server.handle_info({Alfred, ctx.memo}, ctx.state)
-    end
-  end
-
-  describe "Carol.Server.handle_info/2 handles Alfred.Track" do
-    @tag skip: false
-    @tag equipment_add: [cmd: "on", rc: :busy]
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [bootstrap: true]
-    test "TrackerEntry with matching refid", ctx do
-      # NOTE: handle_continue/2 call required to trigger execute
-
-      noreply_tuple = Carol.Server.handle_continue(:tick, ctx.state)
-
-      assert {:noreply, %Carol.State{} = new_state, _timeout} = noreply_tuple
-
-      execute = new_state.exec_result
-      track = %Alfred.Track{tracked_info: %{cmd: execute.detail.cmd}, refid: execute.detail.refid}
-
-      assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
-               Carol.Server.handle_info({Alfred, track}, new_state)
-
-      assert cmd_live =~ ~r/^BUSY\s\{on\}/
-    end
-
-    @tag skip: false
-    @tag equipment_add: [cmd: "on", rc: :busy]
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [bootstrap: true]
-    test "TrackerEntry with mismatched refid", ctx do
-      # NOTE: handle_continue/2 call required to trigger execute
-
-      noreply_tuple = Carol.Server.handle_continue(:tick, ctx.state)
-
-      assert {:noreply, %Carol.State{} = new_state, _timeout} = noreply_tuple
-
-      execute = new_state.exec_result
-      track = %Alfred.Track{tracked_info: %{cmd: execute.detail.cmd}, refid: "1234"}
-
-      assert {:noreply, %Carol.State{cmd_live: cmd_live}, _timeout} =
-               Carol.Server.handle_info({Alfred, track}, new_state)
-
-      assert cmd_live =~ ~r/^BUSY\s\{on\}/
+      reply = Carol.Server.handle_info({Alfred, ctx.memo}, ctx.state)
+      assert {:noreply, %Carol.State{}, {:continue, :tick}} = reply
     end
   end
 
   defp missing_opts_add(ctx) do
     Map.put_new(ctx, :server_name, __MODULE__)
   end
-
-  defp opts_add(ctx), do: Carol.OptsAid.add(ctx)
-  defp episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
-  defp start_args_add(ctx), do: Carol.StartArgsAid.add(ctx)
 
   defp start_supervised_add(%{start_supervised_add: _, child_spec: child_spec}) do
     assert {:ok, pid} = start_supervised(child_spec)
@@ -256,6 +242,4 @@ defmodule CarolServerTest do
   end
 
   defp start_supervised_add(_x), do: :ok
-
-  defp state_add(ctx), do: Carol.StateAid.add(ctx)
 end

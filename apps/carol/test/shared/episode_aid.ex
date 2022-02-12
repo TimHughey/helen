@@ -6,12 +6,16 @@ defmodule Carol.EpisodeAid do
   @shift_opts [:days, :hours, :minutes, :seconds, :milliseconds, :microseconds]
   @tz "America/New_York"
 
+  def add(%{episodes_add: {what, epi_opts}, opts: opts}) do
+    %{episodes: add(what, epi_opts, opts)}
+  end
+
+  def add(_), do: :ok
+
   @many [:future, :mixed, :past, :short]
-  @single [:single_future, :single_now, :single_past]
+  @single [:single_future, :single_now, :single_past, :whole_day]
   @sim [:porch, :greenhouse]
-  def add(%{episodes_add: {what, epi_opts}, opts: opts})
-      when is_list(epi_opts)
-      when is_list(opts) do
+  def add(what, epi_opts, opts) do
     opts_all = if(is_list(epi_opts), do: epi_opts ++ opts, else: opts)
     {analyze?, opts_all} = Keyword.pop(opts_all, :analyze, true)
 
@@ -22,10 +26,8 @@ defmodule Carol.EpisodeAid do
       {:events, opts} -> make_events(opts)
     end
     # NOTE: list order critical.  must adjust future before analyze or calc_at!
-    |> wrap_episodes([adjust_future: what != :short, analyze: analyze?], opts)
+    |> preprocess([adjust_future: what != :short, analyze: analyze?], opts)
   end
-
-  def add(_), do: :ok
 
   @solar_events Solar.event_opts(:binaries)
   def make_events(events) do
@@ -105,6 +107,8 @@ defmodule Carol.EpisodeAid do
     end
   end
 
+  @begin_day "beginning of day"
+  @whole_day [id: "All Day", event: @begin_day, execute: [cmd: :on]]
   def make_single(what, opts) do
     # single requested, ensure count == 1
     opts = Keyword.put(opts, :count, 1)
@@ -113,6 +117,7 @@ defmodule Carol.EpisodeAid do
       :single_future -> make_many(:future, opts)
       :single_now -> make_many(:now, opts)
       :single_past -> make_many(:past, opts)
+      :whole_day -> [Episode.new(@whole_day, [])]
     end
   end
 
@@ -191,14 +196,13 @@ defmodule Carol.EpisodeAid do
     |> Timex.format!("{ASN1:GeneralizedTime:Z}")
   end
 
-  defp wrap_episodes(episodes, wrap_opts, opts) do
+  def preprocess(episodes, wrap_opts, opts) do
     Enum.reduce(wrap_opts, episodes, fn
       {:adjust_future, true}, acc -> adjust_future_when_have_now(acc)
       {:analyze, true}, acc -> Carol.Episode.analyze_episodes(acc, opts)
-      {:analyze, false}, acc -> Enum.map(acc, fn episode -> Carol.Episode.calc_at(episode, opts) end)
+      {:analyze, false}, acc -> Enum.map(acc, &Carol.Episode.calc_at(&1, opts))
       {:adjust_future, false}, acc -> acc
       _, acc -> acc
     end)
-    |> then(fn episodes -> %{episodes: episodes} end)
   end
 end

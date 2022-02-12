@@ -16,37 +16,45 @@ defmodule CarolEpisodeSimTest do
     quote bind_quoted: [want_order: want_order] do
       %{episodes: episodes, opts: opts, ref_dt: ref_dt, sim_ms: sim_ms, step_ms: step_ms} = var!(ctx)
 
-      sim_measure = Map.get(var!(ctx), :sim_measure, false)
+      ms_steps = 0..sim_ms//1000
+      initial_acc = {:none, episodes, want_order}
 
-      for ms when ms < sim_ms <- 0..sim_ms//1000, reduce: {:none, episodes, want_order} do
-        {prev_active, prev_episodes, want_order} ->
-          {timestamp, episodes} =
-            Timex.Duration.measure(fn ->
-              Carol.Episode.analyze_episodes(prev_episodes, shift_ref_dt(opts, ms))
-            end)
+      Enum.reduce(ms_steps, initial_acc, fn ms, {prev_active, prev_episodes, want_order} ->
+        episodes = Carol.Episode.analyze_episodes(prev_episodes, shift_ref_dt(opts, ms))
+        active = Carol.Episode.active_id(episodes)
 
-          if prev_active == :none and sim_measure do
-            episodes_add = Map.get(var!(ctx), :episodes_add)
-            elapsed = Timex.format_duration(timestamp, :humanized)
-            ["\n", inspect(episodes_add), " ", elapsed] |> IO.puts()
-          end
-
-          active = Carol.Episode.active_id(episodes)
-
-          if active != prev_active do
+        cond do
+          active != prev_active ->
             [expect_active | want_order_rest] = want_order
-            assert active == expect_active, msg({active, expect_active}, "should be equal", episodes)
+            assert active == expect_active
 
             {active, episodes, want_order_rest}
-          else
+
+          true ->
             {active, episodes, want_order}
-          end
-      end
+        end
+      end)
+
+      # for ms when ms < sim_ms <- 0..sim_ms//1000, reduce: {:none, episodes, want_order} do
+      #   {prev_active, prev_episodes, want_order} ->
+      #     episodes = Carol.Episode.analyze_episodes(prev_episodes, shift_ref_dt(opts, ms))
+      #
+      #     active = Carol.Episode.active_id(episodes)
+      #
+      #     if active != prev_active do
+      #       [expect_active | want_order_rest] = want_order
+      #       assert active == expect_active, msg({active, expect_active}, "should be equal", episodes)
+      #
+      #       {active, episodes, want_order_rest}
+      #     else
+      #       {active, episodes, want_order}
+      #     end
+      # end
     end
   end
 
   describe "Sally.Episode simulation" do
-    # @tag skip: true
+    @tag skip: false
     @tag timeout: 10 * 1000
     @tag sim_days: 30, step_ms: 1000
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
@@ -84,6 +92,7 @@ defmodule CarolEpisodeSimTest do
       end
     end
 
+    @tag skip: false
     @tag timeout: 10 * 1000
     @tag sim_days: 2, step_ms: 1000
     @tag want_order: ["Overnight", "Day", "Evening"]
@@ -95,6 +104,7 @@ defmodule CarolEpisodeSimTest do
       assert_sim(want_order)
     end
 
+    @tag skip: false
     @tag timeout: 10 * 1000
     @tag sim_days: 3, step_ms: 1000
     @tag want_order: ["Day", "Night"]

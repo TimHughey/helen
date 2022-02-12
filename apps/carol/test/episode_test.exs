@@ -154,6 +154,15 @@ defmodule CarolEpisodeTest do
 
       assert 63_000 = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
     end
+
+    @tag episodes_add: {:whole_day, []}
+    test "handles a single episode for the whole day", ctx do
+      episodes = assert_episodes(ctx)
+
+      next_ms = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
+
+      assert next_ms >= 0
+    end
   end
 
   describe "Sally.Episode misc" do

@@ -3,6 +3,7 @@ defmodule Carol.Server do
 
   require Logger
   use GenServer
+  use Alfred, name: [backend: :message], execute: []
 
   alias __MODULE__
   alias Carol.State
@@ -45,7 +46,9 @@ defmodule Carol.Server do
 
   @doc false
   def start_link(start_args) when is_list(start_args) do
-    server_args = [name: start_args[:id]]
+    id = start_args[:id]
+    server_args = if(id, do: [name: id], else: [])
+
     GenServer.start_link(Server, start_args, server_args)
   end
 
@@ -61,10 +64,24 @@ defmodule Carol.Server do
   # end
 
   @impl true
-  def handle_call({action, _opts} = msg, _from, %State{} = s) when action in [:pause, :resume] do
+  def handle_call({:execute_cmd, [_name_info, opts]}, _from, state) do
+    {rc, {result, new_state}} = execute_cmd(state, opts)
+
+    {:reply, {rc, result}, new_state}
+  end
+
+  @impl true
+  def handle_call({:status_lookup, [_name_info, opts]}, _from, state) do
+    status_lookup = status_lookup(state, opts)
+
+    {:reply, status_lookup, state}
+  end
+
+  @impl true
+  def handle_call({action, _opts} = msg, _from, state) when action in [:pause, :resume] do
     case msg do
-      {:pause, _opts} -> State.stop_notifies(s)
-      {:resume, _opts} -> State.start_notifies(s)
+      {:pause, _opts} -> State.stop_notifies(state)
+      {:resume, _opts} -> State.start_notifies(state)
     end
     |> reply(action)
   end
@@ -101,75 +118,55 @@ defmodule Carol.Server do
     |> reply(s)
   end
 
-  @impl true
-  def handle_call(msg, _from, %State{} = s) when is_map(msg) do
-    _opts = [equipment: s.equipment]
+  # @impl true
+  # def handle_call(msg, _from, %State{} = s) when is_map(msg) do
+  #   _opts = [equipment: s.equipment]
 
-    case msg do
-      %{episode: id, cmd: true, params: true} ->
-        id
-        # Program.cmd(s.programs, id, opts) |> Map.from_struct() |> Map.get(:cmd_params) |> Enum.into([])
-    end
-    |> reply(s)
-  end
+  # case msg do
+  #   %{episode: id, cmd: true, params: true} ->
+  #     id
+  # Program.cmd(s.programs, id, opts) |> Map.from_struct() |> Map.get(:cmd_params) |> Enum.into([])
+  #   end
+  #   |> reply(s)
+  # end
 
   @impl true
-  def handle_continue(:bootstrap, %State{ticket: :none} = state) do
+  def handle_continue(:bootstrap, %{ticket: _} = state) do
     # NOTE: State.refresh_episodes/1 ensures episodes are valid
 
     state
     |> State.refresh_episodes()
     |> State.start_notifies()
-    # NOTE: recurse to validate we have a notify ticket (aka Alfred is running)
-    |> continue(:bootstrap)
+    |> noreply(:timeout)
   end
 
   @impl true
-  def handle_continue(:bootstrap, %State{ticket: {:failed, _}} = state) do
-    # NOTE:  handle startup race conditions
-    Process.sleep(100)
+  def handle_continue(:tick, state) do
+    opts = Carol.State.opts()
 
-    State.save_ticket(:none, state)
-    |> continue(:bootstrap)
-  end
-
-  @impl true
-  def handle_continue(:bootstrap, %State{} = state) do
-    # NOTE:  we now have a notify ticket so begin normal operatins of
-    #  1. receiving notify messages for the equipment
-    #  2. handling starting the next episode (via timeout)
-    noreply(state, :timeout)
-  end
-
-  @impl true
-  def handle_continue(:tick, %State{} = state) do
     state
     |> State.refresh_episodes()
+    |> Carol.State.seen_at()
     |> execute()
+    |> register()
+    |> tap(fn state -> if opts[:echo] == :tick, do: Process.send(opts[:caller], state, []) end)
     |> noreply(:timeout)
   end
 
   @impl true
-  def handle_info({Alfred, %Alfred.Memo{missing?: true} = memo}, %State{} = s) do
-    [server_name: s.server_name, equipment: memo.name, missing: true]
-    |> Betty.app_error_v2(passthrough: s)
-    |> State.update_notify_at()
-    |> noreply(:timeout)
-  end
-
-  @impl true
+  # NOTE: Carol does not register for missing Memos
   def handle_info({Alfred, %Alfred.Memo{}}, %State{} = state) do
     # NOTE: reuse :tick to ensure appropriate episode is active
     state
-    |> State.update_notify_at()
+    |> State.seen_at()
     |> continue(:tick)
   end
 
-  @impl true
-  def handle_info({Alfred, %Alfred.Track{}}, %{exec_result: execute} = s) do
-    State.save_cmd(execute, s)
-    |> noreply(:timeout)
-  end
+  # NOTE no longer need to handle notify when released
+  # @impl true
+  # def handle_info({Alfred, %Alfred.Track{}}, state) do
+  #   noreply(state, :timeout)
+  # end
 
   @impl true
   def handle_info({:echo, _}, state), do: noreply(state, :timeout)
@@ -179,46 +176,52 @@ defmodule Carol.Server do
     continue(:tick, s)
   end
 
-  @doc false
-  def execute(%State{episodes: []} = state) do
-    State.save_exec_result(:no_episodes, state)
+  # Alfred Callbacks
+  @impl true
+  def execute_cmd(state, opts) do
+    opts_map = Enum.into(opts, %{})
+
+    case opts_map do
+      %{cmd: "pause" = cmd} ->
+        {:ok, {%{cmd: cmd, sent_at: state.seen_at}, Carol.State.stop_notifies(state)}}
+
+      %{cmd: "resume" = cmd} ->
+        {:ok, {%{cmd: cmd, sent_at: state.seen_at}, Carol.State.start_notifies(state)}}
+
+      _ ->
+        {:error, {%{}, state}}
+    end
   end
+
+  @impl true
+  def status_lookup(state, _opts) do
+    status = %{ticket: state.ticket}
+
+    Map.take(state, [:name, :seen_at, :ttl_ms])
+    |> Map.put(:status, status)
+  end
+
+  @doc false
+  def execute(%{episodes: []} = state), do: state
 
   @doc false
   def execute(%State{} = state) do
+    _ = assemble_execute_opts(state) |> State.alfred().execute()
+    _ = Process.put(:first_exec_force, false)
+
     state
-    |> assemble_execute_opts()
-    |> State.alfred().execute()
-    |> State.save_exec_result(state)
-    |> tap(fn _ -> Process.put(:first_exec_force, false) end)
   end
 
   ## PRIVATE
   ## PRIVATE
   ## PRIVATE
 
-  defp assemble_execute_opts(%State{equipment: equipment, episodes: episodes}) do
+  defp assemble_execute_opts(%{equipment: equipment, episodes: episodes}) do
     force = Process.get(:first_exec_force, true)
 
-    [equipment: equipment, notify: true, force: force]
+    [equipment: equipment, force: force]
     |> Carol.Episode.execute_args(:active, episodes)
   end
-
-  # @indent 40
-  # def log_refid_mismatch({track, execute}, state) do
-  #   %{refid: b_refid} = track
-  #   %{detail: %{refid: e_refid}} = execute
-  #   %{episodes: episodes} = state
-  #   active_id = Carol.Episode.active_id(episodes)
-  #   active_id = if(is_binary(active_id), do: active_id, else: inspect(active_id))
-  #
-  #   details = Enum.map([b_refid, e_refid], fn x -> ["\n", String.pad_leading(x, @indent)] end)
-  #   episode = ["\n", String.pad_leading(active_id, @indent)]
-  #   execute = ["\n", inspect(execute, pretty: true)]
-  #
-  #   ["refid mismatch", details, episode, execute]
-  #   |> Logger.warn()
-  # end
 
   # GenServer reply helpers
 

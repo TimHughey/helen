@@ -130,8 +130,16 @@ defmodule Carol.Episode do
   def execute_args([], _), do: {[], []}
 
   @doc since: "0.3.0"
+
+  def ms_until_next_episode([%__MODULE__{} = single_episode], opts) do
+    # NOTE: single episode lists are easy...  the ms until next episode is
+    # simply the absolute value of the difference between ref_dt and the episode at
+    next_ms = Timex.diff(ref_dt(), single_episode.at, :milliseconds)
+
+    abs(next_ms)
+  end
+
   def ms_until_next_episode([%Episode{} = episode | rest], opts) do
-    # next_ms = Timex.diff(ref_dt(), episode.at, :milliseconds)
     next_ms = Timex.diff(episode.at, ref_dt(), :milliseconds)
 
     # NOTE: this will recurse 99% of the time because the first element is the active episode

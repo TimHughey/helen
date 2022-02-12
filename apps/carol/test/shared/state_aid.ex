@@ -3,20 +3,20 @@ defmodule Carol.StateAid do
 
   def add(%{state_add: opts} = ctx) when is_list(opts) do
     alfred = ctx[:alfred] || AlfredSim
-    server_name = ctx[:server_name] || __MODULE__
-    equipment = ctx[:equipment] || "equipment missing"
 
     fields = [
       opts: [alfred: alfred, timezone: "America/New_York"],
-      id: server_name,
-      equipment: equipment,
+      id: ctx[:server_name] || __MODULE__,
+      instance: ctx[:instance_name] || Alfred.NamesAid.unique("carol"),
+      equipment: ctx[:equipment] || "equipment missing",
       episodes: ctx[:episodes] || :none
     ]
 
     new_state = Carol.State.new(fields)
 
     case Enum.into(opts, %{}) do
-      %{bootstrap: true} -> Carol.Server.handle_continue(:bootstrap, new_state)
+      %{tick: true} -> handle_continues(new_state, [:bootstrap, :tick])
+      %{bootstrap: true} -> handle_continues(new_state, [:bootstrap])
       _ -> new_state
     end
     |> rationalize(opts)
@@ -24,6 +24,19 @@ defmodule Carol.StateAid do
   end
 
   def add(_), do: :ok
+
+  def handle_continues(state, steps) do
+    Enum.reduce(steps, state, &invoke_handle_continue(&1, &2))
+  end
+
+  def invoke_handle_continue(step, state_or_tuple) do
+    case state_or_tuple do
+      %{} = state -> state
+      {_, state} -> state
+      {_, state, _} -> state
+    end
+    |> then(fn state -> Carol.Server.handle_continue(step, state) end)
+  end
 
   def rationalize(result, opts) do
     cond do
