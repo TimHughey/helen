@@ -23,6 +23,10 @@ defmodule SallyDevAliasExplainTest do
       assert %{dev_alias: %Sally.DevAlias{name: name}} = ctx
 
       explain_output = Sally.explain(name, :status, :datapoints, [])
+      %{execution: exec_ms, planning: plan_ms} = explain_times(explain_output)
+
+      assert exec_ms < 0.5
+      assert plan_ms < 2.0
 
       assert explain_output =~ ~r/datapoint_dev_alias_id_reading_at_index/
       assert explain_output =~ ~r/Index Scan/
@@ -69,5 +73,13 @@ defmodule SallyDevAliasExplainTest do
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Index Cond/
     end
+  end
+
+  @regex ~r/Planning Time: (?<planning>[0-9.]+).*Execution Time: (?<execution>[0-9.]+)/ms
+  def explain_times(output) do
+    output = IO.iodata_to_binary(output)
+
+    Regex.named_captures(@regex, output)
+    |> Enum.into(%{}, fn {key, val} -> {String.to_atom(key), Float.parse(val) |> elem(0)} end)
   end
 end

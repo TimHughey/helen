@@ -7,6 +7,7 @@ defmodule Sally.Synchronous.DeviceTest do
   setup [:host_add, :device_add, :dev_alias_add]
 
   describe "Sally.device_move_aliases/1" do
+    @tag sally_isolated: true
     @tag dev_alias_add: [auto: :mcp23008, count: 8]
     test "moves aliases from src to dest ident", ctx do
       %{host: host, device: %Sally.Device{ident: src_ident}} = ctx
@@ -31,6 +32,7 @@ defmodule Sally.Synchronous.DeviceTest do
       assert Enum.all?(all_equal, fn x -> x end)
     end
 
+    @tag sally_isolated: true
     @tag dev_alias_add: [auto: :mcp23008, count: 8]
     test "moves aliases to the latest device created", ctx do
       %{host: host, device: %Sally.Device{ident: src_ident}} = ctx
@@ -58,6 +60,7 @@ defmodule Sally.Synchronous.DeviceTest do
   end
 
   describe "Sally.Device.latest/1" do
+    @tag sally_isolated: true
     @tag host_add: [], device_add: [auto: :pwm]
     test "finds a recently created device", ctx do
       assert %{device: %{id: device_id}} = ctx

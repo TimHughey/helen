@@ -14,7 +14,6 @@ defmodule Sally.Types do
   @type pub_data() :: map()
   @type pub_to_device() :: Ecto.Schema.t()
   @type pub_topic_filters() :: nonempty_list()
-  @type pub_opts() :: [qos: 0..2]
   @type pid_or_nil() :: pid() | nil
   @type pub_rc() :: reference() | nil
   @type rc() :: :never | nil | term
