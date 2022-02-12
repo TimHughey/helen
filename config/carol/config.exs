@@ -11,7 +11,7 @@ if config_env() == :test do
     instances: [
       front_chandelier: [
         defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: :auto,
+        equipment: "front chandelier pwm",
         episodes: [
           [id: "Evening", event: :sunset, execute: [params: [min: 384, max: 1024]]],
           [id: "Overnight", event: "astro set", execute: [params: [min: 175, max: 640]]],
@@ -20,7 +20,7 @@ if config_env() == :test do
       ],
       front_evergreen: [
         defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: :auto,
+        equipment: "front evergreen pwm",
         episodes: [
           [id: "Evening", event: "sunset", execute: [params: [min: 384, max: 1024]]],
           [id: "Overnight", event: "astro set", execute: [params: [min: 175, max: 640]]],
@@ -29,7 +29,7 @@ if config_env() == :test do
       ],
       front_red_maple: [
         defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: :auto,
+        equipment: "front red maple pwm",
         episodes: [
           [id: "Evening", event: "sunset", execute: [params: [min: 384, max: 1024]]],
           [id: "Overnight", event: "astro set", execute: [params: [min: 175, max: 640]]],
@@ -43,8 +43,8 @@ if config_env() == :test do
       alfred: AlfredSim
     ],
     instances: [
-      first_instance: [],
-      second_instance: []
+      first_instance: [equipment: "first instance power"],
+      second_instance: [equipment: "second instance power"]
     ]
 
   config :carol, CarolWithEpisodes,
@@ -69,9 +69,9 @@ if config_env() == :test do
   config :carol, UseCarol.Alpha,
     opts: [alfred: AlfredSim],
     instances: [
-      first: [equipment: "first instance"],
-      second: [equipment: "second instance"],
-      last: [equipment: "last instance"]
+      first: [equipment: "first instance power"],
+      second: [equipment: "second instance power"],
+      last: [equipment: "last instance power"]
     ]
 
   config :carol, UseCarol.Beta,
@@ -93,7 +93,7 @@ if config_env() == :test do
       ],
       second_instance: [
         defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: "mut abcdef off",
+        equipment: "mut abcdefg off",
         episodes: [
           [id: "First", event: "beginning of day", execute: [cmd: :on]],
           [id: "Second", event: "end of day", shift: [hours: -1], execute: [cmd: :off]],
