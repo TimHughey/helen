@@ -11,6 +11,14 @@ defmodule Alfred.StatusTest do
     test "handles unknown name", %{name: name} do
       assert %Alfred.Status{name: ^name, story: :none, rc: :not_found} = Alfred.status(name, [])
     end
+
+    @tag equipment_add: [cmd: "on"]
+    test "honors binary: true opts", ctx do
+      assert %{equipment: <<_::binary>> = equipment} = ctx
+
+      status = Alfred.status(equipment, binary: true)
+      assert <<_::binary>> = status
+    end
   end
 
   describe "Alfred.Status.of_name/2" do
@@ -21,7 +29,11 @@ defmodule Alfred.StatusTest do
 
     @tag sensor_add: [temp_f: 78.0]
     test "handles well-formed sensor", %{sensor: name} do
-      assert %Alfred.Status{name: ^name, story: %{temp_f: _}, rc: :ok} = Alfred.status(name, [])
+      status = Alfred.status(name, [])
+      assert %Alfred.Status{name: ^name, story: %{temp_f: _}, rc: :ok} = status
+
+      binary = Alfred.Status.to_binary(status)
+      assert binary =~ ~r/temp_f/
     end
 
     @tag equipment_add: [cmd: "on"]

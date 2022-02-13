@@ -65,6 +65,13 @@ defmodule Alfred.Notify do
     end
   end
 
+  def register(%{equipment: equipment, ticket: ticket} = map, opts) do
+    case ticket do
+      %Alfred.Ticket{} -> map
+      _ -> Map.put(map, :ticket, register(equipment, opts))
+    end
+  end
+
   @doc since: "0.3.0"
   def registrations(guards \\ []) when is_list(guards) do
     # NOTE: assigning variables here for clarity; Registry is new and requires atypical syntax
@@ -93,6 +100,17 @@ defmodule Alfred.Notify do
     case find_registration(ref) do
       {_name, notifier_pid, {_caller_pid, _ref}} -> call({:unregister, ref}, notifier_pid)
       _ -> :ok
+    end
+  end
+
+  def unregister(%{} = map) do
+    case map do
+      %{ticket: {:ok, %Alfred.Ticket{} = ticket}} ->
+        _ = unregister(ticket)
+        Map.put(map, :ticket, :none)
+
+      _ ->
+        map
     end
   end
 

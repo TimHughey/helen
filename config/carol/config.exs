@@ -1,7 +1,7 @@
 import Config
 
 if config_env() == :test do
-  config :carol, CarolTest,
+  config :carol, Carol.Test,
     opts: [
       alfred: AlfredSim,
       latitude: 40.21089564609479,
@@ -38,7 +38,7 @@ if config_env() == :test do
       ]
     ]
 
-  config :carol, CarolNoEpisodes,
+  config :carol, Carol.NoEpisodes,
     opts: [
       alfred: AlfredSim
     ],
@@ -47,58 +47,11 @@ if config_env() == :test do
       second_instance: [equipment: "second instance power"]
     ]
 
-  config :carol, CarolWithEpisodes,
-    opts: [
-      alfred: AlfredSim,
-      latitude: 40.21089564609479,
-      longitude: -74.0109850020794,
-      timezone: "America/New_York"
-    ],
-    instances: [
-      first_instance: [
-        defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: "mut abcdef off",
-        episodes: [
-          [id: "First", event: "beginning of day", execute: [cmd: :on]],
-          [id: "Second", event: "end of day", shift: [hours: -1], execute: [cmd: :off]],
-          [id: "Last", event: "end of day", execute: [cmd: :off]]
-        ]
-      ]
-    ]
-
-  config :carol, UseCarol.Alpha,
+  config :carol, Carol.Alpha,
     opts: [alfred: AlfredSim],
     instances: [
       first: [equipment: "first instance power"],
       second: [equipment: "second instance power"],
       last: [equipment: "last instance power"]
-    ]
-
-  config :carol, UseCarol.Beta,
-    opts: [
-      alfred: AlfredSim,
-      timezone: "America/New_York",
-      latitude: 40.21089564609479,
-      longitude: -74.0109850020794
-    ],
-    instances: [
-      first_instance: [
-        defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: "mut abcdef off",
-        episodes: [
-          [id: "First", event: "beginning of day", execute: [cmd: :on]],
-          [id: "Second", event: "end of day", shift: [hours: -1], execute: [cmd: :off]],
-          [id: "Last", event: "end of day", execute: [cmd: :off]]
-        ]
-      ],
-      second_instance: [
-        defaults: [execute: [params: [type: "random", primes: 8, step: 6, step_ms: 40]]],
-        equipment: "mut abcdefg off",
-        episodes: [
-          [id: "First", event: "beginning of day", execute: [cmd: :on]],
-          [id: "Second", event: "end of day", shift: [hours: -1], execute: [cmd: :off]],
-          [id: "Last", event: "end of day", execute: [cmd: :off]]
-        ]
-      ]
     ]
 end

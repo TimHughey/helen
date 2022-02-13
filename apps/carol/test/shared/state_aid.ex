@@ -1,15 +1,33 @@
 defmodule Carol.StateAid do
   @moduledoc false
 
-  def add(%{state_add: opts} = ctx) when is_list(opts) do
-    alfred = ctx[:alfred] || AlfredSim
+  @tz "America/New_York"
+
+  def add(%{} = ctx) do
+    episodes = ctx[:episodes] || []
+    ctx_opts = ctx[:opts] || [alfred: AlfredSim, timezone: @tz, ref_dt: Timex.now(@tz)]
+
+    case ctx do
+      %{state_add: state_opts} ->
+        all_opts = state_opts ++ [episodes: episodes, opts: ctx_opts]
+        add(all_opts)
+
+      _ ->
+        :ok
+    end
+  end
+
+  def add([_ | _] = opts) do
+    alfred = opts[:alfred] || AlfredSim
+    equip_opts = opts[:equipment] || []
+    dev_alias = Alfred.NamesAid.new_dev_alias(:equipment, equip_opts)
 
     fields = [
-      opts: [alfred: alfred, timezone: "America/New_York"],
-      id: ctx[:server_name] || __MODULE__,
-      instance: ctx[:instance_name] || Alfred.NamesAid.unique("carol"),
-      equipment: ctx[:equipment] || "equipment missing",
-      episodes: ctx[:episodes] || :none
+      opts: [alfred: alfred, timezone: @tz],
+      id: opts[:server_name] || __MODULE__,
+      instance: Alfred.NamesAid.unique("carol"),
+      equipment: dev_alias.name,
+      episodes: opts[:episodes] || :none
     ]
 
     new_state = Carol.State.new(fields)
@@ -20,10 +38,8 @@ defmodule Carol.StateAid do
       _ -> new_state
     end
     |> rationalize(opts)
-    |> then(fn state -> %{state: state} end)
+    |> then(fn state -> %{state: state, dev_alias: dev_alias} end)
   end
-
-  def add(_), do: :ok
 
   def handle_continues(state, steps) do
     Enum.reduce(steps, state, &invoke_handle_continue(&1, &2))
@@ -33,7 +49,6 @@ defmodule Carol.StateAid do
     case state_or_tuple do
       %{} = state -> state
       {_, state} -> state
-      {_, state, _} -> state
     end
     |> then(fn state -> Carol.Server.handle_continue(step, state) end)
   end

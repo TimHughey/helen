@@ -1,11 +1,12 @@
 defmodule CarolEpisodeTest do
   use ExUnit.Case, async: true
+  use Carol.TestAid
 
   @moduletag carol: true, carol_episode: true
 
   @tz "America/New_York"
 
-  setup [:opts_add, :episodes_add, :episodes_summary]
+  setup [:episodes_add, :episodes_summary]
 
   defmacro msg(lhs, text, rhs) do
     quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
@@ -28,19 +29,19 @@ defmodule CarolEpisodeTest do
 
   defmacro assert_episodes(ctx) do
     quote bind_quoted: [ctx: ctx] do
+      assert %{episodes: episodes, ref_dt: ref_dt} = ctx
       episode_count = episode_count(ctx)
 
-      episodes = ctx.episodes
       assert [%Carol.Episode{} | _] = episodes
       assert length(episodes) == episode_count
 
       case episode_count do
         x when x >= 2 ->
-          assert_active(episodes, ctx.ref_dt)
-          assert_rest(episodes, ctx.ref_dt)
+          assert_active(episodes, ref_dt)
+          assert_rest(episodes, ref_dt)
 
         x when x == 1 ->
-          assert_active(episodes, ctx.ref_dt)
+          assert_active(episodes, ref_dt)
 
         # empty episode list
         _ ->
@@ -131,35 +132,37 @@ defmodule CarolEpisodeTest do
       assert_episodes(ctx)
     end
 
-    test "handles empty list", ctx do
-      assert [] = Carol.Episode.analyze_episodes([], ctx.opts)
+    test "handles empty list", _ctx do
+      assert [] = Carol.Episode.analyze_episodes([], [])
     end
   end
 
-  describe "Sally.Episode.ms_until_next_episode/2" do
-    test "handles empty episode list", ctx do
-      assert 1000 = Carol.Episode.ms_until_next_episode([], ctx.opts)
+  describe "Sally.Episode.ms_until_next/2" do
+    test "handles empty episode list", _ctx do
+      opts = [ttl_ms: 60_000]
+
+      assert 30_000 = Carol.Episode.ms_until_next([], opts)
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "handles mixed episode list", ctx do
       episodes = assert_episodes(ctx)
 
-      assert 6000 = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
+      assert 6000 = Carol.Episode.ms_until_next(episodes, ctx.opts)
     end
 
     @tag episodes_add: {:future, [count: 10, minutes: 1]}
     test "handles list of only future episodes", ctx do
       episodes = assert_episodes(ctx)
 
-      assert 63_000 = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
+      assert 63_000 = Carol.Episode.ms_until_next(episodes, ctx.opts)
     end
 
     @tag episodes_add: {:whole_day, []}
     test "handles a single episode for the whole day", ctx do
       episodes = assert_episodes(ctx)
 
-      next_ms = Carol.Episode.ms_until_next_episode(episodes, ctx.opts)
+      next_ms = Carol.Episode.ms_until_next(episodes, ctx.opts)
 
       assert next_ms >= 0
     end
@@ -182,7 +185,10 @@ defmodule CarolEpisodeTest do
     test "execute_args/2 returns active execute args", ctx do
       [%Carol.Episode{id: id} | _] = episodes = assert_episodes(ctx)
 
-      assert {[opts: [ack: :host]], [cmd: :on, id: ^id]} = Carol.Episode.execute_args([], :active, episodes)
+      assert {opts, defaults} = Carol.Episode.execute_args(episodes, :active, [])
+
+      assert [id: ^id, cmd: :on] = defaults
+      assert [opts: [ack: :host]] = opts
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
@@ -192,15 +198,18 @@ defmodule CarolEpisodeTest do
       # two element tuple:
       #  - elem0 = execute args
       #  - elem1 = default args
-      assert {[opts: [ack: :host], equipment: "equip"], [cmd: :on, id: "Past -3"]} =
-               Carol.Episode.execute_args([equipment: "equip"], "Past -3", episodes)
+      extra = [equipment: "equip"]
+      assert {opts, defaults} = Carol.Episode.execute_args(episodes, "Past -3", extra)
+
+      assert [opts: [ack: :host], equipment: "equip"] = opts
+      assert [id: "Past -3", cmd: :on] = defaults
     end
 
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     test "execute_args/2 returns empty list for unknown id", ctx do
       episodes = assert_episodes(ctx)
 
-      assert {[], []} = Carol.Episode.execute_args([], "Unknown", episodes)
+      assert [] = Carol.Episode.execute_args([], "Unknown", episodes)
     end
   end
 
@@ -219,11 +228,4 @@ defmodule CarolEpisodeTest do
   end
 
   def episodes_summary(_ctx), do: :ok
-
-  ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
-
-  defp episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
-  defp opts_add(ctx), do: Carol.OptsAid.add(ctx)
 end

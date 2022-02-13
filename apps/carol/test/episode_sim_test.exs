@@ -1,9 +1,10 @@
 defmodule CarolEpisodeSimTest do
   use ExUnit.Case, async: true
+  use Carol.TestAid
 
   @moduletag carol: true, carol_episode_sim: true
 
-  setup [:opts_add, :episodes_add, :sim_add]
+  setup [:episodes_add, :sim_add]
 
   defmacro msg(lhs, text, rhs) do
     quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
@@ -34,22 +35,6 @@ defmodule CarolEpisodeSimTest do
             {active, episodes, want_order}
         end
       end)
-
-      # for ms when ms < sim_ms <- 0..sim_ms//1000, reduce: {:none, episodes, want_order} do
-      #   {prev_active, prev_episodes, want_order} ->
-      #     episodes = Carol.Episode.analyze_episodes(prev_episodes, shift_ref_dt(opts, ms))
-      #
-      #     active = Carol.Episode.active_id(episodes)
-      #
-      #     if active != prev_active do
-      #       [expect_active | want_order_rest] = want_order
-      #       assert active == expect_active, msg({active, expect_active}, "should be equal", episodes)
-      #
-      #       {active, episodes, want_order_rest}
-      #     else
-      #       {active, episodes, want_order}
-      #     end
-      # end
     end
   end
 
@@ -59,7 +44,7 @@ defmodule CarolEpisodeSimTest do
     @tag sim_days: 30, step_ms: 1000
     @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
     @tag want_order: ["Now 1", "Future 1", "Future 2", "Future 3", "Past -3", "Past -2", "Past -1"]
-    test "mixed episodes using Carol.Episode.ms_until_next_episode/2 to advance ref_dt", ctx do
+    test "mixed episodes using Carol.Episode.ms_until_next/2 to advance ref_dt", ctx do
       # calculate the number of reductions we need to simulate the requested sim days
       %{episodes_add: {_, add_opts}} = ctx
       sim_episodes = Enum.reduce(add_opts, 0, fn {_k, val}, acc -> acc + val end) * ctx.sim_days
@@ -70,7 +55,7 @@ defmodule CarolEpisodeSimTest do
           episodes = Carol.Episode.analyze_episodes(prev_episodes, sched_opts)
 
           # calculate how long until the next episode activates
-          ms_until_next = Carol.Episode.ms_until_next_episode(episodes, sched_opts)
+          ms_until_next = Carol.Episode.ms_until_next(episodes, sched_opts)
 
           # get the new active episode id
           active = Carol.Episode.active_id(episodes)
@@ -116,9 +101,6 @@ defmodule CarolEpisodeSimTest do
       assert_sim(want_order)
     end
   end
-
-  defp episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
-  defp opts_add(ctx), do: Carol.OptsAid.add(ctx)
 
   defp sim_add(%{ref_dt: start_dt, sim_days: sim_days, want_order: want_order}) do
     finish_dt = start_dt |> Timex.shift(days: sim_days)

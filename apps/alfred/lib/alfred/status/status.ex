@@ -82,7 +82,49 @@ defmodule Alfred.Status do
       :finalize, chk_map -> finalize(chk_map, args)
     end)
     |> take_fields(args)
-    |> then(fn fields -> struct(__MODULE__, fields) end)
+    |> status_returned(args)
+  end
+
+  @doc false
+  def status_returned(fields, args) do
+    status = struct(__MODULE__, fields)
+
+    cond do
+      get_in(args, [:binary]) == true -> to_binary(status)
+      true -> status
+    end
+  end
+
+  @doc since: "0.4.9"
+  def to_binary(%{name: name} = status, _opts \\ []) do
+    case status do
+      %{rc: :ok, story: <<_::binary>> = story} -> ["OK", story]
+      %{rc: :ok, story: %{cmd: cmd}} -> ["OK", "{#{cmd}}"]
+      %{rc: :ok, story: %{temp_c: _} = story} -> ["OK", to_binary_story(story)]
+      %{rc: :busy, story: <<_::binary>> = story} -> ["BUSY", story]
+      %{rc: :busy, story: %{cmd: cmd, refid: refid}} -> ["BUSY", "{#{cmd}}", "@#{refid}"]
+      %{rc: :not_found} -> ["NOT_FOUND"]
+      %{rc: {:ttl_expired, ms}} -> ["TTL_EXPIRED", "+#{ms}ms"]
+      %{rc: {:timeout, ms}} -> ["TIMEOUT", "+#{ms}ms"]
+      _ -> ["ERROR"]
+    end
+    |> then(fn story -> story ++ ["[#{name}]"] end)
+    |> Enum.join(" ")
+  end
+
+  @doc false
+  @story_keys [:relhum, :temp_c, :temp_f]
+  def to_binary_story(story) do
+    Enum.reduce(@story_keys, [], fn key, acc ->
+      val = get_in(story, [key])
+
+      case val do
+        x when is_float(x) -> [to_string(key), "=", to_string(Float.round(x, 2))]
+        x when is_integer(x) -> [to_string(key), "=", to_string(x)]
+        _ -> []
+      end
+      |> then(fn list -> [list | acc] end)
+    end)
   end
 
   @doc false
@@ -118,7 +160,8 @@ defmodule Alfred.Status do
       %{} -> continue(lookup)
       {:error, :no_data = rc} -> halt(rc, %{})
       {rc, %{} = story} when rc in @allowed_rc -> halt(rc, story)
-      _ -> halt(:errpr, %{})
+      {rc, <<_::binary>> = story} when rc in @allowed_rc -> halt(rc, story)
+      _ -> halt(:error, %{})
     end
   end
 

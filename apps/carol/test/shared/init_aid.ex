@@ -9,7 +9,7 @@ defmodule Carol.InitAid do
         init_args = add(opts)
         {dev_alias, init_args} = Keyword.pop(init_args, :dev_alias)
 
-        %{init_args: init_args, dev_alias: dev_alias}
+        %{init_args: init_args, dev_alias: dev_alias, instance: init_args[:instance]}
 
       _ ->
         :ok

@@ -75,8 +75,8 @@ defmodule Alfred do
   ##
 
   defdelegate notify_register(opts), to: Alfred.Notify, as: :register
-  defdelegate notify_register(name, opts), to: Alfred.Notify, as: :register
-  defdelegate notify_unregister(opts), to: Alfred.Notify, as: :unregister
+  defdelegate notify_register(arg1, opts), to: Alfred.Notify, as: :register
+  defdelegate notify_unregister(args), to: Alfred.Notify, as: :unregister
 
   ##
   ## Alfred.Status delegation

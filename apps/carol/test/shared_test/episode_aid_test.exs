@@ -1,9 +1,10 @@
 defmodule CarolEpisodeAidTest do
   use ExUnit.Case, async: true
+  use Carol.TestAid
 
   @moduletag carol: true, carol_episode_aid: true
 
-  setup [:opts_add, :episodes_add]
+  setup [:episodes_add]
 
   defmacro assert_counts(results, want_counts) do
     quote bind_quoted: [results: results, want_counts: want_counts] do
@@ -71,11 +72,4 @@ defmodule CarolEpisodeAidTest do
       assert_episodes(ctx, past: 0, now: 0, future: 10)
     end
   end
-
-  ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
-
-  defp episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
-  defp opts_add(ctx), do: Carol.OptsAid.add(ctx)
 end

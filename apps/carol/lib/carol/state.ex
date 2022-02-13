@@ -1,6 +1,6 @@
 defmodule Carol.State do
   @moduledoc false
-  alias __MODULE__
+
   require Logger
 
   defstruct server_name: :none,
@@ -11,10 +11,11 @@ defmodule Carol.State do
             register: nil,
             seen_at: :none,
             status: %{},
+            tick: nil,
             ticket: :none,
             ttl_ms: 60_000
 
-  @type t :: %State{
+  @type t :: %__MODULE__{
           server_name: :none | module(),
           name: String.t(),
           equipment: String.t(),
@@ -22,129 +23,132 @@ defmodule Carol.State do
           register: nil | {:ok, pid},
           seen_at: DateTime.t(),
           status: map,
+          tick: nil | reference(),
           ticket: Alfred.Ticket.t(),
           ttl_ms: pos_integer()
         }
 
-  def alfred, do: Process.get(:opts) |> Keyword.get(:alfred, Alfred)
+  def alfred, do: opts(:alfred) || Alfred
 
+  def freshen_episodes(%{episodes: episodes} = state) do
+    sched_opts = sched_opts(state)
+    episodes = Carol.Episode.analyze_episodes(episodes, sched_opts)
+
+    struct(state, episodes: episodes)
+  end
+
+  @common [:alfred, :id, :opts]
+  @want_fields [:name, :instance, :equipment, :episodes]
+  @combine [:name, :instance]
   def new(args) do
-    {opts, rest} = pop_and_put_opts(args)
-    {equipment, rest} = pop_equipment(rest)
-    {name, rest} = pop_name(rest)
-    {defaults, rest} = Keyword.pop(rest, :defaults, [])
-    {episodes, rest} = Keyword.pop(rest, :episodes, [])
+    {common_opts, args_rest} = Keyword.split(args, @common)
+    opts = store_opts(common_opts)
 
-    log_unknown_args(rest)
+    {fields, args_rest} = Keyword.split(args_rest, @want_fields)
+    {defaults, args_extra} = Keyword.pop(args_rest, :defaults, [])
 
-    # NOTE: defaults are only applicable to episodes
-    episodes = Carol.Episode.new_from_episode_list(episodes, defaults)
+    log_unknown_args(args_extra)
 
-    fields = [equipment: equipment, episodes: episodes, server_name: opts[:server_name], name: name]
+    fields = [server_name: opts[:server_name]] ++ fields
 
-    struct(__MODULE__, fields)
+    Enum.map(fields, fn
+      # NOTE: defaults are only applicable to episodes
+      {:episodes = key, list} -> {key, Carol.Episode.new_from_list(list, defaults)}
+      {:equipment = key, val} -> {key, to_name(val)}
+      {key, val} when key in @combine -> {:name, to_name(val)}
+      kv -> kv
+    end)
+    |> Enum.dedup()
+    |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
-  def now, do: sched_opts() |> get_in([:ref_dt])
+  def next_tick(%{episodes: episodes} = state) do
+    sched_opts = sched_opts(state)
 
-  def opts, do: Process.get(:opts)
+    next_tick_ms = Carol.Episode.ms_until_next(episodes, sched_opts)
+    tick = Process.send_after(self(), :tick, next_tick_ms)
 
-  def refresh_episodes(%State{} = s) do
-    [episodes: Carol.Episode.analyze_episodes(s.episodes, sched_opts())]
-    |> update(s)
+    struct(state, tick: tick)
   end
 
-  def save_ticket(ticket_rc, %State{} = s) do
-    case ticket_rc do
-      x when is_atom(x) -> x
-      {:ok, x} -> x
-      x -> {:failed, x}
-    end
-    |> then(fn ticket -> struct(s, ticket: ticket) end)
-  end
-
-  def sched_opts do
+  def opts(keys \\ []) do
     opts = Process.get(:opts)
-    tz = opts[:timezone]
 
-    [List.to_tuple([:ref_dt, Timex.now(tz)]) | opts] |> Enum.sort()
-  end
-
-  def seen_at(s), do: update(s, seen_at: now())
-
-  def start_notifies(%State{ticket: ticket} = state) do
-    case ticket do
-      x when x in [:none, :pause] ->
-        [name: state.equipment, interval_ms: :all]
-        |> alfred().notify_register()
-        |> save_ticket(state)
-
-      x when is_struct(x) ->
-        state
+    case keys do
+      key when is_atom(key) -> get_in(opts, [key])
+      [_ | _] -> Keyword.take(opts, keys)
+      _ -> opts
     end
   end
 
-  def stop_notifies(%State{ticket: ticket} = state) do
-    case ticket do
-      x when is_struct(x) ->
-        alfred().notify_unregister(ticket)
-        :pause
+  def restart(%__MODULE{} = state) do
+    _ = Process.send_after(self(), :restart, 0)
 
-      x when is_atom(x) ->
-        x
+    state
+  end
+
+  def sched_opts(%{seen_at: seen_at, ttl_ms: ttl_ms}) do
+    opts = opts()
+
+    case seen_at do
+      %DateTime{} = ref_dt -> ref_dt
+      _ -> opts[:timezone] |> Timex.now()
     end
-    |> save_ticket(state)
+    |> then(fn ref_dt -> [ref_dt: ref_dt, ttl_ms: ttl_ms] ++ opts end)
   end
 
-  def timeout(%State{} = s), do: Carol.Episode.ms_until_next_episode(s.episodes, sched_opts())
+  def seen_at(state) do
+    tz = opts(:timezone)
 
-  ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
-
-  defp log_unknown_args([]), do: []
-
-  defp log_unknown_args(rest) do
-    ["extra args: ", Keyword.keys(rest) |> inspect()]
-    |> Logger.warn()
-
-    rest
+    struct(state, seen_at: Timex.now(tz))
   end
 
-  defp pop_and_put_opts(args) do
-    {opts, rest} = Keyword.pop(args, :opts, [])
-    {alfred, rest} = Keyword.pop(rest, :alfred, Alfred)
+  @notify_opts [interval_ms: :all]
+  def start_notifies(%{ticket: _} = state) do
+    alfred = alfred()
+
+    alfred.notify_register(state, @notify_opts)
+  end
+
+  def stop_notifies(%{ticket: _} = state) do
+    alfred = alfred()
+
+    alfred.notify_unregister(state)
+  end
+
+  def store_opts(common_opts) do
+    {opts, rest} = Keyword.pop(common_opts, :opts, [])
     {server_name, rest} = Keyword.pop(rest, :id)
 
-    # ensure Alfred is set
-    opts_all = Keyword.put_new(opts, :alfred, alfred) ++ [server_name: server_name]
-
-    Process.put(:opts, opts_all)
-
-    # return tuple of opts first element, rest second element
-    {opts_all, rest}
+    rest
+    |> Keyword.put_new(:server_name, server_name)
+    |> Keyword.merge(opts)
+    |> Keyword.put_new(:alfred, Alfred)
+    |> tap(fn opts_all -> Process.put(:opts, opts_all) end)
   end
 
-  defp pop_equipment(args) do
-    {equipment, rest} = Keyword.pop(args, :equipment)
+  ## PRIVATE
+  ## PRIVATE
+  ## PRIVATE
 
-    case equipment do
-      x when is_binary(x) -> equipment
-      x when is_atom(x) -> to_string(x) |> String.replace("_", " ")
+  def log_unknown_args(rest) do
+    case rest do
+      [] ->
+        rest
+
+      _ ->
+        keys = Keyword.keys(rest)
+        log = ["extra args: ", inspect(keys)]
+
+        tap(rest, fn _ -> Logger.warn(log) end)
     end
-    |> then(fn equipment -> {equipment, rest} end)
   end
 
-  defp pop_name(args) do
-    {instance, rest} = Keyword.pop(args, :instance)
-
-    case instance do
-      x when is_atom(x) -> to_string(instance) |> String.replace("_", " ")
-      <<_::binary>> -> instance
+  def to_name(val) do
+    case val do
+      <<_::binary>> -> val
+      # x when is_atom(x) -> to_string(val) |> String.replace("_", " ")
+      x when is_atom(x) -> to_string(val)
     end
-    |> then(fn name -> {name, rest} end)
   end
-
-  defp update(fields, %__MODULE__{} = s), do: struct(s, fields)
-  defp update(%__MODULE__{} = s, fields), do: struct(s, fields)
 end

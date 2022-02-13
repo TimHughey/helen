@@ -6,8 +6,12 @@ defmodule Carol.EpisodeAid do
   @shift_opts [:days, :hours, :minutes, :seconds, :milliseconds, :microseconds]
   @tz "America/New_York"
 
-  def add(%{episodes_add: {what, epi_opts}, opts: opts}) do
-    %{episodes: add(what, epi_opts, opts)}
+  def add(%{episodes_add: {what, epi_opts}} = ctx) do
+    ref_dt = Timex.now(@tz)
+
+    opts = ctx[:opts] || [alfred: AlfredSim, timezone: @tz, ref_dt: ref_dt]
+
+    %{episodes: add(what, epi_opts, opts), opts: opts, ref_dt: ref_dt}
   end
 
   def add(_), do: :ok
@@ -35,7 +39,7 @@ defmodule Carol.EpisodeAid do
       {id, event} when event in @solar_events -> [id: id, event: event]
       {id, event, shift} -> [id: id, event: event, shift: shift]
     end)
-    |> Carol.Episode.new_from_episode_list(execute: [cmd: :on])
+    |> Carol.Episode.new_from_list(execute: [cmd: :on])
   end
 
   @make_many_type [:future, :now, :past, :yesterday]
@@ -76,7 +80,7 @@ defmodule Carol.EpisodeAid do
 
   # NOTE: include seconds: 0 so make_many_shift_opts/2 doesn't add seconds to
   # shift opts prior to calling fixed/2
-  @shift_short [milliseconds: 130, seconds: 0]
+  @shift_short [milliseconds: 250, seconds: 0]
   def make_many(:short, opts) do
     {mix_opts, opts_rest} = Keyword.split(opts, [:future, :now, :past])
 
@@ -126,30 +130,20 @@ defmodule Carol.EpisodeAid do
   ## PRIVATE
 
   defp adjust_future_when_have_now(episodes) do
-    Enum.reduce_while(episodes, :now_not_present, fn
-      # found a Now in the list
-      %{id: <<"Now"::binary, _rest::binary>>}, _acc -> {:halt, :now_present}
-      # now not found yet, keep looking
-      _episode, acc -> {:cont, acc}
-    end)
-    |> adjust_future_when_have_now(episodes)
+    if Enum.any?(episodes, &match?(%{id: <<"Now"::binary, _::binary>>}, &1)) do
+      Enum.map(episodes, fn
+        %{id: <<"Future"::binary, _rest::binary>>, shift: shift_opts} = episode ->
+          {_, opts} = Keyword.get_and_update(shift_opts, :seconds, fn x -> {x, (x || 0) + 3} end)
+
+          struct(episode, shift: opts)
+
+        episode ->
+          episode
+      end)
+    else
+      episodes
+    end
   end
-
-  defp adjust_future_when_have_now(:now_present, episodes) do
-    # have_now? = Enum.any?(episodes, fn %{id: id} -> id =~ ~r/Now/ end) && :have_now
-
-    Enum.map(episodes, fn
-      %{id: <<"Future"::binary, _rest::binary>>, shift: shift_opts} = episode ->
-        {_, opts} = Keyword.get_and_update(shift_opts, :seconds, fn x -> {x, (x || 0) + 3} end)
-
-        struct(episode, shift: opts)
-
-      episode ->
-        episode
-    end)
-  end
-
-  defp adjust_future_when_have_now(_, episodes), do: episodes
 
   @fixed_types [:future, :now, :past, :yesterday]
   defp fixed(what, opts) when what in @fixed_types do

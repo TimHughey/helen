@@ -1,6 +1,5 @@
 defmodule FarmTest do
   use ExUnit.Case, async: true
-  use Carol.AssertAid, module: Farm
   import Should, only: [assert_started: 2]
 
   describe "Womb.Farm.Heater" do

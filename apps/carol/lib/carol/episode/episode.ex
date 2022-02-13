@@ -1,5 +1,5 @@
 defmodule Carol.Episode do
-  alias __MODULE__
+  @moduledoc "Carol Episode Utilities"
 
   defstruct id: "", execute: [], event: "", at: :none, shift: [], valid: :unchecked, defaults: []
 
@@ -19,33 +19,31 @@ defmodule Carol.Episode do
   end
 
   @doc since: "0.3.0"
-  def active_id([%Episode{id: id} | _]), do: id
+  def active_id([%{id: id} | _]), do: id
   def active_id(_), do: :none
 
   @doc since: "0.3.0"
   # (1 of 3) episodes require first calc_at
-  def analyze_episodes([%Episode{at: :none} | _] = episodes, sched_opts) do
-    for %Episode{} = episode <- episodes do
-      calc_at(episode, sched_opts)
-    end
-    |> sort(:ascending)
+  def analyze_episodes([%{at: :none} | _] = episodes, sched_opts) do
+    Enum.map(episodes, &calc_at(&1, sched_opts))
+    |> sort(:asc)
     |> analyze_episodes(sched_opts)
   end
 
   # (2 of 3) nominal operation, one or more episodes
-  def analyze_episodes([%Episode{} | _] = episodes, opts) do
+  def analyze_episodes([%__MODULE__{} | _] = episodes, opts) do
     # NOTE: reverse the list since we are searching for the first episode before ref_dt.  if we
     # searched the list forward we'd have to look ahead in the list resulting in a complex reduction.
     episodes = Enum.reverse(episodes)
 
-    for episode <- episodes, reduce: %{active: [], rest: []} do
+    Enum.reduce(episodes, %{active: [], rest: []}, fn
       # the first episode found that starts before the ref_dt is considered active
-      %{active: []} = acc -> accumulate_active(episode, acc, opts)
+      episode, %{active: []} = acc -> accumulate_active(episode, acc, opts)
       # once an active episode is located the remaining episodes are simply accumulated
-      %{active: %Episode{}} = acc -> accumulate_rest(episode, acc)
-    end
+      episode, %{active: %{id: _}} = acc -> accumulate_rest(episode, acc)
+    end)
     |> check_analysis(opts)
-    |> sort(:ascending)
+    |> sort(:asc)
   end
 
   # (3 of 3) no episodes or bad config
@@ -63,7 +61,7 @@ defmodule Carol.Episode do
   defp accumulate_rest(episode, acc), do: %{acc | rest: [episode | acc.rest]}
 
   # good, we have an active episode. not much to do here except futurize past episodes
-  defp check_analysis(%{active: %Episode{} = active, rest: rest}, opts) do
+  defp check_analysis(%{active: %__MODULE__{} = active, rest: rest}, opts) do
     futurize(active, rest, opts)
   end
 
@@ -80,7 +78,7 @@ defmodule Carol.Episode do
 
     # sort the list of future episodes descending so the last episode of the 24 hour
     # clock is at the head.
-    [future_active | future_rest] = sort(episodes, :descending)
+    [future_active | future_rest] = sort(episodes, :desc)
 
     # move the future active to the previous day using calc_at/3
     # NOTE: always use calc_at to ensure accurate at calculation based on the event
@@ -92,14 +90,16 @@ defmodule Carol.Episode do
 
   @doc since: "0.3.0"
   # (1 of 3) calculate episode using ref_dt in opts
-  def calc_at(%Episode{} = ep, opts) when is_list(opts) do
+  def calc_at(%__MODULE__{} = ep, opts) when is_list(opts) do
     [event: ep.event, shift_opts: ep.shift]
     |> Keyword.merge(opts)
     |> Carol.Episode.Event.parse()
     |> then(fn at -> struct(ep, at: at) end)
   end
 
-  def calc_at(%Episode{} = episode, {:days, days}, opts) when is_integer(days) and is_list(opts) do
+  def calc_at(%__MODULE__{} = episode, {:days, days}, opts) when is_list(opts) do
+    unless is_integer(days), do: raise("days must be an integer")
+
     # days is > 0 ; shift ref_dt forward by days then calc_at
     next_ref_dt = ref_dt() |> Timex.shift(days: days)
     next_opts = Keyword.put(opts, :ref_dt, next_ref_dt)
@@ -108,58 +108,59 @@ defmodule Carol.Episode do
   end
 
   @doc since: "0.3.0"
-  def execute_args(extra_opts, :active, episodes)
-      when is_list(extra_opts)
-      when is_list(episodes) do
-    List.first(episodes) |> execute_args(extra_opts)
+
+  def execute_args(episode, extra_opts) do
+    case episode do
+      %{id: id, execute: args, defaults: defaults} ->
+        execute_defaults = Keyword.get(defaults, :execute, [])
+        {args ++ extra_opts, [{:id, id} | execute_defaults]}
+
+      _ ->
+        []
+    end
   end
 
-  def execute_args(extra_opts, want_id, episodes)
-      when is_list(extra_opts)
-      when is_binary(want_id)
-      when is_list(episodes) do
+  def execute_args(episodes, :active, extra_opts) do
+    case episodes do
+      [%{id: _} = active | _] -> execute_args(active, extra_opts)
+      _ -> []
+    end
+  end
+
+  def execute_args(episodes, <<_::binary>> = want_id, extra_opts) do
     Enum.find(episodes, [], fn %{id: id} -> id == want_id end)
     |> execute_args(extra_opts)
   end
 
-  def execute_args(%Episode{id: id, execute: args, defaults: defaults}, extra_opts) do
-    execute_defaults = Keyword.get(defaults, :execute, [])
-    {args ++ extra_opts, execute_defaults ++ [id: id]}
-  end
-
-  def execute_args([], _), do: {[], []}
+  @millis :milliseconds
+  def ms_diff(dt1, dt2), do: Timex.diff(dt1, dt2, @millis)
 
   @doc since: "0.3.0"
+  def ms_until_next(episodes, opts) do
+    ref_dt = opts[:ref_dt]
 
-  def ms_until_next_episode([%__MODULE__{} = single_episode], opts) do
-    # NOTE: single episode lists are easy...  the ms until next episode is
-    # simply the absolute value of the difference between ref_dt and the episode at
-    next_ms = Timex.diff(ref_dt(), single_episode.at, :milliseconds)
+    case episodes do
+      # single episode, simply abs of the diff ref_dt and at
+      [%{at: at}] ->
+        ms_diff(at, ref_dt) |> abs()
 
-    abs(next_ms)
-  end
+      # first element is always active so this will recurse 99% of the time
+      [%{at: at} | rest] ->
+        ms_diff = ms_diff(at, ref_dt)
+        if ms_diff > 0, do: ms_diff, else: ms_until_next(rest, opts)
 
-  def ms_until_next_episode([%Episode{} = episode | rest], opts) do
-    next_ms = Timex.diff(episode.at, ref_dt(), :milliseconds)
-
-    # NOTE: this will recurse 99% of the time because the first element is the active episode
-    # and therefore a negative number.  there could be, however, situations that are not obvious
-    # where the first element returns a positive number. that said, we always check the first element.
-
-    case next_ms do
-      x when x <= 0 -> ms_until_next_episode(rest, opts)
-      x -> x
+      # no episodes, use ttl_ms to keep name registered
+      [] ->
+        trunc(opts[:ttl_ms] / 2)
     end
   end
 
-  def ms_until_next_episode(_, _opts), do: 1000
-
   @doc since: "0.3.0"
-  def new_from_episode_list([_ | _rest] = episodes, defaults) do
+  def new_from_list([_ | _rest] = episodes, defaults) do
     Enum.map(episodes, fn episode_args -> new(episode_args, defaults) end)
   end
 
-  def new_from_episode_list(_, _defaults), do: []
+  def new_from_list(_, _defaults), do: []
 
   @doc since: "0.3.0"
   @new_fields [:id, :execute, :shift, :event, :defaults]
@@ -170,19 +171,16 @@ defmodule Carol.Episode do
     |> Keyword.put_new(:defaults, defaults)
     |> List.flatten()
     |> Keyword.take(@new_fields)
-    |> then(fn fields -> struct(Episode, fields) end)
+    |> then(fn fields -> struct(__MODULE__, fields) end)
   end
 
-  def new(%Episode{} = episode, []), do: episode
+  def new(%__MODULE__{} = episode, []), do: episode
 
   def put_execute({want_id, execute}, episodes) do
-    # reverse the list so the result is in the same order (instead of sorting)
-    episodes = Enum.reverse(episodes)
-
-    for %{id: id} = episode <- episodes, reduce: [] do
-      acc when id == want_id -> [struct(episode, execute: execute) | acc]
-      acc -> [episode | acc]
-    end
+    Enum.map(episodes, fn
+      %{id: ^want_id} = episode -> struct(episode, execute: execute)
+      episode -> episode
+    end)
   end
 
   @doc """
@@ -193,22 +191,22 @@ defmodule Carol.Episode do
 
   """
   @doc since: "0.3.0"
-  @spec sort([Episode.t(), ...], order :: :ascending | :descending) :: [Episode.t(), ...]
-  @sort_order [:ascending, :descending]
+  @spec sort([__MODULE__.t(), ...], order :: :asc | :desc) :: [__MODULE__.t(), ...]
+  @sort_order [:asc, :desc]
   def sort([_e0, _e1 | _rest] = episodes, order) when order in @sort_order do
     # flatten the list to remove any empty lists added during check_analysis/2
     episodes = List.flatten(episodes)
 
     case order do
-      :ascending -> Enum.sort(episodes, &ascending/2)
-      :descending -> Enum.sort(episodes, &descending/2)
+      :asc -> Enum.sort(episodes, &ascending/2)
+      :desc -> Enum.sort(episodes, &descending/2)
     end
   end
 
   def sort(episodes, _order), do: episodes
 
   @doc since: "0.3.0"
-  def status_map(%Episode{at: at, id: id}, opts) do
+  def status_map(%__MODULE__{at: at, id: id}, opts) do
     diff_ms = Timex.diff(at, ref_dt(), :milliseconds)
 
     case diff_ms do
@@ -224,21 +222,21 @@ defmodule Carol.Episode do
 
     status_opts_map = Enum.into(status_opts, %{})
 
-    for %Episode{} = episode <- episodes do
+    Enum.map(episodes, fn episode ->
       status_map = status_map(episode, opts_rest)
 
       case status_opts_map do
         %{format: :humanized} -> format_status_map(status_map, :humanized)
         _ -> status_map
       end
-    end
+    end)
   end
 
   @doc false
-  def ascending(%Episode{at: lhs}, %Episode{at: rhs}), do: Timex.compare(lhs, rhs) <= 0
+  def ascending(%{at: lhs}, %{at: rhs}), do: Timex.compare(lhs, rhs) <= 0
 
   @doc false
-  def descending(%Episode{at: lhs}, %Episode{at: rhs}), do: Timex.compare(lhs, rhs) >= 0
+  def descending(%{at: lhs}, %{at: rhs}), do: Timex.compare(lhs, rhs) >= 0
 
   ## PRIVATE
   ## PRIVATE
@@ -267,37 +265,25 @@ defmodule Carol.Episode do
     |> Enum.join(" ")
   end
 
-  # (1 of 4) ensure a single episode is moved to the future by performing
-  # calc_at until the episode at is greater than or equal to ref_dt
-  # defp futurize(%Episode{} = episode, opts) do
-  #   # a calc_at with current ref_dt might bring the episode into the future
-  #   new_episode = calc_at(episode, {:days, 0}, opts)
-  #   compare_tuple = futurize_compare_tuple(new_episode, opts)
-  #
-  #   # check if episode moved to the future
-  #   futurize(episode, compare_tuple, opts)
-  # end
-
   # (1 of 3) ensure a list of episodes are moved to the future using futurize/2
   # then return the stable episode list (active at head)
   # NOTE: does not change the active episode
-  defp futurize(%Episode{} = active, episodes, opts) when is_list(episodes) do
-    for %Episode{} = episode <- episodes, reduce: [active] do
-      acc ->
-        compare = futurize_compare(episode, opts)
+  defp futurize(%__MODULE__{} = active, episodes, opts) when is_list(episodes) do
+    Enum.reduce(episodes, [active], fn episode, acc ->
+      compare = futurize_compare(episode, opts)
 
-        [futurize(episode, compare, opts) | acc]
-    end
+      [futurize(episode, compare, opts) | acc]
+    end)
   end
 
   # (2 of 3) futurizing complete; the episode is in the future (or now)
-  defp futurize(%Episode{} = episode, compare, _opts) when compare in [:lt, :eq] do
+  defp futurize(%__MODULE__{} = episode, compare, _opts) when compare in [:lt, :eq] do
     episode
   end
 
   # (3 of 3) the episode is in the past; execute calc_at with an accumulator of
   # the count of days into the future.
-  defp futurize(%Episode{} = episode, :gt, opts) do
+  defp futurize(%__MODULE__{} = episode, :gt, opts) do
     days = Keyword.get(opts, :futurize_days, 0)
 
     new_episode = calc_at(episode, {:days, days}, opts)

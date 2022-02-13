@@ -68,7 +68,9 @@ defmodule Alfred.Execute do
   @doc since: "0.3.0"
   def to_binary(%{name: name} = execute, _opts \\ []) do
     case execute do
+      %{rc: :ok, story: <<_::binary>> = story} -> ["OK", story]
       %{rc: :ok, story: %{cmd: cmd}} -> ["OK", "{#{cmd}}"]
+      %{rc: :busy, story: <<_::binary>> = story} -> ["BUSY", story]
       %{rc: :busy, story: %{cmd: cmd, refid: refid}} -> ["BUSY", "{#{cmd}}", "@#{refid}"]
       %{rc: :not_found} -> ["NOT_FOUND"]
       %{rc: {:ttl_expired, ms}} -> ["TTL_EXPIRED", "+#{ms}ms"]

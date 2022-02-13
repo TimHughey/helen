@@ -56,6 +56,10 @@ defmodule Alfred.NotifyAid do
     %{memo: memo, memo_before_dt: before_dt, notify_msg: {Alfred, memo}}
   end
 
+  defp make_memo_from_ticket({:ok, %Alfred.Ticket{} = ticket}, opts) do
+    make_memo_from_ticket(ticket, opts)
+  end
+
   defp make_memo_from_ticket(%Alfred.Ticket{} = ticket, opts) when is_list(opts) do
     {seen_at, opts_rest} = Keyword.pop(opts, :seen_at, DateTime.utc_now())
     {missing?, _} = Keyword.pop(opts_rest, :missing?, false)
