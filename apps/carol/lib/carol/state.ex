@@ -147,8 +147,7 @@ defmodule Carol.State do
   def to_name(val) do
     case val do
       <<_::binary>> -> val
-      # x when is_atom(x) -> to_string(val) |> String.replace("_", " ")
-      x when is_atom(x) -> to_string(val)
+      x when is_atom(x) -> to_string(val) |> String.replace("_", " ")
     end
   end
 end
