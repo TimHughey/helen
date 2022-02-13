@@ -6,6 +6,7 @@ defmodule Carol.State do
   defstruct server_name: :none,
             # NOTE: name registered with Alfred
             name: :none,
+            nature: :server,
             equipment: :none,
             episodes: [],
             register: nil,
@@ -18,6 +19,7 @@ defmodule Carol.State do
   @type t :: %__MODULE__{
           server_name: :none | module(),
           name: String.t(),
+          nature: :server,
           equipment: String.t(),
           episodes: [] | [Carol.Episode.t(), ...],
           register: nil | {:ok, pid},
