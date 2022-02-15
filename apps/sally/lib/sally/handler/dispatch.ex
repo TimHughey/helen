@@ -157,7 +157,7 @@ defmodule Sally.Dispatch do
   end
 
   @doc false
-  @steps [:load_host, :unpack, :mtime, :prune_data, :process, :post_process, :finalize, :log]
+  @steps [:load_host, :unpack, :mtime, :prune_data, :filter_check, :process, :post_process, :finalize, :log]
   def reduce(%__MODULE__{} = dispatch, module) do
     dispatch = update(dispatch, module: module)
 
@@ -177,6 +177,16 @@ defmodule Sally.Dispatch do
   def finalize(dispatch), do: [final_at: Timex.now()] |> update(dispatch)
 
   @subsystems ["immut", "mut"]
+  def filter_check(%{subsystem: sub, filter_extra: filter_extra} = dispatch) do
+    case {sub, filter_extra} do
+      {sub, [ident, "error" = status]} when sub in @subsystems -> halt([sub, ident, status], dispatch)
+      {sub, [_ident, "ok"]} when sub in @subsystems -> dispatch
+      {"host", _} -> dispatch
+      {"mut", [_refid]} -> dispatch
+      {sub, [ident, status]} -> halt([sub, ident, status], dispatch)
+    end
+  end
+
   @host_categories ["startup", "boot", "run", "ota", "log"]
   @host_cat_err "unknown host category"
   @sub_cat_err "unknown subsystem/category"
@@ -225,27 +235,27 @@ defmodule Sally.Dispatch do
     end
   end
 
-  @subsystems ["immut", "mut"]
   @doc false
-  def process(%{subsystem: sub, filter_extra: filter_extra} = dispatch) do
-    case {sub, filter_extra} do
-      {"host", _} -> dispatch
-      {"mut", [_refid]} -> dispatch
-      {sub, [_ident, "ok"]} when sub in @subsystems -> dispatch
-      {sub, [ident, status]} -> [sub, ident, status] |> halt(dispatch)
+  def process(%{module: module} = dispatch) do
+    txn_info = module.process(dispatch)
+
+    case txn_info do
+      {:ok, %{host: host}} -> [host: host, txn_info: %{}]
+      {:ok, txn_info} -> [txn_info: txn_info]
     end
-    |> update(:txn_info, dispatch.module.process(dispatch))
+    |> update(dispatch)
   end
 
   @doc false
-  def post_process(%{module: module} = dispatch) do
+  @post_process_path [:_post_process_]
+  def post_process(%{module: module, txn_info: txn_info} = dispatch) do
     arity = module.__info__(:functions) |> get_in([:post_process])
 
     case arity do
-      1 -> module.post_process(dispatch)
-      _ -> :none
+      1 -> [txn_info: put_in(txn_info, @post_process_path, module.post_process(dispatch))]
+      _ -> [txn_info: put_in(txn_info, @post_process_path, :none)]
     end
-    |> update(:post_process, dispatch)
+    |> update(dispatch)
   end
 
   @doc false
@@ -280,8 +290,12 @@ defmodule Sally.Dispatch do
   end
 
   @doc false
-  def halt(<<_::binary>> = reason, %__MODULE__{} = dispatch) do
-    update(dispatch, halt_reason: reason)
+  def halt(reason, %__MODULE__{} = dispatch) do
+    case reason do
+      <<_::binary>> -> reason
+      [<<_::binary>> | _] -> Enum.join(reason, " ")
+    end
+    |> then(fn reason -> struct(dispatch, halt_reason: reason) end)
   end
 
   def halt([<<_::binary>> | _] = parts, %__MODULE__{} = dispatch) do
@@ -291,19 +305,6 @@ defmodule Sally.Dispatch do
   def new(fields), do: struct(__MODULE__, fields)
 
   @doc false
-  def update(any, :post_process, %{txn_info: txn_info} = dispatch) do
-    [txn_info: put_in(txn_info, [:_post_process_], any)] |> update(dispatch)
-  end
-
-  def update(%{halt_reason: :none} = dispatch, :txn_info, txn_info) do
-    case txn_info do
-      {:ok, %{host: host}} -> [host: host, txn_info: %{}]
-      {:ok, txn_info} -> [txn_info: txn_info]
-    end
-    |> update(dispatch)
-  end
-
-  def update(%{halt_reason: <<_::binary>>} = dispatch, _type, _data), do: dispatch
 
   def update(arg1, arg2) do
     case {arg1, arg2} do

@@ -25,10 +25,9 @@ defmodule SallyDevAliasExplainTest do
       explain_output = Sally.explain(name, :status, :datapoints, [])
       %{execution: exec_ms, planning: plan_ms} = explain_times(explain_output)
 
-      assert exec_ms < 0.5
+      assert exec_ms < 1.0
       assert plan_ms < 2.0
 
-      assert explain_output =~ ~r/datapoint_dev_alias_id_reading_at_index/
       assert explain_output =~ ~r/Index Scan/
       assert explain_output =~ ~r/Sort Method/
     end
