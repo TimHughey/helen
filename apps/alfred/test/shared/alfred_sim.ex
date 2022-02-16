@@ -4,11 +4,12 @@ defmodule AlfredSim do
   ##
 
   def execute({opts, overrides} = args_tuple) when is_list(opts) and is_list(overrides) do
-    args_tuple
-    |> Alfred.Execute.Args.auto()
-    |> Enum.into(%{})
-    |> Alfred.Name.invoke(:execute)
-    |> tap(fn execute -> Process.send(self(), {:echo, execute}, []) end)
+    args = Alfred.Execute.Args.auto(args_tuple) |> Enum.into(%{})
+    execute = Alfred.Name.invoke(args, :execute)
+
+    unless GenServer.whereis(self()), do: Process.send(self(), {:echo, execute}, [])
+
+    execute
   end
 
   def execute(opts) when is_list(opts), do: execute(opts, [])
