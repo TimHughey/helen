@@ -95,7 +95,7 @@ defmodule Rena.Sensor do
   end
 
   def action_for_cmd(want_cmd, cmds) do
-    Enum.find(cmds, &match?({_action, ^want_cmd}, &1))
+    Enum.find(cmds, {:no_match, want_cmd}, &match?({_action, ^want_cmd}, &1))
   end
 
   def check_reading_at(chk_map, %{reading_at: reading_at}) do

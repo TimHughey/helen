@@ -120,6 +120,9 @@ defmodule Rena do
       %{next_action: {:no_change, :none}} ->
         nil
 
+      %{next_action: {:no_match, _cmd} = next_action} ->
+        inspect(next_action) |> Logger.warn()
+
       %{next_action: {action, cmd}} ->
         alfred = opts(:alfred)
         alfred.execute(name: equipment, cmd: cmd, notify: false)
