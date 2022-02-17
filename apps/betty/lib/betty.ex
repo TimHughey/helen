@@ -48,13 +48,11 @@ defmodule Betty do
   def app_error_v2(tags, opts \\ [passthrough: :ok])
       when is_list(tags)
       when is_list(opts) do
-    alias Betty.AppError
-
     # find a value for :module
     {mod_or_server, tags_rest} = Keyword.split(tags, [:module, :server_name])
     module = mod_or_server[:module] || mod_or_server[:server_name]
 
-    AppError.record(module, tags_rest)
+    Betty.AppError.record(module, tags_rest)
 
     # decide what to return
     {return, opts_rest} = Keyword.pop(opts, :return, false)
@@ -144,6 +142,9 @@ defmodule Betty do
     module = find_module(passthrough)
 
     if module == :no_module do
+      ["\n", "unable to determine module equivalent", "\n", inspect(passthrough, pretty: true)]
+      |> Logger.warn()
+
       :failed
     else
       [measurement: "runtime", tags: [module: module] ++ tags, fields: fields]
@@ -237,7 +238,8 @@ defmodule Betty do
   defp find_module(x) do
     case x do
       x when is_nil(x) -> nil
-      module when is_atom(module) -> module
+      x when is_atom(x) -> x
+      <<_::binary>> = x -> x
       x when is_list(x) and x != [] -> Enum.into(x, %{}) |> find_module()
       %{server_name: module} -> module |> find_module()
       %{module: module} -> module |> find_module()
