@@ -117,6 +117,7 @@ defmodule Rena.Sensor do
 
   def next_action_compare(chk_map, %{cmds: cmds} = _sensor) do
     case chk_map do
+      %{cmd_want: :no_change} -> {:no_change, :none}
       %{cmd_have: cmd, cmd_want: cmd} -> {:no_change, :none}
       %{cmd_want: cmd} -> action_for_cmd(cmd, cmds)
     end
