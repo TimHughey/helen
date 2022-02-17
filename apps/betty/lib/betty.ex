@@ -236,6 +236,7 @@ defmodule Betty do
 
   defp find_module(x) do
     case x do
+      x when is_nil(x) -> nil
       module when is_atom(module) -> module
       x when is_list(x) and x != [] -> Enum.into(x, %{}) |> find_module()
       %{server_name: module} -> module |> find_module()
