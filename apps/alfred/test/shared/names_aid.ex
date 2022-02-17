@@ -200,17 +200,24 @@ defmodule Alfred.NamesAid do
     end
   end
 
+  @data_error [:expired, :error]
   defp add_data(opts_map) do
-    # must ensure temp_f always proceeds relhum
-    data = Map.take(opts_map, [:temp_f, :relhum]) |> Enum.into([])
+    # NOTE: must ensure temp_f always proceeds relhum so we reverse
+    data = Map.take(opts_map, [:temp_f, :relhum]) |> Enum.into([]) |> Enum.reverse()
 
-    # sort the list first so relhum is before temp_f
-    # the for loop will then create the data elements list in reverse order
-    # so temp_f is before relhum
-    for {k, v} <- Enum.sort(data, fn {_, lhs}, {_, rhs} -> lhs >= rhs end) do
-      [Atom.to_string(k), Float.to_string(v * 1.0)] |> Enum.join("=")
+    case opts_map do
+      %{rc: :ok} when data == [] -> raise("must provide data for immutable")
+      %{rc: rc} when rc in @data_error -> make_daps(temp_f: 0.0)
+      _ -> make_daps(data)
     end
-    |> Enum.join(" ")
+
+    # # sort the list first so relhum is before temp_f
+    # # the for loop will then create the data elements list in reverse order
+    # # so temp_f is before relhum
+    # for {k, v} <- Enum.sort(data, fn {_, lhs}, {_, rhs} -> lhs >= rhs end) do
+    #   [Atom.to_string(k), Float.to_string(v * 1.0)] |> Enum.join("=")
+    # end
+    # |> Enum.join(" ")
   end
 
   defp add_rc(opts_map) do
@@ -232,6 +239,13 @@ defmodule Alfred.NamesAid do
   end
 
   ## general support
+
+  def make_daps(data) do
+    Enum.map(data, fn {key, val} ->
+      [Atom.to_string(key), "=", Float.to_string(val * 1.0)] |> IO.iodata_to_binary()
+    end)
+    |> Enum.join(" ")
+  end
 
   defp make_matchable(map) when is_map(map) do
     for {k, v} when v != "" <- map, into: %{} do
