@@ -48,7 +48,6 @@ defmodule Rena.Sensor do
     |> then(&struct(__MODULE__, &1))
   end
 
-  @new_range_keys [:high, :low, :unit]
   @range_error "must specify [:high, :low, :unit] "
   def new_range(opts) do
     range = Enum.into(opts, %{})
