@@ -114,7 +114,8 @@ defmodule Rena do
 
     case sensor do
       %{halt_reason: <<_::binary>> = reason} ->
-        _ = Betty.app_error_v2(state, name: state.name)
+        tags = Map.take(state, [:server_name, :name]) |> Enum.into([])
+        _ = Betty.app_error_v2(tags)
         Logger.warn(reason)
 
       %{next_action: {:no_change, :none}} ->

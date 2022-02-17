@@ -1,6 +1,8 @@
 defmodule Betty do
   @moduledoc false
 
+  require Logger
+
   alias Betty.{Connection, Metric}
 
   def app_error(passthrough, tags) do
