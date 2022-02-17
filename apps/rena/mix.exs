@@ -4,7 +4,7 @@ defmodule Rena.MixProject do
   def project do
     [
       app: :rena,
-      version: "0.3.2",
+      version: "0.3.3",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -38,7 +38,7 @@ defmodule Rena.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/shared"]
+  defp elixirc_paths(:test), do: ["lib", "test/impl", "test/shared"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp preferred_cli_env do

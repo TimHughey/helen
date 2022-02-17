@@ -202,8 +202,8 @@ defmodule Alfred.NamesAid do
 
   @data_error [:expired, :error]
   defp add_data(opts_map) do
-    # must ensure temp_f always proceeds relhum
-    data = Map.take(opts_map, [:temp_f, :relhum]) |> Enum.into([]) |> Enum.sort()
+    # NOTE: must ensure temp_f always proceeds relhum so we reverse
+    data = Map.take(opts_map, [:temp_f, :relhum]) |> Enum.into([]) |> Enum.reverse()
 
     case opts_map do
       %{rc: :ok} when data == [] -> raise("must provide data for immutable")

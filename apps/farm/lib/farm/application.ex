@@ -7,20 +7,9 @@ defmodule Farm.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      Farm,
-      {Rena.SetPt.Server, [id: Farm.Womb.Heater, init_args_fn: &womb_setpt_args/1]}
-    ]
+    children = [Farm, Farm.Womb.Heater]
+    opts = [strategy: :one_for_one, name: Farm.Supervisor]
 
-    opts = [strategy: :one_for_one, name: Farm.Supervisor, max_restarts: 10, max_seconds: 10]
     Supervisor.start_link(children, opts)
-  end
-
-  def womb_setpt_args(add_args) do
-    sensors = ["womb 1", "womb 2", "womb 3", "womb 4"]
-    range = [low: 78.0, high: 80.1]
-
-    [equipment: "womb heater power", sensors: sensors, sensor_range: range]
-    |> Keyword.merge(add_args)
   end
 end
