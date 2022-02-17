@@ -3,7 +3,7 @@ defmodule Helen.MixProject do
 
   use Mix.Project
 
-  @vsn "2.3.16"
+  @vsn "2.3.17"
 
   def project do
     [

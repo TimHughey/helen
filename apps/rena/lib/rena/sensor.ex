@@ -33,6 +33,12 @@ defmodule Rena.Sensor do
           reading_at: DateTime.t()
         }
 
+  def freshen(%__MODULE__{} = sensor, equipment, opts) do
+    opts = Keyword.put(opts, :return, :sensor)
+
+    Rena.Sensor.tally(sensor, opts) |> Rena.Sensor.next_action(equipment, opts)
+  end
+
   @new_keys [:names, :range, :valid_when, :cmds]
   def new(args) do
     fields_raw = Keyword.take(args, @new_keys)
@@ -71,7 +77,7 @@ defmodule Rena.Sensor do
   @next_action_steps [:reading_at, :cmd_have, :cmd_want, :compare, :finalize]
   @na_default {:no_change, :none}
   @na_chk_map %{cmd_have: nil, cmd_want: :no_change, next_action: @na_default, halt_reason: :none}
-  def next_action(<<_::binary>> = equipment, %__MODULE__{} = sensor, opts) do
+  def next_action(%__MODULE__{} = sensor, <<_::binary>> = equipment, opts) do
     {return_val, opts_rest} = Keyword.pop(opts, :return)
 
     chk_map = Map.put(@na_chk_map, :equipment, equipment)

@@ -110,19 +110,21 @@ defmodule Rena do
   def handle_continue(:tick, %{equipment: equipment, sensor: sensor} = state) do
     state = struct(state, seen_at: opts(:timezone) |> Timex.now())
 
-    sensor = Rena.Sensor.tally(sensor, opts())
-    sensor = Rena.Sensor.next_action(equipment, sensor, return: :sensor)
+    sensor = Rena.Sensor.freshen(sensor, equipment, opts())
 
     case sensor do
       %{halt_reason: <<_::binary>> = reason} ->
+        _ = Betty.app_error_v2(state, name: state.name)
         Logger.warn(reason)
 
       %{next_action: {:no_change, :none}} ->
         nil
 
-      %{next_action: {_action, cmd}} ->
+      %{next_action: {action, cmd}} ->
         alfred = opts(:alfred)
         alfred.execute(name: equipment, cmd: cmd, notify: false)
+
+        _ = Betty.runtime_metric(state, [name: state.name, cmd: cmd], [{action, true}])
     end
 
     struct(state, sensor: sensor)

@@ -58,7 +58,7 @@ defmodule Rena.Sensor2.Test do
 
       assert %Rena.Sensor{reading_at: %DateTime{}} = sensor
 
-      next_action = Rena.Sensor.next_action(equipment, sensor, [])
+      next_action = Rena.Sensor.next_action(sensor, equipment, [])
       assert {:lower, "off"} = next_action
     end
 
@@ -77,7 +77,7 @@ defmodule Rena.Sensor2.Test do
 
       assert %Rena.Sensor{reading_at: %DateTime{}} = sensor
 
-      chk_map = Rena.Sensor.next_action(equipment, sensor, return: :chk_map)
+      chk_map = Rena.Sensor.next_action(sensor, equipment, return: :chk_map)
       assert %{next_action: next_action} = chk_map
       assert {:no_change, :none} = next_action
     end
@@ -97,7 +97,7 @@ defmodule Rena.Sensor2.Test do
 
       assert %Rena.Sensor{reading_at: %DateTime{}} = sensor
 
-      sensor = Rena.Sensor.next_action(equipment, sensor, return: :sensor)
+      sensor = Rena.Sensor.next_action(sensor, equipment, return: :sensor)
       assert %Rena.Sensor{next_action: next_action} = sensor
       assert {:raise, "on"} = next_action
     end
