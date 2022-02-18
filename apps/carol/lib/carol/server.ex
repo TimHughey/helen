@@ -132,7 +132,8 @@ defmodule Carol.Server do
   @first_align :first_align_equipment
   def align_equipment(%{episodes: episodes, equipment: equipment}) do
     force? = Process.get(@first_align, true)
-    extra_opts = [equipment: equipment, force: force?, notify: false]
+    opts = Carol.State.opts()
+    extra_opts = [equipment: equipment, force: force?, notify: false] ++ opts
 
     args = Carol.Episode.execute_args(episodes, :active, extra_opts)
 

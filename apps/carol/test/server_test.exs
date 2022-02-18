@@ -6,26 +6,7 @@ defmodule CarolServerTest do
 
   @moduletag carol: true, carol_server: true
 
-  setup [:episodes_add, :state_add]
-  setup [:memo_add, :start_args_add]
-  setup [:init_add]
-
-  defmacro msg(lhs, text, rhs) do
-    quote bind_quoted: [lhs: lhs, text: text, rhs: rhs] do
-      [Macro.to_string(lhs), text, Macro.to_string(rhs), "\n"]
-      |> Enum.join("\n")
-    end
-  end
-
-  defmacro assert_cmd_echoed(ctx, cmd) do
-    quote location: :keep, bind_quoted: [ctx: ctx, cmd: cmd] do
-      assert %{dev_alias: %{name: <<_::binary>> = name}} = ctx
-
-      assert_receive(msg, 100)
-
-      assert {:echo, %Alfred.Execute{cmd: ^cmd, name: ^name}} = msg
-    end
-  end
+  setup [:episodes_add, :start_args_add, :init_add]
 
   describe "Carol.Server starts supervised" do
     @tag start_args_add: {:app, :carol, Carol.NoEpisodes, :first_instance}
@@ -107,41 +88,6 @@ defmodule CarolServerTest do
           acc
       end)
       |> Enum.each(fn id -> assert id =~ ~r/Past/ end)
-    end
-  end
-
-  describe "Carol.Server.handle_continue/2" do
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [bootstrap: true, raw: true]
-    test ":bootstrap starts notifies", ctx do
-      # NOTE: when raw: true start_add returns the actual reply from handle_continue/2
-      assert %{state: reply} = ctx
-      assert {:noreply, %Carol.State{} = new_state} = reply
-
-      # second call, validate ticket
-      reply = Carol.Server.handle_continue(:bootstrap, new_state)
-      assert {:noreply, %Carol.State{tick: nil, ticket: {:ok, _}}} = reply
-    end
-
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [tick: true]
-    test ":tick executes a cmd when a program is live", ctx do
-      # NOTE: handle_continue(:tick, state) performed by Alfred.StateAid
-      assert %{state: state} = ctx
-      assert %Carol.State{register: pid} = state
-      assert is_pid(pid)
-
-      assert_cmd_echoed(ctx, "on")
-    end
-  end
-
-  describe "Carol.Server.handle_info/2 handles Alfred.Memo" do
-    @tag episodes_add: {:mixed, [past: 3, now: 1, future: 3]}
-    @tag state_add: [bootstrap: true], memo_add: []
-    test "nominal Memo", ctx do
-      assert %{state: state} = ctx
-      reply = Carol.Server.handle_info({Alfred, ctx.memo}, state)
-      assert {:noreply, %Carol.State{}, {:continue, :tick}} = reply
     end
   end
 end

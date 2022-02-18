@@ -22,7 +22,7 @@ defmodule Carol.StateTest do
       core = [:alfred, :server_name, :ttl_ms]
       event = [:latitude, :longitude, :ref_dt, :timezone]
 
-      want_keys = (core ++ event) |> Enum.sort()
+      want_keys = Enum.sort(core ++ event)
       got_keys = Enum.map(sched_opts, &elem(&1, 0)) |> Enum.sort()
 
       assert want_keys == got_keys

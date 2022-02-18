@@ -6,7 +6,6 @@ defmodule Carol.TestAid do
       def episodes_add(ctx), do: Carol.EpisodeAid.add(ctx)
       def init_add(ctx), do: Carol.InitAid.add(ctx)
       def start_args_add(ctx), do: Carol.StartArgsAid.add(ctx)
-      def state_add(ctx), do: Carol.StateAid.add(ctx)
     end
   end
 end
