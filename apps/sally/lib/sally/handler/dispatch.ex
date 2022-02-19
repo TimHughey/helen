@@ -111,6 +111,7 @@ defmodule Sally.Dispatch do
   end
 
   @impl true
+  @tags [:module, :subsytem]
   def handle_continue({dispatch, caller_pid}, state) do
     dispatch = reduce(dispatch, state.module)
 
@@ -118,9 +119,9 @@ defmodule Sally.Dispatch do
 
     hostname = if match?(%{host: %{name: _}}, dispatch), do: dispatch.host.name, else: "unknown"
 
-    tags = [category: dispatch.category, subsystem: dispatch.subsystem, host: hostname]
+    tags = Map.take(dispatch, @tags) |> Map.put(:host, hostname)
     fields = %{processed_us: Timex.diff(dispatch.final_at, dispatch.sent_at, :microseconds)}
-    Betty.runtime_metric(state, tags, fields)
+    {:ok, _point} = Betty.runtime_metric(tags, fields)
 
     {:noreply, state}
   end

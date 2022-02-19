@@ -69,7 +69,7 @@ defmodule Sally.Command do
     |> Map.merge(fields_map)
     |> changeset(new_cmd)
     |> Sally.Repo.insert!(returning: true)
-    |> track(cmd_opts)
+    |> track(opts)
     |> save()
   end
 

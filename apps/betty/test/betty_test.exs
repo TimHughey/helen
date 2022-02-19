@@ -67,62 +67,13 @@ defmodule BettyTest do
     end
   end
 
-  describe "Betty.app_error_v2/2" do
+  describe "Betty.app_error/1" do
     test "handles a well-formed tags list" do
-      tags = [module: __MODULE__, rc: :error]
-      assert :error = Betty.app_error_v2(tags, return: :rc)
-    end
-  end
+      tags = [module: __MODULE__]
+      assert {:ok, points} = Betty.app_error(tags)
 
-  describe "Betty.runtime_metric/3" do
-    test "writes a metric with tags and fields" do
-      assert __MODULE__ = Betty.runtime_metric(__MODULE__, [name: "test"], val: 1)
-    end
-  end
-
-  describe "Betty.write/1" do
-    test "handles well-formed opts" do
-      assert :ok =
-               [
-                 measurement: "betty_test",
-                 fields: [val1: true, val2: 100.1, val3: false],
-                 tags: %{test_tag: false, module: __MODULE__, test_tag2: true, test_tag3: nil}
-               ]
-               |> Betty.write()
-    end
-
-    test "handles well-formed opts with :return" do
-      assert [:test] =
-               [
-                 return: [:test],
-                 measurement: "betty_test",
-                 fields: [val1: true, val2: 100.1],
-                 tags: %{test_tag: true, module: __MODULE__, cmd: "on"}
-               ]
-               |> Betty.write()
-    end
-
-    test "handles missing opts" do
-      import ExUnit.CaptureLog
-
-      log =
-        capture_log(fn ->
-          assert :ok =
-                   [
-                     fields: [val1: true, val2: 100.1],
-                     tags: %{test_tag: true, module: __MODULE__}
-                   ]
-                   |> Betty.write()
-        end)
-
-      assert log =~ ~r/missing/
-    end
-  end
-
-  describe "Betty.app_error/2" do
-    @tag capture_log: true
-    test "detects and logs invalid args" do
-      assert nil === Betty.app_error(nil, [])
+      mod = inspect(__MODULE__)
+      assert %{measurement: "app_error", tags: %{module: ^mod}, fields: %{error: 1}} = points
     end
   end
 end

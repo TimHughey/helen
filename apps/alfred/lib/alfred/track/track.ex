@@ -178,7 +178,7 @@ defmodule Alfred.Track do
     at_list = [released: release_at, complete: release_at]
     state = update_at(state, at_list) |> notify_if_requested(:ok)
 
-    :ok = record_metrics(state)
+    {:ok, _point} = record_metrics(state)
     :ok = Alfred.Track.Metrics.count(state)
 
     # :normal exit won't restart the linked process
@@ -214,9 +214,9 @@ defmodule Alfred.Track do
       _, _ -> :ok
     end
 
-    :ok = record_metrics(state)
+    {:ok, _point} = record_metrics(state)
     :ok = Alfred.Track.Metrics.count(state)
-    :ok = record_timeout(state)
+    {:ok, _point} = record_timeout(state)
 
     {:stop, :normal, state}
   end
@@ -244,12 +244,12 @@ defmodule Alfred.Track do
 
   @doc false
   def record_metrics(state) do
-    %{opts: opts, tracked_info: info, at: at} = state
+    %{module: module, opts: opts, tracked_info: info, at: at} = state
 
     name = opts[:name]
-    cmd = if(is_struct(info), do: info.cmd, else: opts[:cmd])
+    cmd = if(match?(%{cmd: _}, info), do: info.cmd, else: opts[:cmd])
 
-    tags = [mutable: name, name: name, cmd: cmd, release: true]
+    tags = [module: module, mutable: name, name: name, cmd: cmd, release: true]
 
     fields = [
       track_us: safe_diff_dt(at.tracked, at.sent),
@@ -258,23 +258,21 @@ defmodule Alfred.Track do
       timeout_us: safe_diff_dt(at.timeout, at.sent)
     ]
 
-    # NOTE: Betty.runtime_metric/3 will extract module from state
-    Betty.runtime_metric(state, tags, fields)
-
-    :ok
+    {:ok, _point} = Betty.runtime_metric(tags, fields)
   end
 
   @doc false
-  def record_timeout(state) do
-    %{module: module, opts: opts, tracked_info: info} = state
-
+  def record_timeout(%{opts: opts, tracked_info: info} = state) do
     name = opts[:name]
-    cmd = if(is_struct(info), do: info.cmd, else: info[:cmd])
 
-    [mutable: name, module: module, name: name, cmd: cmd, timeout: true]
-    |> Betty.app_error_v2()
-
-    :ok
+    [
+      mutable: name,
+      module: state.module,
+      name: name,
+      cmd: if(match?(%{cmd: _}, info), do: info.cmd, else: info[:cmd]),
+      timeout: true
+    ]
+    |> Betty.app_error()
   end
 
   @doc false

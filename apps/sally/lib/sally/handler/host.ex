@@ -47,7 +47,7 @@ defmodule Sally.Host.Dispatch do
         stack_used: stack_used
       ]
     ]
-    |> Betty.write()
+    |> Betty.metric()
   end
 
   @impl true
@@ -63,7 +63,7 @@ defmodule Sally.Host.Dispatch do
         heap_free: msg.data.heap["free"]
       ]
     ]
-    |> Betty.write()
+    |> Betty.metric()
   end
 
   defp collect_changes(%{category: "startup"} = msg) do

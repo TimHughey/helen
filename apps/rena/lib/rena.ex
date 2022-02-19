@@ -107,6 +107,7 @@ defmodule Rena do
   end
 
   @impl true
+  @tags [:server_name, :name]
   def handle_continue(:tick, %{equipment: equipment, sensor: sensor} = state) do
     state = struct(state, seen_at: opts(:timezone) |> Timex.now())
 
@@ -114,8 +115,7 @@ defmodule Rena do
 
     case sensor do
       %{halt_reason: <<_::binary>> = reason} ->
-        tags = Map.take(state, [:server_name, :name]) |> Enum.into([])
-        _ = Betty.app_error_v2(tags)
+        {:ok, _points} = Map.take(state, @tags) |> Betty.app_error()
         Logger.warn(reason)
 
       %{next_action: {:no_change, :none}} ->
@@ -128,7 +128,10 @@ defmodule Rena do
         alfred = opts(:alfred)
         alfred.execute(name: equipment, cmd: cmd, notify: false)
 
-        _ = Betty.runtime_metric(state, [name: state.name, cmd: cmd], [{action, true}])
+        tags = Map.take(state, @tags) |> Map.put(:cmd, cmd)
+        fields = [{action, true}]
+
+        {:ok, _point} = Betty.runtime_metric(tags, fields)
     end
 
     struct(state, sensor: sensor)

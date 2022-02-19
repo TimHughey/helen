@@ -143,16 +143,19 @@ defmodule Sally.Datapoint do
   @measurement "immutables"
   @fields_want [:temp_c, :relhum]
   def write_metrics(%{aliases: aliases, datapoints: datapoints} = map) do
-    family = map.device.family
-    read_us = map.data.metrics["read"]
+    Enum.map(datapoints, fn %{dev_alias_id: id} = dap ->
+      %{name: name} = Enum.find(aliases, &match?(%{id: ^id}, &1))
 
-    Enum.map(datapoints, fn dap ->
-      %{name: name} = Enum.find(aliases, fn dev_alias -> dev_alias.id == dap.dev_alias_id end)
+      fields = Map.take(dap, @fields_want)
+      fields_extra = %{temp_f: temp_f(dap), read_us: map.data.metrics["read"]}
 
-      tags = [name: name, family: family]
-      fields = Map.take(dap, @fields_want) |> Map.merge(%{temp_f: temp_f(dap), read_us: read_us})
+      metric_opts = [
+        measurement: @measurement,
+        tags: [name: name, family: map.device.family],
+        fields: Map.merge(fields, fields_extra)
+      ]
 
-      Betty.metric(@measurement, fields, tags)
+      {:ok, _points} = Betty.metric(metric_opts)
 
       {name, :ok}
     end)

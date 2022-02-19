@@ -112,7 +112,8 @@ defmodule Sally.DevAlias do
     Alfred.Status.raw(status) |> execute_cmd(opts)
   end
 
-  def execute_cmd(%Sally.DevAlias{} = dev_alias, opts) do
+  def execute_cmd(%{name: name} = dev_alias, opts) do
+    opts = Keyword.put_new(opts, :name, name)
     new_cmd = Sally.Command.add(dev_alias, opts)
 
     rc = if(new_cmd.acked, do: :ok, else: :busy)

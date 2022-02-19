@@ -43,9 +43,10 @@ defmodule Alfred.Track.Metrics do
   @impl true
   @metric_fields [:tracked, :released, :timeout, :errors]
   def handle_continue(:report_metrics, state) do
-    fields = Map.take(state, @metric_fields) |> Enum.into([])
+    tags = [module: __MODULE__]
+    fields = Map.take(state, @metric_fields)
 
-    _ = Betty.runtime_metric([module: __MODULE__], _tags = [], fields)
+    {:ok, _point} = Betty.runtime_metric(tags, fields)
 
     struct(state, last_report_at: Timex.now())
     |> noreply()

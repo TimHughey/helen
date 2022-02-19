@@ -1,67 +1,77 @@
 defmodule Betty do
   @moduledoc false
 
-  require Logger
+  @app_error "app_error"
+  @runtime "runtime"
 
-  alias Betty.{Connection, Metric}
-
-  def app_error(passthrough, tags) do
-    alias Betty.AppError
-
-    case {passthrough, tags} do
-      {x, tags} when is_atom(x) and not is_nil(x) -> AppError.record(x, tags)
-      {x, tags} when is_list(x) and x != [] -> Enum.into(x, %{}) |> app_error(tags)
-      {%{server_name: module}, tags} -> app_error(module, tags)
-      {%{module: module}, tags} -> app_error(module, tags)
-      x -> log_app_error_failed(x)
-    end
-
-    passthrough
-  end
-
-  @doc """
-  Write an app error metric to the timeseries database
-
-  Pipelining is supported automatically by returning `:rc` or an alternative
-  specified via opts `[returning: :some_key]`.
-
-  ## Examples
-  ```
-  # list of tags with :module and returns :rc (by default)
-  [module: Some.Module, rc: :error, equipment: "equipment name"]
-  |> Betty.app_error_v2()
-  #=> :error
-
-  # list of tags with :server_name
-  [server_name: Some.Server, rc: :failed, other_tag: "important"]
-  |> Betty.app_error_v3()
-  #=> :failed
-
-  # return the value of a key other than :rc
-  [module: Some.Module, rc: :some_rc]
-  |> Betty.app_error_v3([returning: :some_rc])
-  #=> :some_rc
-  ```
-
-  > `tags` must include a value for key `:module` __or__ `:server_name`
-
-  """
   @doc since: "0.2.6"
-  def app_error_v2(tags, opts \\ [passthrough: :ok])
-      when is_list(tags)
-      when is_list(opts) do
-    # find a value for :module
-    {mod_or_server, tags_rest} = Keyword.split(tags, [:module, :server_name])
-    module = mod_or_server[:module] || mod_or_server[:server_name]
+  def app_error(tags) when is_map(tags) or is_list(tags) do
+    tags = if match?(%{}, tags), do: Map.drop(tags, [:__struct__]), else: tags
 
-    Betty.AppError.record(module, tags_rest)
-
-    # decide what to return
-    {return, opts_rest} = Keyword.pop(opts, :return, false)
-    {passthrough, _} = Keyword.pop(opts_rest, :passthrough, :ok)
-
-    if return, do: tags[return], else: passthrough
+    Betty.Metric.write(measurement: @app_error, tags: tags, fields: [error: true])
   end
+
+  # def app_error(passthrough, tags) do
+  #   alias Betty.AppError
+  #
+  #   case {passthrough, tags} do
+  #     {x, tags} when is_atom(x) and not is_nil(x) -> AppError.record(x, tags)
+  #     {x, tags} when is_list(x) and x != [] -> Enum.into(x, %{}) |> app_error(tags)
+  #     {%{server_name: module}, tags} -> app_error(module, tags)
+  #     {%{module: module}, tags} -> app_error(module, tags)
+  #     x -> log_app_error_failed(x)
+  #   end
+  #
+  #   passthrough
+  # end
+  #
+  # @doc """
+  # Write an app error metric to the timeseries database
+  #
+  # Pipelining is supported automatically by returning `:rc` or an alternative
+  # specified via opts `[returning: :some_key]`.
+  #
+  # ## Examples
+  # ```
+  # # list of tags with :module and returns :rc (by default)
+  # [module: Some.Module, rc: :error, equipment: "equipment name"]
+  # |> Betty.app_error_v2()
+  # #=> :error
+  #
+  # # list of tags with :server_name
+  # [server_name: Some.Server, rc: :failed, other_tag: "important"]
+  # |> Betty.app_error_v3()
+  # #=> :failed
+  #
+  # # return the value of a key other than :rc
+  # [module: Some.Module, rc: :some_rc]
+  # |> Betty.app_error_v3([returning: :some_rc])
+  # #=> :some_rc
+  # ```
+  #
+  # > `tags` must include a value for key `:module` __or__ `:server_name`
+  #
+  # """
+  # @doc since: "0.2.6"
+  # def app_error_v2(tags, opts \\ [passthrough: :ok])
+  #     when is_list(tags)
+  #     when is_list(opts) do
+  #   # find a value for :module
+  #   {mod_or_server, tags_rest} = Keyword.split(tags, [:module, :server_name])
+  #   module = mod_or_server[:module] || mod_or_server[:server_name]
+  #
+  #   Betty.AppError.record(module, tags_rest)
+  #
+  #   # decide what to return
+  #   {return, opts_rest} = Keyword.pop(opts, :return, false)
+  #   {passthrough, _} = Keyword.pop(opts_rest, :passthrough, :ok)
+  #
+  #   if return, do: tags[return], else: passthrough
+  # end
+  #
+  # def app_error_v3(tags) when is_list(tags) or is_map(tags) do
+  #   Betty.Metric.write(measurement: "app_error", tags: tags, fields: [error: true])
+  # end
 
   @doc """
   Measurement exploration and maintenance
@@ -109,7 +119,7 @@ defmodule Betty do
   def measurements(action \\ :show) do
     case action do
       :show ->
-        case Connection.run_query("SHOW MEASUREMENTS") |> List.flatten() do
+        case Betty.Connection.run_query("SHOW MEASUREMENTS") |> List.flatten() do
           [_ | _] = vals -> Enum.map(vals, fn x -> String.to_atom(x) end)
           error -> [error]
         end
@@ -126,10 +136,7 @@ defmodule Betty do
 
   """
   @doc since: "0.2.2"
-  def metric(measurement, fields, tags) do
-    Metric.new(measurement, fields, tags)
-    |> Metric.write()
-  end
+  defdelegate metric(opts), to: Betty.Metric, as: :write
 
   @doc """
   Create and write a runtime metric to the cnvironment configured database
@@ -139,22 +146,9 @@ defmodule Betty do
       iex> fields = [val: 1]
       iex> Betty.runtime_metric(SomeModule, tags, fields)
   """
-  @doc since: "0.2.3"
-  def runtime_metric(passthrough, tags, fields) do
-    module = find_module(passthrough)
-
-    if module == :no_module do
-      ["\n", "unable to determine module equivalent", "\n", inspect(passthrough, pretty: true)]
-      |> Logger.warn()
-
-      :failed
-    else
-      [measurement: "runtime", tags: [module: module] ++ tags, fields: fields]
-      |> Metric.new()
-      |> Metric.write()
-    end
-
-    passthrough
+  @doc since: "0.4.0"
+  def runtime_metric(tags, fields) do
+    Betty.Metric.write(measurement: @runtime, tags: tags, fields: fields)
   end
 
   @doc """
@@ -169,53 +163,10 @@ defmodule Betty do
   """
   @doc since: "0.2.1"
   def shards(db) do
-    case Connection.execute("SHOW SHARDS") do
+    case Betty.Connection.execute("SHOW SHARDS") do
       %{results: [%{series: series}]} -> Enum.find(series, fn %{name: x} -> x == db end)
       error -> error
     end
-  end
-
-  @doc """
-  Write a generic measurement with tags and fields
-
-  ## Examples
-  ```
-  # via a list of opts
-  [measurement: "generic", tags: [tag1: "val"], fields: [field: :val]]
-  |> Betty.write()
-  #=> :ok
-
-  # via a list of opts include what to return
-  [return: [], measurement: "generic", tags: [tag1: "val"], fields: [field: :val]]
-  |> Betty.write()
-  #=> []
-
-  # when required opts are missing a warning message is logged
-  [tags: [tag1: "val"], fields: [field: :val]]
-  |> Betty.write()
-  #=> :ok
-
-  ```
-  """
-  @doc since: "0.2.6"
-  def write(opts) when is_list(opts) do
-    want_keys = [:measurement, :tags, :fields]
-    {metric_kv, _} = Keyword.split(opts, want_keys)
-
-    if length(metric_kv) == 3 do
-      metric_kv |> Metric.new() |> Metric.write()
-    else
-      require Logger
-
-      missing_keys = want_keys -- Keyword.keys(metric_kv)
-
-      ["missing keys: ", inspect(missing_keys), "\n", inspect(opts, pretty: true)]
-      |> IO.iodata_to_binary()
-      |> Logger.warn()
-    end
-
-    # return the passthrough if specified
-    opts[:return] || :ok
   end
 
   ## Private
@@ -223,8 +174,7 @@ defmodule Betty do
   ##
 
   defp drop(meas) do
-    "DROP MEASUREMENT #{meas}"
-    |> Connection.run_query()
+    Betty.Connection.run_query("DROP MEASUREMENT #{meas}")
 
     String.to_atom(meas)
   end
@@ -237,41 +187,32 @@ defmodule Betty do
     end
   end
 
-  defp find_module(x) do
-    case x do
-      x when is_nil(x) -> nil
-      x when is_atom(x) -> x
-      <<_::binary>> = x -> x
-      x when is_list(x) and x != [] -> Enum.into(x, %{}) |> find_module()
-      %{server_name: module} -> module |> find_module()
-      %{module: module} -> module |> find_module()
-      _ -> :no_module
-    end
-  end
-
   defp known_fields(meas) do
-    Connection.run_query("SHOW FIELD KEYS FROM #{meas}")
-    |> rationalize_fields()
+    Betty.Connection.run_query("SHOW FIELD KEYS FROM #{meas}")
+    |> Enum.map(fn [field, type] -> {String.to_atom(field), String.to_atom(type)} end)
   end
 
   defp known_tags(meas) do
-    Connection.run_query("SHOW TAG KEYS FROM #{meas}")
-    |> rationalize_results()
-    |> List.flatten()
-    |> Enum.map(fn tag -> String.to_atom(tag) end)
+    results = Betty.Connection.run_query("SHOW TAG KEYS FROM #{meas}")
+
+    Enum.reduce(results, [], fn
+      [x], acc -> [String.to_atom(x) | acc]
+      _x, acc -> acc
+    end)
+    |> Enum.sort()
   end
 
   defp known_tag_values(meas, opts) do
     for tag <- known_tags(meas) do
       q = "SHOW TAG VALUES FROM #{meas} WITH KEY=\"#{tag}\""
 
-      for [tag, val] <- Connection.run_query(q), reduce: [] do
+      for [tag, val] <- Betty.Connection.run_query(q), reduce: [] do
         acc ->
           tag_key = String.to_atom(tag)
           acc_vals = acc[tag_key] || []
 
           case {tag_key, val} do
-            {key, val} when key in [:module, :server_name] -> to_module(val)
+            {key, val} when key in [:module, :server_name] -> Module.concat(String.split(val, "."))
             {_, "true"} -> true
             {_, "false"} -> false
             kv -> kv
@@ -283,39 +224,18 @@ defmodule Betty do
     |> filter_results(opts)
   end
 
-  defp log_app_error_failed({passthrough, tags}) do
-    require Logger
-
-    ["\n", "passthrough: ", inspect(passthrough, pretty: true), "\n", "tags: ", inspect(tags, pretty: true)]
-    |> IO.iodata_to_binary()
-    |> Logger.error()
-
-    :failed
-  end
-
-  defp rationalize_fields(results) do
-    for [field, type] <- results, reduce: [] do
-      acc ->
-        [{String.to_atom(field), String.to_atom(type)}] ++ acc
-    end
-    |> Enum.reverse()
-  end
-
-  defp rationalize_results(results) do
-    case results do
-      x when is_list(x) -> x
-      _ -> []
-    end
-  end
-
-  # defp to_float(val) do
-  #   case Float.parse(val) do
-  #     {float, ""} -> float
-  #     _x -> val
+  # defp rationalize_fields(results) do
+  #   for [field, type] <- results, reduce: [] do
+  #     acc ->
+  #       [{String.to_atom(field), String.to_atom(type)}] ++ acc
   #   end
-  # catch
-  #   _, _ -> val
+  #   |> Enum.reverse()
   # end
 
-  defp to_module(val), do: String.split(val, ".") |> Module.concat()
+  # defp rationalize_results(results) do
+  #   case results do
+  #     x when is_list(x) -> x
+  #     _ -> []
+  #   end
+  # end
 end
