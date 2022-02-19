@@ -26,7 +26,6 @@ defmodule Alfred.NamesAid do
   See `Alfred.NamesAid.name_add/1` for available options.
 
   """
-  # NOTE: need ctx for ref_dt/0
   def equipment_add(%{equipment_add: opts}) do
     dev_alias = new_dev_alias(:equipment, opts)
 

@@ -153,25 +153,23 @@ defmodule Alfred.Track do
     {fields_base, opts_rest} = Keyword.split(opts, [:tracked_info, :module])
     opts_actual = Keyword.get(opts_rest, :opts, [])
 
-    {tracked_at, opts_clean} = Keyword.pop(opts_actual, :ref_dt, now())
-
     tracked_info = Keyword.get(fields_base, :tracked_info)
 
     [
       refid: tracked_info.refid,
-      notify_pid: notify?(opts_clean) && caller_pid,
-      timeout_ms: opt(opts_clean, :timeout_ms),
-      opts: opts_clean
+      notify_pid: notify?(opts_actual) && caller_pid,
+      timeout_ms: opt(opts_actual, :timeout_ms),
+      opts: opts_actual
     ]
     |> then(fn fields -> struct(__MODULE__, fields ++ fields_base) end)
     |> update_at(:sent, Map.get(tracked_info, :sent_at, now()))
-    |> update_at(:tracked, tracked_at)
+    |> update_at(:tracked, now())
   end
 
   @impl true
   # NOTE: duplicate variables in the pattern are matched
-  def handle_call({:release, refid, opts}, _from, %{refid: refid} = state) do
-    release_at = Keyword.get(opts, :ref_dt, now())
+  def handle_call({:release, refid, _opts}, _from, %{refid: refid} = state) do
+    release_at = now()
 
     # NOTE: ensure complete at is set.
     # update_at/3 won't override previous value when passed a list of keys
@@ -286,7 +284,7 @@ defmodule Alfred.Track do
       :ok
 
     kind, reason ->
-      {kind, reason} |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> IO.puts() end)
+      {kind, reason} |> tap(fn x -> ["\n", inspect(x, pretty: true)] |> Logger.warn() end)
       #  kind, reason -> format_exception(kind, reason)
   end
 
@@ -307,7 +305,7 @@ defmodule Alfred.Track do
       {:timeout_ms, ms}, acc -> Keyword.put_new(acc, :timeout_ms, ms)
       {:timeout_after, iso8601}, acc -> Keyword.put_new(acc, :timeout_ms, to_ms(iso8601))
       {:cmd_opts, cmd_opts}, acc -> merge_cmd_opts(acc, cmd_opts)
-      {:ref_dt, at}, acc -> Keyword.put_new(acc, :ref_dt, at)
+      {:ref_dt, _at}, acc -> acc
       {key, val}, acc -> Keyword.put_new(acc, key, val)
     end)
     |> Enum.sort()

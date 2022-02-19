@@ -50,7 +50,7 @@ defmodule Sally.Command do
   def add(%Sally.DevAlias{} = da, opts) do
     {cmd, opts_rest} = Keyword.pop(opts, :cmd)
     {cmd_opts, opts_rest} = Keyword.pop(opts_rest, :cmd_opts, [])
-    {ref_dt, field_list} = Keyword.pop(opts_rest, :ref_dt, now())
+    {sent_at, field_list} = Keyword.pop(opts_rest, :sent_at, now())
     fields_map = Enum.into(field_list, %{})
 
     new_cmd = Ecto.build_assoc(da, :cmds)
@@ -63,8 +63,8 @@ defmodule Sally.Command do
       refid: make_refid(),
       cmd: cmd,
       acked: ack_immediate?,
-      acked_at: if(ack_immediate?, do: ref_dt, else: nil),
-      sent_at: ref_dt
+      acked_at: if(ack_immediate?, do: sent_at, else: nil),
+      sent_at: sent_at
     }
     |> Map.merge(fields_map)
     |> changeset(new_cmd)
@@ -106,7 +106,7 @@ defmodule Sally.Command do
   def align_cmd_force(dev_alias, pin_cmd, align_at) do
     :ok = log_aligned_cmd(dev_alias, pin_cmd)
 
-    add(dev_alias, cmd: pin_cmd, ref_dt: align_at, cmd_opts: @immediate)
+    add(dev_alias, cmd: pin_cmd, sent_at: align_at, cmd_opts: @immediate)
   end
 
   def changeset(changes, %__MODULE__{} = c) when is_map(changes) do

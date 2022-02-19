@@ -38,7 +38,7 @@ defmodule Sally.DatapointAid do
     shift_opts = Map.take(opts_map, @shifts) |> Enum.into([])
     shift_opts = if(shift_opts == [], do: @shift_default, else: shift_opts)
 
-    # NOTE: get ref_dt ONCE because datapoint reading at must shift from a fixed point
+    # NOTE: get ref_dt ONCE to shift reading_at from a fixed point
     ref_dt = get_in(opts_map, [:ref_dt]) || Timex.now()
 
     # NOTE: create the daps in reverse order
