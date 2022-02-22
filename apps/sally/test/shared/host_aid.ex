@@ -30,17 +30,25 @@ defmodule Sally.HostAid do
 
   def add_one(opts) when is_list(opts) do
     ident = unique(:ident)
-    start_at = opts[:start_at] || DateTime.utc_now()
-    seen_at = opts[:seen_at] || DateTime.utc_now()
 
-    changes = %{ident: ident, last_start_at: start_at, last_seen_at: seen_at, name: ident}
+    changes = %{
+      ident: ident,
+      name: ident,
+      firmware_vsn: "00.01.00",
+      idf_vsn: "v4.4-beta1",
+      app_sha: "0123456789ab",
+      build_at: Timex.now() |> Timex.shift(minutes: -5),
+      start_at: Keyword.get(opts, :start_at, Timex.now()),
+      reset_reason: "esp_restart",
+      seen_at: Keyword.get(opts, :seen_at, Timex.now())
+    }
 
     changeset = Sally.Host.changeset(changes)
-    replace_cols = [:ident, :last_start_at, :last_seen_at, :name]
+    replace_cols = Map.keys(changes)
     insert_opts = Sally.Host.insert_opts(replace_cols)
 
     case Sally.Repo.insert(changeset, insert_opts) do
-      {:ok, %Sally.Host{} = host} -> host
+      {:ok, %{} = host} -> host
       error -> raise(inspect(error, pretty: true))
     end
   end

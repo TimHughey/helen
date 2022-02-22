@@ -173,8 +173,8 @@ CREATE TABLE public.host (
     app_sha character varying(12),
     reset_reason character varying(24),
     build_at timestamp without time zone,
-    last_start_at timestamp without time zone NOT NULL,
-    last_seen_at timestamp without time zone NOT NULL,
+    start_at timestamp without time zone NOT NULL,
+    seen_at timestamp without time zone NOT NULL,
     inserted_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -413,3 +413,4 @@ INSERT INTO public."schema_migrations" (version) VALUES (20220201145624);
 INSERT INTO public."schema_migrations" (version) VALUES (20220206160941);
 INSERT INTO public."schema_migrations" (version) VALUES (20220206170830);
 INSERT INTO public."schema_migrations" (version) VALUES (20220209192638);
+INSERT INTO public."schema_migrations" (version) VALUES (20220219225636);

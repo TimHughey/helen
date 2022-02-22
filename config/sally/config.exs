@@ -11,8 +11,8 @@ config :sally,
     filter_env: "#{config_env()}"
   ]
 
-config :sally, Sally.Host,
-  host_profiles: [dir: :auto, search_paths: [".", "/usr/local/helen_v2/etc", "test/toml", "etc"]]
+# config :sally, Sally.Host,
+#   host_profiles: [dir: :auto, search_paths: [".", "/usr/local/helen_v2/etc", "test/toml", "etc"]]
 
 config :sally, Sally.Host.Firmware,
   opts: [

@@ -5,12 +5,12 @@ defmodule Sally.Application do
 
   use Application
 
-  @config_all Application.get_all_env(:sally)
+  # @config_all Application.get_all_env(:sally)
 
   @impl true
   def start(_type, _args) do
     children = [
-      {Sally.Config.Agent, @config_all},
+      {Sally.Config, []},
       {Sally.Repo, []},
       {Sally.Command, []},
       {Sally.Dispatch.Supervisor, []}

@@ -21,7 +21,7 @@ defmodule Sally.Host.Dispatch do
       ident: msg.ident,
       name: msg.host.name,
       subsystem: "host",
-      data: Sally.Host.boot_payload_data(msg.host),
+      data: Sally.Host.boot_payload(msg.host),
       filters: ["profile", msg.host.name]
     ]
     |> Sally.Host.Instruct.send()
@@ -74,8 +74,8 @@ defmodule Sally.Host.Dispatch do
       idf_vsn: msg.data[:idf_vsn],
       app_sha: msg.data[:app_sha],
       build_at: make_build_datetime(msg.data),
-      last_start_at: msg.sent_at,
-      last_seen_at: msg.sent_at,
+      start_at: msg.sent_at,
+      seen_at: msg.sent_at,
       reset_reason: msg.data[:reset_reason]
     }
 
@@ -83,11 +83,14 @@ defmodule Sally.Host.Dispatch do
   end
 
   defp collect_changes(%{category: cat} = msg) when cat in ["boot", "run"] do
-    # NOTE: these are the columns to insert __OR__ update keeping in mind that a host may be running
-    # however we have no record of it in the database (edge case)
-    changes = %{ident: msg.ident, name: msg.ident, last_start_at: msg.sent_at, last_seen_at: msg.sent_at}
+    # NOTE: these are the columns to insert __OR__ update
+    # {EDGE CASE] the host may be running and we don't have a database record
+    # for it (missed the startup message)
+    changes = %{ident: msg.ident, name: msg.ident, start_at: msg.sent_at, seen_at: msg.sent_at}
 
-    {changes, [:last_seen_at]}
+    # NOTE: we only want :seen_at updated however we must
+    # include start_at to pass changeset validations on insert
+    {changes, [:seen_at]}
   end
 
   @months ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]

@@ -59,11 +59,11 @@ defmodule Sally.DevAlias.Explain do
     |> assemble_output(module, ".load_aliases/2")
   end
 
-  defp explain(query, opts) do
+  def explain(query, opts) do
     Sally.Repo.explain(:all, query, explain_opts(opts))
   end
 
-  defp assemble_output(raw, module, function) do
+  def assemble_output(raw, module, function) do
     ["\n", inspect(module), function, "\n", raw] |> IO.iodata_to_binary()
   end
 end

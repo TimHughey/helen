@@ -3,8 +3,6 @@ defmodule Sally do
   Documentation for `Sally`.
   """
 
-  alias Sally.{Command, DevAlias, Device, Host, Repo}
-
   @doc """
   Deletes a DevAlias by name or id
 
@@ -57,12 +55,12 @@ defmodule Sally do
       cond do
         [:summary] == opts ->
           assoc = %{
-            device: Device.summary(dev_alias.device),
-            host: Host.summary(dev_alias.device.host),
-            cmd: Command.summary(dev_alias.status)
+            device: Sally.Device.summary(dev_alias.device),
+            host: Sally.Host.summary(dev_alias.device.host),
+            cmd: Sally.Command.summary(dev_alias.status)
           }
 
-          DevAlias.summary(dev_alias) |> Map.merge(assoc)
+          Sally.DevAlias.summary(dev_alias) |> Map.merge(assoc)
 
         [:raw] == opts ->
           dev_alias
@@ -110,8 +108,8 @@ defmodule Sally do
   def devalias_rename(opts) when is_list(opts) do
     alfred = opts[:alfred] || Alfred
 
-    case DevAlias.rename(opts) do
-      %DevAlias{} ->
+    case Sally.DevAlias.rename(opts) do
+      %{} ->
         alfred.name_unregister(opts[:from])
         :ok
 
@@ -237,18 +235,18 @@ defmodule Sally do
   defdelegate explain(name, category, what, opts \\ []), to: Sally.DevAlias.Explain, as: :query
 
   def host_devices(name) do
-    host = Host.find_by_name(name) |> Repo.preload(:devices)
+    host = Sally.Host.find_by(name: name) |> Sally.Repo.preload(:devices)
 
-    with %Host{} = host <- Host.find_by_name(name),
-         %Host{devices: devices} <- Repo.preload(host, :devices) do
-      for %Device{ident: ident} <- devices, do: ident
+    with %{} = host <- Sally.Host.find_by(name: name),
+         %{devices: devices} <- Sally.Repo.preload(host, :devices) do
+      for %Sally.Device{ident: ident} <- devices, do: ident
     else
       _ -> {:not_found, host}
     end
   end
 
   def host_info(name) do
-    Host.find_by_name(name)
+    Sally.Host.find_by(name: name)
   end
 
   @doc """
@@ -268,7 +266,8 @@ defmodule Sally do
   See `Sally.host_ota/2` for additional options.
   """
   @doc since: "0.5.9"
-  def host_latest(opts \\ [schema: false, age: [hours: -1]]), do: Host.latest(opts)
+  @host_latest_defaults Sally.Host.latest_defaults() ++ [schema: false]
+  def host_latest(opts \\ @host_latest_defaults), do: Sally.Host.latest(opts)
 
   @doc """
   Initiate an OTA for specific host name
@@ -276,19 +275,28 @@ defmodule Sally do
   * `file:` the firmware file, defaults to `latest.bin`
   * `valid_ms:`  milliseconds to wait before marking OTA valid, defaults to `60_000`
   """
-  def host_ota(name, opts \\ []) when is_binary(name) do
-    Host.Firmware.ota(name, opts)
+  def host_ota(<<_::binary>> = name, opts \\ []) do
+    host = Sally.Host.find_by(name: name)
+
+    case host do
+      %{} -> Sally.Host.ota(host, opts) |> Map.get(:name)
+      _ -> {:not_found, name}
+    end
   end
 
   def host_ota_live(opts \\ []) do
-    Host.Firmware.ota(:live, opts)
+    hosts = Sally.Host.live(opts)
+
+    Enum.map(hosts, &(Sally.Host.ota(&1, opts) |> Map.get(:name)))
   end
 
-  def host_profile(hostname, profile_name) do
-    case Host.find_by_name(hostname) do
-      %Host{profile: profile} when profile == profile_name -> :no_change
-      %Host{} = x -> Host.changeset(x, %{profile: profile_name}, [:profile]) |> Repo.update()
-      _ -> :not_found
+  def host_profile(<<_::binary>> = name, <<_::binary>> = profile) do
+    host = Sally.Host.find_by(name: name)
+
+    case host do
+      %{profile: ^profile} -> :no_change
+      %{} -> Sally.Host.profile(host, profile)
+      _ -> {:not_found, name}
     end
   end
 
@@ -314,15 +322,29 @@ defmodule Sally do
   2. `to:`   new host name
   """
   @doc since: "0.5.9"
-  def host_rename(opts) when is_list(opts) do
-    case Host.rename(opts) do
-      %Host{} -> :ok
-      error -> error
+  def host_rename(<<_::binary>> = from, <<_::binary>> = to) do
+    host = Sally.Host.find_by(name: from)
+
+    case host do
+      %{name: ^from} -> Sally.Host.rename(host, to)
+      _ -> {:not_found, from}
     end
   end
 
-  def host_restart(name, opts \\ []) when is_binary(name) do
-    Host.Restart.now(name, opts)
+  @doc since: "0.7.14"
+  def host_restart(<<_::binary>> = name, opts \\ []) do
+    host = Sally.Host.find_by(name: name)
+
+    case host do
+      %{} -> Sally.Host.restart(host, opts) |> Map.get(:name)
+      _ -> {:not_found, name}
+    end
+  end
+
+  def host_restart_live(opts \\ []) do
+    hosts = Sally.Host.live(opts)
+
+    Enum.map(hosts, &(Sally.Host.restart(&1, opts) |> Map.get(:name)))
   end
 
   @doc """
@@ -339,9 +361,11 @@ defmodule Sally do
 
   """
   @doc since: "0.5.9"
-  def host_retire(name) when is_binary(name) do
-    case Host.find_by_name(name) do
-      %Host{} = x -> Host.retire(x)
+  def host_retire(<<_::binary>> = name) do
+    host = Sally.Host.find_by(name: name)
+
+    case host do
+      %{} -> Sally.Host.retire(host)
       _ -> {:not_found, name}
     end
   end
@@ -361,21 +385,52 @@ defmodule Sally do
   """
   @doc since: "0.5.9"
   def host_setup(:unnamed, opts) do
-    case Host.unnamed() do
-      [%Host{} = host] -> Host.setup(host, opts)
-      [] -> {:all_named, []}
-      multiple -> {:multiple, multiple}
-    end
+    Sally.Host.unnamed(opts) |> many_results(opts)
   end
 
   def host_setup(ident, opts) when is_binary(ident) do
-    case Host.find_by_ident(ident) do
-      %Host{} = host -> Host.setup(host, opts)
+    host = Sally.Host.find_by(ident: ident)
+
+    case host do
+      %{} -> Sally.Host.setup(host, opts)
       _ -> {:not_found, ident}
     end
   end
 
   def ttl_adjust([<<_::binary>> | _] = names, ttl_ms) when is_integer(ttl_ms) do
     Enum.map(names, &Sally.DevAlias.ttl_adjust(&1, ttl_ms))
+  end
+
+  @doc false
+  @many_error_list "expected a list, got: "
+  @many_error_map "expected a map or struct, got: "
+  @many_error_field "field does not exist in result: "
+  def many_results([], _opts), do: :none
+
+  def many_results(what, opts) do
+    multi? = Keyword.get(opts, :multiple, false)
+    schema? = Keyword.get(opts, :schema, false)
+    key = Keyword.get(opts, :field)
+
+    unless is_list(what), do: raise(@many_error_list <> inspect(what))
+
+    first = List.first(what)
+    unless is_map(first), do: raise(@many_error_map <> inspect(first))
+    unless is_map_key(first, key), do: raise(@many_error_field <> inspect(key))
+
+    case what do
+      [_] ->
+        cond do
+          schema? -> first
+          true -> Map.get(first, key)
+        end
+
+      [%{} | _] ->
+        cond do
+          multi? and schema? -> what
+          multi? -> Enum.map(what, &Map.get(&1, key))
+          true -> :multiple
+        end
+    end
   end
 end

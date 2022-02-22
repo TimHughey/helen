@@ -200,7 +200,7 @@ defmodule Sally.Dispatch do
         dispatch
 
       {sub, _cat} when sub in @subsystems ->
-        host = Sally.Host.find_by_ident(host_ident)
+        host = Sally.Host.find_by(ident: host_ident)
 
         case host do
           %{authorized: true} -> [host: host] |> update(dispatch)

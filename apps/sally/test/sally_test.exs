@@ -6,6 +6,10 @@ defmodule SallyTest do
 
   setup [:host_add, :device_add, :dev_alias_add]
 
+  ##
+  ## DevAlias
+  ##
+
   describe "Sally.devalias_delete/1" do
     @tag skip: false
     @tag dev_alias_add: [auto: :mcp23008, cmds: [history: 50, minutes: -11]]
@@ -92,6 +96,36 @@ defmodule SallyTest do
     end
   end
 
+  describe "Sally.ttl_adjust/2" do
+    @tag dev_alias_add: [auto: :ds]
+    test "changes ttl for a list of immutables", ctx do
+      assert %{device: %{ident: ident}} = ctx
+      %{aliases: [_] = dev_aliases} = Sally.Device.find(ident) |> Sally.Device.preload()
+
+      names = Enum.map(dev_aliases, &Map.get(&1, :name))
+
+      adjusted = Sally.ttl_adjust(names, 9997)
+
+      assert Enum.count(names) == Enum.count(adjusted)
+    end
+
+    @tag dev_alias_add: [auto: :pwm, count: 4]
+    test "changes ttl for a list of mutables", ctx do
+      assert %{device: %{ident: ident}} = ctx
+      %{aliases: [_ | _] = dev_aliases} = Sally.Device.find(ident) |> Sally.Device.preload()
+
+      names = Enum.map(dev_aliases, &Map.get(&1, :name))
+
+      adjusted = Sally.ttl_adjust(names, 9998)
+
+      assert Enum.count(names) == Enum.count(adjusted)
+    end
+  end
+
+  ##
+  ## Device
+  ##
+
   describe "Sally.device_add_alias/1" do
     @tag host_add: [], device_add: [auto: :mcp23008], dev_alias_add: false
     test "detects missing options", ctx do
@@ -128,29 +162,92 @@ defmodule SallyTest do
     end
   end
 
-  describe "Sally.ttl_adjust/2" do
-    @tag dev_alias_add: [auto: :ds]
-    test "changes ttl for a list of immutables", ctx do
-      assert %{device: %{ident: ident}} = ctx
-      %{aliases: [_] = dev_aliases} = Sally.Device.find(ident) |> Sally.Device.preload()
+  ##
+  ## Host
+  ##
 
-      names = Enum.map(dev_aliases, &Map.get(&1, :name))
+  describe "Sally.host_ota/2" do
+    @tag host_add: []
+    test "invokes an OTA for a known host name (default opts)", ctx do
+      %{host: %{name: name}} = ctx
 
-      adjusted = Sally.ttl_adjust(names, 9997)
+      assert <<_::binary>> = Sally.host_ota(name)
+    end
+  end
 
-      assert Enum.count(names) == Enum.count(adjusted)
+  describe "Sally.host_ota_live/1" do
+    @tag host_add: []
+    test "invokes an OTA for live hosts with default opts", ctx do
+      %{host: %{name: name}} = ctx
+
+      names = Sally.host_ota_live(echo: :instruct)
+      assert [<<_::binary>> | _] = names
+      assert Enum.any?(names, &match?(^name, &1))
+
+      assert_receive(%{data: data, subsystem: "host"} = instruct, 1)
+
+      assert %{filters: ["ota"]} = instruct
+      assert %{ident: <<"host."::binary, _::binary>>} = instruct
+      assert %{packed_length: packed_length} = instruct
+      assert packed_length < 100
+
+      assert %{file: <<"00"::binary, _::binary>>, valid_ms: 60_000} = data
+    end
+  end
+
+  describe "Sally.host_rename/2" do
+    test "handles from host not found" do
+      from = Sally.HostAid.unique(:name)
+      to = Sally.HostAid.unique(:name)
+
+      assert {:not_found, ^from} = Sally.host_rename(from, to)
     end
 
-    @tag dev_alias_add: [auto: :pwm, count: 4]
-    test "changes ttl for a list of mutables", ctx do
-      assert %{device: %{ident: ident}} = ctx
-      %{aliases: [_ | _] = dev_aliases} = Sally.Device.find(ident) |> Sally.Device.preload()
+    @tag host_add: []
+    test "handles success", ctx do
+      %{host: %Sally.Host{name: from}} = ctx
+      # create unique new name
+      to = Sally.HostAid.unique(:name)
+      assert %{name: ^to} = Sally.host_rename(from, to)
+    end
+  end
 
-      names = Enum.map(dev_aliases, &Map.get(&1, :name))
+  describe "Sally.host_retire/1" do
+    @tag host_add: []
+    test "retires a host", ctx do
+      assert %{host: host} = ctx
+      assert %Sally.Host{name: retire_name, ident: retire_ident} = host
 
-      adjusted = Sally.ttl_adjust(names, 9998)
+      assert {:ok, %Sally.Host{} = host} = Sally.host_retire(retire_name)
 
-      assert Enum.count(names) == Enum.count(adjusted)
+      assert %{authorized: false, ident: ^retire_ident, reset_reason: "retired"} = host
+    end
+  end
+
+  describe "Sally.host_restart/2" do
+    @tag host_add: []
+    test "invokes a restart for a known host name (default opts)", ctx do
+      %{host: %{name: name}} = ctx
+
+      assert <<_::binary>> = Sally.host_restart(name)
+    end
+  end
+
+  describe "Sally.host_restart_live/1" do
+    @tag host_add: []
+    test "invokes a restart for live hosts (default opts)", ctx do
+      %{host: %{name: name}} = ctx
+
+      names = Sally.host_restart_live(echo: :instruct)
+      assert [<<_::binary>> | _] = names
+      assert Enum.any?(names, &match?(^name, &1))
+
+      assert_receive(%{data: %{}, subsystem: "host"} = instruct, 1)
+
+      assert %{filters: ["restart"]} = instruct
+      assert %{ident: <<"host."::binary, _::binary>>} = instruct
+      assert %{packed_length: packed_length} = instruct
+      assert packed_length < 100
     end
   end
 end
