@@ -145,7 +145,7 @@ defmodule Sally.Host do
     from(host in __MODULE__, where: host.seen_at >= ^since_dt, order_by: [asc: host.name])
   end
 
-  @ota_defaults [valid_ms: 60_000, want: :latest]
+  @ota_defaults [want: :latest]
   def ota_defaults, do: @ota_defaults
 
   @ota_send_opts [filters: ["ota"]]
@@ -157,10 +157,7 @@ defmodule Sally.Host do
 
     case firmware do
       <<_::binary>> ->
-        valid_ms = opts[:valid_ms]
-        data = %{valid_ms: valid_ms, file: firmware}
-
-        send_opts = Keyword.merge(@ota_send_opts, ident: ident, data: data, opts: opts)
+        send_opts = Keyword.merge(@ota_send_opts, ident: ident, data: %{file: firmware}, opts: opts)
 
         struct(host, instruct: Sally.Host.Instruct.send(send_opts))
     end

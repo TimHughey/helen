@@ -191,7 +191,7 @@ defmodule SallyTest do
       assert %{packed_length: packed_length} = instruct
       assert packed_length < 100
 
-      assert %{file: <<"00"::binary, _::binary>>, valid_ms: 60_000} = data
+      assert %{file: <<"00"::binary, _::binary>>} = data
     end
   end
 

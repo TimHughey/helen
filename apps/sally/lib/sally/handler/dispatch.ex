@@ -299,8 +299,8 @@ defmodule Sally.Dispatch do
     |> then(fn reason -> struct(dispatch, halt_reason: reason) end)
   end
 
-  def halt([<<_::binary>> | _] = parts, %__MODULE__{} = dispatch) do
-    Enum.join(parts, " ") |> halt(dispatch)
+  def halt([<<_::binary>> | _] = parts, %{ident: ident} = dispatch) do
+    Enum.join(["[#{ident}]" | parts], " ") |> halt(dispatch)
   end
 
   def new(fields), do: struct(__MODULE__, fields)

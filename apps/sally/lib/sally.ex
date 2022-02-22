@@ -273,7 +273,6 @@ defmodule Sally do
   Initiate an OTA for specific host name
 
   * `file:` the firmware file, defaults to `latest.bin`
-  * `valid_ms:`  milliseconds to wait before marking OTA valid, defaults to `60_000`
   """
   def host_ota(<<_::binary>> = name, opts \\ []) do
     host = Sally.Host.find_by(name: name)
