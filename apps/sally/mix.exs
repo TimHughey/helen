@@ -4,7 +4,7 @@ defmodule Sally.MixProject do
   def project do
     [
       app: :sally,
-      version: "0.7.14",
+      version: "0.7.15",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -44,10 +44,10 @@ defmodule Sally.MixProject do
       now = System.os_time(:second) |> to_string()
 
       backup_file = "#{Mix.env()}-#{now}.sql"
-      structure_backup = ["priv", "sally_repo", "structure", backup_file] |> Path.join()
+      structure_backup = ["priv", "repo", "structure", backup_file] |> Path.join()
 
       latest_file = "#{Mix.env()}.sql"
-      structure_latest = ["priv", "sally_repo", "structure", latest_file] |> Path.join()
+      structure_latest = ["priv", "repo", "structure", latest_file] |> Path.join()
 
       [
         "sally.ecto.init": [

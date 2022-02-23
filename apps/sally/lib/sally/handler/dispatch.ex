@@ -204,8 +204,8 @@ defmodule Sally.Dispatch do
 
         case host do
           %{authorized: true} -> [host: host] |> update(dispatch)
-          %{authorized: false} -> [@no_auth, host_ident] |> halt(dispatch)
-          nil -> [@unknown_host, host_ident] |> halt(dispatch)
+          %{authorized: false} -> [@no_auth] |> halt(dispatch)
+          nil -> [@unknown_host] |> halt(dispatch)
         end
 
       {"host", cat} ->
@@ -291,16 +291,19 @@ defmodule Sally.Dispatch do
   end
 
   @doc false
-  def halt(reason, %__MODULE__{} = dispatch) do
-    case reason do
-      <<_::binary>> -> reason
-      [<<_::binary>> | _] -> Enum.join(reason, " ")
+  def halt([<<_::binary>> | _] = parts, %__MODULE__{} = dispatch) do
+    # NOTE: prepend the host name (when available), fallback to ident from dispatch
+    case dispatch do
+      %{host: %{name: <<_::binary>>} = name} -> ["[", name, "]"] ++ parts
+      %{ident: <<_::binary>> = ident} -> ["[", ident, "]"] ++ parts
+      _ -> parts
     end
-    |> then(fn reason -> struct(dispatch, halt_reason: reason) end)
+    |> Enum.join(" ")
+    |> halt(dispatch)
   end
 
-  def halt([<<_::binary>> | _] = parts, %{ident: ident} = dispatch) do
-    Enum.join(["[#{ident}]" | parts], " ") |> halt(dispatch)
+  def halt(<<_::binary>> = reason, %__MODULE__{} = dispatch) do
+    struct(dispatch, halt_reason: reason)
   end
 
   def new(fields), do: struct(__MODULE__, fields)
