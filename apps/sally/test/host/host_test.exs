@@ -200,6 +200,18 @@ defmodule Sally.HostTest do
     end
   end
 
+  describe "Sally.Host.retire/1" do
+    @tag host_add: []
+    test "retires a host", ctx do
+      assert %{host: host} = ctx
+      assert %Sally.Host{id: id} = host
+
+      assert retired_host = Sally.Host.retire(host)
+      assert %{authorized: false, reset_reason: "retired"} = retired_host
+      assert %{id: ^id, name: <<"retired"::binary, _::binary>>} = retired_host
+    end
+  end
+
   describe "Sally.Host.setup/2" do
     @tag host_add: [setup: false]
     test "detects unknown profile", ctx do

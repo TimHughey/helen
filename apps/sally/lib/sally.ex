@@ -234,14 +234,29 @@ defmodule Sally do
   defdelegate explain(), to: Sally.DevAlias.Explain, as: :all
   defdelegate explain(name, category, what, opts \\ []), to: Sally.DevAlias.Explain, as: :query
 
-  def host_devices(name) do
-    host = Sally.Host.find_by(name: name) |> Sally.Repo.preload(:devices)
+  defp host_if_found(<<_::binary>> = what, by \\ :name, func, return_key \\ :name)
+       when is_atom(by) and is_function(func) and is_atom(return_key) do
+    host = Sally.Host.find_by([{by, what}])
 
-    with %{} = host <- Sally.Host.find_by(name: name),
-         %{devices: devices} <- Sally.Repo.preload(host, :devices) do
-      for %Sally.Device{ident: ident} <- devices, do: ident
+    if host do
+      host = func.(host)
+
+      cond do
+        return_key == :struct -> host
+        is_map_key(host, return_key) -> Map.get(host, return_key)
+        true -> {:unknown_key, return_key}
+      end
     else
-      _ -> {:not_found, host}
+      {:not_found, what}
+    end
+  end
+
+  def host_devices(<<_::binary>> = name) do
+    with %Sally.Host{} = host <- Sally.Host.find_by(name: name),
+         %{devices: devices} <- Sally.Repo.preload(host, :devices) do
+      Enum.map(devices, &Map.get(&1, :ident))
+    else
+      _ -> {:not_found, name}
     end
   end
 
@@ -275,12 +290,7 @@ defmodule Sally do
   * `file:` the firmware file, defaults to `latest.bin`
   """
   def host_ota(<<_::binary>> = name, opts \\ []) do
-    host = Sally.Host.find_by(name: name)
-
-    case host do
-      %{} -> Sally.Host.ota(host, opts) |> Map.get(:name)
-      _ -> {:not_found, name}
-    end
+    host_if_found(name, &Sally.Host.ota(&1, opts))
   end
 
   def host_ota_live(opts \\ []) do
@@ -290,13 +300,7 @@ defmodule Sally do
   end
 
   def host_profile(<<_::binary>> = name, <<_::binary>> = profile) do
-    host = Sally.Host.find_by(name: name)
-
-    case host do
-      %{profile: ^profile} -> :no_change
-      %{} -> Sally.Host.profile(host, profile)
-      _ -> {:not_found, name}
-    end
+    host_if_found(name, &Sally.Host.profile(&1, profile), :profile)
   end
 
   # def host_replace_hardware(opts) when is_list(opts) do
@@ -322,28 +326,17 @@ defmodule Sally do
   """
   @doc since: "0.5.9"
   def host_rename(<<_::binary>> = from, <<_::binary>> = to) do
-    host = Sally.Host.find_by(name: from)
-
-    case host do
-      %{name: ^from} -> Sally.Host.rename(host, to)
-      _ -> {:not_found, from}
-    end
+    host_if_found(from, &Sally.Host.rename(&1, to))
   end
 
   @doc since: "0.7.14"
   def host_restart(<<_::binary>> = name, opts \\ []) do
-    host = Sally.Host.find_by(name: name)
-
-    case host do
-      %{} -> Sally.Host.restart(host, opts) |> Map.get(:name)
-      _ -> {:not_found, name}
-    end
+    host_if_found(name, &Sally.Host.restart(&1, opts))
   end
 
   def host_restart_live(opts \\ []) do
-    hosts = Sally.Host.live(opts)
-
-    Enum.map(hosts, &(Sally.Host.restart(&1, opts) |> Map.get(:name)))
+    Sally.Host.live(opts)
+    |> Enum.map(&(Sally.Host.restart(&1, opts) |> Map.get(:name)))
   end
 
   @doc """
@@ -361,12 +354,7 @@ defmodule Sally do
   """
   @doc since: "0.5.9"
   def host_retire(<<_::binary>> = name) do
-    host = Sally.Host.find_by(name: name)
-
-    case host do
-      %{} -> Sally.Host.retire(host)
-      _ -> {:not_found, name}
-    end
+    host_if_found(name, &Sally.Host.retire(&1))
   end
 
   @doc """
@@ -387,13 +375,8 @@ defmodule Sally do
     Sally.Host.unnamed(opts) |> many_results(opts)
   end
 
-  def host_setup(ident, opts) when is_binary(ident) do
-    host = Sally.Host.find_by(ident: ident)
-
-    case host do
-      %{} -> Sally.Host.setup(host, opts)
-      _ -> {:not_found, ident}
-    end
+  def host_setup(ident, opts) when is_binary(ident) and is_list(opts) do
+    host_if_found(ident, :ident, &Sally.Host.setup(&1, opts), :struct)
   end
 
   def ttl_adjust([<<_::binary>> | _] = names, ttl_ms) when is_integer(ttl_ms) do

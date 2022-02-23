@@ -208,19 +208,17 @@ defmodule SallyTest do
       %{host: %Sally.Host{name: from}} = ctx
       # create unique new name
       to = Sally.HostAid.unique(:name)
-      assert %{name: ^to} = Sally.host_rename(from, to)
+      assert to == Sally.host_rename(from, to)
     end
   end
 
   describe "Sally.host_retire/1" do
     @tag host_add: []
     test "retires a host", ctx do
-      assert %{host: host} = ctx
-      assert %Sally.Host{name: retire_name, ident: retire_ident} = host
+      assert %{host: %{name: name}} = ctx
 
-      assert {:ok, %Sally.Host{} = host} = Sally.host_retire(retire_name)
-
-      assert %{authorized: false, ident: ^retire_ident, reset_reason: "retired"} = host
+      retired_name = Sally.host_retire(name)
+      assert <<"retired"::binary, _::binary>> = retired_name
     end
   end
 

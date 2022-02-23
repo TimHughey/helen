@@ -205,7 +205,7 @@ defmodule Sally.Host do
     name = "retired " <> host.name
     changes = %{authorized: false, name: name, reset_reason: "retired"}
 
-    changeset(host, changes) |> Sally.Repo.update(@returned)
+    changeset(host, changes) |> Sally.Repo.update!(@returned)
   end
 
   @restart_opts [subsystem: "host", filters: ["restart"]]

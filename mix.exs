@@ -3,7 +3,7 @@ defmodule Helen.MixProject do
 
   use Mix.Project
 
-  @vsn "2.3.23"
+  @vsn "2.3.24"
 
   def project do
     [
@@ -91,11 +91,10 @@ defmodule Helen.MixProject do
   defp applications do
     [
       runtime_tools: :permanent,
-      alfred: :permanent,
       betty: :permanent,
-      glow: :permanent,
+      alfred: :permanent,
       sally: :permanent,
-      legacy_db: :permanent,
+      glow: :permanent,
       farm: :permanent
     ]
   end

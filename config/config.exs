@@ -12,6 +12,6 @@ config :logger,
   level: :info,
   compile_time_purge_matching: [[application: :helen, level_lower_than: :info]]
 
-apps = ["betty", "carol", "farm", "glow", "sally", "legacy_db"]
+apps = ["betty", "carol", "farm", "glow", "sally"]
 
 Enum.each(apps, fn app -> import_config "#{app}/config.exs" end)
