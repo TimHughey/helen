@@ -294,7 +294,7 @@ defmodule Sally.Dispatch do
   def halt([<<_::binary>> | _] = parts, %__MODULE__{} = dispatch) do
     # NOTE: prepend the host name (when available), fallback to ident from dispatch
     case dispatch do
-      %{host: %{name: <<_::binary>>} = name} -> ["[", name, "]"] ++ parts
+      %{host: %{name: <<_::binary>> = name}} -> ["[", name, "]"] ++ parts
       %{ident: <<_::binary>> = ident} -> ["[", ident, "]"] ++ parts
       _ -> parts
     end
