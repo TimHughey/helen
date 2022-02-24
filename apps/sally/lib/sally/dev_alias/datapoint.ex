@@ -16,6 +16,7 @@ defmodule Sally.Datapoint do
   end
 
   @returned [returning: true]
+  @shift_opts [:years, :months, :days, :hours, :minutes, :seconds, :milliseconds]
 
   def add([_ | _] = aliases, raw_data, at), do: Enum.map(aliases, &add(&1, raw_data, at))
 
@@ -41,6 +42,28 @@ defmodule Sally.Datapoint do
     |> Ecto.Changeset.validate_number(:relhum, @validate_relhum)
   end
 
+  @cleanup_defaults [days: -1]
+  def cleanup(%Sally.DevAlias{} = dev_alias, opts) do
+    ids = cleanup_query(dev_alias, opts) |> Sally.Repo.all()
+
+    purge(ids, opts)
+  end
+
+  def cleanup_query(%{id: dev_alias_id}, opts) do
+    shift_opts = Keyword.take(opts, @shift_opts)
+
+    shift_opts = if shift_opts == [], do: @cleanup_defaults, else: shift_opts
+
+    before_dt = Timex.now() |> Timex.shift(shift_opts)
+
+    from(dap in __MODULE__,
+      where: dap.dev_alias_id == ^dev_alias_id,
+      where: dap.reading_at <= ^before_dt,
+      order_by: :id,
+      select: dap.id
+    )
+  end
+
   @shift_units [:months, :days, :hours, :minutes, :seconds, :milliseconds]
   def ids_query(opts) do
     query = from(dap in __MODULE__, order_by: :id, select: dap.id)
@@ -57,6 +80,8 @@ defmodule Sally.Datapoint do
         raise("unknown opt: #{inspect(kv)}")
     end)
   end
+
+  def purge([], _opts), do: 0
 
   def purge([id | _] = ids, opts) when is_integer(id) do
     batch_size = opts[:batch_size] || 10

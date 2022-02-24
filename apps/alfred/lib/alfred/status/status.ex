@@ -81,6 +81,7 @@ defmodule Alfred.Status do
       :timeout, chk_map -> timeout(chk_map, args)
       :finalize, chk_map -> finalize(chk_map, args)
     end)
+    |> log()
     |> take_fields(args)
     |> status_returned(args)
   end
@@ -133,6 +134,19 @@ defmodule Alfred.Status do
       %{acked: false} = status -> halt(:busy, status)
       _ -> continue(:ok)
     end
+  end
+
+  @doc false
+  @log_no [:ok, :busy]
+  @log_tags [status: :error, module: __MODULE__]
+  def log(chk_map) do
+    case chk_map do
+      %{rc: rc} when rc in @log_no -> :dont_log
+      %{name: name, rc: _} -> Keyword.put(@log_tags, :name, name) |> Betty.app_error()
+    end
+
+    # NOTE: passthrough the chk_map
+    chk_map
   end
 
   @doc false

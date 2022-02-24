@@ -22,6 +22,7 @@ defmodule Sally.Command do
   end
 
   @returned [returning: true]
+  @shift_opts [:years, :months, :days, :hours, :minutes, :seconds, :milliseconds]
 
   def ack_now(%{id: _id} = cmd) do
     ack_now_cs(cmd, :ack, Timex.now())
@@ -122,20 +123,60 @@ defmodule Sally.Command do
     |> Changeset.unique_constraint(:refid)
   end
 
+  @cleanup_defaults [days: -1]
+  def cleanup(%Sally.DevAlias{} = dev_alias, opts) do
+    # NOTE: don't clean up the latest cmd. important since the latest cmd
+    # could be older than the cleanup timeframe when the dev_alias isn't
+    # sent a command frequently
+    latest_cmd = latest_cmd(dev_alias)
+
+    case latest_cmd do
+      %{id: latest_id} ->
+        ids = cleanup_query(dev_alias, opts) |> Sally.Repo.all()
+
+        Enum.reject(ids, &(&1 == latest_id)) |> purge(opts)
+
+      # NOTE: no latest cmd -- nothing to purge
+      _ ->
+        0
+    end
+  end
+
+  def cleanup_query(%{id: dev_alias_id}, opts) do
+    shift_opts = Keyword.take(opts, @shift_opts)
+
+    shift_opts = if shift_opts == [], do: @cleanup_defaults, else: shift_opts
+
+    before_dt = Timex.now() |> Timex.shift(shift_opts)
+
+    from(cmd in __MODULE__,
+      where: cmd.dev_alias_id == ^dev_alias_id,
+      where: cmd.sent_at <= ^before_dt,
+      order_by: :id,
+      select: cmd.id
+    )
+  end
+
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
   @shift_units [:months, :days, :hours, :minutes, :seconds, :milliseconds]
   def ids_query(opts) do
+    {shift_opts, opts_rest} = Keyword.split(opts, @shift_opts)
+    opts_final = Keyword.put(opts_rest, :shift_opts, shift_opts)
+
     query = from(cmd in __MODULE__, order_by: :id, select: cmd.id)
 
-    Enum.reduce(opts, query, fn
+    Enum.reduce(opts_final, query, fn
       {:dev_alias_id, id}, query ->
         where(query, [cmd], cmd.dev_alias_id == ^id)
 
-      {unit, _val} = shift_tuple, query when unit in @shift_units ->
-        before = Timex.now() |> Timex.shift([shift_tuple])
-        where(query, [cmd], cmd.sent_at <= ^before)
+      {:shift_opts, []}, query ->
+        query
+
+      {:shift_opts, shift_opts}, query ->
+        before_dt = Timex.now() |> Timex.shift(shift_opts)
+        where(query, [cmd], cmd.sent_at <= ^before_dt)
 
       kv, _query ->
         raise("unknown opt: #{inspect(kv)}")
@@ -172,6 +213,8 @@ defmodule Sally.Command do
     Enum.find(pin_data, @default_pin, &match?([^pio, _], &1))
     |> Enum.at(1)
   end
+
+  def purge([], _opts), do: 0
 
   def purge([id | _] = ids, opts) when is_integer(id) do
     batch_size = opts[:batch_size] || 10

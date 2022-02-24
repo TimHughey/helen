@@ -3,6 +3,11 @@ defmodule Sally do
   Documentation for `Sally`.
   """
 
+  @doc since: "0.7.16"
+  def clean_up(:devices, opts) do
+    Sally.Device.cleanup(opts)
+  end
+
   @doc """
   Deletes a DevAlias by name or id
 
@@ -75,12 +80,7 @@ defmodule Sally do
 
   @device_types [:imm, :mut]
   def devalias_names(type) when type in @device_types do
-    mutable = type == :mut
-
-    devices = Sally.Device.find(mutable: mutable) |> Enum.map(&Sally.Device.preload(&1))
-
-    dev_aliases = Enum.reduce(devices, [], fn %{aliases: aliases}, acc -> aliases ++ acc end)
-    Enum.map(dev_aliases, fn %{name: name} -> name end) |> Enum.sort()
+    Sally.DevAlias.names_query(type) |> Sally.Repo.all() |> Enum.sort()
   end
 
   @doc """

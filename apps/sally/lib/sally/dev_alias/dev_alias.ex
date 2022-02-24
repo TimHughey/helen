@@ -71,6 +71,24 @@ defmodule Sally.DevAlias do
     end
   end
 
+  @cleanup_defaults [days: -1]
+  def cleanup(opts) when is_list(opts) do
+    names = names()
+    dev_aliases = Enum.map(names, &load_alias(&1))
+    cleanup_list = Enum.map(dev_aliases, &cleanup(&1, opts))
+
+    Enum.reject(cleanup_list, &match?({_, 0}, elem(&1, 1))) |> Enum.into(%{})
+  end
+
+  def cleanup(%__MODULE__{} = dev_alias, opts) do
+    opts = if opts == [], do: @cleanup_defaults, else: opts
+
+    {nature, module} = nature_module(dev_alias)
+    cleanup = module.cleanup(dev_alias, opts)
+
+    {dev_alias.name, {nature, cleanup}}
+  end
+
   @columns [:id, :name, :pio, :description, :ttl_ms, :device_id, :inserted_at, :updated_at]
   @required [:device_id, :name, :pio]
 
@@ -92,6 +110,23 @@ defmodule Sally.DevAlias do
     |> then(fn dev_alias -> struct(dev_alias, seen_at: dev_alias.updated_at, nature: nature) end)
   end
 
+  def delete(%{id: _device_id, aliases: _} = device) do
+    aliases = load_aliases(device)
+
+    Enum.reduce(aliases, %{}, fn %{name: name} = dev_alias, acc ->
+      {nature, module} = nature_module(dev_alias)
+
+      nature_ids = nature_ids_query(dev_alias) |> Sally.Repo.all()
+
+      purged = if nature_ids != [], do: module.purge(nature_ids, []), else: 0
+      unregister = unregister(dev_alias)
+
+      Sally.Repo.delete(dev_alias)
+
+      Map.put(acc, name, %{nature => purged, :unregister => unregister})
+    end)
+  end
+
   def delete(what) do
     dev_alias = load_alias(what)
 
@@ -102,6 +137,8 @@ defmodule Sally.DevAlias do
     nature_ids = nature_ids_query(dev_alias) |> Sally.Repo.all()
     purged = module.purge(nature_ids, [])
     unregister = unregister(dev_alias)
+
+    Sally.Repo.delete(dev_alias)
 
     {:ok, %{:name => dev_alias.name, nature => purged, :unregister => unregister}}
   end
@@ -164,7 +201,7 @@ defmodule Sally.DevAlias do
   end
 
   def names do
-    from(x in __MODULE__, select: x.name, order_by: x.name) |> Sally.Repo.all()
+    from(x in __MODULE__, select: x.name, order_by: x.name) |> Sally.Repo.all() |> Enum.sort()
   end
 
   def names_begin_with(pattern) when is_binary(pattern) do
@@ -172,6 +209,18 @@ defmodule Sally.DevAlias do
 
     from(x in __MODULE__, where: like(x.name, ^like_string), order_by: x.name, select: x.name)
     |> Sally.Repo.all()
+  end
+
+  def names_query(type) do
+    mutable = type == :mut
+
+    devices_query = from(device in Sally.Device, where: device.mutable == ^mutable)
+
+    from(dev_alias in Sally.DevAlias,
+      join: device in subquery(devices_query),
+      on: device.id == dev_alias.device_id,
+      select: dev_alias.name
+    )
   end
 
   def nature_ids_query(what, opts \\ []) when is_list(opts) do

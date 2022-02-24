@@ -70,6 +70,8 @@ defmodule Rena do
           ttl_ms: pos_integer()
         }
 
+  @tz_default "UTC"
+
   @impl true
   def init(args) do
     state = make_state(args)
@@ -109,7 +111,8 @@ defmodule Rena do
   @impl true
   @tags [:server_name, :name]
   def handle_continue(:tick, %{equipment: equipment, sensor: sensor} = state) do
-    state = struct(state, seen_at: opts(:timezone) |> Timex.now())
+    tz = opts(:timezone) || @tz_default
+    state = struct(state, seen_at: Timex.now(tz))
 
     sensor = Rena.Sensor.freshen(sensor, equipment, opts())
 

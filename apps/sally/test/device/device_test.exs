@@ -6,6 +6,29 @@ defmodule Sally.DeviceTest do
 
   setup [:host_add, :device_add, :dev_alias_add]
 
+  describe "Sally.Device.cleanup/1" do
+    @tag skip: true
+    test "deletes devices, aliases, commands and datapoints using opts" do
+      opts = [hours: -24]
+
+      cleanup_map = Sally.Device.cleanup(opts)
+
+      assert map_size(cleanup_map) == 0 or map_size(cleanup_map) > 1
+    end
+  end
+
+  describe "Sally.Device.cleanup_query/1" do
+    @tag dev_alias_add: [auto: :ds]
+    test "returns query with shift opts applied", ctx do
+      %{dev_alias: %{device_id: want_device_id}} = ctx
+      query = Sally.Device.cleanup_query(milliseconds: -1)
+      device_ids = Sally.Repo.all(query)
+      assert is_list(device_ids)
+
+      assert Enum.any?(device_ids, &match?(%{id: ^want_device_id}, &1))
+    end
+  end
+
   describe "Sally.Device.find/1" do
     @tag host_add: [], device_add: [auto: :pwm]
     test "finds devices of a specific family", ctx do

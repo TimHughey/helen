@@ -31,6 +31,28 @@ defmodule SallyDevAliasTest do
     end
   end
 
+  describe "Sally.DevAlias.cleanup/1" do
+    @tag skip: true
+    test "purges cmds or daps for all DevAlias (default opts)", _ctx do
+      # assert %{dev_alias: %{name: name}} = ctx
+
+      cleanup_map = Sally.DevAlias.cleanup(minutes: -30)
+      assert %{} = cleanup_map
+      assert map_size(cleanup_map) > 0
+    end
+
+    # @tag dev_alias_add: [auto: :pwm, cmds: [history: 30]]
+    # test "deletes a mutable by name (including cmds)", ctx do
+    #   assert %{dev_alias: %{name: name}} = ctx
+    #
+    #   delete = Sally.DevAlias.delete(name)
+    #
+    #   assert {:ok, %{name: ^name, cmds: count}} = delete
+    #
+    #   assert count == 30
+    # end
+  end
+
   describe "Sally.DevAlias.delete/2" do
     @tag dev_alias_add: [auto: :ds, daps: [history: 30]]
     test "deletes an immutable by name (including datapoints)", ctx do

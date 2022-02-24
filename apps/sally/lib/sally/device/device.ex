@@ -27,6 +27,7 @@ defmodule Sally.Device do
   end
 
   @returned [returning: true]
+  @shift_opts [:years, :months, :days, :hours, :minutes, :seconds, :milliseconds]
 
   def changeset(changes, %Host{} = host) when is_map(changes) do
     Ecto.build_assoc(host, :devices) |> changeset(changes)
@@ -40,6 +41,31 @@ defmodule Sally.Device do
     |> Changeset.validate_length(:ident, max: 128)
     |> Changeset.validate_format(:family, ~r/^[pwm]|[ds]|[i2c]$/)
     |> Changeset.validate_number(:pios, greater_than_or_equal_to: 1)
+  end
+
+  def cleanup(opts) do
+    cleanup_query(opts)
+    |> Sally.Repo.all()
+    |> Enum.reduce(%{}, fn device, acc ->
+      deleted_map = Sally.DevAlias.delete(device)
+
+      Map.merge(acc, deleted_map)
+    end)
+  end
+
+  @cleanup_defaults [months: -6]
+  def cleanup_query(opts) when is_list(opts) do
+    shift_opts = Keyword.take(opts, @shift_opts)
+
+    shift_opts = if shift_opts == [], do: @cleanup_defaults, else: shift_opts
+
+    before_dt = Timex.now() |> Timex.shift(shift_opts)
+
+    from(device in __MODULE__,
+      where: device.updated_at <= ^before_dt,
+      order_by: [desc: :updated_at],
+      select: [:id, :ident]
+    )
   end
 
   @columns [:id, :ident, :family, :mutable, :pios, :updated_at, :inserted_at]
@@ -97,7 +123,6 @@ defmodule Sally.Device do
   @insert_opts [on_conflict: {:replace, @replace}, conflict_target: [:ident]] ++ @returned
   def insert_opts, do: @insert_opts
 
-  @shift_opts [:months, :days, :hours, :minutes, :seconds, :milliseconds]
   @latest_steps [:query, :load, :locate, :finalize]
   # NOTE: this can be a very expensive function!!
   def latest(opts \\ []) do
