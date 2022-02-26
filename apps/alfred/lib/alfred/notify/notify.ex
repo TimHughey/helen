@@ -189,7 +189,7 @@ defmodule Alfred.Notify do
 
   @impl true
   def handle_info(:timeout, state) do
-    :ok = log_missing(state)
+    {:ok, _map} = log_missing(state)
     :ok = send_missing_if_needed(state)
 
     update_at(state, :missing, now())
@@ -230,7 +230,9 @@ defmodule Alfred.Notify do
   end
 
   @doc false
-  def log_missing(_state), do: :ok
+  def log_missing(%{name: name}) do
+    Betty.app_error(module: __MODULE__, name: name, missing: true)
+  end
 
   defmacro put_ms(key, val) do
     quote bind_quoted: [key: key, val: val], do: put_in(var!(acc), [:ms, key], val)

@@ -121,6 +121,7 @@ defmodule Alfred.Name do
   end
 
   @doc false
+  @ttl_error_tags [module: __MODULE__, ttl_expired: true, rc: :ttl_expired]
   def ttl_check(%{ttl_ms: ttl_ms, seen_at: at} = info, opts, action) do
     ref_dt = get_in(opts, [:ref_dt])
     ttl_ms = get_in(opts, [:ttl_ms]) || ttl_ms
@@ -132,6 +133,8 @@ defmodule Alfred.Name do
     else
       ms = Timex.diff(ref_dt, at, :millisecond)
       fields = [name: info.name, rc: {:ttl_expired, ms}]
+
+      {:ok, _map} = Betty.app_error([{:name, info.name} | @ttl_error_tags])
 
       case action do
         :execute -> {:halt, struct(Alfred.Execute, fields)}

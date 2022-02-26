@@ -105,6 +105,11 @@ defmodule Alfred.NotifyTest do
       # NOTE: the minimum allowed missing ms is 100
       assert_receive({Alfred, memo}, 200)
       assert %Alfred.Memo{name: ^name, pid: ^pid, ref: ^ref, missing?: true} = memo
+
+      # NOTE: confirm missing app_error was written to Betty
+      tags = Betty.measurement("app_error", :tag_values, want: [:name])
+
+      assert Enum.any?(tags, &match?({:name, ^name}, &1))
     end
   end
 
