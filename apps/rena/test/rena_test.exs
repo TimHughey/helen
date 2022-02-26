@@ -6,8 +6,6 @@ defmodule RenaTest do
 
   setup [:init_add]
 
-  @tz "America/New_York"
-
   describe "Rena.child_spec/3" do
     @tag init_add: [
            equipment: [cmd: "off"],
@@ -105,7 +103,7 @@ defmodule RenaTest do
       valid_when = [valid: 2, total: 4]
       sensor_group = [names: sensor_names, range: range, valid_when: valid_when]
 
-      args_common = [alfred: AlfredSim, timezone: @tz]
+      args_common = [alfred: AlfredSim]
       args = args_common ++ [equipment: equipment, name: name, sensor_group: sensor_group]
 
       state = Rena.make_state(args)

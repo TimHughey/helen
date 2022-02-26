@@ -6,7 +6,7 @@ defmodule Alfred.Track.Metrics do
 
   defstruct interval_ms: 60_000,
             start_at: nil,
-            last_report_at: DateTime.from_unix!(0),
+            last_report_at: Timex.epoch(),
             tracked: 0,
             released: 0,
             timeout: 0,
@@ -80,7 +80,7 @@ defmodule Alfred.Track.Metrics do
   end
 
   @doc false
-  def now, do: DateTime.utc_now()
+  def now, do: Timex.now()
 
   @doc false
   def timeout_ms(%{last_report_at: at, interval_ms: interval_ms}) do

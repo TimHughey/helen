@@ -76,7 +76,7 @@ defmodule Sally.DispatchAid do
     if data == :none, do: raise(":data field missing")
     unless payload == :none, do: IO.warn(":payload field ignored")
 
-    mtime = DateTime.utc_now() |> DateTime.to_unix(:millisecond)
+    mtime = Timex.now() |> DateTime.to_unix(:millisecond)
     # NOTE: default to echo the dispatch, use echo: false to disable
     echo = Map.get(opts_map, :echo, :dispatch)
     common_data = %{echo: echo, mtime: mtime}

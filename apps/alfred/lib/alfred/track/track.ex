@@ -327,7 +327,7 @@ defmodule Alfred.Track do
   end
 
   @doc false
-  def now, do: DateTime.utc_now()
+  def now, do: Timex.now()
 
   @doc false
   def notify?(opts), do: Keyword.get(opts, :cmd_opts, []) |> Keyword.get(:notify_when_released, false)

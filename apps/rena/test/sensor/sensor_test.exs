@@ -2,9 +2,7 @@ defmodule Rena.Sensor2.Test do
   use ExUnit.Case, async: true
   use Rena.TestAid
 
-  @moduletag rena: true, rena_sensor2_test: true
-
-  @tz "America/New_York"
+  @moduletag rena: true, rena_sensor_test: true
 
   setup [:sensor_group_add]
 
@@ -33,7 +31,7 @@ defmodule Rena.Sensor2.Test do
     test "creates accurate summary", ctx do
       assert %{sensor_group: sensor} = ctx
 
-      sensor = Rena.Sensor.tally(sensor, timezone: @tz)
+      sensor = Rena.Sensor.tally(sensor, [])
 
       assert %Rena.Sensor{reading_at: %DateTime{}, tally: tally} = sensor
 
@@ -54,7 +52,7 @@ defmodule Rena.Sensor2.Test do
       assert %{sensor_group: sensor} = ctx
       assert %{equipment: %{name: equipment}} = ctx
 
-      sensor = Rena.Sensor.tally(sensor, timezone: @tz)
+      sensor = Rena.Sensor.tally(sensor, [])
 
       assert %Rena.Sensor{reading_at: %DateTime{}} = sensor
 
@@ -73,7 +71,7 @@ defmodule Rena.Sensor2.Test do
       assert %{sensor_group: sensor} = ctx
       assert %{equipment: %{name: equipment}} = ctx
 
-      sensor = Rena.Sensor.tally(sensor, timezone: @tz)
+      sensor = Rena.Sensor.tally(sensor, [])
 
       assert %Rena.Sensor{reading_at: %DateTime{}} = sensor
 
@@ -93,7 +91,7 @@ defmodule Rena.Sensor2.Test do
       assert %{sensor_group: sensor} = ctx
       assert %{equipment: %{name: equipment}} = ctx
 
-      sensor = Rena.Sensor.tally(sensor, timezone: @tz)
+      sensor = Rena.Sensor.tally(sensor, [])
 
       assert %Rena.Sensor{reading_at: %DateTime{}} = sensor
 

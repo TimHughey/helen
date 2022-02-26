@@ -221,12 +221,12 @@ defmodule Sally.Dispatch do
   @stale_err "data is stale"
   @variance_opt [Sally.Dispatch.Handler, :mtime_variance_ms]
   @variance_ms Application.compile_env(:sally, @variance_opt, 10_000)
-  @unit_ms :millisecond
+  @unit_ms :milliseconds
   @doc false
   def mtime(%{data: data, recv_at: recv_at} = dispatch) do
     mtime = data[:mtime]
-    sent_at = if(mtime, do: DateTime.from_unix!(mtime, @unit_ms), else: nil)
-    ms_diff = if(sent_at, do: DateTime.diff(recv_at, sent_at, @unit_ms), else: nil)
+    sent_at = if(mtime, do: Timex.from_unix(mtime, @unit_ms), else: nil)
+    ms_diff = if(sent_at, do: Timex.diff(recv_at, sent_at, @unit_ms), else: nil)
 
     cond do
       is_nil(sent_at) -> halt(@mtime_err, dispatch)

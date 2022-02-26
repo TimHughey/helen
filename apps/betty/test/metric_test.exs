@@ -54,7 +54,7 @@ defmodule Betty.MetricTest do
     end
 
     test "writes a metric from well-formed opts" do
-      test_tag = DateTime.utc_now() |> to_string()
+      test_tag = Timex.now() |> to_string()
       test_field = :rand.uniform(100_000)
 
       opts = [measurement: "runtime", tags: [test_tag: test_tag], fields: [test_field: test_field]]

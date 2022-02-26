@@ -260,7 +260,7 @@ defmodule Alfred.Notify do
   end
 
   @doc false
-  def now, do: DateTime.utc_now()
+  def now, do: Timex.now()
 
   @doc false
   def notify(%{at: at_map, opts: opts} = state) do
@@ -281,7 +281,7 @@ defmodule Alfred.Notify do
 
   @doc false
   def since_ms(last_at) do
-    last_at = if(last_at == :never, do: DateTime.from_unix!(0), else: last_at)
+    last_at = if(last_at == :never, do: Timex.epoch(), else: last_at)
 
     Timex.diff(now(), last_at)
   end

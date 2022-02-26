@@ -29,14 +29,14 @@ defmodule Alfred.NotifyAid do
     # creates a generic ticket from ticket opts
     %{memo_add: [interval_ms: 10_000]} |> memo_add()
 
-    > `memo_before_dt` is set to `DateTime.utc_now/0` and is often used to
+    > `memo_before_dt` is set to `Timex.now/0` and is often used to
     > compare `last_notify_at`.
   """
   @doc since: "0.2.6"
   def memo_add(%{memo_add: opts} = ctx) when is_list(opts) do
     # Memo tests generally compare the Memo seen_at
     # so include something to compare to in the context
-    now_dt = DateTime.utc_now()
+    now_dt = Timex.now()
 
     # find the source Ticket
     case ctx do
@@ -61,7 +61,7 @@ defmodule Alfred.NotifyAid do
   end
 
   defp make_memo_from_ticket(%Alfred.Ticket{} = ticket, opts) when is_list(opts) do
-    {seen_at, opts_rest} = Keyword.pop(opts, :seen_at, DateTime.utc_now())
+    {seen_at, opts_rest} = Keyword.pop(opts, :seen_at, Timex.now())
     {missing?, _} = Keyword.pop(opts_rest, :missing?, false)
 
     Map.take(ticket, [:name, :ref])

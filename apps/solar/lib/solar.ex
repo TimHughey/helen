@@ -41,9 +41,9 @@ defmodule Solar do
   def event("noon", opts) when is_list(opts) do
     with %DateTime{} = sunrise <- event("sunrise", opts),
          %DateTime{} = sunset <- event("sunset", opts) do
-      half_day_secs = (DateTime.diff(sunset, sunrise, :second) / 2) |> trunc()
+      half_day_secs = (Timex.diff(sunset, sunrise, :second) / 2) |> trunc()
 
-      DateTime.add(sunrise, half_day_secs, :second)
+      Timex.shift(sunrise, seconds: half_day_secs)
     else
       x -> x
     end

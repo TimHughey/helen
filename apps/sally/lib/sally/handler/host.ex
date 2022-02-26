@@ -93,6 +93,7 @@ defmodule Sally.Host.Dispatch do
     {changes, [:seen_at]}
   end
 
+  @tz "America/New_York"
   @months ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
   defp make_build_datetime(%{build_date: build_date, build_time: build_time}) do
     [month_bin, day, year] = String.split(build_date, " ", trim: true)
@@ -101,7 +102,7 @@ defmodule Sally.Host.Dispatch do
     date = Date.new!(String.to_integer(year), month, String.to_integer(day))
     time = Time.from_iso8601!("#{build_time}.49152Z")
 
-    DateTime.new!(date, time, "America/New_York")
+    Timex.now(@tz) |> Timex.set(date: date, time: time)
   end
 
   defp make_build_datetime(_), do: nil

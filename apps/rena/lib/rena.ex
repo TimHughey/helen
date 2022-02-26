@@ -70,8 +70,6 @@ defmodule Rena do
           ttl_ms: pos_integer()
         }
 
-  @tz_default "UTC"
-
   @impl true
   def init(args) do
     state = make_state(args)
@@ -111,8 +109,7 @@ defmodule Rena do
   @impl true
   @tags [:server_name, :name]
   def handle_continue(:tick, %{equipment: equipment, sensor: sensor} = state) do
-    tz = opts(:timezone) || @tz_default
-    state = struct(state, seen_at: Timex.now(tz))
+    state = struct(state, seen_at: Timex.now())
 
     sensor = Rena.Sensor.freshen(sensor, equipment, opts())
 
@@ -194,7 +191,7 @@ defmodule Rena do
 
   @common [:alfred, :id, :opts]
   @name_error "must specify :name to register"
-  @want_fields [:alfred, :server_name, :equipment, :name, :timezone]
+  @want_fields [:alfred, :server_name, :equipment, :name]
   def make_state(args) do
     {common_opts, args_rest} = Keyword.split(args, @common)
 

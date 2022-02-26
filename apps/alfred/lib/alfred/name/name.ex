@@ -130,7 +130,7 @@ defmodule Alfred.Name do
     if Timex.before?(ttl_start_at, at) do
       {:cont, info}
     else
-      ms = DateTime.diff(ref_dt, at, :millisecond)
+      ms = Timex.diff(ref_dt, at, :millisecond)
       fields = [name: info.name, rc: {:ttl_expired, ms}]
 
       case action do
@@ -187,7 +187,7 @@ defmodule Alfred.Name do
 
   @impl true
   def handle_call({:missing?, opts}, _from, state) do
-    at = opts[:ref_dt] || DateTime.utc_now()
+    at = opts[:ref_dt] || Timex.now()
     ttl_ms = opts[:ttl_ms] || state.ttl_ms
 
     diff_greater_than_ms?(at, state.seen_at, ttl_ms)

@@ -26,7 +26,7 @@ defmodule Sally.DeviceAid do
   def add(opts, %Sally.Host{} = host) when is_list(opts) do
     type = opts[:auto] || :ds
     ident = opts[:ident] || unique(type)
-    create_at = DateTime.utc_now()
+    create_at = Timex.now()
 
     params = %{data: %{pins: pin_data(ident)}, host: host, subsystem: subsystem(ident)}
 

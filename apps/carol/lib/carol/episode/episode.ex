@@ -277,13 +277,13 @@ defmodule Carol.Episode do
   end
 
   # (2 of 3) futurizing complete; the episode is in the future (or now)
-  defp futurize(%__MODULE__{} = episode, compare, _opts) when compare in [:lt, :eq] do
+  defp futurize(%__MODULE__{} = episode, compare, _opts) when compare <= 0 do
     episode
   end
 
   # (3 of 3) the episode is in the past; execute calc_at with an accumulator of
   # the count of days into the future.
-  defp futurize(%__MODULE__{} = episode, :gt, opts) do
+  defp futurize(%__MODULE__{} = episode, 1, opts) do
     days = Keyword.get(opts, :futurize_days, 0)
 
     new_episode = calc_at(episode, {:days, days}, opts)
@@ -294,7 +294,7 @@ defmodule Carol.Episode do
     futurize(new_episode, compare, next_futurize_opts)
   end
 
-  defp futurize_compare(%{at: at}, opts), do: DateTime.compare(ref_dt(), at)
+  defp futurize_compare(%{at: at}, opts), do: Timex.compare(ref_dt(), at)
 
   defp humanize_ms(ms) do
     Timex.Duration.from_milliseconds(ms)

@@ -182,9 +182,7 @@ defmodule Rena.Sensor do
   end
 
   def finalize(tally, %{valid_when: valid_when} = sensor, opts) do
-    tz = opts[:timezone] || "Etc/UTC"
-
-    reading_at = Enum.all?(valid_when, &(tally[elem(&1, 0)] >= elem(&1, 1))) && Timex.now(tz)
+    reading_at = Enum.all?(valid_when, &(tally[elem(&1, 0)] >= elem(&1, 1))) && Timex.now()
 
     fields = [reading_at: if(match?(%DateTime{}, reading_at), do: reading_at, else: nil), tally: tally]
     struct(sensor, fields)

@@ -19,7 +19,7 @@ defmodule Alfred.Memo do
 
   def new(base_info, overrides) when is_map(base_info) do
     {at_map, fields_rest} = Map.pop(base_info, :at)
-    seen_at = Map.get(at_map, :seen, DateTime.utc_now())
+    seen_at = Map.get(at_map, :seen, Timex.now())
 
     fields = Map.put(fields_rest, :seen_at, seen_at)
     overrides = Enum.into(overrides, %{})

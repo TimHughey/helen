@@ -1,8 +1,6 @@
 defmodule Rena.InitArgsAid do
   @moduledoc false
 
-  @tz "America/New_York"
-
   def add(%{} = ctx) do
     case ctx do
       %{module: id, init_add: opts} ->
@@ -20,7 +18,7 @@ defmodule Rena.InitArgsAid do
   @add_steps [:equipment, :sensor_group, :name, :opts_generic]
   @want_created [:dev_alias, :equipment, :name, :opts, :sensor, :sensor_group]
   def add([_ | _] = opts) do
-    opts_map = Enum.into(opts, %{timezone: @tz})
+    opts_map = Enum.into(opts, %{})
 
     Enum.reduce(@add_steps, opts_map, fn
       :equipment, opts_map -> equipment(opts_map)
@@ -47,8 +45,8 @@ defmodule Rena.InitArgsAid do
     Map.put(opts_map, :name, name)
   end
 
-  def opts_generic(%{timezone: tz} = opts_map) do
-    generic = [alfred: AlfredSim, echo: :tick, caller: self(), timezone: tz]
+  def opts_generic(%{} = opts_map) do
+    generic = [alfred: AlfredSim, echo: :tick, caller: self()]
     put_in(opts_map, [:opts], generic)
   end
 
