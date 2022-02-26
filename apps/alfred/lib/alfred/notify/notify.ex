@@ -7,6 +7,7 @@ defmodule Alfred.Notify do
   defstruct name: nil,
             ref: nil,
             pid: nil,
+            missing_timer: nil,
             at: %{missing: nil, seen: :never, notified: :never},
             opts: %{ms: %{interval: 60_000, missing: 60_000}, send_missing_msg: false}
 
@@ -94,7 +95,7 @@ defmodule Alfred.Notify do
   end
 
   @doc since: "0.3.0"
-  def unregister(%Alfred.Ticket{ref: ref}), do: unregister(ref)
+  # def unregister(%Alfred.Ticket{ref: ref}), do: unregister(ref)
 
   def unregister(ref) when is_reference(ref) do
     case find_registration(ref) do
@@ -105,6 +106,9 @@ defmodule Alfred.Notify do
 
   def unregister(%{} = map) do
     case map do
+      %Alfred.Ticket{ref: ref} ->
+        unregister(ref)
+
       %{ticket: {:ok, %Alfred.Ticket{} = ticket}} ->
         _ = unregister(ticket)
         Map.put(map, :ticket, :none)
@@ -130,7 +134,7 @@ defmodule Alfred.Notify do
 
     {:ok, _owner_pid} = Registry.register(@registry, reg_key, reg_val)
 
-    {:ok, state, timeout_ms(state, :only_ms)}
+    {:ok, state}
   end
 
   @impl true
@@ -162,12 +166,13 @@ defmodule Alfred.Notify do
     ["unmatched call msg\n  from: ", from, "\n  msg: ", msg, "\n\n", state_binary]
     |> Logger.warn()
 
-    reply(state, :error)
+    reply(:error, state)
   end
 
   @impl true
-  def handle_cast({:notify, %{name: x, seen_at: seen_at}, _opts}, %{name: x} = state) do
+  def handle_cast({:notify, %{seen_at: seen_at}, _opts}, state) do
     state
+    |> missing_timer()
     |> update_at(:seen, seen_at)
     |> notify()
     |> noreply()
@@ -185,14 +190,12 @@ defmodule Alfred.Notify do
   end
 
   @impl true
-  def handle_continue(:missing, state), do: handle_info(:timeout, state)
-
-  @impl true
-  def handle_info(:timeout, state) do
-    {:ok, _map} = log_missing(state)
-    :ok = send_missing_if_needed(state)
+  def handle_info(:missing, state) do
+    {:ok, _map} = missing_log(state)
+    :ok = missing_send_if_needed(state)
 
     update_at(state, :missing, now())
+    |> missing_timer()
     |> noreply()
   end
 
@@ -229,11 +232,6 @@ defmodule Alfred.Notify do
     kind, reason -> format_exception(kind, reason)
   end
 
-  @doc false
-  def log_missing(%{name: name}) do
-    Betty.app_error(module: __MODULE__, name: name, missing: true)
-  end
-
   defmacro put_ms(key, val) do
     quote bind_quoted: [key: key, val: val], do: put_in(var!(acc), [:ms, key], val)
   end
@@ -250,15 +248,42 @@ defmodule Alfred.Notify do
     fields = [name: name, pid: pid, ref: make_ref()]
     state = struct(__MODULE__, fields) |> update_at(:missing, now())
 
-    Enum.reduce(opts_rest, state.opts, fn
-      {:interval_ms, :all = val}, acc -> put_ms(:interval, val)
-      {:interval_ms, x}, acc when is_integer(x) -> put_ms(:interval, x)
-      {:missing_ms, x}, acc when x < 100 -> put_ms(:missing, 100)
-      {:missing_ms, x}, acc when is_integer(x) -> put_ms(:missing, x)
-      {:send_missing_msg, x}, acc when is_boolean(x) -> put_opt(:send_missing_msg, x)
-      _kv, acc -> acc
-    end)
-    |> then(fn opts_map -> struct(state, opts: opts_map) end)
+    opts_map =
+      Enum.reduce(opts_rest, state.opts, fn
+        {:interval_ms, :all = val}, acc -> put_ms(:interval, val)
+        {:interval_ms, x}, acc when is_integer(x) -> put_ms(:interval, x)
+        {:missing_ms, x}, acc when x < 100 -> put_ms(:missing, 100)
+        {:missing_ms, x}, acc when is_integer(x) -> put_ms(:missing, x)
+        {:send_missing_msg, x}, acc when is_boolean(x) -> put_opt(:send_missing_msg, x)
+        _kv, acc -> acc
+      end)
+
+    struct(state, opts: opts_map) |> missing_timer()
+  end
+
+  @doc false
+  @missing_tags [module: __MODULE__, missing: true]
+  def missing_log(%{name: name}) do
+    Betty.app_error([{:name, name} | @missing_tags])
+  end
+
+  @doc false
+  def missing_send_if_needed(%{opts: opts} = state) do
+    case opts do
+      %{send_missing_msg: true} -> Alfred.Memo.send(state, missing?: true)
+      _ -> :ok
+    end
+  end
+
+  @missing :missing
+  @cancel_opts [async: true, info: false]
+  @doc false
+  def missing_timer(%{missing_timer: timer} = state) do
+    is_reference(timer) && Process.cancel_timer(timer, @cancel_opts)
+
+    missing_ms = get_in(state.opts, [:ms, @missing])
+
+    struct(state, missing_timer: Process.send_after(self(), @missing, missing_ms))
   end
 
   @doc false
@@ -274,26 +299,19 @@ defmodule Alfred.Notify do
       is_integer(ms) and since_ms(notified) >= ms -> true
       true -> false
     end
-    |> notify_now(state)
-    |> update_at(:notified, now())
+    |> tap(fn send? -> send? && Alfred.Memo.send(state, []) end)
+
+    update_at(state, :notified, now())
   end
 
-  def notify_now(true = _send?, state), do: tap(state, &Alfred.Memo.send(&1, []))
-  def notify_now(false = _send?, state), do: state
+  # def notify_now(true = _send?, state), do: tap(state, &Alfred.Memo.send(&1, []))
+  # def notify_now(false = _send?, state), do: state
 
   @doc false
   def since_ms(last_at) do
-    last_at = if(last_at == :never, do: Timex.epoch(), else: last_at)
+    last_at = if(last_at == :never, do: Timex.from_unix(0), else: last_at)
 
     Timex.diff(now(), last_at)
-  end
-
-  @doc false
-  def send_missing_if_needed(%{opts: opts} = state) do
-    case opts do
-      %{send_missing_msg: true} -> Alfred.Memo.send(state, missing?: true)
-      _ -> :ok
-    end
   end
 
   @doc false
@@ -305,20 +323,20 @@ defmodule Alfred.Notify do
     call({:get, :ticket}, notifier_pid)
   end
 
-  @doc false
-  @timeout_types [:only_ms, :ensure_timeout]
-  def timeout_ms(state, type) when type in @timeout_types do
-    last_missing_at = state.at.missing
-    missing_ms = state.opts.ms.missing
-
-    elapsed_ms = Timex.diff(now(), last_missing_at, :milliseconds)
-
-    cond do
-      elapsed_ms > missing_ms and type == :ensure_timeout -> {:continue, :missing}
-      elapsed_ms > missing_ms -> 0
-      true -> missing_ms - elapsed_ms
-    end
-  end
+  # @doc false
+  # @timeout_types [:only_ms, :ensure_timeout]
+  # def timeout_ms(state, type) when type in @timeout_types do
+  #   last_missing_at = state.at.missing
+  #   missing_ms = state.opts.ms.missing
+  #
+  #   elapsed_ms = Timex.diff(now(), last_missing_at, :milliseconds)
+  #
+  #   cond do
+  #     elapsed_ms > missing_ms and type == :ensure_timeout -> {:continue, :missing}
+  #     elapsed_ms > missing_ms -> 0
+  #     true -> missing_ms - elapsed_ms
+  #   end
+  # end
 
   @doc false
   def update_at(%{at: at_map} = state, key, %DateTime{} = at) do
@@ -326,15 +344,8 @@ defmodule Alfred.Notify do
   end
 
   @doc false
-  def noreply(state), do: {:noreply, state, timeout_ms(state, :ensure_timeout)}
+  def noreply(state), do: {:noreply, state}
 
   @doc false
-  def reply(rc, %__MODULE__{} = state) do
-    {:reply, rc, state, timeout_ms(state, :ensure_timeout)}
-  end
-
-  @doc false
-  def reply(%__MODULE__{} = state, rc) do
-    {:reply, rc, state, timeout_ms(state, :ensure_timeout)}
-  end
+  def reply(rc, %__MODULE__{} = state), do: {:reply, rc, state}
 end

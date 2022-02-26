@@ -106,7 +106,8 @@ defmodule Alfred.NotifyTest do
       assert_receive({Alfred, memo}, 200)
       assert %Alfred.Memo{name: ^name, pid: ^pid, ref: ^ref, missing?: true} = memo
 
-      # NOTE: confirm missing app_error was written to Betty
+      # NOTE: confirm missing app_error was written to Betty, allow time for write
+      Process.sleep(100)
       tags = Betty.measurement("app_error", :tag_values, want: [:name])
 
       assert Enum.any?(tags, &match?({:name, ^name}, &1))
