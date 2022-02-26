@@ -160,7 +160,6 @@ defmodule Sally.Command do
   @cast_cols [:refid, :cmd, :acked, :orphaned, :rt_latency_us, :sent_at, :acked_at]
   def columns(:cast), do: @cast_cols
 
-  @shift_units [:months, :days, :hours, :minutes, :seconds, :milliseconds]
   def ids_query(opts) do
     {shift_opts, opts_rest} = Keyword.split(opts, @shift_opts)
     opts_final = Keyword.put(opts_rest, :shift_opts, shift_opts)
