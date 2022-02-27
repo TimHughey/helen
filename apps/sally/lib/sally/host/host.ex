@@ -216,6 +216,8 @@ defmodule Sally.Host do
     struct(host, instruct: instruct)
   end
 
+  def setup(:required_opts), do: [:name, :profile]
+
   def setup(%__MODULE__{} = host, opts) do
     changes = Enum.into(opts, %{authorized: true})
 
@@ -232,21 +234,23 @@ defmodule Sally.Host do
     Timex.shift(ref_dt, shift_opts)
   end
 
-  @summary_keys [:name, :ident, :profile, :seen_at]
-  def summary(%__MODULE__{} = host) do
-    Map.take(host, @summary_keys)
-  end
+  def summary(:keys), do: [:name, :ident, :profile, :seen_at]
 
   @unnamed_default [years: -10]
-  def unnamed_defaults, do: @unnamed_default
+  @unnamed_shift_opts [:years, :months, :days, :hours, :minutes, :seconds, :milliseconds]
+  def unnamed(what) when what in [:opts, :defaults] do
+    case what do
+      :opts -> @unnamed_shift_opts
+      :defaults -> @unnamed_default
+    end
+  end
 
   def unnamed(opts) when is_list(opts) do
     unnamed_query(opts) |> Sally.Repo.all()
   end
 
-  @unnamed_shift_opts [:years, :months, :days, :hours, :minutes, :seconds]
   def unnamed_query(opts) do
-    since_dt = since_dt(opts, @unnamed_shift_opts, unnamed_defaults())
+    since_dt = since_dt(opts, unnamed(:opts), unnamed(:defaults))
 
     from(host in __MODULE__,
       where: host.ident == host.name,

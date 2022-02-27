@@ -7,21 +7,31 @@ defmodule Sally.DeviceTest do
   setup [:host_add, :device_add, :dev_alias_add]
 
   describe "Sally.Device.cleanup/1" do
-    @tag skip: true
-    test "deletes devices, aliases, commands and datapoints using opts" do
-      opts = [hours: -24]
+    test "returns empty map when nothing cleaned up" do
+      opts = [years: -10]
 
-      cleanup_map = Sally.Device.cleanup(opts)
+      assert %{} = Sally.Device.cleanup(opts)
+    end
 
-      assert map_size(cleanup_map) == 0 or map_size(cleanup_map) > 1
+    test "cleans up the oldest device" do
+      assert device = Sally.Device.oldest()
+      assert %Sally.Device{ident: ident, updated_at: oldest_at} = device
+
+      shift_ms = Timex.diff(oldest_at, Timex.now(), :milliseconds) + 1
+
+      assert shift_ms < 0
+
+      assert %{} = Sally.Device.cleanup(milliseconds: shift_ms)
+
+      refute Sally.Device.find(ident)
     end
   end
 
-  describe "Sally.Device.cleanup_query/1" do
+  describe "Sally.Device.cleanup/2 (query)" do
     @tag dev_alias_add: [auto: :ds]
     test "returns query with shift opts applied", ctx do
       %{dev_alias: %{device_id: want_device_id}} = ctx
-      query = Sally.Device.cleanup_query(milliseconds: -1)
+      query = Sally.Device.cleanup(:query, milliseconds: -1)
       device_ids = Sally.Repo.all(query)
       assert is_list(device_ids)
 

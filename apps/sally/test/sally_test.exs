@@ -34,12 +34,38 @@ defmodule SallyTest do
 
   describe "Sally.devalias_info/2" do
     @tag dev_alias_add: [auto: :pwm, cmds: [history: 2]]
-    test "Sally.devalias_info/2 returns summarized and raw results", ctx do
+    test "handles known name (raw)", ctx do
+      assert %{dev_alias: %{name: <<_::binary>> = name}} = ctx
+
+      info = Sally.devalias_info(name, :raw)
+      assert %Sally.DevAlias{} = info
+
+      assert %{device: %{host: %{}}, status: %{}} = info
+    end
+
+    @tag dev_alias_add: [auto: :pwm, cmds: [history: 2]]
+    test "handles mutable (summarized)", ctx do
       assert %{dev_alias: %{name: <<_::binary>> = name}} = ctx
 
       info = Sally.devalias_info(name)
 
-      assert %{cmd: _, device: _, host: _, name: ^name} = info
+      assert %{status: _, device: _, host: _, name: ^name} = info
+    end
+
+    @tag dev_alias_add: [auto: :ds, daps: [history: 10]]
+    test "handles immutable (summarized)", ctx do
+      assert %{dev_alias: %{name: <<_::binary>> = name}} = ctx
+
+      info = Sally.devalias_info(name)
+
+      assert %{status: _, device: _, host: _, name: ^name} = info
+    end
+
+    test "handles unknown name" do
+      name = "foobar"
+      info = Sally.devalias_info(name)
+
+      assert {:not_found, ^name} = info
     end
   end
 
@@ -246,6 +272,40 @@ defmodule SallyTest do
       assert %{ident: <<"host."::binary, _::binary>>} = instruct
       assert %{packed_length: packed_length} = instruct
       assert packed_length < 100
+    end
+  end
+
+  describe "Sally.host_setup/2" do
+    test "raises when passed :unnamed and empty setup opts" do
+      assert_raise(RuntimeError, ~r/must/, fn -> Sally.host_setup(:unnamed, []) end)
+    end
+
+    test "handles all hosts named" do
+      opts = [name: "foobar", profile: "pwm", milliseconds: -1]
+      setup = Sally.host_setup(:unnamed, opts)
+
+      assert {:error, :all_named} = setup
+    end
+
+    test "handles when multiple unnamed hosts are found" do
+      fake_ctx = %{host_add: [setup: false]}
+      Enum.each(1..2, fn _ -> assert %{host: %{}} = host_add(fake_ctx) end)
+
+      opts = [name: "foobar", profile: "pwm", milliseconds: -100]
+      setup = Sally.host_setup(:unnamed, opts)
+
+      assert {:error, :multiple} = setup
+    end
+
+    @tag host_add: [setup: false]
+    test "handles ident", ctx do
+      assert %{host: %{ident: <<_::binary>> = ident}} = ctx
+
+      name = Sally.HostAid.unique(:name)
+      opts = [name: name, profile: "pwm"]
+      setup = Sally.host_setup(ident, opts)
+
+      assert %Sally.Host{name: ^name} = setup
     end
   end
 end

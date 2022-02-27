@@ -44,17 +44,19 @@ defmodule Sally.Device do
   end
 
   def cleanup(opts) do
-    cleanup_query(opts)
-    |> Sally.Repo.all()
-    |> Enum.reduce(%{}, fn device, acc ->
+    cleanup = cleanup(:query, opts) |> Sally.Repo.all()
+
+    Enum.reduce(cleanup, %{}, fn device, acc ->
       deleted_map = Sally.DevAlias.delete(device)
+
+      Sally.Repo.delete(device)
 
       Map.merge(acc, deleted_map)
     end)
   end
 
   @cleanup_defaults [months: -6]
-  def cleanup_query(opts) when is_list(opts) do
+  def cleanup(:query, opts) when is_list(opts) do
     shift_opts = Keyword.take(opts, @shift_opts)
 
     shift_opts = if shift_opts == [], do: @cleanup_defaults, else: shift_opts
@@ -183,6 +185,12 @@ defmodule Sally.Device do
 
   def nature(%Sally.Device{mutable: mutable}), do: if(mutable, do: :cmds, else: :datapoints)
 
+  def oldest(:query) do
+    from(device in __MODULE__, order_by: [asc: :updated_at], limit: 1)
+  end
+
+  def oldest, do: oldest(:query) |> Sally.Repo.one()
+
   def pio_check(schema, opts) when is_list(opts) do
     pio = opts[:pio]
 
@@ -217,7 +225,7 @@ defmodule Sally.Device do
     end
   end
 
-  def summary(%Schema{} = x), do: Map.take(x, [:ident, :seen_at])
+  def summary(:keys), do: [:ident, :seen_at]
 
   def ttl_reset(%Sally.DevAlias{device_id: id, updated_at: ttl_at}) do
     Sally.Repo.load(Schema, id: id)

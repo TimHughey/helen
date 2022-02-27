@@ -86,6 +86,8 @@ defmodule Sally.DevAlias do
     {nature, module} = nature_module(dev_alias)
     cleanup = module.cleanup(dev_alias, opts)
 
+    Sally.Repo.delete(dev_alias)
+
     {dev_alias.name, {nature, cleanup}}
   end
 
@@ -163,6 +165,38 @@ defmodule Sally.DevAlias do
 
   def find(id) when is_integer(id), do: Sally.Repo.get_by(__MODULE__, id: id)
   def find(<<_::binary>> = name), do: Sally.Repo.get_by(__MODULE__, name: name)
+
+  @info_defaults [:summary]
+  def info(:defaults), do: @info_defaults
+
+  @info_preload [preload: :device_and_host]
+  @info_opt_error "opts must be :summary || :raw || []"
+  def info(<<_::binary>> = name, opts) do
+    dev_alias = load_alias(name) |> status_lookup(@info_preload)
+
+    return = List.first(opts, :summary)
+
+    cond do
+      return == :summary ->
+        {_nature, nature_module} = nature_module(dev_alias)
+
+        base = Map.take(dev_alias, summary(:keys))
+        device = Map.take(dev_alias.device, Sally.Device.summary(:keys))
+        host = Map.take(dev_alias.device.host, Sally.Host.summary(:keys))
+        status = Map.take(dev_alias.status, nature_module.summary(:keys))
+
+        Map.merge(base, %{device: device, host: host, status: status})
+
+      return == :raw ->
+        dev_alias || {:not_found, name}
+
+      true ->
+        raise(@info_opt_error)
+    end
+  catch
+    _kind, :function_clause ->
+      {:not_found, name}
+  end
 
   @dont_replace [:id, :last_seen_at, :updated_at]
   @replace Enum.reject(@columns, fn x -> x in @dont_replace end)
@@ -288,7 +322,7 @@ defmodule Sally.DevAlias do
     end
   end
 
-  def summary(%{id: _} = x), do: Map.take(x, [:name, :pio, :description, :ttl_ms])
+  def summary(:keys), do: [:name, :pio, :description, :ttl_ms]
 
   def ttl_adjust(what, ttl_ms) do
     changes = %{ttl_ms: ttl_ms}

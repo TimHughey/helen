@@ -52,30 +52,13 @@ defmodule Sally do
 
   """
   @doc since: "0.5.9"
-  @info_preload [preload: :device_and_host]
-  def devalias_info(name, opts \\ [:summary]) when is_binary(name) do
-    with %{nature: _} = dev_alias <- Sally.DevAlias.load_alias(name) do
-      dev_alias = Sally.DevAlias.status_lookup(dev_alias, @info_preload)
 
-      cond do
-        [:summary] == opts ->
-          assoc = %{
-            device: Sally.Device.summary(dev_alias.device),
-            host: Sally.Host.summary(dev_alias.device.host),
-            cmd: Sally.Command.summary(dev_alias.status)
-          }
+  # @devalias_info_defaults Sally.DevAlias.info(:defaults)
 
-          Sally.DevAlias.summary(dev_alias) |> Map.merge(assoc)
+  def devalias_info(<<_::binary>> = name, opts \\ Sally.DevAlias.info(:defaults)) do
+    opts = List.wrap(opts)
 
-        [:raw] == opts ->
-          dev_alias
-
-        true ->
-          {:bad_args, opts}
-      end
-    else
-      nil -> {:not_found, name}
-    end
+    Sally.DevAlias.info(name, opts)
   end
 
   @device_types [:imm, :mut]
@@ -242,7 +225,7 @@ defmodule Sally do
       host = func.(host)
 
       cond do
-        return_key == :struct -> host
+        return_key == :struct and match?({:ok, _}, host) -> elem(host, 1)
         is_map_key(host, return_key) -> Map.get(host, return_key)
         true -> {:unknown_key, return_key}
       end
@@ -371,48 +354,34 @@ defmodule Sally do
   2. `profile: String.t()` profile to assign to host
   """
   @doc since: "0.5.9"
-  def host_setup(:unnamed, opts) do
-    Sally.Host.unnamed(opts) |> many_results(opts)
+  @host_setup_opts Sally.Host.setup(:required_opts)
+  @host_setup_error "opts must include: #{inspect(@host_setup_opts)}"
+  @host_unnamed_defaults Sally.Host.unnamed(:defaults)
+  def host_setup(:unnamed, opts) when is_list(opts) do
+    unnamed_opts = Keyword.take(opts, Sally.Host.unnamed(:opts))
+    setup_opts = Keyword.take(opts, Sally.Host.setup(:required_opts))
+
+    unless setup_opts != [], do: raise(@host_setup_error)
+
+    unnamed_opts = if unnamed_opts == [], do: @host_unnamed_defaults, else: unnamed_opts
+
+    host = Sally.Host.unnamed(unnamed_opts)
+
+    case host do
+      [%{}] -> Sally.Host.setup(host, setup_opts)
+      [_ | _] -> {:error, :multiple}
+      [] -> {:error, :all_named}
+    end
   end
 
-  def host_setup(ident, opts) when is_binary(ident) and is_list(opts) do
+  def host_setup(<<_::binary>> = ident, opts) when is_list(opts) do
+    setup_opts = Keyword.take(opts, Sally.Host.setup(:required_opts))
+    unless setup_opts != [], do: raise(@host_setup_error)
+
     host_if_found(ident, :ident, &Sally.Host.setup(&1, opts), :struct)
   end
 
   def ttl_adjust([<<_::binary>> | _] = names, ttl_ms) when is_integer(ttl_ms) do
     Enum.map(names, &Sally.DevAlias.ttl_adjust(&1, ttl_ms))
-  end
-
-  @doc false
-  @many_error_list "expected a list, got: "
-  @many_error_map "expected a map or struct, got: "
-  @many_error_field "field does not exist in result: "
-  def many_results([], _opts), do: :none
-
-  def many_results(what, opts) do
-    multi? = Keyword.get(opts, :multiple, false)
-    schema? = Keyword.get(opts, :schema, false)
-    key = Keyword.get(opts, :field)
-
-    unless is_list(what), do: raise(@many_error_list <> inspect(what))
-
-    first = List.first(what)
-    unless is_map(first), do: raise(@many_error_map <> inspect(first))
-    unless is_map_key(first, key), do: raise(@many_error_field <> inspect(key))
-
-    case what do
-      [_] ->
-        cond do
-          schema? -> first
-          true -> Map.get(first, key)
-        end
-
-      [%{} | _] ->
-        cond do
-          multi? and schema? -> what
-          multi? -> Enum.map(what, &Map.get(&1, key))
-          true -> :multiple
-        end
-    end
   end
 end

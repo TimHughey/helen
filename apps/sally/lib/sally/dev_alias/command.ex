@@ -132,7 +132,7 @@ defmodule Sally.Command do
 
     case latest_cmd do
       %{id: latest_id} ->
-        ids = cleanup_query(dev_alias, opts) |> Sally.Repo.all()
+        ids = cleanup(:query, dev_alias, opts) |> Sally.Repo.all()
 
         Enum.reject(ids, &(&1 == latest_id)) |> purge(opts)
 
@@ -142,7 +142,7 @@ defmodule Sally.Command do
     end
   end
 
-  def cleanup_query(%{id: dev_alias_id}, opts) do
+  def cleanup(:query, %{id: dev_alias_id}, opts) do
     shift_opts = Keyword.take(opts, @shift_opts)
 
     shift_opts = if shift_opts == [], do: @cleanup_defaults, else: shift_opts
@@ -297,13 +297,7 @@ defmodule Sally.Command do
     end)
   end
 
-  def summary(%{cmd: _, acked: _, sent_at: _} = x) do
-    Map.take(x, [:cmd, :acked, :sent_at])
-  end
-
-  def summary([%{cmd: _} = x | _]), do: summary(x)
-
-  def summary([]), do: %{}
+  def summary(:keys), do: [:cmd, :acked, :sent_at]
 
   @impl true
   def track_now?(%__MODULE__{} = cmd, opts) do

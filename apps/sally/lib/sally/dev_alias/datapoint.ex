@@ -5,7 +5,7 @@ defmodule Sally.Datapoint do
 
   use Ecto.Schema
   require Logger
-  import Ecto.Query, only: [from: 2, join: 4, preload: 3, where: 3]
+  import Ecto.Query, only: [from: 2, preload: 2, where: 3]
 
   schema "datapoint" do
     field(:temp_c, :float)
@@ -44,12 +44,12 @@ defmodule Sally.Datapoint do
 
   @cleanup_defaults [days: -1]
   def cleanup(%Sally.DevAlias{} = dev_alias, opts) do
-    ids = cleanup_query(dev_alias, opts) |> Sally.Repo.all()
+    ids = cleanup(:query, dev_alias, opts) |> Sally.Repo.all()
 
     purge(ids, opts)
   end
 
-  def cleanup_query(%{id: dev_alias_id}, opts) do
+  def cleanup(:query, %{id: dev_alias_id}, opts) do
     shift_opts = Keyword.take(opts, @shift_opts)
 
     shift_opts = if shift_opts == [], do: @cleanup_defaults, else: shift_opts
@@ -122,6 +122,7 @@ defmodule Sally.Datapoint do
     from(dev_alias in Sally.DevAlias,
       as: :dev_alias,
       where: field(dev_alias, ^field) == ^val,
+      group_by: [:id],
       inner_lateral_join:
         latest in subquery(
           from(d in Sally.Datapoint,
@@ -129,7 +130,6 @@ defmodule Sally.Datapoint do
             where: d.reading_at >= ago(^since_ms, "millisecond")
           )
         ),
-      group_by: [:id],
       select_merge: %{
         nature: :datapoints,
         seen_at: dev_alias.updated_at,
@@ -149,15 +149,19 @@ defmodule Sally.Datapoint do
 
     Enum.reduce(opts, query, fn
       {:preload, :device_and_host}, query ->
-        query
-        |> join(:inner, [dev_alias], device in assoc(dev_alias, :device))
-        |> join(:inner, [_, _, device], host in assoc(device, :host))
-        |> preload([_, _, device, host], device: {device, host: host})
+        query |> preload(device: :host)
+
+      # query
+      # |> join(:inner, [dev_alias], device in assoc(dev_alias, :device))
+      # |> join(:inner, [_, _, device], host in assoc(device, :host))
+      # |> preload([_, _, device, host], device: {device, host: host})
 
       _, query ->
         query
     end)
   end
+
+  def summary(:keys), do: [:points, :relhum, :temp_c, :temp_f]
 
   def temp_f(%{temp_c: tc}), do: tc * 1.8 + 32.0
   def temp_f(_), do: nil
