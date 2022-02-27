@@ -113,7 +113,7 @@ defmodule Sally.Datapoint do
     status_query(name, opts) |> Sally.Repo.one()
   end
 
-  @since_ms_default 1000 * 60 * 5
+  @since_ms_default 1000 * 60 * 1
   @temp_f ~s|((avg(?) * 1.8) + 32.0)|
   def status_base_query(val, opts) when is_list(opts) do
     since_ms = Keyword.get(opts, :since_ms, @since_ms_default)
