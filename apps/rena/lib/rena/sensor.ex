@@ -107,9 +107,10 @@ defmodule Rena.Sensor do
 
   def cmd_want(chk_map, %{cmds: cmds, tally: tally}) do
     case tally do
-      %{gt_high: x} when x >= 1 -> cmds.lower
-      %{lt_low: x} when x >= 1 -> cmds.raise
-      %{lt_mid: x} when x >= 1 -> cmds.raise
+      %{gt_high: x} when x > 0 -> cmds.lower
+      %{gt_mid: x} when x > 0 -> cmds.lower
+      %{lt_low: x} when x > 0 -> cmds.raise
+      %{lt_mid: x} when x > 0 -> cmds.raise
       _ -> :no_change
     end
     |> chk_map_put(:cmd_want)

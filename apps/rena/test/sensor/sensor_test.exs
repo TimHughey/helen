@@ -61,10 +61,10 @@ defmodule Rena.Sensor2.Test do
     end
 
     @tag sensor_group_add: [
-           name: [temp_f: 6.0],
-           name: [temp_f: 6.1],
+           name: [temp_f: 4.1],
+           name: [temp_f: 4.1],
            name: [temp_f: 0.5],
-           name: [temp_f: 6.1],
+           name: [temp_f: 4.1],
            equipment: [cmd: "on"]
          ]
     test "handles :no_change case", ctx do
