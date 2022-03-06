@@ -154,10 +154,7 @@ defmodule Rena.Sensor do
   end
 
   def log_cmd(%{equipment: equipment, cmd_have: cmd} = chk_map, opts) do
-    server_name = opts[:server_name]
-    name = opts[:name]
-
-    tags = [equipment: equipment, server_name: server_name, name: name]
+    tags = [equipment: equipment, module: __MODULE__]
     fields = [cmd_have: cmd]
 
     {:ok, _point} = Betty.runtime_metric(tags, fields)
