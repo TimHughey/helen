@@ -106,8 +106,8 @@ defmodule Rena do
     #       equipment notification is received
   end
 
+  @log_tags [:server_name, :name]
   @impl true
-  @tags [:server_name, :name]
   def handle_continue(:tick, %{equipment: equipment, sensor: sensor} = state) do
     state = struct(state, seen_at: Timex.now())
 
@@ -115,28 +115,13 @@ defmodule Rena do
 
     case sensor do
       %{halt_reason: <<_::binary>> = reason} ->
-        {:ok, _points} = Map.take(state, @tags) |> Betty.app_error()
+        {:ok, _points} = Map.take(state, @log_tags) |> Betty.app_error()
         Logger.warn(reason)
 
-      %{next_action: {:no_change = action, _cmd}} ->
-        tags = Map.take(state, @tags) |> Map.merge(%{cmd: :none, action: action})
-        fields = [{:val, "no_change"}]
+      %{next_action: {action, cmd} = next_action} ->
+        if action in [:raise, :lower], do: alfred().execute(name: equipment, cmd: cmd, notify: false)
 
-        {:ok, _point} = Betty.runtime_metric(tags, fields)
-
-        nil
-
-      %{next_action: {:no_match, _cmd} = next_action} ->
-        inspect(next_action) |> Logger.warn()
-
-      %{next_action: {action, cmd}} ->
-        alfred = opts(:alfred)
-        alfred.execute(name: equipment, cmd: cmd, notify: false)
-
-        tags = Map.take(state, @tags) |> Map.merge(%{cmd: cmd, state_change: true})
-        fields = [{:val, to_string(action)}]
-
-        {:ok, _point} = Betty.runtime_metric(tags, fields)
+        log_action(next_action, state)
     end
 
     struct(state, sensor: sensor)
@@ -191,8 +176,17 @@ defmodule Rena do
   end
 
   ## PRIVATE
-  ## PRIVATE
-  ## PRIVATE
+
+  def alfred, do: opts(:alfred)
+
+  def log_action({action, _cmd}, %__MODULE__{} = state) do
+    tags = Map.take(state, @log_tags) |> Map.put(:action_update, true)
+    fields = [{:action, action}]
+
+    {:ok, _point} = Betty.runtime_metric(tags, fields)
+
+    if action == :no_match, do: Logger.warn(inspect(action))
+  end
 
   @common [:alfred, :id, :opts]
   @name_error "must specify :name to register"
