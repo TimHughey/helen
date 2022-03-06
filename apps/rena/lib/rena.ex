@@ -128,8 +128,8 @@ defmodule Rena do
         alfred = opts(:alfred)
         alfred.execute(name: equipment, cmd: cmd, notify: false)
 
-        tags = Map.take(state, @tags) |> Map.put(:cmd, cmd)
-        fields = [{action, true}]
+        tags = Map.take(state, @tags) |> Map.merge(%{cmd: cmd, action: action})
+        fields = if action == :activate, do: [{:val, 0.5}], else: [{:val, -0.5}]
 
         {:ok, _point} = Betty.runtime_metric(tags, fields)
     end
