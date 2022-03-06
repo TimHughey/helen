@@ -66,7 +66,7 @@ defmodule RenaTest do
              name: [temp_f: 5.7],
              name: [temp_f: 5.8],
              name: [rc: :expired],
-             adjust_when: [lower: [gt_mid: 1], raise: [lt_mid: 1]],
+             adjust_when: [lower: [gt_high: 1], raise: [lt_low: 1]],
              valid_when: [valid: 1, total: 3]
            ]
          ]
@@ -86,7 +86,7 @@ defmodule RenaTest do
       # NOTE: receive the second noreply for the first tick
       assert_receive({:noreply, %Rena{server_name: Rena.Use} = state}, 200)
       assert %{register: pid, seen_at: %DateTime{}, sensor: sensor} = state
-      assert %Rena.Sensor{next_action: {:raise, "on"}} = sensor
+      assert %Rena.Sensor{next_action: {:no_change, :none}} = sensor
 
       # ensure the server wasn't restarted by the Supervisor
       assert Process.alive?(pid)

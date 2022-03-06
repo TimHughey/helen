@@ -95,7 +95,7 @@ defmodule Rena.Sensor do
     end
   end
 
-  @next_action_steps [:reading_at, :cmd_have, :action_want, :compare, :finalize]
+  @next_action_steps [:reading_at, :cmd_have, :log_cmd, :action_want, :compare, :finalize]
   @next_action_default {:no_change, :none}
   @next_action_chk_map %{
     cmd_have: nil,
@@ -115,6 +115,7 @@ defmodule Rena.Sensor do
       _step, %{halt_reason: <<_::binary>>} = chk_map -> chk_map
       :action_want, chk_map -> action_want(chk_map, sensor)
       :cmd_have, chk_map -> equipment_status(chk_map, opts_rest)
+      :log_cmd, chk_map -> log_cmd(chk_map, opts_rest)
       :compare, chk_map -> next_action_compare(chk_map, sensor)
     end)
   end
@@ -150,6 +151,18 @@ defmodule Rena.Sensor do
       %{rc: :ok, story: %{cmd: cmd}} -> chk_map_put(cmd, :cmd_have)
       _ -> chk_map_put("invalid status", :halt_reason)
     end
+  end
+
+  def log_cmd(%{equipment: equipment, cmd_have: cmd} = chk_map, opts) do
+    server_name = opts[:server_name]
+    name = opts[:name]
+
+    tags = [equipment: equipment, server_name: server_name, name: name]
+    fields = [cmd_have: cmd]
+
+    {:ok, _point} = Betty.runtime_metric(tags, fields)
+
+    chk_map
   end
 
   @want_fields [:halt_reason, :next_action, :reading_at, :tally]

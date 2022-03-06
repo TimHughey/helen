@@ -118,9 +118,9 @@ defmodule Rena do
         {:ok, _points} = Map.take(state, @tags) |> Betty.app_error()
         Logger.warn(reason)
 
-      %{next_action: {:no_change = action, :none = cmd}} ->
-        tags = Map.take(state, @tags) |> Map.merge(%{cmd: cmd, action: action})
-        fields = [{:val, 0}]
+      %{next_action: {:no_change = action, _cmd}} ->
+        tags = Map.take(state, @tags) |> Map.merge(%{cmd: :none, action: action})
+        fields = [{:val, "no_change"}]
 
         {:ok, _point} = Betty.runtime_metric(tags, fields)
 
@@ -133,8 +133,8 @@ defmodule Rena do
         alfred = opts(:alfred)
         alfred.execute(name: equipment, cmd: cmd, notify: false)
 
-        tags = Map.take(state, @tags) |> Map.merge(%{cmd: cmd, action: action})
-        fields = if action == :raise, do: [{:val, 0.5}], else: [{:val, -0.5}]
+        tags = Map.take(state, @tags) |> Map.merge(%{cmd: cmd, state_change: true})
+        fields = [{:val, to_string(action)}]
 
         {:ok, _point} = Betty.runtime_metric(tags, fields)
     end
