@@ -10,8 +10,8 @@ defmodule Betty.MetricTest do
       # NOTE: first argument is the accumulator
       assert %{fields: refined} = Betty.Metric.map(%{}, :fields, %{fields: data})
 
-      assert %{boolean: "true", float: 1.987, integer: 3} = refined
-      assert map_size(refined) == 4
+      assert %{boolean: "true", float: 1.987, integer: 3, atom: "doctor"} = refined
+      assert map_size(refined) == 5
     end
 
     test "properly converts and filters tags" do
