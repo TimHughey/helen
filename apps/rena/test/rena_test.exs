@@ -66,6 +66,7 @@ defmodule RenaTest do
              name: [temp_f: 5.7],
              name: [temp_f: 5.8],
              name: [rc: :expired],
+             adjust_when: [lower: [gt_mid: 1], raise: [lt_mid: 1]],
              valid_when: [valid: 1, total: 3]
            ]
          ]

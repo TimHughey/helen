@@ -11,11 +11,14 @@ defmodule Rena.Sensor2.Test do
     test "creates new Sensor from fields", ctx do
       assert %{sensor_group: sensor} = ctx
       assert %Rena.Sensor{reading_at: nil, tally: %{}} = sensor
-      assert %{names: names, range: range, valid_when: valid_when} = sensor
+      assert %{names: names} = sensor
       assert Enum.count(names) == 4
       assert Enum.all?(names, &match?(<<_::binary>>, &1))
 
+      assert %{range: range} = sensor
       assert %{low: 1.0, high: 11.0, unit: :temp_f} = range
+
+      assert %{valid_when: valid_when} = sensor
       assert %{valid: 2, total: 4} = valid_when
     end
   end

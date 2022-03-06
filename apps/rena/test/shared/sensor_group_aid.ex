@@ -17,7 +17,10 @@ defmodule Rena.SensorGroupAid do
 
     valid = if names_count == 1, do: 1, else: trunc(names_count / 2)
 
-    fields = [names: names, range: range, valid_when: [valid: valid, total: names_count]]
+    adjust_when = Keyword.take(opts, [:adjust_when])
+    valid_when = [valid: valid, total: names_count]
+    fields = [names: names, range: range, valid_when: valid_when] ++ adjust_when
+
     Rena.Sensor.new(fields)
   end
 
@@ -31,7 +34,7 @@ defmodule Rena.SensorGroupAid do
     end)
   end
 
-  @want_fields [:names, :range, :valid_when, :cmds]
+  @want_fields [:names, :range, :valid_when, :adjust_when, :cmds]
   def to_args(%{} = sensor) do
     fields = Map.take(sensor, @want_fields)
 

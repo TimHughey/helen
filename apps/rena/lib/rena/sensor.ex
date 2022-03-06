@@ -8,6 +8,8 @@ defmodule Rena.Sensor do
   @tally_keys @band_keys ++ [:invalid, :valid, :total]
   @tally_default Enum.into(@tally_keys, %{}, &{&1, 0})
 
+  @adjust_default [lower: [gt_high: 1], raise: [lt_low: 1], default: :no_change]
+
   @valid_when_keys [:total, :valid]
   @valid_when_default Enum.into(@valid_when_keys, %{}, &{&1, 0})
 
@@ -16,6 +18,7 @@ defmodule Rena.Sensor do
   defstruct names: [],
             range: @range_default,
             tally: @tally_default,
+            adjust_when: @adjust_default,
             valid_when: @valid_when_default,
             cmds: @cmds_default,
             halt_reason: :none,
@@ -26,6 +29,7 @@ defmodule Rena.Sensor do
           names: [String.t(), ...],
           range: map(),
           tally: map(),
+          adjust_when: list(),
           valid_when: map(),
           cmds: map(),
           halt_reason: :none | String.t(),
@@ -39,7 +43,9 @@ defmodule Rena.Sensor do
     Rena.Sensor.tally(sensor, opts) |> Rena.Sensor.next_action(equipment, opts)
   end
 
-  @new_keys [:names, :range, :valid_when, :cmds]
+  # New
+
+  @new_keys [:names, :range, :valid_when, :adjust_when, :cmds]
   def new(args) do
     fields_raw = Keyword.take(args, @new_keys)
 
@@ -47,11 +53,28 @@ defmodule Rena.Sensor do
       {:names = key, <<_::binary>> = val} -> {key, List.wrap(val)}
       {:names = key, x} when is_list(x) -> {key, x}
       {:range = key, opts} -> {key, new_range(opts)}
+      # NOTE: adjust_range must be a list; append defaults to ensure on/off at high and low
+      {:adjust_when = key, opts} -> {key, new_adjust_when(opts)}
       {key, val} when is_list(val) -> {key, Enum.into(val, %{})}
       {key, %{} = val} -> {key, val}
       kv -> raise("unrecognized arg: #{inspect(kv)}")
     end)
     |> then(&struct(__MODULE__, &1))
+  end
+
+  @adjust_base [lower: [], raise: [], default: :no_change]
+  def new_adjust_when(opts) do
+    Keyword.take(opts, Keyword.keys(@adjust_base))
+    |> Enum.reduce(@adjust_base, fn
+      # handle :lower and :raise which are list
+      {action, kw_list}, acc when is_list(kw_list) ->
+        default = Keyword.get(@adjust_default, action)
+        put_in(acc, [action], Keyword.merge(default, kw_list))
+
+      # handle the default option
+      {action, opt}, acc when is_atom(opt) ->
+        put_in(acc, [action], opt)
+    end)
   end
 
   @range_error "must specify [:high, :low, :unit] "
@@ -63,9 +86,7 @@ defmodule Rena.Sensor do
     put_in(range, [:mid], (range.high - range.low) / 2 + range.low)
   end
 
-  ###
   ### Next Action
-  ###
 
   defmacro chk_map_put(val, key) do
     quote bind_quoted: [val: val, key: key] do
@@ -74,64 +95,55 @@ defmodule Rena.Sensor do
     end
   end
 
-  @next_action_steps [:reading_at, :cmd_have, :cmd_want, :compare, :finalize]
-  @na_default {:no_change, :none}
-  @na_chk_map %{cmd_have: nil, cmd_want: :no_change, next_action: @na_default, halt_reason: :none}
+  @next_action_steps [:reading_at, :cmd_have, :action_want, :compare, :finalize]
+  @next_action_default {:no_change, :none}
+  @next_action_chk_map %{
+    cmd_have: nil,
+    action_want: :no_change,
+    cmd_want: :no_change,
+    next_action: @next_action_default,
+    halt_reason: :none
+  }
   def next_action(%__MODULE__{} = sensor, <<_::binary>> = equipment, opts) do
     {return_val, opts_rest} = Keyword.pop(opts, :return)
 
-    chk_map = Map.put(@na_chk_map, :equipment, equipment)
+    chk_map = Map.put(@next_action_chk_map, :equipment, equipment)
 
     Enum.reduce(@next_action_steps, chk_map, fn
-      :finalize, chk_map when return_val == :chk_map -> chk_map
-      :finalize, chk_map when return_val == :sensor -> sensor_from_chk_map(chk_map, sensor)
-      :finalize, %{next_action: next_action} -> next_action
+      :finalize, chk_map -> next_action_finalize(chk_map, return_val, sensor)
       :reading_at, chk_map -> check_reading_at(chk_map, sensor)
       _step, %{halt_reason: <<_::binary>>} = chk_map -> chk_map
-      :cmd_have, chk_map -> status_equipment(chk_map, opts_rest)
-      :cmd_want, chk_map -> cmd_want(chk_map, sensor)
+      :action_want, chk_map -> action_want(chk_map, sensor)
+      :cmd_have, chk_map -> equipment_status(chk_map, opts_rest)
       :compare, chk_map -> next_action_compare(chk_map, sensor)
     end)
   end
 
-  def action_for_cmd(want_cmd, cmds) do
-    Enum.find(cmds, {:no_match, want_cmd}, &match?({_action, ^want_cmd}, &1))
+  @actions [:raise, :lower]
+  def action_want(chk_map, %{tally: tally, adjust_when: adjust_when} = _sensor) do
+    {default, adjust_when} = Keyword.pop(adjust_when, :default, :no_change)
+
+    Enum.reduce(adjust_when, default, fn
+      # action decided, spin through rest of adjust_when
+      _, acc when acc in @actions ->
+        acc
+
+      # have an action, compare the action opts to the tally counts
+      {action, [_ | _] = opts}, acc ->
+        want_action? = Enum.any?(opts, fn {key, adjust} -> get_in(tally, [key]) >= adjust end)
+        (want_action? && action) || acc
+    end)
+    |> chk_map_put(:action_want)
   end
 
   def check_reading_at(chk_map, %{reading_at: reading_at}) do
     case reading_at do
       %DateTime{} -> chk_map
-      _ -> chk_map_put("invalid equipment sensor", :halt_reason)
+      _ -> chk_map_put("not enough valid sensors", :halt_reason)
     end
   end
 
-  def cmd_want(chk_map, %{cmds: cmds, tally: tally}) do
-    case tally do
-      %{gt_high: x} when x > 0 -> cmds.lower
-      %{gt_mid: x} when x > 0 -> cmds.lower
-      %{lt_low: x} when x > 0 -> cmds.raise
-      %{lt_mid: x} when x > 0 -> cmds.raise
-      _ -> :no_change
-    end
-    |> chk_map_put(:cmd_want)
-  end
-
-  def next_action_compare(chk_map, %{cmds: cmds} = _sensor) do
-    case chk_map do
-      %{cmd_want: :no_change} -> {:no_change, :none}
-      %{cmd_have: cmd, cmd_want: cmd} -> {:no_change, :none}
-      %{cmd_want: cmd} -> action_for_cmd(cmd, cmds)
-    end
-    |> chk_map_put(:next_action)
-  end
-
-  @want_fields [:halt_reason, :next_action, :reading_at, :tally]
-  def sensor_from_chk_map(chk_map, %__MODULE__{} = sensor) do
-    fields = Map.take(chk_map, @want_fields)
-    struct(sensor, fields)
-  end
-
-  def status_equipment(%{equipment: name} = chk_map, opts) do
+  def equipment_status(%{equipment: name} = chk_map, opts) do
     alfred = opts[:alfred] || Alfred
 
     case alfred.status(name, opts) do
@@ -140,12 +152,29 @@ defmodule Rena.Sensor do
     end
   end
 
-  ###
+  @want_fields [:halt_reason, :next_action, :reading_at, :tally]
+  def next_action_finalize(chk_map, return_val, sensor) do
+    cond do
+      return_val == :chk_map -> chk_map
+      return_val == :sensor -> struct(sensor, Map.take(chk_map, @want_fields))
+      true -> chk_map.next_action
+    end
+  end
+
+  def next_action_compare(%{action_want: action_want} = chk_map, %{cmds: cmds} = _sensor) do
+    cmd_want = Map.get(cmds, action_want, :none)
+
+    cond do
+      action_want == :no_change -> {:no_change, :none}
+      chk_map.cmd_have == cmd_want -> {:no_change, :none}
+      true -> Enum.find(cmds, {:no_match, cmd_want}, &match?({_action, ^cmd_want}, &1))
+    end
+    |> chk_map_put(:next_action)
+  end
+
   ### Tally
-  ###
 
   @tally_steps [:names, :counts, :finalize]
-
   def tally(%__MODULE__{} = sensor, opts) do
     # NOTE: begin with an empty tally
     tally = @tally_default
@@ -185,8 +214,7 @@ defmodule Rena.Sensor do
   def finalize(tally, %{valid_when: valid_when} = sensor, _opts) do
     reading_at = Enum.all?(valid_when, &(tally[elem(&1, 0)] >= elem(&1, 1))) && Timex.now()
 
-    fields = [reading_at: if(match?(%DateTime{}, reading_at), do: reading_at, else: nil), tally: tally]
-    struct(sensor, fields)
+    struct(sensor, reading_at: reading_at, tally: tally)
   end
 
   @name_steps [:status, :compare, :clean]
