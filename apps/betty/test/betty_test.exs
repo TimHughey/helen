@@ -73,7 +73,7 @@ defmodule BettyTest do
       assert {:ok, points} = Betty.app_error(tags)
 
       mod = inspect(__MODULE__)
-      assert %{measurement: "app_error", tags: %{module: ^mod}, fields: %{error: 1}} = points
+      assert %{measurement: "app_error", tags: %{module: ^mod}, fields: %{error: "true"}} = points
     end
   end
 end

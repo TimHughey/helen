@@ -38,7 +38,7 @@ defmodule Betty.Metric do
       :fields ->
         # NOTE: fields must always be an numeric value
         Enum.map(data, fn
-          {k, v} when is_boolean(v) -> {k, if(v, do: 1, else: -1)}
+          {k, v} when is_boolean(v) -> {k, if(v, do: "true", else: "false")}
           {k, v} when is_float(v) -> {k, Float.round(v, 3)}
           {k, v} when is_integer(v) -> {k, v}
           {k, <<_::binary>> = v} -> {k, v}
