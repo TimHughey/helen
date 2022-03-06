@@ -4,7 +4,7 @@ defmodule Rena.MixProject do
   def project do
     [
       app: :rena,
-      version: "0.3.13",
+      version: "0.3.14",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
