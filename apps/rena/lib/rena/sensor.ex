@@ -153,7 +153,7 @@ defmodule Rena.Sensor do
     end
   end
 
-  def log_cmd(%{equipment: equipment, cmd_have: cmd} = chk_map, opts) do
+  def log_cmd(%{equipment: equipment, cmd_have: cmd} = chk_map, _opts) do
     tags = [equipment: equipment, module: __MODULE__]
     fields = [cmd_have: cmd]
 
