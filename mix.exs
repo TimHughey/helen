@@ -33,7 +33,7 @@ defmodule Helen.MixProject do
   # the apps folder.
   defp deps do
     [
-      {:pid_file, "~> 0.2.0"},
+      {:pid_file, "~> 0.2.0", only: :prod},
       {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false}
     ]
   end

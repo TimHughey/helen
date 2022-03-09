@@ -15,7 +15,7 @@ config :logger,
 apps = ["betty", "carol", "farm", "glow", "sally"]
 
 if config_env() == :prod do
-  config :pid_file, file: {:SYSTEM, "PIDFILE"}
+  config :pid_file, file: "/run/helen/helen.pid"
 end
 
 Enum.each(apps, fn app -> import_config "#{app}/config.exs" end)
