@@ -3,7 +3,7 @@ defmodule Helen.MixProject do
 
   use Mix.Project
 
-  @vsn "2.3.36"
+  @vsn "2.3.37"
 
   def project do
     [
@@ -33,6 +33,7 @@ defmodule Helen.MixProject do
   # the apps folder.
   defp deps do
     [
+      {:pid_file, "~> 0.2.0"},
       {:ex_doc, "~> 0.24", only: [:dev, :test], runtime: false}
     ]
   end
