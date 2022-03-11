@@ -81,7 +81,7 @@ defmodule Sally.MixProject do
     [
       {:ecto_sql, "~> 3.1"},
       {:msgpax, "~> 2.0"},
-      {:postgrex, ">= 0.15.0"},
+      {:postgrex, "~> 0.16.2"},
       {:tortoise, "~> 0.9"},
       {:toml, "~> 0.6.1"},
       {:alfred, in_umbrella: true},
