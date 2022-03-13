@@ -9,7 +9,7 @@ defmodule Sally.ImmutableDispatchTest do
   describe "Sally.Immutable.Dispatch processes" do
     @tag dev_alias_opts: [auto: :ds, daps: [history: 1, echo: :dispatch]]
     @tag dispatch_add: [subsystem: "immut", category: "celsius"]
-    test "a status message (celsius)", ctx do
+    test "an ok status message (celsius)", ctx do
       assert %{dispatch: dispatch, dispatch_filter: filter} = ctx
       assert %Sally.Dispatch{txn_info: %{} = create_info} = dispatch
       assert %{dev_alias: %Sally.DevAlias{name: name}} = create_info
@@ -43,6 +43,31 @@ defmodule Sally.ImmutableDispatchTest do
 
       # NOTE: ensure the status story has changed
       refute before_story == after_story
+    end
+
+    @tag captue_log: true
+    @tag dev_alias_opts: [auto: :ds, daps: [history: 1, echo: :dispatch]]
+    @tag dispatch_add: [subsystem: "immut", category: "celsius"]
+    test "an error status message (celsius)", ctx do
+      assert %{dispatch: dispatch, dispatch_filter: filter} = ctx
+      assert %Sally.Dispatch{txn_info: %{} = create_info} = dispatch
+      assert %{dev_alias: %Sally.DevAlias{}} = create_info
+      assert %{dap_history: [_ | _]} = create_info
+
+      assert %{payload: payload, filter_extra: filter_extra} = dispatch
+      assert [device_ident, "ok"] = filter_extra
+      device = Sally.Device.find(device_ident)
+      assert %Sally.Device{ident: ^device_ident} = device
+
+      # NOTE: simulate an error
+      filter = List.replace_at(filter, -1, "error")
+
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
+
+      assert_receive(%Sally.Dispatch{} = dispatch, 500)
+
+      assert %{subsystem: "immut", halt_reason: reason} = dispatch
+      assert reason =~ ~r/immut/
     end
 
     @tag dispatch_add: [subsystem: "immut", category: "celsius", device: [auto: :ds]]

@@ -25,7 +25,15 @@ defmodule Sally.Datapoint do
     |> Map.take([:temp_c, :relhum])
     |> Map.put(:reading_at, at)
     |> changeset(Ecto.build_assoc(a, :datapoints))
-    |> Sally.Repo.insert!(@returned)
+    |> add()
+  end
+
+  def add(%Ecto.Changeset{valid?: true} = cs), do: Sally.Repo.insert!(cs, @returned)
+
+  def add(%Ecto.Changeset{} = cs) do
+    ["\n", inspect(cs, pretty: true)] |> Logger.warn()
+
+    nil
   end
 
   def changeset(changes, %__MODULE__{} = dp) when is_map(changes), do: changeset(dp, changes)
@@ -150,11 +158,6 @@ defmodule Sally.Datapoint do
     Enum.reduce(opts, query, fn
       {:preload, :device_and_host}, query ->
         query |> preload(device: :host)
-
-      # query
-      # |> join(:inner, [dev_alias], device in assoc(dev_alias, :device))
-      # |> join(:inner, [_, _, device], host in assoc(device, :host))
-      # |> preload([_, _, device, host], device: {device, host: host})
 
       _, query ->
         query

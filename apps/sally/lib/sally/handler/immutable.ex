@@ -4,6 +4,8 @@ defmodule Sally.Immutable.Dispatch do
 
   use Sally.Dispatch, subsystem: "immut"
 
+  def accumulate(nil, %{} = map), do: map
+
   def accumulate(what, map) do
     Enum.reduce(what, map, fn {key, val}, acc -> %{acc | key => [val | acc[key]]} end)
   end

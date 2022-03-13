@@ -164,12 +164,12 @@ defmodule Sally.Dispatch do
 
     # NOTE: each step function returns the dispatch
     Enum.reduce(@steps, dispatch, fn
-      :log, %{halt_reason: <<_::binary>>} = dispatch -> tap(dispatch, &Logger.warn(&1.halt_reason))
-      :log, dispatch -> dispatch
+      # NOTE: explictly match on log and finalize to process halt_reason
+      :log, dispatch -> log(dispatch)
       :finalize, dispatch -> finalize(dispatch)
-      # NOTE: prevent remaining steps from executing when halt_reason is set
-      _step, %{halt_reason: <<_::binary>>} = dispatch -> dispatch
-      step, dispatch -> apply(__MODULE__, step, [dispatch])
+      # NOTE: only execute other steps if halt reason == :none
+      step, %{halt_reason: :none} = dispatch -> apply(__MODULE__, step, [dispatch])
+      _step, dispatch -> dispatch
     end)
   end
 
@@ -216,6 +216,16 @@ defmodule Sally.Dispatch do
     end
   end
 
+  def log(%{halt_reason: reason} = dispatch) do
+    case reason do
+      :none -> nil
+      <<_::binary>> -> Logger.warn(reason)
+      other -> inspect(other, pretty: true) |> Logger.warn()
+    end
+
+    dispatch
+  end
+
   @mtime_err "mtime is missing"
   @future_err "data is from the future"
   @stale_err "data is stale"
@@ -232,7 +242,7 @@ defmodule Sally.Dispatch do
       is_nil(sent_at) -> halt(@mtime_err, dispatch)
       ms_diff < @variance_ms * -1 -> halt([@future_err, "#{ms_diff * -1}ms"], dispatch)
       ms_diff >= @variance_ms -> halt([@stale_err, "#{ms_diff}ms"], dispatch)
-      true -> [sent_at: sent_at] |> update(dispatch)
+      true -> update(dispatch, sent_at: sent_at)
     end
   end
 
@@ -294,8 +304,8 @@ defmodule Sally.Dispatch do
   def halt([<<_::binary>> | _] = parts, %__MODULE__{} = dispatch) do
     # NOTE: prepend the host name (when available), fallback to ident from dispatch
     case dispatch do
-      %{host: %{name: <<_::binary>> = name}} -> ["[", name, "]"] ++ parts
-      %{ident: <<_::binary>> = ident} -> ["[", ident, "]"] ++ parts
+      %{host: %{name: <<_::binary>> = name}} -> ["[#{name}]" | parts]
+      %{ident: <<_::binary>> = ident} -> ["[#{ident}]" | parts]
       _ -> parts
     end
     |> Enum.join(" ")

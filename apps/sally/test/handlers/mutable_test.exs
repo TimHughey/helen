@@ -40,7 +40,7 @@ defmodule Sally.MutableDispatchTest do
     @tag capture_log: true
     @tag dev_alias_opts: [auto: :pwm, count: 2, cmds: [history: 3, echo: :dispatch]]
     @tag dispatch_add: [subsystem: "mut", category: "status"]
-    test "a status message", ctx do
+    test "an ok status message", ctx do
       assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
       assert %{payload: payload} = dispatch
       assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
@@ -57,6 +57,27 @@ defmodule Sally.MutableDispatchTest do
       :ok = Enum.each(aligned, fn kv -> assert {{:aligned, <<_::binary>>}, %{}} = kv end)
 
       assert Enum.count(aligned) == 2
+    end
+
+    @tag capture_log: true
+    @tag dev_alias_opts: [auto: :pwm, count: 2, cmds: [history: 3, echo: :dispatch]]
+    @tag dispatch_add: [subsystem: "mut", category: "status"]
+    test "an error status message", ctx do
+      assert %{dispatch: %Sally.Dispatch{} = dispatch} = ctx
+      assert %{payload: payload} = dispatch
+      assert [_ | _] = filter = Sally.DispatchAid.make_filter(dispatch)
+
+      # NOTE: simulate error
+      filter = List.replace_at(filter, -1, "error")
+
+      assert {:ok, %{}} = Sally.Mqtt.Handler.handle_message(filter, payload, %{})
+
+      assert_receive(%Sally.Dispatch{} = dispatch, 150)
+
+      assert %{subsystem: "mut", halt_reason: <<_::binary>> = reason} = dispatch
+      assert reason =~ ~r/mut/
+      assert %{filter_extra: [_device_ident, "error"]} = dispatch
+      assert %{txn_info: :none} = dispatch
     end
   end
 end
