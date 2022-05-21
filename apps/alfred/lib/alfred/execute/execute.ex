@@ -21,7 +21,9 @@ defmodule Alfred.Execute do
 
     quote bind_quoted: [rc: rc, story: story, what: what] do
       chk_map = var!(chk_map)
-      story = if(story == :none, do: :none, else: Map.get(chk_map, :story, %{}) |> Map.merge(story))
+
+      story =
+        if(story == :none, do: :none, else: Map.get(chk_map, :story, %{}) |> Map.merge(story))
 
       {:halt, Map.merge(chk_map, %{what => rc, rc: rc, story: story})}
     end

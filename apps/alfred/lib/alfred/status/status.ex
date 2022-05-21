@@ -71,6 +71,7 @@ defmodule Alfred.Status do
 
   @doc since: "0.3.0"
   @checks [:lookup, :raw, :busy, :timeout, :finalize]
+  @spec status_now(%{:name => any, optional(any) => any}, any) :: binary | struct
   def status_now(%{name: name} = info, args) do
     chk_map = %{info: info, name: name}
 

@@ -12,7 +12,7 @@ config :logger,
   level: :info,
   compile_time_purge_matching: [[application: :helen, level_lower_than: :info]]
 
-apps = ["betty", "carol", "farm", "glow", "sally"]
+apps = ["betty", "carol",  "glow", "sally"]
 
 if config_env() == :prod do
   config :pid_file, file: "/run/helen/helen.pid"
