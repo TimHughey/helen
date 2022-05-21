@@ -96,7 +96,6 @@ defmodule Helen.MixProject do
       alfred: :permanent,
       sally: :permanent,
       glow: :permanent,
-      farm: :permanent,
       pid_file: :permanent
     ]
   end
