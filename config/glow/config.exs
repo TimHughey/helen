@@ -37,8 +37,8 @@ config :glow, Glow,
     greenhouse: [
       equipment: "greenhouse alpha power",
       episodes: [
-        [id: "Sunshine", event: "civil rise", execute: [cmd: "on"]],
-        [id: "Night", event: "civil rise", shift: [hours: 15], execute: [cmd: "off"]]
+        [id: "Sunshine", event: "sunrise", execute: [cmd: "on"]],
+        [id: "Night", event: "sunrise", shift: [hours: 15], execute: [cmd: "off"]]
       ]
     ]
   ]
