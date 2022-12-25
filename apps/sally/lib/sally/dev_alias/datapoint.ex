@@ -172,6 +172,8 @@ defmodule Sally.Datapoint do
   # NOTE: assume the caller (Sally.Immutable.Dispatch has verified the map)
   def write(%{aliases: []}), do: []
 
+  def write_metrics(%{aliases: _, datapoints: nil}), do: []
+
   @measurement "immutables"
   @fields_want [:temp_c, :relhum]
   def write_metrics(%{aliases: aliases, datapoints: datapoints} = map) do

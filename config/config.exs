@@ -7,7 +7,7 @@ config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 # Configures Elixir's Logger
 config :logger,
   #  console: [format: "$level$levelpad $time $metadata$message\n", metadata: [:mfa, :line]],
-  console: [format: "$level$levelpad $time $metadata$message\n", metadata: [:mfa]],
+  console: [format: "$level $time $metadata$message\n", metadata: [:mfa]],
   backends: [:console],
   level: :info,
   compile_time_purge_matching: [[application: :helen, level_lower_than: :info]]
