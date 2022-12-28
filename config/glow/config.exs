@@ -25,15 +25,15 @@ config :glow, Glow,
         [id: "Day", event: "civil rise", execute: [cmd: "off"]]
       ]
     ],
-    front_red_maple: [
-      equipment: "front red maple pwm",
-      defaults: [execute: [params: [type: "random", primes: 8, step: 12, step_ms: 40]]],
-      episodes: [
-        [id: "Evening", event: "sunset", execute: [params: [min: 384, max: 3072]]],
-        [id: "Overnight", event: "astro set", execute: [params: [min: 175, max: 2560]]],
-        [id: "Day", event: "civil rise", execute: [cmd: "off"]]
-      ]
-    ],
+#    front_red_maple: [
+#      equipment: "front red maple pwm",
+#      defaults: [execute: [params: [type: "random", primes: 8, step: 12, step_ms: 40]]],
+#      episodes: [
+#        [id: "Evening", event: "sunset", execute: [params: [min: 384, max: 3072]]],
+#        [id: "Overnight", event: "astro set", execute: [params: [min: 175, max: 2560]]],
+#        [id: "Day", event: "civil rise", execute: [cmd: "off"]]
+#      ]
+#    ],
     greenhouse: [
       equipment: "greenhouse alpha power",
       episodes: [
